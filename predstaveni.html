@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PÁTRAČ — Představení projektu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #070707;
+            --panel: #0c0c0c;
+            --border: #2a2a2a;
+            --text: #8a8a8a;
+            --dim: #505050;
+            --accent: #8a9488;
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'IBM Plex Mono', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.75;
+            min-height: 100%;
+        }
+        body::before {
+            content: '';
+            position: fixed; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 4px);
+        }
+        .wrap {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 32px 20px 48px;
+        }
+        .header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 28px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 18px;
+            letter-spacing: 0.26em;
+            color: #9a9a9a;
+            font-weight: 600;
+        }
+        .header p {
+            margin: 8px 0 0;
+            font-size: 9px;
+            letter-spacing: 0.18em;
+            color: var(--dim);
+            text-transform: uppercase;
+        }
+        .status-line {
+            font-size: 8px;
+            color: var(--dim);
+            letter-spacing: 0.1em;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+        }
+        h2 {
+            font-size: 10px;
+            letter-spacing: 0.14em;
+            color: var(--accent);
+            text-transform: uppercase;
+            margin: 28px 0 10px;
+            font-weight: 600;
+        }
+        p { margin: 0 0 14px; color: var(--text); }
+        .muted { color: var(--dim); font-size: 11px; }
+        .block {
+            border-left: 2px solid #222;
+            padding: 12px 14px;
+            margin: 16px 0;
+            background: var(--panel);
+        }
+        ul {
+            margin: 0 0 14px;
+            padding-left: 18px;
+            color: var(--text);
+        }
+        li { margin-bottom: 6px; }
+        a.back {
+            display: inline-block;
+            margin-top: 32px;
+            font-size: 9px;
+            letter-spacing: 0.12em;
+            color: var(--dim);
+            text-decoration: none;
+            text-transform: uppercase;
+            border: 1px solid var(--border);
+            padding: 10px 16px;
+        }
+        a.back:hover { color: var(--accent); border-color: var(--accent); }
+        .redacted {
+            background: #111;
+            color: #333;
+            padding: 0 4px;
+            letter-spacing: 0.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <header class="header">
+            <h1>PÁTRAČ</h1>
+            <p>Síť znovuobjevení</p>
+        </header>
+
+        <p class="status-line">[ STATUS: VEŘEJNÝ BRIEFING — ÚROVEŇ 1 ]</p>
+
+        <p>Nejsi turista. Jsi <strong>pátrač</strong> — někdo, kdo chodí terénem, zapisuje souřadnice, sdílí signál s ostatními a pomáhá komunitě znovu zmapovat svět, který se po kolapsu přestal dávat brát jako samozřejmost.</p>
+
+        <h2>Co je Pátrač</h2>
+        <p>Mobilní nástroj pro malé skupiny přeživších. Kombinuje taktickou mapu, lokální úkoly a společný deník operací. Není to hra o body — je to hra o <em>polohách, důvěře a paměti míst</em>.</p>
+
+        <div class="block">
+            <p class="muted" style="margin:0;">Základní cyklus operace:</p>
+            <ul>
+                <li>Přijmi rozkaz od postavy nebo vlastní komunity</li>
+                <li>Dojdi na místo fyzicky — GPS potvrzuje realitu</li>
+                <li>Zaměř bod, zapiš stav, sdílej s ostatními</li>
+                <li>Buduj síť útočišť, zdrojů a orientačních bodů</li>
+            </ul>
+        </div>
+
+        <h2>Proč existujeme</h2>
+        <p>Oficiální mapy a sítě selhaly. Zůstaly fragmenty: staré cesty, opuštěné chaty, místa, kde je voda, kde je úkryt, kde <span class="redacted">████</span>. Pátrači tyto fragmenty spojují do živé sítě — bez korporací, bez reklam, bez iluze, že někdo přijde zachránit.</p>
+
+        <h2>Co neřekneme</h2>
+        <p>Tento briefing neobsahuje plný původ viru, identitu všech frakcí ani to, co se stalo s <span class="redacted">CENTRÁLOU</span>. Ty informace se odemykají až v terénu — signálem, který musíš nejdřív zachytit sám.</p>
+
+        <h2>Jak vstoupit</h2>
+        <p>Máš volací ID? Vrať se na terminál a dešifruj signál. Nemáš? Zaregistruj se jako nový pátrač a připoj se ke komunitě, která tě přijme — nebo si jednu založ sám.</p>
+
+        <p class="muted">Skenovací frekvence na letácích otevírá tento briefing. Plná aplikace běží v prohlížeči po přihlášení.</p>
+
+        <a class="back" href="index.html">← ZPĚT NA TERMINÁL</a>
+    </div>
+</body>
+</html>
