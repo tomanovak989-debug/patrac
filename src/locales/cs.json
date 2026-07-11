@@ -1,20 +1,235 @@
-{
-  "gate": {
-    "header": {
-      "title": "PÁTRAČ",
-      "subtitle": "Síť znovuobjevení"
-    },
-    "lang": {
-      "label": "Jazyk"
-    },
-    "login": {
-      "userIdLabel": "Uživatelské ID",
-      "userIdPlaceholder": "identifikátor pátrače",
-      "passwordLabel": "Heslo",
-      "submit": "DEŠIFROVAT A VSTOUPIT",
-      "register": "REGISTRACE NOVÉHO PÁTRAČE",
-      "recover": "[ OBNOVA HESLA PŘES EMAIL ]",
-      "projectStatus": "[STATUS: PŘEDSTAVENÍ PROJEKTU]"
-    }
-  }
+﻿{
+    "gate":  {
+                 "header":  {
+                                "title":  "PÁTRAČ",
+                                "subtitle":  "Síť znovuobjevení"
+                            },
+                 "lang":  {
+                              "label":  "Jazyk"
+                          },
+                 "login":  {
+                               "userIdLabel":  "Uživatelské ID",
+                               "userIdPlaceholder":  "identifikátor pátrače",
+                               "passwordLabel":  "Heslo",
+                               "submit":  "DEŠIFROVAT A VSTOUPIT",
+                               "register":  "REGISTRACE NOVÉHO PÁTRAČE",
+                               "recover":  "[ OBNOVA HESLA PŘES EMAIL ]",
+                               "projectStatus":  "[STATUS: PŘEDSTAVENÍ PROJEKTU]"
+                           },
+                 "register":  {
+                                  "title":  "Nový pátrač — registrace",
+                                  "userIdLabel":  "Uživatelské ID",
+                                  "userIdPlaceholder":  "identifikátor pro přihlášení",
+                                  "emailLabel":  "Email (pouze obnova hesla)",
+                                  "emailPlaceholder":  "např. patrac@signál.cz",
+                                  "passwordLabel":  "Heslo",
+                                  "passwordPlaceholder":  "min. 4 znaky",
+                                  "password2Label":  "Potvrzení hesla",
+                                  "password2Placeholder":  "zopakuj heslo",
+                                  "comLabel":  "Komunita",
+                                  "comCreate":  "Založit novou komunitu",
+                                  "comJoin":  "Připojit se ke komunitě",
+                                  "comNameLabel":  "Název komunity",
+                                  "comNamePlaceholder":  "skupina, která přežila",
+                                  "comNameHint":  "Po registraci obdrží komunita vlastní 5místný kód.",
+                                  "comCodeLabel":  "Kód komunity",
+                                  "comCodePlaceholder":  "např. K7X2M",
+                                  "comCodeHint":  "5 znaků — musíš ho dostat od zakladatele komunity.",
+                                  "playerNameLabel":  "Jméno operativce",
+                                  "playerNamePlaceholder":  "tvoje volací značka",
+                                  "playerNameHint":  "Operativci dostávají vlastní 5místný kód automaticky.",
+                                  "descLabel":  "Poziční popis",
+                                  "descPlaceholder":  "stručný záznam o tobě…",
+                                  "avatarLabel":  "Avatar (foto)",
+                                  "submit":  "ZALOŽIT A VSTOUPIT",
+                                  "back":  "← ZPĚT NA PŘIHLÁŠENÍ"
+                              },
+                 "recover":  {
+                                 "title":  "Obnova hesla",
+                                 "hint":  "Email slouží pouze k obnově přístupu. Nové heslo se uloží k tvému účtu.",
+                                 "emailLabel":  "Registrační email",
+                                 "emailPlaceholder":  "stejný jako při registraci",
+                                 "passwordLabel":  "Nové heslo",
+                                 "passwordPlaceholder":  "min. 4 znaky",
+                                 "password2Label":  "Potvrzení hesla",
+                                 "password2Placeholder":  "zopakuj heslo",
+                                 "submit":  "NASTAVIT NOVÉ HESLO",
+                                 "back":  "← ZPĚT NA PŘIHLÁŠENÍ"
+                             },
+                 "operator":  {
+                                  "title":  "⬡ Operátorský vstup",
+                                  "hint":  "Správa hráčů v záložce Útočiště. Vyžaduje kód komunity a operátorský klíč (sdílen zakladatelem).",
+                                  "comCodeLabel":  "Kód komunity",
+                                  "comCodePlaceholder":  "např. K7X2M",
+                                  "comSelectLabel":  "Nebo vyber komunitu ze seznamu",
+                                  "loadingComs":  "— načítám komunity… —",
+                                  "adminKeyLabel":  "Operátorský klíč",
+                                  "adminKeyPlaceholder":  "operátorský klíč",
+                                  "submit":  "VSTOUPIT DO REŽIMU SPRÁVA",
+                                  "back":  "← ZPĚT NA PŘIHLÁŠENÍ"
+                              },
+                 "errors":  {
+                                "loginMissingId":  "CHYBA: Zadej uživatelské ID.",
+                                "loginUnknownId":  "CHYBA: ID není v síti. Zaregistruj nového pátrače.",
+                                "loginBadPass":  "CHYBA: Heslo nesouhlasí. Signál zamítnut.",
+                                "loginNoPassNeeded":  "CHYBA: Tento účet nemá heslo — nech pole prázdné, nebo resetuj data.",
+                                "recoverBadEmail":  "CHYBA: Zadej platný registrační email.",
+                                "recoverShortPass":  "CHYBA: Nové heslo musí mít alespoň 4 znaky.",
+                                "recoverPassMismatch":  "CHYBA: Hesla se neshodují.",
+                                "recoverUnknownEmail":  "CHYBA: Email není v síti registrován.",
+                                "registerMissingId":  "CHYBA: Uživatelské ID je povinné.",
+                                "registerBadEmail":  "CHYBA: Zadej platný email (např. jmeno@email.cz).",
+                                "registerShortPass":  "CHYBA: Heslo musí mít alespoň 4 znaky.",
+                                "registerPassMismatch":  "CHYBA: Hesla se neshodují.",
+                                "registerMissingName":  "CHYBA: Vyplň jméno operativce.",
+                                "registerMissingComName":  "CHYBA: Zadej název nové komunity.",
+                                "registerBadComCode":  "CHYBA: Kód komunity musí mít 5 znaků.",
+                                "registerUnknownCom":  "CHYBA: Komunita s tímto kódem neexistuje.",
+                                "registerIdTaken":  "CHYBA: Toto ID už v síti existuje.",
+                                "registerEmailTaken":  "CHYBA: Tento email je už registrován.",
+                                "registerFailed":  "CHYBA: Registrace selhala — {{msg}}",
+                                "operatorMissingFields":  "CHYBA: Vyplň kód komunity i operátorský klíč.",
+                                "operatorUnknownCom":  "CHYBA: Komunita s tímto kódem neexistuje.",
+                                "operatorBadKey":  "CHYBA: Operátorský klíč nesouhlasí."
+                            }
+             },
+    "settings":  {
+                     "title":  "Nastavení",
+                     "language":  "Jazyk",
+                     "textSize":  "Velikost textu",
+                     "textDefault":  "Standard",
+                     "textLarge":  "Velké",
+                     "logout":  "⏻ OHLÁSIT SE"
+                 },
+    "quests":  {
+                   "story":  {
+                                 "roxy":  {
+                                              "mapLabel":  "Útočiště",
+                                              "title":  "Nastav si útočiště",
+                                              "desc":  "Dojdi fyzicky na bezpečné místo a ulož tam souřadnice Útočiště."
+                                          },
+                                 "sef":  {
+                                             "mapLabel":  "Zdroj vody",
+                                             "title":  "Najdi zdroj vody",
+                                             "desc":  "Bez vody nepřežijeme. Najdi potok nebo studánku a zaměř polohu."
+                                         },
+                                 "herbert":  {
+                                                 "mapLabel":  "Lesní sklad",
+                                                 "title":  "Lesní shromaždiště",
+                                                 "desc":  "Vyhledej kryté prostranství vhodné pro ukládání zdravotnických zásob."
+                                             },
+                                 "ino":  {
+                                             "mapLabel":  "Cvičiště",
+                                             "title":  "Najdi cvičiště",
+                                             "desc":  "Musíme najít rovnou lesní mýtinu vhodnou pro fyzický trénink."
+                                         },
+                                 "adam":  {
+                                              "mapLabel":  "Rozhledna",
+                                              "title":  "Najdi rozhlednu",
+                                              "desc":  "Dojdi přímo k patě nejbližší vyhlídky a zapiš ji jako pozorovací bod."
+                                          }
+                             },
+                   "random":  {
+                                  "rx_perimeter":  {
+                                                       "title":  "Obchůzka perimetru",
+                                                       "desc":  "Obejdi okolí útočiště po směru hodinových ručiček. Zkontroluj, zda není prolomená linie."
+                                                   },
+                                  "rx_supplies":  {
+                                                      "title":  "Inventura zásob",
+                                                      "desc":  "Projdi sklad a sepiš, co dochází. Bez pořádku padneš jako první."
+                                                  },
+                                  "rx_nightwatch":  {
+                                                        "title":  "Noční hlídka",
+                                                        "desc":  "Vydrž do úsvitu u východní strany tábora. Hlásíš každý podezřelý zvuk."
+                                                    },
+                                  "rx_escape":  {
+                                                    "title":  "Kontrola únikových tras",
+                                                    "desc":  "Projdi všechny naplánované únikové cesty a ověř, že jsou průchozí."
+                                                },
+                                  "rx_rally":  {
+                                                   "title":  "Svolání družiny",
+                                                   "desc":  "Dojdi na mýtinu a ověř, že se tam vejde celá jednotka — záložní shromaždiště."
+                                               },
+                                  "sf_rain":  {
+                                                  "title":  "Sběr dešťové vody",
+                                                  "desc":  "Postav improvizovaný sběrač vody z plachty a nádob. Musí fungovat."
+                                              },
+                                  "sf_filter":  {
+                                                    "title":  "Čištění filtru",
+                                                    "desc":  "Vyčisti nebo vyměň filtrační materiál u zdroje vody. Bez vody jsme mrtví."
+                                                },
+                                  "sf_firewood":  {
+                                                      "title":  "Zásoba paliva",
+                                                      "desc":  "Nasekej a uskladni dřevo na tři dny topení. Práce pro dříče."
+                                                  },
+                                  "sf_stream":  {
+                                                    "title":  "Průzkum potoka",
+                                                    "desc":  "Sleduj potok po proudu a najdi nejčistší místo pro čerpání."
+                                                },
+                                  "sf_repair":  {
+                                                    "title":  "Oprava odvodnění",
+                                                    "desc":  "Oprav kanál nebo výpust, ať se nám nezaplave sklad při dešti."
+                                                },
+                                  "hb_herbs":  {
+                                                   "title":  "Sběr bylin",
+                                                   "desc":  "Najdi místo s hojností léčivých rostlin a nasbírej do sáčku."
+                                               },
+                                  "hb_disinfect":  {
+                                                       "title":  "Dezinfekce zóny",
+                                                       "desc":  "Vyčisti a dezinfikuj pracovní plochu zdravotního koutku."
+                                                   },
+                                  "hb_medcheck":  {
+                                                      "title":  "Kontrola lékárničky",
+                                                      "desc":  "Projdi obsah lékárničky. Prošlé věci vyhoď, chybějící doplň."
+                                                  },
+                                  "hb_pine":  {
+                                                  "title":  "Borovicové pryskyřice",
+                                                  "desc":  "Najdi borovici a nasbírej pryskyřici — na dezinfekci a lepení."
+                                              },
+                                  "hb_dry":  {
+                                                 "title":  "Sušení obvazů",
+                                                 "desc":  "Vysuš čisté látky na slunci a ulož do vodotěsného obalu."
+                                             },
+                                  "in_run":  {
+                                                 "title":  "Okruh vytrvalosti",
+                                                 "desc":  "Uběhni minimálně 3 km v terénu. Tempo drž, flákání neberu."
+                                             },
+                                  "in_track":  {
+                                                   "title":  "Stopování stopy",
+                                                   "desc":  "Najdi a sleduj čerstvou stopu zvěře nebo lidí — zapiš směr."
+                                               },
+                                  "in_night":  {
+                                                   "title":  "Noční průzkum",
+                                                   "desc":  "Projdi okolí za tmy bez svítilny po vyznačené trase. Ostražitost je život."
+                                               },
+                                  "in_climb":  {
+                                                   "title":  "Terénní překážka",
+                                                   "desc":  "Najdi místo s přirozenou překážkou (pařez, skála) a třikrát ji zdolaj."
+                                               },
+                                  "in_cache":  {
+                                                   "title":  "Skrýš zásob",
+                                                   "desc":  "Založ tajnou skrýš mimo hlavní tábor — záloha pro nouzi."
+                                               },
+                                  "ad_scout":  {
+                                                   "title":  "Výzvěda z výšky",
+                                                   "desc":  "Vylez na nejbližší kopec nebo strom a 10 minut pozoruj okolí."
+                                               },
+                                  "ad_weather":  {
+                                                     "title":  "Záznam počasí",
+                                                     "desc":  "Sleduj oblohu a vítr 30 minut. Zapiš, co přijde — bouřka nebo klid."
+                                                 },
+                                  "ad_trail":  {
+                                                   "title":  "Značení stezky",
+                                                   "desc":  "Vyznač bezpečnou stezku páskou nebo kamínky od tábora k cíli."
+                                               },
+                                  "ad_animal":  {
+                                                    "title":  "Stopa zvěře",
+                                                    "desc":  "Najdi místo, kde zvířata pijí nebo se pasou — důležité pro pasti i varování."
+                                                },
+                                  "ad_map":  {
+                                                 "title":  "Kresba okolí",
+                                                 "desc":  "Projdi okolí a doplň do mentální mapy nové cesty, které jsme ještě nešli."
+                                             }
+                              }
+               }
 }

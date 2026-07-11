@@ -31,6 +31,33 @@
             --gate-accent: #8a9488;
             --gate-accent-hover: #a8b4a4;
             --gate-input-bg: #050505;
+            --font-size-base: 10px;
+            --font-size-sm: 9px;
+            --font-size-heading: 14px;
+            --font-size-title: 22px;
+            --text-muted: #b8e8a8;
+            --text-body: #f0fff0;
+            --text-label: #d8ffd0;
+            --touch-min-h: 40px;
+            --touch-pad-y: 10px;
+            --touch-pad-x: 14px;
+        }
+
+        body.contrast-enhanced {
+            --gate-text: #c8d4c4;
+            --gate-text-dim: #a0b0a0;
+            --text-green-dim: #b8f0a8;
+            color: var(--text-body);
+        }
+
+        body.text-size-large {
+            --font-size-base: 16px;
+            --font-size-sm: 14px;
+            --font-size-heading: 20px;
+            --font-size-title: 24px;
+            --touch-min-h: 48px;
+            --touch-pad-y: 14px;
+            --touch-pad-x: 18px;
         }
 
         /* CRT efekt jen na HUD panelech — mapa zůstává čistá */
@@ -291,7 +318,7 @@
         .gate-panel.active { display: block; }
         .gate-form-group { margin-bottom: 14px; }
         .gate-form-group label {
-            display: block; font-size: 8px; color: var(--gate-text);
+            display: block; font-size: var(--font-size-sm); color: var(--gate-text);
             letter-spacing: 0.14em; margin-bottom: 6px;
             text-transform: uppercase;
         }
@@ -309,23 +336,25 @@
         .gate-form-group textarea:focus,
         .gate-form-group select:focus { border-color: var(--gate-accent); color: #ccc; }
         .gate-form-group textarea { resize: vertical; min-height: 52px; }
-        .gate-code-hint { font-size: 8px; color: var(--gate-text-dim); margin-top: 4px; letter-spacing: 0.06em; }
+        .gate-code-hint { font-size: var(--font-size-sm); color: var(--gate-text-dim); margin-top: 4px; letter-spacing: 0.06em; }
         .gate-subpanel { display: none; }
         .gate-subpanel.active { display: block; }
         .gate-btn-primary {
-            width: 100%; padding: 12px 10px; margin-top: 6px;
+            width: 100%; min-height: var(--touch-min-h, 44px);
+            padding: var(--touch-pad-y, 12px) var(--touch-pad-x, 14px); margin-top: 6px;
             background: transparent;
             border: 1px solid var(--gate-accent);
             color: var(--gate-accent);
-            font-family: inherit; font-size: 10px; font-weight: 600;
+            font-family: inherit; font-size: var(--font-size-base, 10px); font-weight: 600;
             letter-spacing: 0.12em; cursor: pointer;
             text-transform: uppercase;
         }
         .gate-btn-primary:active { background: rgba(138,148,136,0.08); color: var(--gate-accent-hover); border-color: var(--gate-accent-hover); }
         .gate-btn-secondary {
-            width: 100%; padding: 10px; margin-top: 10px;
+            width: 100%; min-height: var(--touch-min-h, 44px);
+            padding: var(--touch-pad-y, 10px) var(--touch-pad-x, 14px); margin-top: 10px;
             background: transparent; border: 1px solid #333;
-            color: #555; font-family: inherit; font-size: 9px;
+            color: #888; font-family: inherit; font-size: var(--font-size-sm, 9px);
             letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
         }
         .gate-btn-secondary:active { border-color: #555; color: #777; }
@@ -431,13 +460,79 @@
             border-color: var(--text-green); color: var(--text-green);
             box-shadow: var(--neon-glow);
         }
+        .hud-menu-settings {
+            padding: 8px 12px 10px;
+            border-top: 1px dotted rgba(74, 246, 38, 0.2);
+            border-bottom: 1px dotted rgba(74, 246, 38, 0.2);
+        }
+        .hud-menu-settings-title {
+            font-size: var(--font-size-sm, 9px); color: var(--text-green);
+            font-weight: bold; letter-spacing: 0.1em; margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .hud-menu-setting-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+        }
+        .hud-menu-setting-row:last-child { margin-bottom: 0; }
+        .hud-menu-setting-label {
+            font-size: var(--font-size-sm, 9px); color: var(--text-muted, #b8e8a8);
+            letter-spacing: 0.06em;
+        }
+        .hud-menu-toggle { display: flex; gap: 6px; }
+        .hud-menu-toggle-btn {
+            min-height: 36px; min-width: 44px; padding: 6px 10px;
+            background: rgba(8, 14, 8, 0.9);
+            border: 1px solid rgba(74, 246, 38, 0.35);
+            color: var(--text-green-dim); font-family: inherit;
+            font-size: var(--font-size-sm, 9px); font-weight: bold;
+            cursor: pointer;
+        }
+        body.text-size-large .hud-menu-lang-btn,
+        body.text-size-large .hud-menu-toggle-btn { min-height: 44px; font-size: 16px; }
+        .hud-menu-toggle-btn:hover { border-color: var(--text-green); color: var(--text-green); }
+        .hud-menu-toggle-btn.is-active {
+            border-color: var(--text-green); color: var(--text-green);
+            box-shadow: var(--neon-glow);
+        }
+        .gate-settings-block {
+            margin-top: 12px; padding-top: 10px;
+            border-top: 1px dotted rgba(106, 106, 106, 0.35);
+        }
+        .gate-settings-row {
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; flex-wrap: wrap; margin-top: 6px;
+        }
+        .gate-settings-row button {
+            display: inline-block; margin: 0; padding: 6px 12px; min-height: 36px;
+            border: 1px solid var(--gate-border); background: var(--gate-input-bg);
+            color: var(--gate-text); font-family: inherit; font-size: var(--font-size-sm, 9px);
+            letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
+        }
+        .gate-settings-row button.is-active {
+            border-color: var(--gate-accent); color: var(--gate-accent-hover);
+            box-shadow: 0 0 8px rgba(138, 148, 136, 0.25);
+        }
+        .gate-settings-label { font-size: var(--font-size-sm, 9px); color: var(--gate-text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+        body.text-size-large .mini-profile-card,
+        body.text-size-large .community-profile-card,
+        body.text-size-large .quest-card,
+        body.text-size-large .form-group label,
+        body.text-size-large .gate-register-title,
+        body.text-size-large .hud-menu-user { font-size: 16px !important; }
+        body.text-size-large .quest-section-title,
+        body.text-size-large .gate-header h1 { font-size: 20px !important; }
+        body.text-size-large .gate-subtitle { font-size: 16px !important; }
+        body.text-size-large .gate-form-group input,
+        body.text-size-large .gate-form-group select,
+        body.text-size-large .gate-form-group textarea { font-size: 16px !important; min-height: 44px; }
         .left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; }
         .tool-btn {
             background-color: var(--hud-bg); border: 1px solid var(--hud-border);
-            color: #e8ffe8; width: 50px; height: 42px;
+            color: #e8ffe8; width: 50px; min-height: var(--touch-min-h, 42px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             font-size: 7px; cursor: pointer; font-family: inherit;
-            padding: 4px; line-height: 1.4;
+            padding: var(--touch-pad-y, 6px) 4px; line-height: 1.4;
         }
         .hud-center-panel {
             top: 44px; left: 60px; width: calc(100% - 65px);
@@ -1010,6 +1105,13 @@
                     <button type="button" id="btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
                     <button type="button" id="btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
                 </div>
+                <div class="gate-settings-block" id="gate-settings-block">
+                    <div class="gate-settings-row">
+                        <span class="gate-settings-label" data-i18n="settings.textSize">Velikost textu</span>
+                        <button type="button" id="btn-gate-text-default" onclick="patracSetTextSize('default')" data-i18n="settings.textDefault">Standard</button>
+                        <button type="button" id="btn-gate-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
+                    </div>
+                </div>
             </header>
 
             <div id="gate-login" class="gate-panel active">
@@ -1029,104 +1131,104 @@
             </div>
 
             <div id="gate-operator" class="gate-panel">
-                <p class="gate-register-title" style="color:var(--danger-orange);">⬡ Operátorský vstup</p>
+                <p class="gate-register-title" style="color:var(--danger-orange);" data-i18n="gate.operator.title">⬡ Operátorský vstup</p>
                 <div id="gate-operator-error" class="gate-error"></div>
-                <p style="font-size:9px;color:var(--gate-text-dim);margin:0 0 14px 0;line-height:1.5;">Správa hráčů v záložce Útočiště. Vyžaduje kód komunity a operátorský klíč (sdílen zakladatelem).</p>
+                <p style="font-size:var(--font-size-sm);color:var(--gate-text-dim);margin:0 0 14px 0;line-height:1.5;" data-i18n="gate.operator.hint">Správa hráčů v záložce Útočiště. Vyžaduje kód komunity a operátorský klíč (sdílen zakladatelem).</p>
                 <div class="gate-form-group">
-                    <label for="input-operator-com-code">Kód komunity</label>
-                    <input type="text" id="input-operator-com-code" placeholder="např. K7X2M" maxlength="5" autocapitalize="characters" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,''); onOperatorCommunityCodeInput();">
-                    <label for="select-operator-com" style="margin-top:8px;color:var(--gate-text-dim);">Nebo vyber komunitu ze seznamu</label>
+                    <label for="input-operator-com-code" data-i18n="gate.operator.comCodeLabel">Kód komunity</label>
+                    <input type="text" id="input-operator-com-code" data-i18n-placeholder="gate.operator.comCodePlaceholder" placeholder="např. K7X2M" maxlength="5" autocapitalize="characters" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,''); onOperatorCommunityCodeInput();">
+                    <label for="select-operator-com" style="margin-top:8px;color:var(--gate-text-dim);" data-i18n="gate.operator.comSelectLabel">Nebo vyber komunitu ze seznamu</label>
                     <select id="select-operator-com" onchange="onOperatorCommunitySelectChange()">
-                        <option value="">— načítám komunity… —</option>
+                        <option value="" data-i18n="gate.operator.loadingComs">— načítám komunity… —</option>
                     </select>
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-operator-admin-key">Operátorský klíč</label>
-                    <input type="password" id="input-operator-admin-key" placeholder="operátorský klíč" autocomplete="off">
+                    <label for="input-operator-admin-key" data-i18n="gate.operator.adminKeyLabel">Operátorský klíč</label>
+                    <input type="password" id="input-operator-admin-key" data-i18n-placeholder="gate.operator.adminKeyPlaceholder" placeholder="operátorský klíč" autocomplete="off">
                 </div>
-                <button type="button" class="gate-btn-primary" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="patracOperatorLogin()">VSTOUPIT DO REŽIMU SPRÁVA</button>
-                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')">← ZPĚT NA PŘIHLÁŠENÍ</button>
+                <button type="button" class="gate-btn-primary" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="patracOperatorLogin()" data-i18n="gate.operator.submit">VSTOUPIT DO REŽIMU SPRÁVA</button>
+                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')" data-i18n="gate.operator.back">← ZPĚT NA PŘIHLÁŠENÍ</button>
             </div>
 
             <div id="gate-recover" class="gate-panel">
-                <p class="gate-register-title">Obnova hesla</p>
+                <p class="gate-register-title" data-i18n="gate.recover.title">Obnova hesla</p>
                 <div id="gate-recover-error" class="gate-error"></div>
-                <p style="font-size:9px;color:var(--gate-text-dim);margin:0 0 14px 0;line-height:1.5;">Email slouží pouze k obnově přístupu. Nové heslo se uloží k tvému účtu.</p>
+                <p style="font-size:var(--font-size-sm);color:var(--gate-text-dim);margin:0 0 14px 0;line-height:1.5;" data-i18n="gate.recover.hint">Email slouží pouze k obnově přístupu. Nové heslo se uloží k tvému účtu.</p>
                 <div class="gate-form-group">
-                    <label for="input-recover-email">Registrační email</label>
-                    <input type="email" id="input-recover-email" placeholder="stejný jako při registraci" autocomplete="email">
+                    <label for="input-recover-email" data-i18n="gate.recover.emailLabel">Registrační email</label>
+                    <input type="email" id="input-recover-email" data-i18n-placeholder="gate.recover.emailPlaceholder" placeholder="stejný jako při registraci" autocomplete="email">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-recover-pass">Nové heslo</label>
-                    <input type="password" id="input-recover-pass" placeholder="min. 4 znaky" autocomplete="new-password">
+                    <label for="input-recover-pass" data-i18n="gate.recover.passwordLabel">Nové heslo</label>
+                    <input type="password" id="input-recover-pass" data-i18n-placeholder="gate.recover.passwordPlaceholder" placeholder="min. 4 znaky" autocomplete="new-password">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-recover-pass2">Potvrzení hesla</label>
-                    <input type="password" id="input-recover-pass2" placeholder="zopakuj heslo" autocomplete="new-password">
+                    <label for="input-recover-pass2" data-i18n="gate.recover.password2Label">Potvrzení hesla</label>
+                    <input type="password" id="input-recover-pass2" data-i18n-placeholder="gate.recover.password2Placeholder" placeholder="zopakuj heslo" autocomplete="new-password">
                 </div>
-                <button type="button" class="gate-btn-primary" onclick="patracRecoverPassword()">NASTAVIT NOVÉ HESLO</button>
-                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')">← ZPĚT NA PŘIHLÁŠENÍ</button>
+                <button type="button" class="gate-btn-primary" onclick="patracRecoverPassword()" data-i18n="gate.recover.submit">NASTAVIT NOVÉ HESLO</button>
+                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')" data-i18n="gate.recover.back">← ZPĚT NA PŘIHLÁŠENÍ</button>
             </div>
 
             <div id="gate-register" class="gate-panel">
-                <p class="gate-register-title">Nový pátrač — registrace</p>
+                <p class="gate-register-title" data-i18n="gate.register.title">Nový pátrač — registrace</p>
                 <div class="gate-form-group">
-                    <label for="input-gate-user-id">Uživatelské ID</label>
-                    <input type="text" id="input-gate-user-id" placeholder="identifikátor pro přihlášení" autocomplete="username">
+                    <label for="input-gate-user-id" data-i18n="gate.register.userIdLabel">Uživatelské ID</label>
+                    <input type="text" id="input-gate-user-id" data-i18n-placeholder="gate.register.userIdPlaceholder" placeholder="identifikátor pro přihlášení" autocomplete="username">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-gate-email">Email (pouze obnova hesla)</label>
-                    <input type="email" id="input-gate-email" placeholder="např. patrac@signál.cz" autocomplete="email">
+                    <label for="input-gate-email" data-i18n="gate.register.emailLabel">Email (pouze obnova hesla)</label>
+                    <input type="email" id="input-gate-email" data-i18n-placeholder="gate.register.emailPlaceholder" placeholder="např. patrac@signál.cz" autocomplete="email">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-gate-password">Heslo</label>
-                    <input type="password" id="input-gate-password" placeholder="min. 4 znaky" autocomplete="new-password">
+                    <label for="input-gate-password" data-i18n="gate.register.passwordLabel">Heslo</label>
+                    <input type="password" id="input-gate-password" data-i18n-placeholder="gate.register.passwordPlaceholder" placeholder="min. 4 znaky" autocomplete="new-password">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-gate-password2">Potvrzení hesla</label>
-                    <input type="password" id="input-gate-password2" placeholder="zopakuj heslo" autocomplete="new-password">
+                    <label for="input-gate-password2" data-i18n="gate.register.password2Label">Potvrzení hesla</label>
+                    <input type="password" id="input-gate-password2" data-i18n-placeholder="gate.register.password2Placeholder" placeholder="zopakuj heslo" autocomplete="new-password">
                 </div>
                 <div class="gate-divider"></div>
                 <div class="gate-form-group">
-                    <label for="input-com-mode">Komunita</label>
+                    <label for="input-com-mode" data-i18n="gate.register.comLabel">Komunita</label>
                     <select id="input-com-mode" onchange="onRegComModeChange()">
-                        <option value="create">Založit novou komunitu</option>
-                        <option value="join">Připojit se ke komunitě</option>
+                        <option value="create" data-i18n="gate.register.comCreate">Založit novou komunitu</option>
+                        <option value="join" data-i18n="gate.register.comJoin">Připojit se ke komunitě</option>
                     </select>
                 </div>
                 <div id="reg-com-create" class="gate-subpanel active">
                     <div class="gate-form-group">
-                        <label for="input-com-name">Název komunity</label>
-                        <input type="text" id="input-com-name" placeholder="skupina, která přežila">
-                        <p class="gate-code-hint">Po registraci obdrží komunita vlastní 5místný kód.</p>
+                        <label for="input-com-name" data-i18n="gate.register.comNameLabel">Název komunity</label>
+                        <input type="text" id="input-com-name" data-i18n-placeholder="gate.register.comNamePlaceholder" placeholder="skupina, která přežila">
+                        <p class="gate-code-hint" data-i18n="gate.register.comNameHint">Po registraci obdrží komunita vlastní 5místný kód.</p>
                     </div>
                 </div>
                 <div id="reg-com-join" class="gate-subpanel">
                     <div class="gate-form-group">
-                        <label for="input-com-code">Kód komunity</label>
-                        <input type="text" id="input-com-code" placeholder="např. K7X2M" maxlength="5" autocapitalize="characters" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
-                        <p class="gate-code-hint">5 znaků — musíš ho dostat od zakladatele komunity.</p>
+                        <label for="input-com-code" data-i18n="gate.register.comCodeLabel">Kód komunity</label>
+                        <input type="text" id="input-com-code" data-i18n-placeholder="gate.register.comCodePlaceholder" placeholder="např. K7X2M" maxlength="5" autocapitalize="characters" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                        <p class="gate-code-hint" data-i18n="gate.register.comCodeHint">5 znaků — musíš ho dostat od zakladatele komunity.</p>
                     </div>
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-player-name">Jméno operativce</label>
-                    <input type="text" id="input-player-name" placeholder="tvoje volací značka">
-                    <p class="gate-code-hint">Operativci dostávají vlastní 5místný kód automaticky.</p>
+                    <label for="input-player-name" data-i18n="gate.register.playerNameLabel">Jméno operativce</label>
+                    <input type="text" id="input-player-name" data-i18n-placeholder="gate.register.playerNamePlaceholder" placeholder="tvoje volací značka">
+                    <p class="gate-code-hint" data-i18n="gate.register.playerNameHint">Operativci dostávají vlastní 5místný kód automaticky.</p>
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-desc">Poziční popis</label>
-                    <textarea id="input-desc" rows="2" placeholder="stručný záznam o tobě…"></textarea>
+                    <label for="input-desc" data-i18n="gate.register.descLabel">Poziční popis</label>
+                    <textarea id="input-desc" rows="2" data-i18n-placeholder="gate.register.descPlaceholder" placeholder="stručný záznam o tobě…"></textarea>
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-file">Avatar (foto)</label>
+                    <label for="input-file" data-i18n="gate.register.avatarLabel">Avatar (foto)</label>
                     <input type="file" id="input-file" accept="image/*" onchange="previewImage(this)">
                 </div>
                 <div style="display:flex; justify-content:center; margin: 8px 0 12px;">
                     <div class="avatar-box" id="avatar-setup-preview" style="border-color:#333; color:#444; box-shadow:none;">NO DATA</div>
                 </div>
                 <div id="gate-register-error" class="gate-error"></div>
-                <button type="button" class="gate-btn-primary" id="btn-register-submit" onclick="saveProfileAndLaunch()">ZALOŽIT A VSTOUPIT</button>
-                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')">← ZPĚT NA PŘIHLÁŠENÍ</button>
+                <button type="button" class="gate-btn-primary" id="btn-register-submit" onclick="saveProfileAndLaunch()" data-i18n="gate.register.submit">ZALOŽIT A VSTOUPIT</button>
+                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')" data-i18n="gate.register.back">← ZPĚT NA PŘIHLÁŠENÍ</button>
             </div>
         </div>
     </div>
@@ -1141,11 +1243,24 @@
             <span>PÁTRAČ</span>
             <div id="hud-menu-dropdown" class="hud-menu-dropdown">
                 <div class="hud-menu-user" id="hud-menu-user-id">—</div>
-                <button type="button" class="hud-menu-item" onclick="patracLogout()">⏻ OHLÁSIT SE</button>
-                <div class="hud-menu-lang">
-                    <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
-                    <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
+                <div class="hud-menu-settings" id="hud-menu-settings">
+                    <div class="hud-menu-settings-title" data-i18n="settings.title">Nastavení</div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.language">Jazyk</span>
+                        <div class="hud-menu-lang">
+                            <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
+                            <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
+                        </div>
+                    </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.textSize">Velikost textu</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-text-default" onclick="patracSetTextSize('default')" data-i18n="settings.textDefault">Standard</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
+                        </div>
+                    </div>
                 </div>
+                <button type="button" class="hud-menu-item" onclick="patracLogout()" data-i18n="settings.logout">⏻ OHLÁSIT SE</button>
             </div>
         </div>
         <div style="color:var(--text-green)" id="gps-status-text">● DETEKCE GPS SIGNÁLU...</div>
@@ -2254,7 +2369,9 @@
                 }
             }
             if (!q) return null;
-            return getQuestWithReq(q);
+            q = getQuestWithReq(q);
+            if (window.patracTranslateQuest) q = window.patracTranslateQuest(q);
+            return q;
         }
 
         function getQuestReqOverrides() {
@@ -2589,7 +2706,10 @@
             var limit = Math.min(profile.missionLog.length, 20);
             for (var i = 0; i < limit; i++) {
                 var m = profile.missionLog[i];
-                html += '<div class="mission-log-entry">☣️ ' + m.char + ': ' + m.title + ' <span style="color:#555;">(' + m.date + ')</span></div>';
+                var q = m.questId ? getQuestById(m.questId) : null;
+                var title = q ? q.title : (m.title || '—');
+                var charLabel = q ? (q.char || m.char) : (m.char || 'Mise');
+                html += '<div class="mission-log-entry">☣️ ' + charLabel + ': ' + title + ' <span style="color:#888;">(' + m.date + ')</span></div>';
             }
             el.innerHTML = html;
         }
@@ -2986,12 +3106,12 @@
         function getActiveQuestsList() {
             var list = [];
             for (var k in gameQuests) {
-                var q = getQuestWithReq(gameQuests[k]);
+                var q = getQuestById(gameQuests[k].id) || getQuestWithReq(gameQuests[k]);
                 if (isQuestActive(q)) list.push(q);
             }
             var randomQuests = getRandomQuestsList();
             for (var r = 0; r < randomQuests.length; r++) {
-                var rq = getQuestWithReq(randomQuests[r]);
+                var rq = getQuestById(randomQuests[r].id) || getQuestWithReq(randomQuests[r]);
                 if (isQuestActive(rq)) list.push(rq);
             }
             var customQuests = getSafeJSON('custom_quests_list');
@@ -4721,16 +4841,16 @@
             var comCode = (document.getElementById('input-operator-com-code').value || '').trim().toUpperCase();
             var adminKey = (document.getElementById('input-operator-admin-key').value || '').trim();
             if (!comCode || !adminKey) {
-                showGateError('gate-operator-error', 'CHYBA: Vyplň kód komunity i operátorský klíč.');
+                showGateError('gate-operator-error', 'gate.errors.operatorMissingFields');
                 return;
             }
             var comm = findCommunityByCode(comCode);
             if (!comm) {
-                showGateError('gate-operator-error', 'CHYBA: Komunita s tímto kódem neexistuje.');
+                showGateError('gate-operator-error', 'gate.errors.operatorUnknownCom');
                 return;
             }
             if (!verifyOperatorAdminKey(adminKey)) {
-                showGateError('gate-operator-error', 'CHYBA: Operátorský klíč nesouhlasí.');
+                showGateError('gate-operator-error', 'gate.errors.operatorBadKey');
                 return;
             }
             isOperatorMode = true;
@@ -5637,20 +5757,20 @@
             var pass = document.getElementById('input-recover-pass').value;
             var pass2 = document.getElementById('input-recover-pass2').value;
             if (!isValidEmail(email)) {
-                showGateError('gate-recover-error', 'CHYBA: Zadej platný registrační email.');
+                showGateError('gate-recover-error', 'gate.errors.recoverBadEmail');
                 return;
             }
             if (pass.length < 4) {
-                showGateError('gate-recover-error', 'CHYBA: Nové heslo musí mít alespoň 4 znaky.');
+                showGateError('gate-recover-error', 'gate.errors.recoverShortPass');
                 return;
             }
             if (pass !== pass2) {
-                showGateError('gate-recover-error', 'CHYBA: Hesla se neshodují.');
+                showGateError('gate-recover-error', 'gate.errors.recoverPassMismatch');
                 return;
             }
             var found = findAccountByEmail(email);
             if (!found) {
-                showGateError('gate-recover-error', 'CHYBA: Email není v síti registrován.');
+                showGateError('gate-recover-error', 'gate.errors.recoverUnknownEmail');
                 return;
             }
             var accounts = getPatracAccounts();
@@ -5660,9 +5780,18 @@
             switchGatePage('gate-login');
         }
 
-        function showGateError(elId, msg) {
+        function gateErr(key, opts) {
+            if (window.patracT) return window.patracT(key, opts);
+            return key;
+        }
+
+        function showGateError(elId, msgOrKey, opts) {
             var el = document.getElementById(elId);
             if (!el) return;
+            var msg = msgOrKey;
+            if (window.patracT && typeof msgOrKey === 'string' && msgOrKey.indexOf('gate.errors.') === 0) {
+                msg = window.patracT(msgOrKey, opts || {});
+            }
             el.textContent = msg;
             el.classList.add('visible');
             try { el.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
@@ -5767,21 +5896,21 @@
             var userId = normalizePatracId(document.getElementById('input-login-id').value);
             var pass = document.getElementById('input-login-pass').value;
             if (!userId) {
-                showGateError('gate-login-error', 'CHYBA: Zadej uživatelské ID.');
+                showGateError('gate-login-error', 'gate.errors.loginMissingId');
                 return;
             }
             var accounts = getPatracAccounts();
             var acc = accounts[userId];
             if (!acc) {
-                showGateError('gate-login-error', 'CHYBA: ID není v síti. Zaregistruj nového pátrače.');
+                showGateError('gate-login-error', 'gate.errors.loginUnknownId');
                 return;
             }
             if (acc.pass && acc.pass !== pass) {
-                showGateError('gate-login-error', 'CHYBA: Heslo nesouhlasí. Signál zamítnut.');
+                showGateError('gate-login-error', 'gate.errors.loginBadPass');
                 return;
             }
             if (!acc.pass && pass) {
-                showGateError('gate-login-error', 'CHYBA: Tento účet nemá heslo — nech pole prázdné, nebo resetuj data.');
+                showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
                 return;
             }
             applyAccountToLocalStorage(userId);
@@ -5813,23 +5942,23 @@
             var playerName = document.getElementById('input-player-name').value.trim();
 
             if (!userId) {
-                showGateError('gate-register-error', 'CHYBA: Uživatelské ID je povinné.');
+                showGateError('gate-register-error', 'gate.errors.registerMissingId');
                 return;
             }
             if (!isValidEmail(email)) {
-                showGateError('gate-register-error', 'CHYBA: Zadej platný email (např. jmeno@email.cz).');
+                showGateError('gate-register-error', 'gate.errors.registerBadEmail');
                 return;
             }
             if (pass.length < 4) {
-                showGateError('gate-register-error', 'CHYBA: Heslo musí mít alespoň 4 znaky.');
+                showGateError('gate-register-error', 'gate.errors.registerShortPass');
                 return;
             }
             if (pass !== pass2) {
-                showGateError('gate-register-error', 'CHYBA: Hesla se neshodují.');
+                showGateError('gate-register-error', 'gate.errors.registerPassMismatch');
                 return;
             }
             if (!playerName) {
-                showGateError('gate-register-error', 'CHYBA: Vyplň jméno operativce.');
+                showGateError('gate-register-error', 'gate.errors.registerMissingName');
                 return;
             }
 
@@ -5838,18 +5967,18 @@
             if (comMode === 'create') {
                 comName = document.getElementById('input-com-name').value.trim();
                 if (!comName) {
-                    showGateError('gate-register-error', 'CHYBA: Zadej název nové komunity.');
+                    showGateError('gate-register-error', 'gate.errors.registerMissingComName');
                     return;
                 }
             } else {
                 comCode = (document.getElementById('input-com-code').value || '').trim().toUpperCase();
                 if (comCode.length !== 5) {
-                    showGateError('gate-register-error', 'CHYBA: Kód komunity musí mít 5 znaků.');
+                    showGateError('gate-register-error', 'gate.errors.registerBadComCode');
                     return;
                 }
                 var existingComm = findCommunityByCode(comCode);
                 if (!existingComm) {
-                    showGateError('gate-register-error', 'CHYBA: Komunita s tímto kódem neexistuje.');
+                    showGateError('gate-register-error', 'gate.errors.registerUnknownCom');
                     return;
                 }
                 comName = existingComm.name;
@@ -5857,11 +5986,11 @@
 
             var accounts = getPatracAccounts();
             if (accounts[userId]) {
-                showGateError('gate-register-error', 'CHYBA: Toto ID už v síti existuje.');
+                showGateError('gate-register-error', 'gate.errors.registerIdTaken');
                 return;
             }
             if (isEmailTaken(email)) {
-                showGateError('gate-register-error', 'CHYBA: Tento email je už registrován.');
+                showGateError('gate-register-error', 'gate.errors.registerEmailTaken');
                 return;
             }
 
@@ -5913,7 +6042,7 @@
             launchGame();
             } catch (err) {
                 console.error('saveProfileAndLaunch', err);
-                showGateError('gate-register-error', 'CHYBA: Registrace selhala — ' + (err.message || err));
+                showGateError('gate-register-error', 'gate.errors.registerFailed', { msg: err.message || err });
                 var btn = document.getElementById('btn-register-submit');
                 if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
             }
@@ -6649,10 +6778,22 @@
         window.attemptStartQuest = attemptStartQuest;
 
         window.patracSetLanguage = function(code) {
-            import('./src/components/gate-header.js').then(function(mod) {
-                mod.switchGateLanguage(code);
+            import('./src/components/gate-i18n.js').then(function(mod) {
+                mod.switchGateLanguage(code).then(function() {
+                    import('./src/apply-i18n.js').then(function(app) {
+                        app.applyPatracI18n();
+                    });
+                });
             });
         };
+
+        window.patracSetTextSize = function(size) {
+            import('./src/settings.js').then(function(mod) {
+                mod.setPatracTextSize(size);
+            });
+        };
+
+        window.renderQuestList = renderQuestList;
 
         window.onload = async function() {
             if (window.__patracI18nBoot) await window.__patracI18nBoot;

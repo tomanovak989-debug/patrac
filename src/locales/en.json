@@ -1,20 +1,235 @@
-{
-  "gate": {
-    "header": {
-      "title": "PÁTRAČ",
-      "subtitle": "Network of Rediscovery"
-    },
-    "lang": {
-      "label": "Language"
-    },
-    "login": {
-      "userIdLabel": "User ID",
-      "userIdPlaceholder": "tracker identifier",
-      "passwordLabel": "Password",
-      "submit": "DECRYPT AND ENTER",
-      "register": "REGISTER NEW TRACKER",
-      "recover": "[ PASSWORD RECOVERY VIA EMAIL ]",
-      "projectStatus": "[STATUS: PROJECT OVERVIEW ]"
-    }
-  }
+﻿{
+    "gate":  {
+                 "header":  {
+                                "title":  "PÁTRAČ",
+                                "subtitle":  "Network of Rediscovery"
+                            },
+                 "lang":  {
+                              "label":  "Language"
+                          },
+                 "login":  {
+                               "userIdLabel":  "User ID",
+                               "userIdPlaceholder":  "tracker identifier",
+                               "passwordLabel":  "Password",
+                               "submit":  "DECRYPT AND ENTER",
+                               "register":  "REGISTER NEW TRACKER",
+                               "recover":  "[ PASSWORD RECOVERY VIA EMAIL ]",
+                               "projectStatus":  "[STATUS: PROJECT OVERVIEW ]"
+                           },
+                 "register":  {
+                                  "title":  "New tracker — registration",
+                                  "userIdLabel":  "User ID",
+                                  "userIdPlaceholder":  "login identifier",
+                                  "emailLabel":  "Email (password recovery only)",
+                                  "emailPlaceholder":  "e.g. patrac@signal.net",
+                                  "passwordLabel":  "Password",
+                                  "passwordPlaceholder":  "min. 4 characters",
+                                  "password2Label":  "Confirm password",
+                                  "password2Placeholder":  "repeat password",
+                                  "comLabel":  "Community",
+                                  "comCreate":  "Create new community",
+                                  "comJoin":  "Join a community",
+                                  "comNameLabel":  "Community name",
+                                  "comNamePlaceholder":  "group that survived",
+                                  "comNameHint":  "Community receives a unique 5-character code after registration.",
+                                  "comCodeLabel":  "Community code",
+                                  "comCodePlaceholder":  "e.g. K7X2M",
+                                  "comCodeHint":  "5 characters — get it from the community founder.",
+                                  "playerNameLabel":  "Operative name",
+                                  "playerNamePlaceholder":  "your call sign",
+                                  "playerNameHint":  "Operatives receive their own 5-character code automatically.",
+                                  "descLabel":  "Position description",
+                                  "descPlaceholder":  "brief note about you…",
+                                  "avatarLabel":  "Avatar (photo)",
+                                  "submit":  "CREATE AND ENTER",
+                                  "back":  "← BACK TO LOGIN"
+                              },
+                 "recover":  {
+                                 "title":  "Password recovery",
+                                 "hint":  "Email is used for access recovery only. New password is saved to your account.",
+                                 "emailLabel":  "Registration email",
+                                 "emailPlaceholder":  "same as during registration",
+                                 "passwordLabel":  "New password",
+                                 "passwordPlaceholder":  "min. 4 characters",
+                                 "password2Label":  "Confirm password",
+                                 "password2Placeholder":  "repeat password",
+                                 "submit":  "SET NEW PASSWORD",
+                                 "back":  "← BACK TO LOGIN"
+                             },
+                 "operator":  {
+                                  "title":  "⬡ Operator access",
+                                  "hint":  "Player management in Shelter tab. Requires community code and operator key (shared by founder).",
+                                  "comCodeLabel":  "Community code",
+                                  "comCodePlaceholder":  "e.g. K7X2M",
+                                  "comSelectLabel":  "Or select community from list",
+                                  "loadingComs":  "— loading communities… —",
+                                  "adminKeyLabel":  "Operator key",
+                                  "adminKeyPlaceholder":  "operator key",
+                                  "submit":  "ENTER MANAGEMENT MODE",
+                                  "back":  "← BACK TO LOGIN"
+                              },
+                 "errors":  {
+                                "loginMissingId":  "ERROR: Enter your user ID.",
+                                "loginUnknownId":  "ERROR: ID not in network. Register a new tracker.",
+                                "loginBadPass":  "ERROR: Wrong password. Signal denied.",
+                                "loginNoPassNeeded":  "ERROR: This account has no password — leave blank or reset data.",
+                                "recoverBadEmail":  "ERROR: Enter a valid registration email.",
+                                "recoverShortPass":  "ERROR: New password must be at least 4 characters.",
+                                "recoverPassMismatch":  "ERROR: Passwords do not match.",
+                                "recoverUnknownEmail":  "ERROR: Email is not registered in the network.",
+                                "registerMissingId":  "ERROR: User ID is required.",
+                                "registerBadEmail":  "ERROR: Enter a valid email (e.g. name@email.com).",
+                                "registerShortPass":  "ERROR: Password must be at least 4 characters.",
+                                "registerPassMismatch":  "ERROR: Passwords do not match.",
+                                "registerMissingName":  "ERROR: Enter operative name.",
+                                "registerMissingComName":  "ERROR: Enter new community name.",
+                                "registerBadComCode":  "ERROR: Community code must be 5 characters.",
+                                "registerUnknownCom":  "ERROR: No community with this code.",
+                                "registerIdTaken":  "ERROR: This ID already exists in the network.",
+                                "registerEmailTaken":  "ERROR: This email is already registered.",
+                                "registerFailed":  "ERROR: Registration failed — {{msg}}",
+                                "operatorMissingFields":  "ERROR: Enter community code and operator key.",
+                                "operatorUnknownCom":  "ERROR: No community with this code.",
+                                "operatorBadKey":  "ERROR: Operator key does not match."
+                            }
+             },
+    "settings":  {
+                     "title":  "Settings",
+                     "language":  "Language",
+                     "textSize":  "Text size",
+                     "textDefault":  "Standard",
+                     "textLarge":  "Large",
+                     "logout":  "⏻ LOG OUT"
+                 },
+    "quests":  {
+                   "story":  {
+                                 "roxy":  {
+                                              "mapLabel":  "Safe Haven",
+                                              "title":  "Set Up Your Safe Haven",
+                                              "desc":  "Walk to a secure location in the real world and save its coordinates as your Safe Haven."
+                                          },
+                                 "sef":  {
+                                             "mapLabel":  "Water Source",
+                                             "title":  "Find a Water Source",
+                                             "desc":  "We won\u0027t survive without water. Find a stream or spring and mark its location."
+                                         },
+                                 "herbert":  {
+                                                 "mapLabel":  "Forest Storage",
+                                                 "title":  "Forest Staging Area",
+                                                 "desc":  "Locate a sheltered clearing suitable for storing medical supplies."
+                                             },
+                                 "ino":  {
+                                             "mapLabel":  "Training Ground",
+                                             "title":  "Find a Training Ground",
+                                             "desc":  "We need a flat forest clearing suitable for physical training."
+                                         },
+                                 "adam":  {
+                                              "mapLabel":  "Lookout Tower",
+                                              "title":  "Find a Lookout Tower",
+                                              "desc":  "Walk to the base of the nearest lookout and register it as an observation point."
+                                          }
+                             },
+                   "random":  {
+                                  "rx_perimeter":  {
+                                                       "title":  "Perimeter Patrol",
+                                                       "desc":  "Walk the perimeter around the safe haven clockwise. Check that the line hasn\u0027t been breached."
+                                                   },
+                                  "rx_supplies":  {
+                                                      "title":  "Supply Inventory",
+                                                      "desc":  "Go through the stockpile and note what\u0027s running low. Without order, you\u0027re first to fall."
+                                                  },
+                                  "rx_nightwatch":  {
+                                                        "title":  "Night Watch",
+                                                        "desc":  "Hold the east side of camp until dawn. Report every suspicious sound."
+                                                    },
+                                  "rx_escape":  {
+                                                    "title":  "Escape Route Check",
+                                                    "desc":  "Walk all planned escape routes and confirm they\u0027re passable."
+                                                },
+                                  "rx_rally":  {
+                                                   "title":  "Unit Rally Point",
+                                                   "desc":  "Walk to the clearing and confirm the whole squad can fit — backup rendezvous point."
+                                               },
+                                  "sf_rain":  {
+                                                  "title":  "Rainwater Collection",
+                                                  "desc":  "Build an improvised rain collector from a tarp and containers. It has to work."
+                                              },
+                                  "sf_filter":  {
+                                                    "title":  "Filter Maintenance",
+                                                    "desc":  "Clean or replace the filtration material at the water source. Without water, we\u0027re dead."
+                                                },
+                                  "sf_firewood":  {
+                                                      "title":  "Fuel Stockpile",
+                                                      "desc":  "Chop and store firewood for three days of heating. Work for the woodcutters."
+                                                  },
+                                  "sf_stream":  {
+                                                    "title":  "Stream Survey",
+                                                    "desc":  "Follow the stream downstream and find the cleanest spot to draw water."
+                                                },
+                                  "sf_repair":  {
+                                                    "title":  "Drainage Repair",
+                                                    "desc":  "Fix the channel or outlet so the stockpile doesn\u0027t flood in the rain."
+                                                },
+                                  "hb_herbs":  {
+                                                   "title":  "Herb Gathering",
+                                                   "desc":  "Find a spot rich in medicinal plants and fill a bag."
+                                               },
+                                  "hb_disinfect":  {
+                                                       "title":  "Zone Disinfection",
+                                                       "desc":  "Clean and disinfect the medical corner workspace."
+                                                   },
+                                  "hb_medcheck":  {
+                                                      "title":  "First-Aid Kit Check",
+                                                      "desc":  "Go through the first-aid kit. Toss expired items, restock what\u0027s missing."
+                                                  },
+                                  "hb_pine":  {
+                                                  "title":  "Pine Resin",
+                                                  "desc":  "Find a pine tree and collect resin — for disinfection and patching."
+                                              },
+                                  "hb_dry":  {
+                                                 "title":  "Bandage Drying",
+                                                 "desc":  "Dry clean cloth in the sun and store it in a waterproof bag."
+                                             },
+                                  "in_run":  {
+                                                 "title":  "Endurance Lap",
+                                                 "desc":  "Run at least 3 km in rough terrain. Keep pace — no slacking."
+                                             },
+                                  "in_track":  {
+                                                   "title":  "Track Following",
+                                                   "desc":  "Find and follow a fresh wildlife or human trail — log the direction."
+                                               },
+                                  "in_night":  {
+                                                   "title":  "Night Recon",
+                                                   "desc":  "Walk the marked route at night without a flashlight. Stay alert or die."
+                                               },
+                                  "in_climb":  {
+                                                   "title":  "Terrain Obstacle",
+                                                   "desc":  "Find a natural obstacle (stump, rock) and clear it three times."
+                                               },
+                                  "in_cache":  {
+                                                   "title":  "Supply Cache",
+                                                   "desc":  "Hide a secret stash outside main camp — emergency backup."
+                                               },
+                                  "ad_scout":  {
+                                                   "title":  "High Ground Recon",
+                                                   "desc":  "Climb the nearest hill or tree and observe the surroundings for 10 minutes."
+                                               },
+                                  "ad_weather":  {
+                                                     "title":  "Weather Log",
+                                                     "desc":  "Watch the sky and wind for 30 minutes. Log what\u0027s coming — storm or calm."
+                                                 },
+                                  "ad_trail":  {
+                                                   "title":  "Trail Marking",
+                                                   "desc":  "Mark a safe trail with tape or stones from camp to the objective."
+                                               },
+                                  "ad_animal":  {
+                                                    "title":  "Wildlife Signs",
+                                                    "desc":  "Find where animals drink or graze — vital for traps and early warning."
+                                                },
+                                  "ad_map":  {
+                                                 "title":  "Area Sketch",
+                                                 "desc":  "Walk the surroundings and add new routes we haven\u0027t taken to the mental map."
+                                             }
+                              }
+               }
 }

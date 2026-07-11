@@ -1,0 +1,25 @@
+import { applyI18nToDom, getPatracLanguage } from './i18n.js';
+import { applyGateI18n, updateLanguageButtons } from './components/gate-i18n.js';
+import { updateTextSizeButtons, getTextSize } from './settings.js';
+
+export function applySettingsMenuI18n() {
+    var menu = document.getElementById('hud-menu-dropdown');
+    if (menu) applyI18nToDom(menu);
+    var gate = document.getElementById('gate-box');
+    if (gate) {
+        var settingsBlock = document.getElementById('gate-settings-block');
+        if (settingsBlock) applyI18nToDom(settingsBlock);
+    }
+    updateLanguageButtons(getPatracLanguage());
+    updateTextSizeButtons(getTextSize());
+}
+
+export async function applyPatracI18n() {
+    applyGateI18n();
+    applySettingsMenuI18n();
+
+    if (typeof window.renderQuestList === 'function') window.renderQuestList();
+    if (typeof window.updateStatsHud === 'function') window.updateStatsHud({ skipMembersList: true });
+    if (typeof window.renderMissionLog === 'function') window.renderMissionLog();
+    if (typeof window.renderCommunityProfile === 'function') window.renderCommunityProfile({ skipMembersList: true });
+}
