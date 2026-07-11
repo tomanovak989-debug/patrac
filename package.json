@@ -1,0 +1,8 @@
+{
+  "name": "patrac",
+  "private": true,
+  "description": "PÁTRAČ — síť znovuobjevení",
+  "dependencies": {
+    "i18next": "^25.4.2"
+  }
+}

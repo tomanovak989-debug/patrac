@@ -1,0 +1,17 @@
+{
+  "gate": {
+    "header": {
+      "title": "PÁTRAČ",
+      "subtitle": "Síť znovuobjevení"
+    },
+    "login": {
+      "userIdLabel": "Uživatelské ID",
+      "userIdPlaceholder": "identifikátor pátrače",
+      "passwordLabel": "Heslo",
+      "submit": "DEŠIFROVAT A VSTOUPIT",
+      "register": "REGISTRACE NOVÉHO PÁTRAČE",
+      "recover": "[ OBNOVA HESLA PŘES EMAIL ]",
+      "projectStatus": "[STATUS: PŘEDSTAVENÍ PROJEKTU]"
+    }
+  }
+}

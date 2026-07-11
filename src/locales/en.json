@@ -1,0 +1,17 @@
+{
+  "gate": {
+    "header": {
+      "title": "PÁTRAČ",
+      "subtitle": "Network of Rediscovery"
+    },
+    "login": {
+      "userIdLabel": "User ID",
+      "userIdPlaceholder": "tracker identifier",
+      "passwordLabel": "Password",
+      "submit": "DECRYPT AND ENTER",
+      "register": "REGISTER NEW TRACKER",
+      "recover": "[ PASSWORD RECOVERY VIA EMAIL ]",
+      "projectStatus": "[STATUS: PROJECT OVERVIEW ]"
+    }
+  }
+}

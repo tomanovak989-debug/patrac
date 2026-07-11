@@ -969,24 +969,29 @@
                 <span>SKEN.</span><span>FREQ.</span>
             </div>
             <header class="gate-header">
-                <h1>PÁTRAČ</h1>
-                <p class="gate-subtitle">Síť znovuobjevení</p>
+                <h1 data-i18n="gate.header.title">PÁTRAČ</h1>
+                <p class="gate-subtitle" data-i18n="gate.header.subtitle">Síť znovuobjevení</p>
             </header>
 
             <div id="gate-login" class="gate-panel active">
                 <div id="gate-login-error" class="gate-error"></div>
                 <div class="gate-form-group">
-                    <label for="input-login-id">Uživatelské ID</label>
-                    <input type="text" id="input-login-id" placeholder="identifikátor pátrače" autocomplete="username">
+                    <label for="input-login-id" data-i18n="gate.login.userIdLabel">Uživatelské ID</label>
+                    <input type="text" id="input-login-id" data-i18n-placeholder="gate.login.userIdPlaceholder" placeholder="identifikátor pátrače" autocomplete="username">
                 </div>
                 <div class="gate-form-group">
-                    <label for="input-login-pass">Heslo</label>
+                    <label for="input-login-pass" data-i18n="gate.login.passwordLabel">Heslo</label>
                     <input type="password" id="input-login-pass" placeholder="••••••••" autocomplete="current-password">
                 </div>
-                <button type="button" class="gate-btn-primary" onclick="patracLogin()">DEŠIFROVAT A VSTOUPIT</button>
-                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-register')">REGISTRACE NOVÉHO PÁTRAČE</button>
-                <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;" onclick="switchGatePage('gate-recover')">[ OBNOVA HESLA PŘES EMAIL ]</button>
-                <a class="gate-link" href="predstaveni.html">[STATUS: PŘEDSTAVENÍ PROJEKTU]</a>
+                <button type="button" class="gate-btn-primary" onclick="patracLogin()" data-i18n="gate.login.submit">DEŠIFROVAT A VSTOUPIT</button>
+                <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-register')" data-i18n="gate.login.register">REGISTRACE NOVÉHO PÁTRAČE</button>
+                <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;" onclick="switchGatePage('gate-recover')" data-i18n="gate.login.recover">[ OBNOVA HESLA PŘES EMAIL ]</button>
+                <a class="gate-link" href="predstaveni.html" data-i18n="gate.login.projectStatus">[STATUS: PŘEDSTAVENÍ PROJEKTU]</a>
+                <div class="gate-lang-switch" style="margin-top:12px;font-size:9px;color:var(--gate-text-dim);text-align:center;">
+                    <button type="button" class="gate-link" style="border:none;background:none;cursor:pointer;padding:0 4px;" onclick="patracSetLanguage('cs')">CS</button>
+                    <span>|</span>
+                    <button type="button" class="gate-link" style="border:none;background:none;cursor:pointer;padding:0 4px;" onclick="patracSetLanguage('en')">EN</button>
+                </div>
             </div>
 
             <div id="gate-operator" class="gate-panel">
@@ -1529,6 +1534,14 @@
         </div>
     </div>
 
+    <script type="importmap">
+    {
+        "imports": {
+            "i18next": "https://esm.sh/i18next@25.4.2"
+        }
+    }
+    </script>
+    <script type="module" src="src/bootstrap-i18n.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
@@ -6597,7 +6610,14 @@
         window.operatorRemoveBotOperative = operatorRemoveBotOperative;
         window.attemptStartQuest = attemptStartQuest;
 
-        window.onload = function() {
+        window.patracSetLanguage = function(code) {
+            import('./src/components/gate-header.js').then(function(mod) {
+                mod.switchGateLanguage(code);
+            });
+        };
+
+        window.onload = async function() {
+            if (window.__patracI18nBoot) await window.__patracI18nBoot;
             try { migratePatracAccountsStorage(); } catch (e) { console.warn('migratePatracAccountsStorage', e); }
             initGateOperatorTrigger();
             migrateLegacyPatracAccount();
