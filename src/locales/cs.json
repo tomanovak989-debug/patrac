@@ -99,6 +99,9 @@
                      "textSize":  "Velikost textu",
                      "textDefault":  "Standard",
                      "textLarge":  "Velké",
+                     "compass":  "Kompas na mapě",
+                     "compassShow":  "Zobrazit",
+                     "compassHide":  "Skrýt",
                      "logout":  "⏻ OHLÁSIT SE"
                  },
     "quests":  {

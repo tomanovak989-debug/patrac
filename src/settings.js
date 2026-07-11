@@ -24,11 +24,41 @@ export function updateTextSizeButtons(size) {
     }
 }
 
+export function getCompassVisible() {
+    return localStorage.getItem('patrac_compass_visible') !== 'false';
+}
+
+export function applyCompassVisible(visible) {
+    localStorage.setItem('patrac_compass_visible', visible ? 'true' : 'false');
+    updateCompassButtons(visible);
+    if (typeof window.updateMapCompassDisplay === 'function') {
+        window.updateMapCompassDisplay();
+    }
+}
+
+export function updateCompassButtons(visible) {
+    var ids = [
+        ['btn-compass-show', visible],
+        ['btn-compass-hide', !visible],
+        ['btn-gate-compass-show', visible],
+        ['btn-gate-compass-hide', !visible]
+    ];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i][0]);
+        if (el) el.classList.toggle('is-active', ids[i][1]);
+    }
+}
+
 export function initPatracSettings() {
     document.body.classList.add('contrast-enhanced');
     applyTextSize(getTextSize());
+    applyCompassVisible(getCompassVisible());
 }
 
 export function setPatracTextSize(size) {
     applyTextSize(size);
+}
+
+export function setPatracCompassVisible(visible) {
+    applyCompassVisible(visible);
 }

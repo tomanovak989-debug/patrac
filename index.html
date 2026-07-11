@@ -730,7 +730,15 @@
             font-size: 8px; color: #ffcc00; letter-spacing: 0.12em;
             margin-bottom: 6px; text-transform: uppercase;
         }
-        .data-karta-block { margin-bottom: 12px; }
+        .terminal-code-row {
+            display: flex; gap: 6px; margin-bottom: 10px;
+        }
+        .terminal-code-row input {
+            flex: 1; letter-spacing: 0.2em; text-transform: uppercase;
+            font-size: 14px; text-align: center;
+        }
+        .terminal-entry-card { background: rgba(10, 14, 10, 0.55); }
+        .pocta-popup .popup-desc { text-transform: none; letter-spacing: 0.02em; }
         #btn-center-shelter { display: none; }
         .avatar-box {
             width: 52px; height: 52px; border: 1px solid var(--text-green);
@@ -861,7 +869,7 @@
         #map-tools-bar select { background: var(--hud-bg); border: 1px solid var(--hud-border); color: var(--text-green); font-size: 7px; padding: 6px; font-family: inherit; width: 52px; box-shadow: var(--neon-glow); text-shadow: var(--text-glow); }
 
         #map-add-poi-bar, #map-measure-bar {
-            display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 400;
+            display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
             background: rgba(6, 10, 6, 0.97); border: 1px solid var(--xp-blue);
             padding: 16px; box-sizing: border-box; border-radius: 2px;
             box-shadow: 0 0 14px rgba(0,136,255,0.4), 0 0 28px rgba(0,136,255,0.12);
@@ -909,7 +917,7 @@
         .story-pos-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
         .story-pos-actions .btn-accept { flex: 1 1 45%; margin-top: 0; font-size: 8px; padding: 6px 4px; }
         #map-story-bar, #poi-edit-bar, #story-pos-edit-bar {
-            display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 400;
+            display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
             background: rgba(6, 10, 6, 0.97); border: 1px solid var(--text-green);
             padding: 14px; box-sizing: border-box; border-radius: 2px;
             box-shadow: var(--neon-glow-strong); max-height: 55vh; overflow-y: auto;
@@ -973,7 +981,7 @@
             box-shadow: 0 0 14px rgba(74, 246, 38, 0.45), inset 0 0 10px rgba(74, 246, 38, 0.12);
         }
         #map-targeting-bar {
-            display:none; position:absolute; bottom:54px; left:5%; width:90%; z-index:400;
+            display:none; position:absolute; bottom:54px; left:5%; width:90%; z-index:500;
             background:rgba(6,10,6,0.97); border:1px solid var(--text-green);
             padding:16px; box-sizing:border-box; text-align:center;
             box-shadow: var(--neon-glow-strong);
@@ -1000,7 +1008,7 @@
             position: absolute;
             left: 12px;
             bottom: 108px;
-            z-index: 450;
+            z-index: 350;
             width: 132px;
             user-select: none;
             -webkit-user-select: none;
@@ -1110,6 +1118,11 @@
                         <span class="gate-settings-label" data-i18n="settings.textSize">Velikost textu</span>
                         <button type="button" id="btn-gate-text-default" onclick="patracSetTextSize('default')" data-i18n="settings.textDefault">Standard</button>
                         <button type="button" id="btn-gate-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
+                    </div>
+                    <div class="gate-settings-row">
+                        <span class="gate-settings-label" data-i18n="settings.compass">Kompas na mapě</span>
+                        <button type="button" id="btn-gate-compass-show" onclick="patracSetCompassVisible(true)" data-i18n="settings.compassShow">Zobrazit</button>
+                        <button type="button" id="btn-gate-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
                     </div>
                 </div>
             </header>
@@ -1259,6 +1272,13 @@
                             <button type="button" class="hud-menu-toggle-btn" id="btn-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
                         </div>
                     </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.compass">Kompas na mapě</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-compass-show" onclick="patracSetCompassVisible(true)" data-i18n="settings.compassShow">Zobrazit</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" class="hud-menu-item" onclick="patracLogout()" data-i18n="settings.logout">⏻ OHLÁSIT SE</button>
             </div>
@@ -1293,7 +1313,7 @@
     </div>
 
     <div id="map-add-poi-bar">
-        <div style="font-size:10px; color:var(--xp-blue); font-weight:bold; margin-bottom:6px;">📍 NOVÝ VOLNÝ BOD (STŘED MAPY)</div>
+        <div id="map-add-poi-title" style="font-size:10px; color:var(--xp-blue); font-weight:bold; margin-bottom:6px;">📍 NOVÝ VOLNÝ BOD (GPS POLOHA)</div>
         <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV (NA MAPĚ):</label><input type="text" id="poi-name" placeholder="Mýtina u potoka"></div>
         <div class="form-group" style="margin-bottom:4px;"><label>SKRYTÁ POZNÁMKA (JEN V DETAILU):</label><textarea id="poi-note" rows="2" placeholder="Později doplníš popis, co tu je…"></textarea></div>
         <div class="form-group" style="margin-bottom:6px;"><label>FOTO (VOLITELNĚ):</label><input type="file" id="poi-file" accept="image/*" onchange="previewPoiImage(this)"></div>
@@ -1440,12 +1460,6 @@
                             </div>
                             <button type="button" class="btn-accept" style="width:100%;border-color:#ffcc00;color:#ffcc00;" onclick="transferCommunityAdmin()">Předat správcovství</button>
                         </div>
-                        <div id="operator-key-display-block" style="display:none; margin-top:8px; padding-top:8px; border-top:1px dotted rgba(255,85,0,0.25);">
-                            <div class="form-group"><label>⬡ OPERÁTORSKÝ KLÍČ KOMUNITY</label>
-                                <div id="operator-key-display" class="operator-key-hint" style="color:#ffcc00;font-size:10px;">—</div>
-                            </div>
-                            <p class="operator-key-hint">Dlouhé podržení kompasu na přihlašovací obrazovce → Operátorský vstup.</p>
-                        </div>
                         <button type="button" class="btn-accept" style="width:100%; margin-top:8px;" onclick="saveProfileEdits()">ULOŽIT ZMĚNY PROFILU</button>
                     </div>
                 </div>
@@ -1504,13 +1518,12 @@
                         <div class="form-group"><label>POŽADOVANÉ VYBAVENÍ (NA ZÁDECH):</label><input type="text" id="custom-loc-req" placeholder="Např. Sekera, Lano — oddělte čárkou"></div>
                         <div class="form-group"><label>POLOHA ÚKOLU:</label>
                             <select id="custom-loc-position-mode" onchange="onCustomLocModeChange()">
-                                <option value="later">Později — zaměřit z rozkazu (standard)</option>
-                                <option value="map_now">Hned zaměřit na mapě (střed kříže)</option>
-                                <option value="link">Připojit k existujícímu bodu</option>
+                                <option value="later">Později — zaměřit GPS na místě</option>
+                                <option value="link">Vybrat bod z mapy</option>
                             </select>
                         </div>
                         <div class="form-group" id="custom-loc-link-box" style="display:none;">
-                            <label>VYBRAT EXISTUJÍCÍ BOD:</label>
+                            <label>BOD NA MAPĚ:</label>
                             <select id="custom-loc-link-point"></select>
                         </div>
                         <button class="btn-accept" style="border-color:var(--xp-blue); color:var(--xp-blue); width:100%;" onclick="createNewCustomLocation()">Vytvořit bod a úkol</button>
@@ -1600,20 +1613,32 @@
             </div>
         </div>
 
-        <!-- ZÁLOŽKA DATA KARTA -->
-        <div id="data-karta" style="display:none;">
+        <!-- ZÁLOŽKA TERMINÁL (POCTA) -->
+        <div id="content-terminal" style="display:none;">
             <div class="panel-content-inner">
-                <div id="lore-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">📜 LORE</div>
-                    <p style="font-size:9px;color:#666;margin:0;">Příběhové záznamy světa PÁTRAČ — doplní se postupně.</p>
+                <div class="quest-card" style="border-color:rgba(232,197,71,0.45); background:rgba(14,12,6,0.85);">
+                    <div class="quest-section-title" style="margin-top:0;color:#e8c547;">🖥️ TERMINÁL — ZADAT KÓD</div>
+                    <p style="font-size:9px;color:#888;margin:0 0 10px 0;line-height:1.5;">6místný kód od Pocty nebo fázovaného úkolu. Po aktivaci se bod objeví na mapě — vlastní (plná barva) vs. sdílené (čárkovaně).</p>
+                    <form id="terminal-code-form" autocomplete="off">
+                        <div class="terminal-code-row">
+                            <input type="text" id="terminal-code-input" maxlength="6" placeholder="ABC123" autocapitalize="characters" autocomplete="off">
+                            <button type="submit" class="btn-accept" style="border-color:#e8c547;color:#e8c547;white-space:nowrap;padding:8px 12px;">AKTIVOVAT</button>
+                        </div>
+                    </form>
+                    <div id="terminal-last-message" style="font-size:9px;color:var(--text-green-dim);min-height:14px;margin-bottom:8px;"></div>
                 </div>
-                <div id="postapopedie-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">🌆 POSTAPOPEDIE</div>
-                    <p style="font-size:9px;color:#666;margin:0;">Encyklopedie světa po kolapsu — doplní se postupně.</p>
-                </div>
-                <div id="schránka-nápadů-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">💡 SCHRÁNKA NÁPADŮ</div>
-                    <p style="font-size:9px;color:#666;margin:0;">Nápady a poznámky ke hře — doplní se postupně.</p>
+
+                <div class="quest-section-title">📡 AKTIVOVANÉ BODY</div>
+                <div id="terminal-activated-list"></div>
+
+                <div class="quest-section-title" style="margin-top:14px;font-size:9px;color:#666;">PROTOTYP — VYTVOŘENÍ TESTU</div>
+                <div class="quest-card" style="border-color:#444;background:rgba(8,8,8,0.5);">
+                    <p style="font-size:8px;color:#666;margin:0 0 8px 0;">Pro lokální test modulu POCTA (data zůstávají v tomto prohlížeči).</p>
+                    <div class="story-pos-actions">
+                        <button type="button" class="btn-accept" id="terminal-sim-quest-pocta" style="border-color:#e8c547;color:#e8c547;font-size:8px;">✅ Simulovat odměnu z mise</button>
+                        <button type="button" class="btn-accept" id="terminal-demo-pocta" style="border-color:#e8c547;color:#e8c547;font-size:8px;">🕯️ Nová Pocta</button>
+                        <button type="button" class="btn-accept" id="terminal-demo-quest" style="border-color:#888;color:#888;font-size:8px;">❓ Nový fázovaný úkol</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1682,7 +1707,7 @@
             <button class="action-tab" onclick="switchMainTab('tasks', this)">🗺️ Úkoly</button>
             <button class="action-tab" onclick="switchMainTab('map-only', this)">📡 Mapa HUD</button>
             <button class="action-tab" onclick="switchMainTab('clan', this)">👥 Komunita</button>
-            <button class="action-tab" onclick="switchMainTab('data-karta', this)">📂 Data</button>
+            <button class="action-tab" onclick="switchMainTab('terminal', this)">🖥️ Terminál</button>
             <button class="action-tab" onclick="switchMainTab('inventory', this)">🎒 Inventář</button>
         </div>
     </div>
@@ -1708,6 +1733,13 @@
         var mapMeasureLayer = null;
         var mapMarkerRegistry = {};
         var measureState = { pointA: null, pointB: null, line: null, markerA: null, markerB: null };
+        var lastUserPosition = null;
+        var _mapToolsTabActive = false;
+        var QUEST_GPS_RADIUS_M = 80;
+
+        function canUseMapPlacement() {
+            return isOperatorMode === true;
+        }
 
         var isOperatorMode = false;
         var currentlyEditingPlayerId = null;
@@ -1923,17 +1955,25 @@
                 alert('Nejdřív odhal misi tlačítkem SBALIT VĚCI.');
                 return;
             }
-            if (q.needsMap && !hasStoredQuestCoords(questId)) {
-                alert('Tato mise vyžaduje zaměření na mapě.');
-                return;
+            completeQuestAtLocation(questId);
+        }
+
+        function renderQuestActionButtons(questId, opts) {
+            opts = opts || {};
+            var html = '';
+            var placed = hasStoredQuestCoords(questId);
+            if (!placed) {
+                html += '<button class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue); width:100%; margin-bottom:4px;" onclick="placeQuestAtGps(\'' + questId + '\')">📍 ZAMĚŘIT POZICI (GPS)</button>';
+                if (canUseMapPlacement()) {
+                    html += '<button class="btn-accept" style="border-color:#888;color:#888; width:100%; margin-bottom:4px;" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: UMÍSTIT NA MAPĚ</button>';
+                }
+            } else {
+                html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green); width:100%; margin-bottom:4px;" onclick="completeQuestAtLocation(\'' + questId + '\')">✅ POTVRDIT VÝKON NA MÍSTĚ</button>';
+                if (canUseMapPlacement()) {
+                    html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange); width:100%;" onclick="activateTargeting(\'' + questId + '\')">🗺️ ADMIN: SPLNIT Z MAPY</button>';
+                }
             }
-            recordMissionComplete(q);
-            refreshQuestMapPoint(questId);
-            renderQuestList();
-            rebuildSelectOptions();
-            ensureRandomQuests();
-            loadCustomCraftedItems();
-            alert('✅ Mise „' + q.title + '“ splněna. Odměna v inventáři.');
+            return html;
         }
 
         function renderRandomQuestCard(q) {
@@ -1969,11 +2009,7 @@
                 html += '<div class="countdown-timer">⏳ AKTIVNÍ (' + q.time + ')</div>';
                 if (reqIcons) html += '<div style="margin:4px 0;">' + reqIcons + '</div>';
                 html += '<div class="quest-footer" style="margin-top:5px;">';
-                if (q.needsMap) {
-                    html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange); width:100%; margin-bottom:4px;" onclick="activateTargeting(\'' + q.id + '\')">🗺️ ZAMĚŘIT A SPLNIT</button>';
-                } else {
-                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green); width:100%;" onclick="confirmRandomQuestDone(\'' + q.id + '\')">✅ POTVRDIT VÝKON V TERÉNU</button>';
-                }
+                html += renderQuestActionButtons(q.id);
                 html += '</div>';
             }
             html += '</div>';
@@ -2049,7 +2085,7 @@
                     html += '<div class="quest-header">📡 ' + (q.char ? q.char + ': ' : '') + q.title + '</div>';
                     html += '<div class="quest-body" style="margin-top:4px;">' + q.desc + '</div>';
                     html += '<div class="countdown-timer">⏳ LIMIT OPERACE SPUŠTĚN (' + q.time + ')</div>';
-                    html += '<div class="quest-footer" style="margin-top:5px;"><button class="btn-accept" style="border-color:var(--danger-orange); color:var(--danger-orange);" onclick="activateTargeting(\'' + q.id + '\')">🗺️ ZOBRAZIT TAKTICKOU MAPU A ZAMĚŘIT</button></div>';
+                    html += '<div class="quest-footer" style="margin-top:5px;">' + renderQuestActionButtons(q.id) + '</div>';
                 }
 
                 html += '</div>';
@@ -3144,6 +3180,10 @@
             var lng = position.coords.longitude;
             var acc = position.coords.accuracy || 30;
 
+            lastUserPosition = { lat: lat, lng: lng, accuracy: acc, ts: Date.now() };
+            if (window.patracPoctaBridge) window.patracPoctaBridge.lastUserPosition = lastUserPosition;
+            if (typeof window.patracPoctaOnGps === 'function') window.patracPoctaOnGps();
+
             setGpsStatus('● GPS LOCK <span style="color:#0077ff;">[' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ']</span>');
 
             if (!userMarker) {
@@ -3394,7 +3434,11 @@
             restoreStoryQuestToActive(questId);
             renderQuestList();
             renderStoryPositionsList();
-            activateTargeting(questId);
+            if (canUseMapPlacement()) {
+                activatePlacementMode(questId);
+            } else {
+                placeQuestAtGps(questId);
+            }
         }
 
         function panToStoryQuest(questId) {
@@ -3413,6 +3457,7 @@
             var status = getStoryQuestStatusText(questId);
             var placed = isStoryQuestPlaced(questId);
             var isUnlocked = localStorage.getItem('unlocked_story_' + questId) === 'true';
+            var isDone = isQuestCompleted(q);
             var commNote = getStoryPosCommunityNote(questId);
             var html = '<div class="quest-card" style="margin-bottom:8px;">';
             html += '<div class="quest-header" style="color:var(--text-green);">📍 ' + label + '</div>';
@@ -3424,13 +3469,19 @@
             if (placed) {
                 html += '<button class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue);" onclick="panToStoryQuest(\'' + questId + '\')">🗺️ NA MAPĚ</button>';
                 html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="openStoryPosEditor(\'' + questId + '\')">📝 POPIS KOMUNITY</button>';
+                if (!isDone && isUnlocked) {
+                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="completeQuestAtLocation(\'' + questId + '\')">✅ SPLNIT NA MÍSTĚ</button>';
+                }
                 html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="resetStoryQuestPosition(\'' + questId + '\')">↺ RESET</button>';
             }
             if (!placed) {
                 if (!isUnlocked) {
                     html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + questId + '\')">🔓 ODHALIT</button>';
                 } else {
-                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + questId + '\')">🎯 ZAMĚŘIT</button>';
+                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + questId + '\')">🎯 ZAMĚŘIT (GPS)</button>';
+                    if (canUseMapPlacement()) {
+                        html += '<button class="btn-accept" style="border-color:#888;color:#888;" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: MAPA</button>';
+                    }
                 }
             }
             html += '</div></div>';
@@ -3452,12 +3503,21 @@
                     html += '<br><span style="font-size:9px;color:#888;font-style:italic;">📢 ' + commNote + '</span>';
                 }
                 html += '<div class="story-pos-actions" style="margin-top:6px;">';
+                var qStory = getQuestWithReq(gameQuests[id]);
+                var storyDone = isQuestCompleted(qStory);
+                var storyUnlocked = localStorage.getItem('unlocked_story_' + id) === 'true';
                 if (isStoryQuestPlaced(id)) {
                     html += '<button class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue);" onclick="panToStoryQuest(\'' + id + '\')">🗺️ Přejít</button>';
                     html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="openStoryPosEditor(\'' + id + '\')">📝 Popis</button>';
+                    if (!storyDone && storyUnlocked) {
+                        html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="completeQuestAtLocation(\'' + id + '\')">✅ Splnit</button>';
+                    }
                     html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="resetStoryQuestPosition(\'' + id + '\')">↺ Reset</button>';
                 } else {
-                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + id + '\')">🎯 Zaměřit</button>';
+                    html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + id + '\')">🎯 Zaměřit (GPS)</button>';
+                    if (canUseMapPlacement()) {
+                        html += '<button class="btn-accept" style="border-color:#888;color:#888;" onclick="activatePlacementMode(\'' + id + '\')">🗺️ Admin</button>';
+                    }
                 }
                 html += '</div></div>';
             }
@@ -3473,10 +3533,12 @@
             renderStoryPositionsList();
             document.getElementById('map-story-bar').style.display = 'block';
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+            updateMapCrosshair();
         }
 
         function closeStoryPositionsPanel() {
             document.getElementById('map-story-bar').style.display = 'none';
+            updateMapCrosshair();
         }
 
         function closeAllMapPanels() {
@@ -3552,11 +3614,13 @@
             prev.innerHTML = poi.img ? '<img src="' + poi.img + '">' : 'BEZ FOTO';
             document.getElementById('poi-edit-bar').style.display = 'block';
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+            updateMapCrosshair();
         }
 
         function closePoiEditor() {
             document.getElementById('poi-edit-bar').style.display = 'none';
             base64PoiEditImg = '';
+            updateMapCrosshair();
         }
 
         function previewStoryPosEditImage(input) {
@@ -3582,12 +3646,14 @@
             prev.innerHTML = base64StoryPosEditImg ? '<img src="' + base64StoryPosEditImg + '">' : 'BEZ FOTO';
             document.getElementById('story-pos-edit-bar').style.display = 'block';
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+            updateMapCrosshair();
         }
 
         function closeStoryPosEditor() {
             document.getElementById('story-pos-edit-bar').style.display = 'none';
             base64StoryPosEditImg = '';
             storyPosEditHadImg = false;
+            updateMapCrosshair();
         }
 
         function saveStoryPosChanges() {
@@ -3659,7 +3725,6 @@
             rebuildCustomLocLinkSelect();
             renderStoryPositionsList();
             document.getElementById('map-sensor-output').innerHTML = '↺ Reset: ' + getQuestMapLabel(questId);
-            activateTargeting(questId);
         }
 
         function getAvailablePositionPoints() {
@@ -3699,6 +3764,20 @@
                     label: pois[p].name + ' (volný bod)',
                     lat: pois[p].lat, lng: pois[p].lng
                 });
+            }
+            var randomQuests = getRandomQuestsList();
+            for (var r = 0; r < randomQuests.length; r++) {
+                var rq = randomQuests[r];
+                if (!shouldShowQuestPointOnMap(rq.id)) continue;
+                var latR = localStorage.getItem('point_' + rq.id + '_lat');
+                var lngR = localStorage.getItem('point_' + rq.id + '_lng');
+                if (latR && lngR) {
+                    list.push({
+                        key: 'random:' + rq.id,
+                        label: getQuestMapLabel(rq) + ' (náhodný rozkaz)',
+                        lat: parseFloat(latR), lng: parseFloat(lngR)
+                    });
+                }
             }
             return list;
         }
@@ -3896,6 +3975,7 @@
                 var poi = pois[p];
                 renderPointOnMap(poi.id, poi.lat, poi.lng, poi.name, poi.note || poi.desc || '');
             }
+            if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
         }
 
         function haversineKm(lat1, lng1, lat2, lng2) {
@@ -3906,6 +3986,104 @@
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLng / 2) * Math.sin(dLng / 2);
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        function distanceMeters(lat1, lng1, lat2, lng2) {
+            return haversineKm(lat1, lng1, lat2, lng2) * 1000;
+        }
+
+        function getUserPositionOrAlert() {
+            if (!lastUserPosition) {
+                alert('GPS poloha není k dispozici. Povol polohu v prohlížeči a počkej na lock, nebo stiskni CENTR.');
+                return null;
+            }
+            if (Date.now() - lastUserPosition.ts > 120000) {
+                alert('GPS signál je zastaralý. Počkej na obnovení nebo stiskni CENTR.');
+                return null;
+            }
+            return lastUserPosition;
+        }
+
+        function getEffectiveGpsRadiusM() {
+            var acc = lastUserPosition ? lastUserPosition.accuracy : 30;
+            return QUEST_GPS_RADIUS_M + Math.min(acc, 50);
+        }
+
+        function isUserNearCoords(targetLat, targetLng) {
+            var pos = getUserPositionOrAlert();
+            if (!pos) return false;
+            var dist = distanceMeters(pos.lat, pos.lng, targetLat, targetLng);
+            var maxDist = getEffectiveGpsRadiusM();
+            if (dist > maxDist) {
+                alert('Nejsi na místě úkolu. Vzdálenost: ' + Math.round(dist) + ' m (limit ~' + Math.round(maxDist) + ' m). Dojdi fyzicky k cíli.');
+                return false;
+            }
+            return true;
+        }
+
+        function getQuestStoredCoords(questId) {
+            if (!hasStoredQuestCoords(questId)) return null;
+            return {
+                lat: parseFloat(localStorage.getItem('point_' + questId + '_lat')),
+                lng: parseFloat(localStorage.getItem('point_' + questId + '_lng'))
+            };
+        }
+
+        function isUserNearQuest(questId) {
+            var coords = getQuestStoredCoords(questId);
+            if (!coords) {
+                alert('Úkol nemá nastavenou pozici. Nejdřív ji zaměř GPS na místě nebo vyber bod z mapy.');
+                return false;
+            }
+            return isUserNearCoords(coords.lat, coords.lng);
+        }
+
+        function placeQuestAtGps(questId) {
+            var pos = getUserPositionOrAlert();
+            if (!pos) return;
+            var q = getQuestById(questId);
+            if (!q) return;
+            saveQuestCoords(questId, pos.lat, pos.lng);
+            renderPointOnMap(questId, pos.lat, pos.lng, q.mapLabel || q.title, q.desc);
+            rebuildCustomLocLinkSelect();
+            renderQuestList();
+            renderStoryPositionsList();
+            alert('📍 Pozice „' + getQuestMapLabel(q) + '“ uložena z GPS. Misi splníš po fyzickém výkonu na místě.');
+        }
+
+        function finalizeQuestComplete(q) {
+            recordMissionComplete(q);
+            refreshQuestMapPoint(q.id);
+            var comItems = getCommunityItemsRaw().slice();
+            var persItems = getCurrentPersonalItems().slice();
+            for (var i = 0; i < comItems.length; i++) { if (comItems[i].bind === q.id) comItems[i].locked = false; }
+            for (var i = 0; i < persItems.length; i++) { if (persItems[i].bind === q.id) persItems[i].locked = false; }
+            saveCommunityItemsRaw(comItems);
+            saveCurrentPersonalItems(persItems);
+            var poctaReward = null;
+            if (typeof window.patracMaybeGrantPoctaReward === 'function') {
+                poctaReward = window.patracMaybeGrantPoctaReward(q);
+            }
+            updateStatsHud();
+            renderQuestList();
+            renderStoryPositionsList();
+            rebuildSelectOptions();
+            rebuildCustomLocLinkSelect();
+            ensureRandomQuests();
+            loadCustomCraftedItems();
+            return poctaReward;
+        }
+
+        function completeQuestAtLocation(questId) {
+            var q = getQuestById(questId);
+            if (!q) return;
+            if (!isUserNearQuest(questId)) return;
+            var poctaReward = finalizeQuestComplete(q);
+            var msg = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Odměna v inventáři.';
+            if (poctaReward) {
+                msg += '\n\n🕯️ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
+            }
+            alert(msg);
         }
 
         function formatDistance(km) {
@@ -3964,13 +4142,35 @@
             return { lat: c.lat, lng: c.lng };
         }
 
+        function isOverlayPanelVisible(id) {
+            var el = document.getElementById(id);
+            return el && el.style.display === 'block';
+        }
+
+        function isMapOverlayOpen() {
+            return !!activeTargetingQuest
+                || isMeasurePanelOpen()
+                || isPoiPanelOpen()
+                || isOverlayPanelVisible('poi-edit-bar')
+                || isOverlayPanelVisible('story-pos-edit-bar')
+                || isOverlayPanelVisible('map-story-bar');
+        }
+
+        function updateMapCompassDisplay() {
+            var compass = document.getElementById('map-compass');
+            if (!compass) return;
+            var userWants = localStorage.getItem('patrac_compass_visible') !== 'false';
+            compass.style.display = (userWants && _mapToolsTabActive && !isMapOverlayOpen()) ? 'block' : 'none';
+        }
+        window.updateMapCompassDisplay = updateMapCompassDisplay;
+
         function setMapToolsVisible(show) {
+            _mapToolsTabActive = show;
             var bar = document.getElementById('map-tools-bar');
             if (bar) bar.style.display = show ? 'flex' : 'none';
-            var compass = document.getElementById('map-compass');
-            if (compass) compass.style.display = show ? 'block' : 'none';
             var shelterBtn = document.getElementById('btn-center-shelter');
             if (shelterBtn) shelterBtn.style.display = show ? 'flex' : 'none';
+            updateMapCompassDisplay();
         }
 
         function isMeasurePanelOpen() {
@@ -3986,8 +4186,10 @@
         function updateMapCrosshair() {
             var el = document.getElementById('map-crosshair');
             if (!el) return;
-            var show = !!activeTargetingQuest || isMeasurePanelOpen() || isPoiPanelOpen();
+            var show = isMeasurePanelOpen()
+                || (canUseMapPlacement() && (!!activeTargetingQuest || isPoiPanelOpen()));
             el.style.display = show ? 'block' : 'none';
+            updateMapCompassDisplay();
         }
 
         function openAddPoiPanel() {
@@ -3999,6 +4201,12 @@
             base64PoiImg = '';
             var prev = document.getElementById('poi-create-preview');
             if (prev) prev.innerHTML = 'BEZ FOTO';
+            var titleEl = document.getElementById('map-add-poi-title');
+            if (titleEl) {
+                titleEl.textContent = canUseMapPlacement()
+                    ? '📍 NOVÝ VOLNÝ BOD (STŘED MAPY — ADMIN)'
+                    : '📍 NOVÝ VOLNÝ BOD (GPS POLOHA)';
+            }
             document.getElementById('map-add-poi-bar').style.display = 'block';
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
             updateMapCrosshair();
@@ -4013,18 +4221,28 @@
             var name = document.getElementById('poi-name').value.trim();
             var note = document.getElementById('poi-note').value.trim();
             if (!name) { alert('Zadej název bodu!'); return; }
-            var center = getMapCenterCoords();
+            var lat, lng;
+            if (canUseMapPlacement()) {
+                var center = getMapCenterCoords();
+                lat = center.lat;
+                lng = center.lng;
+            } else {
+                var pos = getUserPositionOrAlert();
+                if (!pos) return;
+                lat = pos.lat;
+                lng = pos.lng;
+            }
             var pois = getSafeJSON('map_free_pois');
             var poiId = 'poi_' + Date.now();
             pois.push({
                 id: poiId, name: name, note: note, desc: note,
                 img: base64PoiImg || '',
-                lat: center.lat, lng: center.lng,
+                lat: lat, lng: lng,
                 date: new Date().toLocaleString('cs-CZ'),
                 creator: localStorage.getItem('player_name') || 'Operativec'
             });
             localStorage.setItem('map_free_pois', JSON.stringify(pois));
-            renderPointOnMap(poiId, center.lat, center.lng, name, note);
+            renderPointOnMap(poiId, lat, lng, name, note);
             document.getElementById('poi-name').value = '';
             document.getElementById('poi-note').value = '';
             document.getElementById('poi-file').value = '';
@@ -5200,19 +5418,6 @@
             renderOperatorEditPanel();
         }
 
-        function updateOperatorKeyDisplay() {
-            var block = document.getElementById('operator-key-display-block');
-            var el = document.getElementById('operator-key-display');
-            if (!block || !el) return;
-            var session = localStorage.getItem('patrac_session');
-            if (isCommunityAdmin(session)) {
-                block.style.display = 'block';
-                el.textContent = OPERATOR_ADMIN_KEY;
-                return;
-            }
-            block.style.display = 'none';
-        }
-
         function findCommunityByCode(code) {
             if (!code) return null;
             var comms = getPatracCommunities();
@@ -5615,7 +5820,6 @@
             }
             populateTransferAdminSelect();
             renderShelterStory();
-            updateOperatorKeyDisplay();
         }
 
         function populateTransferAdminSelect() {
@@ -5636,7 +5840,6 @@
                 html += '<option value="' + members[i].userId + '">' + (members[i].account.playerName || members[i].userId) + '</option>';
             }
             sel.innerHTML = html;
-            updateOperatorKeyDisplay();
         }
 
         var base64ProfileEditAvatar = '';
@@ -6102,8 +6305,9 @@
             updateCraftBindLabel();
 
             updateAdminBar();
-            updateOperatorKeyDisplay();
             renderOperatorClanUI();
+
+            initPoctaModuleAsync();
 
             var tabBtn = document.querySelectorAll('.bottom-action-bar button')[0];
             switchMainTab('shelter', tabBtn);
@@ -6131,6 +6335,10 @@
         }
 
         function activatePlacementMode(questId) {
+            if (!canUseMapPlacement()) {
+                placeQuestAtGps(questId);
+                return;
+            }
             targetingMode = 'place_only';
             activeTargetingQuest = questId;
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
@@ -6143,13 +6351,41 @@
         function lockQuestLocationOnly(char) {
             var q = getQuestById(char);
             if (!q) return;
-            var center = getMapCenterCoords();
-            saveQuestCoords(char, center.lat, center.lng);
-            renderPointOnMap(char, center.lat, center.lng, q.mapLabel || q.title, q.desc);
+            var lat, lng;
+            if (canUseMapPlacement()) {
+                var center = getMapCenterCoords();
+                lat = center.lat;
+                lng = center.lng;
+            } else {
+                var pos = getUserPositionOrAlert();
+                if (!pos) return;
+                lat = pos.lat;
+                lng = pos.lng;
+            }
+            saveQuestCoords(char, lat, lng);
+            renderPointOnMap(char, lat, lng, q.mapLabel || q.title, q.desc);
             rebuildCustomLocLinkSelect();
             cancelTargeting();
             switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);
             alert('📍 Poloha „' + getQuestMapLabel(q) + '“ uložena. Misi splníš po fyzickém výkonu a potvrzení v rozkazech.');
+        }
+
+        function initPoctaModuleAsync() {
+            import('./src/pocta/index.js').then(function(mod) {
+                mod.initPoctaModule({
+                    map: map,
+                    mapPointsLayer: mapPointsLayer,
+                    mapMarkerRegistry: mapMarkerRegistry,
+                    lastUserPosition: lastUserPosition,
+                    distanceMeters: distanceMeters,
+                    switchMainTab: switchMainTab,
+                    getCommunityItemsRaw: getCommunityItemsRaw,
+                    saveCommunityItemsRaw: saveCommunityItemsRaw,
+                    loadCustomCraftedItems: loadCustomCraftedItems
+                });
+            }).catch(function(err) {
+                console.error('initPoctaModule', err);
+            });
         }
 
         function switchMainTab(tab, element) {
@@ -6187,8 +6423,11 @@
                 document.getElementById('content-shelter').style.display = (tab === 'shelter') ? 'block' : 'none';
                 document.getElementById('content-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';
                 document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
-                document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
+                document.getElementById('content-terminal').style.display = (tab === 'terminal') ? 'block' : 'none';
                 document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
+                if (tab === 'terminal' && typeof window.patracPoctaRenderTerminal === 'function') {
+                    window.patracPoctaRenderTerminal();
+                }
                 if (isOperatorMode) ensureOperatorEditContext();
             }
         }
@@ -6266,6 +6505,14 @@
         }
 
         function activateTargeting(char) {
+            if (!canUseMapPlacement()) {
+                if (hasStoredQuestCoords(char)) {
+                    completeQuestAtLocation(char);
+                } else {
+                    placeQuestAtGps(char);
+                }
+                return;
+            }
             targetingMode = 'complete';
             activeTargetingQuest = char;
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
@@ -6285,27 +6532,16 @@
 
             var center = getMapCenterCoords();
             saveQuestCoords(char, center.lat, center.lng);
-
-            recordMissionComplete(q);
+            var poctaReward = finalizeQuestComplete(q);
             renderPointOnMap(char, center.lat, center.lng, q.mapLabel || q.title, q.desc);
-
-            var comItems = getCommunityItemsRaw().slice();
-            var persItems = getCurrentPersonalItems().slice();
-            for (var i = 0; i < comItems.length; i++) { if (comItems[i].bind === char) comItems[i].locked = false; }
-            for (var i = 0; i < persItems.length; i++) { if (persItems[i].bind === char) persItems[i].locked = false; }
-            saveCommunityItemsRaw(comItems);
-            saveCurrentPersonalItems(persItems);
-
-            updateStatsHud();
-            renderQuestList();
-            rebuildSelectOptions();
-            rebuildCustomLocLinkSelect();
-            ensureRandomQuests();
-            loadCustomCraftedItems();
 
             cancelTargeting();
             switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);
-            alert("📍 Cíl zaměřen! Mise zapsána do profilu. Odměna v inventáři.");
+            var msg = "📍 Cíl zaměřen (admin)! Mise zapsána do profilu. Odměna v inventáři.";
+            if (poctaReward) {
+                msg += '\n\n🕯️ Pocta: „' + poctaReward.title + '“ → inventář komunity.';
+            }
+            alert(msg);
         }
 
         function createNewCustomLocation() {
@@ -6363,14 +6599,7 @@
 
             var msg = "Operace vytvořena.\nZadavatel: " + assignerChar + " (" + (SPECIALIZATION_MAP[assignerKey] || '') + ")";
             if (req.length) msg += "\nPožadavek: " + req.join(', ');
-            if (posMode === 'link') msg += "\n📍 Poloha připojena k existujícímu bodu.";
-            if (posMode === 'map_now') {
-                localStorage.setItem('unlocked_story_' + randId, 'true');
-                msg += "\n🗺️ Nyní zaměř polohu na mapě.";
-                alert(msg);
-                activatePlacementMode(randId);
-                return;
-            }
+            if (posMode === 'link') msg += "\n📍 Poloha připojena k vybranému bodu na mapě.";
             alert(msg);
         }
 
@@ -6493,6 +6722,10 @@
             if (item.itemType === 'tool') {
                 return '<div class="item-rank-summary">🔧 Nástroj</div>';
             }
+            if (item.itemType === 'pocta') {
+                var phaseLabel = item.poctaPhase === 'anchored' ? 'Ukotvená' : 'Neaktivovaná';
+                return '<div class="item-rank-summary" style="color:#e8c547;">🕯️ Pocta · ' + phaseLabel + '</div>';
+            }
             var rank = getTalismanStatusDisplay(item);
             if (!rank) return '';
             return '<div class="item-rank-summary">⭐ ' + rank.label + '</div>';
@@ -6500,6 +6733,15 @@
 
         function getItemDetailHtml(item) {
             var html = '';
+            if (item.itemType === 'pocta') {
+                html += '<div class="item-type-badge" style="margin-top:0;border-color:#e8c547;color:#e8c547;">🕯️ POCTA — příběhový artefakt komunity</div>';
+                html += '<div class="item-meta-info" style="color:#e8c547;">Terminálový kód: <strong style="letter-spacing:0.12em;">' + (item.poctaCode || '—') + '</strong></div>';
+                html += '<div class="item-meta-info">Fáze: ' + (item.poctaPhase === 'anchored' ? 'Ukotvená na mapě' : 'Neaktivovaná — čeká na ukotvení v terénu (GPS)') + '</div>';
+                if (item.lore) {
+                    html += '<div class="item-meta-info" style="color:#aaa;">' + item.lore + '</div>';
+                }
+                return html;
+            }
             if (item.spec) {
                 html += '<div style="font-size:8px; color:#ffcc00; margin-top:2px;">✨ ' + item.spec + '</div>';
             }
@@ -6572,9 +6814,13 @@
                     var detailId = (isComm ? 'com' : 'pers') + '-' + i;
                     var imgHtml = item.img ? '<img src="' + item.img + '">' : '📦';
                     var blueprintWatermark = (item.locked && item.itemType !== 'tool') ? '<div class="blueprint-alert">PROTOTYP<br>PLÁN</div>' : '';
+                    if (item.itemType === 'pocta') {
+                        imgHtml = '<span style="font-size:24px;line-height:42px;display:block;text-align:center;">🕯️</span>';
+                        blueprintWatermark = '<div class="blueprint-alert" style="border-color:#e8c547;color:#e8c547;font-size:7px;">POCTA<br>NEAKT.</div>';
+                    }
                     var rankSummary = getItemRankSummaryHtml(item);
                     var detailHtml = getItemDetailHtml(item);
-                    var cardClick = isOperatorMode ? '' : ' onclick="moveItem(' + i + ', ' + isComm + ')"';
+                    var cardClick = (isOperatorMode || item.itemType === 'pocta') ? '' : ' onclick="moveItem(' + i + ', ' + isComm + ')"';
 
                     html += '<div class="item-craft-card"' + cardClick + '>';
                     html += '<div class="item-main-row">';
@@ -6595,9 +6841,13 @@
                     html += '<button type="button" class="btn-item-detail" onclick="event.stopPropagation(); toggleItemDetail(\'' + detailId + '\', this)">▼ Detail předmětu</button>';
                     html += '<div class="item-detail-panel" id="item-detail-' + detailId + '">';
                     html += detailHtml;
-                    html += '<div style="margin-top:6px; display:flex; gap:4px;">';
-                    html += '<button class="btn-accept" style="font-size:7px; padding:3px 6px; border-color:#ffcc00; color:#ffcc00;" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
-                    html += '<button class="btn-accept" style="font-size:7px; padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT</button>';
+                    html += '<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">';
+                    if (item.itemType !== 'pocta') {
+                        html += '<button class="btn-accept" style="font-size:7px; padding:3px 6px; border-color:#ffcc00; color:#ffcc00;" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
+                        html += '<button class="btn-accept" style="font-size:7px; padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT</button>';
+                    } else if (isComm && item.poctaPhase !== 'anchored') {
+                        html += '<span style="font-size:8px;color:#888;">Ukotvení GPS — brzy v další fázi modulu.</span>';
+                    }
                     html += '</div></div></div>';
                 }
                 return html === "" ? '<p style="font-size:9px; color:#444; text-align:center;">Prázdno</p>' : html;
@@ -6636,6 +6886,10 @@
             if (fromCommunity) {
                 if (index < 0 || index >= comDisplay.length) return;
                 var item = comDisplay[index];
+                if (item.itemType === 'pocta') {
+                    alert('Pocta je majetek celé komunity — zůstává ve skladu, ne v osobním batohu.');
+                    return;
+                }
                 var rawIdx = findItemIndexInRawByIdentity(comRaw, item);
                 if (rawIdx === -1) return;
                 comRaw.splice(rawIdx, 1);
@@ -6652,6 +6906,13 @@
         }
 
         function destroyItem(index, isComm) {
+            if (isComm) {
+                var resolved = resolveCommunityItemAtDisplayIndex(index);
+                if (resolved && resolved.item.itemType === 'pocta') {
+                    alert('Poctu nelze zničit — lze ji ukotvit na mapě nebo vyzvednout zpět do inventáře.');
+                    return;
+                }
+            }
             if (confirm("Zničit věc klanu?")) {
                 if (isComm) {
                     var resolved = resolveCommunityItemAtDisplayIndex(index);
@@ -6792,6 +7053,15 @@
                 mod.setPatracTextSize(size);
             });
         };
+
+        window.patracSetCompassVisible = function(visible) {
+            import('./src/settings.js').then(function(mod) {
+                mod.setPatracCompassVisible(visible);
+            });
+        };
+
+        window.placeQuestAtGps = placeQuestAtGps;
+        window.completeQuestAtLocation = completeQuestAtLocation;
 
         window.renderQuestList = renderQuestList;
 

@@ -99,6 +99,9 @@
                      "textSize":  "Text size",
                      "textDefault":  "Standard",
                      "textLarge":  "Large",
+                     "compass":  "Map compass",
+                     "compassShow":  "Show",
+                     "compassHide":  "Hide",
                      "logout":  "⏻ LOG OUT"
                  },
     "quests":  {
