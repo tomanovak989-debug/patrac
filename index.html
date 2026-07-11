@@ -336,6 +336,24 @@
             text-transform: uppercase;
         }
         .gate-link:hover { color: var(--gate-accent); }
+        .gate-lang-switch {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            margin-top: 14px; padding: 8px 0 2px;
+            font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+            border-top: 1px dotted rgba(106, 106, 106, 0.35);
+        }
+        .gate-lang-switch-label { color: var(--gate-text-dim); font-size: 9px; margin-right: 4px; }
+        .gate-lang-switch button {
+            display: inline-block; margin: 0; padding: 4px 10px;
+            border: 1px solid var(--gate-border); background: var(--gate-input-bg);
+            color: var(--gate-text); font-family: inherit; font-size: 9px;
+            letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
+        }
+        .gate-lang-switch button:hover { border-color: var(--gate-accent); color: var(--gate-accent); }
+        .gate-lang-switch button.is-active {
+            border-color: var(--gate-accent); color: var(--gate-accent-hover);
+            box-shadow: 0 0 8px rgba(138, 148, 136, 0.25);
+        }
         .gate-error {
             display: none; font-size: 9px; color: #c07070;
             margin-bottom: 10px; letter-spacing: 0.04em;
@@ -397,6 +415,22 @@
             padding: 10px 12px; cursor: pointer; letter-spacing: 0.08em;
         }
         .hud-menu-item:hover { background: rgba(255, 85, 0, 0.08); }
+        .hud-menu-lang {
+            display: flex; gap: 6px; padding: 8px 12px 10px;
+            border-top: 1px dotted rgba(74, 246, 38, 0.2);
+        }
+        .hud-menu-lang-btn {
+            flex: 1; background: rgba(8, 14, 8, 0.9);
+            border: 1px solid rgba(74, 246, 38, 0.35);
+            color: var(--text-green-dim); font-family: inherit;
+            font-size: 9px; font-weight: bold; letter-spacing: 0.08em;
+            padding: 6px 8px; cursor: pointer;
+        }
+        .hud-menu-lang-btn:hover { border-color: var(--text-green); color: var(--text-green); }
+        .hud-menu-lang-btn.is-active {
+            border-color: var(--text-green); color: var(--text-green);
+            box-shadow: var(--neon-glow);
+        }
         .left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; }
         .tool-btn {
             background-color: var(--hud-bg); border: 1px solid var(--hud-border);
@@ -971,6 +1005,11 @@
             <header class="gate-header">
                 <h1 data-i18n="gate.header.title">PÁTRAČ</h1>
                 <p class="gate-subtitle" data-i18n="gate.header.subtitle">Síť znovuobjevení</p>
+                <div class="gate-lang-switch" id="gate-lang-switch">
+                    <span class="gate-lang-switch-label" data-i18n="gate.lang.label">Jazyk</span>
+                    <button type="button" id="btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
+                    <button type="button" id="btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
+                </div>
             </header>
 
             <div id="gate-login" class="gate-panel active">
@@ -987,11 +1026,6 @@
                 <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-register')" data-i18n="gate.login.register">REGISTRACE NOVÉHO PÁTRAČE</button>
                 <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;" onclick="switchGatePage('gate-recover')" data-i18n="gate.login.recover">[ OBNOVA HESLA PŘES EMAIL ]</button>
                 <a class="gate-link" href="predstaveni.html" data-i18n="gate.login.projectStatus">[STATUS: PŘEDSTAVENÍ PROJEKTU]</a>
-                <div class="gate-lang-switch" style="margin-top:12px;font-size:9px;color:var(--gate-text-dim);text-align:center;">
-                    <button type="button" class="gate-link" style="border:none;background:none;cursor:pointer;padding:0 4px;" onclick="patracSetLanguage('cs')">CS</button>
-                    <span>|</span>
-                    <button type="button" class="gate-link" style="border:none;background:none;cursor:pointer;padding:0 4px;" onclick="patracSetLanguage('en')">EN</button>
-                </div>
             </div>
 
             <div id="gate-operator" class="gate-panel">
@@ -1108,6 +1142,10 @@
             <div id="hud-menu-dropdown" class="hud-menu-dropdown">
                 <div class="hud-menu-user" id="hud-menu-user-id">—</div>
                 <button type="button" class="hud-menu-item" onclick="patracLogout()">⏻ OHLÁSIT SE</button>
+                <div class="hud-menu-lang">
+                    <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
+                    <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
+                </div>
             </div>
         </div>
         <div style="color:var(--text-green)" id="gps-status-text">● DETEKCE GPS SIGNÁLU...</div>

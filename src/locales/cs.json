@@ -4,6 +4,9 @@
       "title": "PÁTRAČ",
       "subtitle": "Síť znovuobjevení"
     },
+    "lang": {
+      "label": "Jazyk"
+    },
     "login": {
       "userIdLabel": "Uživatelské ID",
       "userIdPlaceholder": "identifikátor pátrače",

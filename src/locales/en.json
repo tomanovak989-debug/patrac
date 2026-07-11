@@ -4,6 +4,9 @@
       "title": "PÁTRAČ",
       "subtitle": "Network of Rediscovery"
     },
+    "lang": {
+      "label": "Language"
+    },
     "login": {
       "userIdLabel": "User ID",
       "userIdPlaceholder": "tracker identifier",

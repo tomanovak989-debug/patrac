@@ -1,8 +1,7 @@
 /**
  * Přihlašovací brána — první i18n „komponenta“ (vanilla HTML + data-i18n).
- * Vzor pro další panely: přidej klíče do cs.json/en.json, atributy do HTML, zavolej apply*.
  */
-import { applyI18nToDom, setPatracLanguage, t } from '../i18n.js';
+import { applyI18nToDom, setPatracLanguage, t, getPatracLanguage } from '../i18n.js';
 
 export function applyGateHeaderI18n() {
     var header = document.querySelector('.gate-header');
@@ -14,10 +13,20 @@ export function applyGateLoginI18n() {
     if (panel) applyI18nToDom(panel);
 }
 
-/** Celá brána — header + přihlašovací panel (Main Menu). */
 export function applyGateI18n() {
     applyGateHeaderI18n();
     applyGateLoginI18n();
+    updateLanguageButtons(getPatracLanguage());
+}
+
+export function updateLanguageButtons(code) {
+    var ids = ['btn-lang-cs', 'btn-lang-en', 'hud-btn-lang-cs', 'hud-btn-lang-en'];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i]);
+        if (!el) continue;
+        var isCs = ids[i].indexOf('-cs') !== -1;
+        el.classList.toggle('is-active', (code === 'cs' && isCs) || (code === 'en' && !isCs));
+    }
 }
 
 export async function switchGateLanguage(code) {
