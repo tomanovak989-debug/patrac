@@ -6,51 +6,30 @@
     <title>PÁTRAČ — Síť znovuobjevení</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="src/theme.css" />
+    <link rel="stylesheet" href="src/globals.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --hud-bg: rgba(8, 12, 8, 0.92);
-            --hud-border: rgba(74, 246, 38, 0.55);
-            --text-green: #4af626;
-            --text-green-dim: #8fd87a;
             --danger-orange: #ff5500;
             --xp-blue: #0088ff;
-            --neon-glow: 0 0 8px rgba(74, 246, 38, 0.35), 0 0 20px rgba(74, 246, 38, 0.12), inset 0 0 30px rgba(74, 246, 38, 0.03);
-            --neon-glow-strong: 0 0 12px rgba(74, 246, 38, 0.55), 0 0 28px rgba(74, 246, 38, 0.2), inset 0 0 40px rgba(74, 246, 38, 0.05);
-            --text-glow: 0 0 4px rgba(74, 246, 38, 0.45), 0 0 10px rgba(74, 246, 38, 0.15);
             --panel-padding: 14px;
             --panel-line-height: 1.7;
             --font-weight-normal: 500;
             --font-weight-bold: 600;
-            --gate-bg: #070707;
-            --gate-panel: #0c0c0c;
-            --gate-border: #2a2a2a;
-            --gate-text: #6a6a6a;
-            --gate-text-dim: #444;
-            --gate-accent: #8a9488;
-            --gate-accent-hover: #a8b4a4;
-            --gate-input-bg: #050505;
-            --text-muted: #b8e8a8;
-            --text-body: #f0fff0;
-            --text-label: #d8ffd0;
         }
 
         body.contrast-enhanced {
-            --gate-text: #c8d4c4;
-            --gate-text-dim: #a0b0a0;
-            --text-green-dim: #b8f0a8;
             color: var(--text-body);
         }
 
         /* CRT efekt jen na HUD panelech — mapa zůstává čistá */
         html, body {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #030503;
             font-family: 'IBM Plex Mono', 'Courier New', monospace;
             font-weight: var(--font-weight-normal);
-            overflow: hidden; color: #f0fff0;
+            overflow: hidden;
             line-height: var(--panel-line-height);
             letter-spacing: 0.02em;
             -webkit-font-smoothing: antialiased;
@@ -129,8 +108,8 @@
 
         .setup-container {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 100; border: 2px solid var(--text-green);
-            background-color: rgba(6, 10, 6, 0.96);
+            z-index: 100; border: 2px solid var(--border-color);
+            background-color: var(--overlay-bg);
             padding: 22px; width: 95%; max-width: 420px;
             box-shadow: var(--neon-glow-strong);
             border-radius: 2px; box-sizing: border-box; max-height: 90vh; overflow-y: auto;
@@ -207,7 +186,7 @@
             font-weight: bold; padding: 5px 8px; cursor: pointer; letter-spacing: 0.06em;
         }
         #operator-admin-bar .op-bar-actions button.btn-op-save {
-            border-color: #ffcc00; color: #ffcc00;
+            border-color: var(--accent-gold); color: var(--accent-gold);
         }
         #operator-admin-bar .op-bar-actions button.btn-op-exit-admin {
             border-color: var(--text-green); color: var(--text-green);
@@ -223,11 +202,11 @@
             background: rgba(20, 10, 6, 0.6);
             font-size: var(--text-base);
         }
-        .operator-member-row.is-editing { border-color: #ffcc00; background: rgba(30, 20, 6, 0.75); }
+        .operator-member-row.is-editing { border-color: var(--accent-gold); background: rgba(30, 20, 6, 0.75); }
         .operator-member-row.is-bot { border-color: rgba(74, 246, 38, 0.35); }
         .operator-member-row .btn-op-remove {
             font-size: var(--text-xxs); padding: 4px 6px; margin-left: 4px;
-            border: 1px solid #888; color: #888;
+            border: 1px solid #888; color: var(--muted-fg);
             background: none; font-family: inherit; cursor: pointer; white-space: nowrap;
         }
         .operator-bot-tools {
@@ -241,7 +220,7 @@
             background: none; font-family: inherit; cursor: pointer; white-space: nowrap;
         }
         #operator-edit-panel {
-            display: none; border: 1px solid #ffcc00;
+            display: none; border: 1px solid var(--accent-gold);
             background: rgba(20, 14, 6, 0.92); padding: 10px; margin-bottom: 12px;
         }
         #operator-edit-panel.open { display: block; }
@@ -251,7 +230,7 @@
         }
         .operator-mission-row {
             display: flex; align-items: flex-start; gap: 6px;
-            font-size: var(--text-sm); color: #aaa; margin-bottom: 4px; line-height: 1.35;
+            font-size: var(--text-sm); color: var(--subtle-fg); margin-bottom: 4px; line-height: 1.35;
         }
         .operator-mission-row input { margin-top: 2px; flex-shrink: 0; }
         .operator-spec-grid { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; margin-top: 6px; }
@@ -260,29 +239,29 @@
         .operator-spec-controls { display: flex; align-items: center; gap: 4px; }
         .operator-spec-controls button {
             width: 22px; height: 22px; padding: 0; font-size: var(--text-lg); line-height: 1;
-            border: 1px solid var(--hud-border); background: rgba(8,14,8,0.9);
+            border: 1px solid var(--hud-border); background: var(--panel-bg-alt);
             color: var(--text-green); cursor: pointer; font-family: inherit;
         }
-        .operator-spec-val { min-width: 20px; text-align: center; font-size: var(--text-base); color: #ffcc00; }
+        .operator-spec-val { min-width: 20px; text-align: center; font-size: var(--text-base); color: var(--accent-gold); }
         .operator-spec-input {
             width: 44px; height: 22px; padding: 0 4px; text-align: center;
-            font-size: var(--text-base); color: #ffcc00;
-            border: 1px solid var(--hud-border); background: rgba(8, 14, 8, 0.9);
+            font-size: var(--text-base); color: var(--accent-gold);
+            border: 1px solid var(--hud-border); background: var(--panel-bg-alt);
             font-family: inherit; -moz-appearance: textfield;
         }
         .operator-spec-input::-webkit-outer-spin-button,
         .operator-spec-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         .operator-item-level-row {
             display: flex; align-items: center; gap: 6px; margin-top: 4px;
-            font-size: var(--text-xs); color: #ffcc00;
+            font-size: var(--text-xs); color: var(--accent-gold);
         }
         .operator-item-level-row button {
             width: 22px; height: 20px; padding: 0; font-size: var(--text-md);
-            border: 1px solid #ffcc00; background: rgba(20,14,6,0.9);
-            color: #ffcc00; cursor: pointer; font-family: inherit;
+            border: 1px solid var(--accent-gold); background: rgba(20,14,6,0.9);
+            color: var(--accent-gold); cursor: pointer; font-family: inherit;
         }
         .operator-key-hint {
-            font-size: var(--text-xs); color: #666; margin-top: 4px; word-break: break-all;
+            font-size: var(--text-xs); color: var(--dim-fg); margin-top: 4px; word-break: break-all;
         }
 
         /* ── Režim operátor ── */
@@ -290,7 +269,7 @@
         .gate-header { margin-bottom: 28px; padding-right: 64px; }
         .gate-header h1 {
             margin: 0; font-size: var(--text-title); font-weight: 700;
-            letter-spacing: 0.28em; color: #9a9a9a;
+            letter-spacing: 0.28em; color: var(--gate-heading);
             text-transform: uppercase;
         }
         .gate-subtitle {
@@ -338,10 +317,10 @@
             width: 100%; min-height: var(--touch-min-h, 44px);
             padding: var(--touch-pad-y, 10px) var(--touch-pad-x, 14px); margin-top: 10px;
             background: transparent; border: 1px solid #333;
-            color: #888; font-family: inherit; font-size: var(--text-sm);
+            color: var(--muted-fg); font-family: inherit; font-size: var(--text-sm);
             letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
         }
-        .gate-btn-secondary:active { border-color: #555; color: #777; }
+        .gate-btn-secondary:active { border-color: var(--faint-fg); color: #777; }
         .gate-link {
             display: block; margin-top: 22px; text-align: center;
             font-size: var(--text-xs); color: var(--gate-text-dim);
@@ -375,11 +354,11 @@
         }
         .gate-error.visible { display: block; }
         .gate-register-title {
-            font-size: var(--text-base); color: #666; letter-spacing: 0.14em;
+            font-size: var(--text-base); color: var(--dim-fg); letter-spacing: 0.14em;
             text-transform: uppercase; margin: 0 0 16px 0;
             border-bottom: 1px solid #222; padding-bottom: 8px;
         }
-        .gate-divider { height: 1px; background: #1a1a1a; margin: 18px 0; }
+        .gate-divider { height: 1px; background: var(--gate-divider); margin: 18px 0; }
 
         .hud-element {
             position: absolute; z-index: 10;
@@ -411,13 +390,13 @@
         }
         .hud-menu-dropdown {
             display: none; position: absolute; top: calc(100% + 6px); left: 0;
-            min-width: 180px; background: rgba(6, 10, 6, 0.98);
+            min-width: 180px; background: var(--overlay-bg);
             border: 1px solid var(--hud-border); box-shadow: var(--neon-glow);
             z-index: 30; padding: 6px 0;
         }
         .hud-menu-dropdown.open { display: block; }
         .hud-menu-user {
-            font-size: var(--text-sm); color: #666; padding: 6px 12px 8px;
+            font-size: var(--text-sm); color: var(--dim-fg); padding: 6px 12px 8px;
             border-bottom: 1px dotted rgba(74, 246, 38, 0.2);
             letter-spacing: 0.06em;
         }
@@ -433,7 +412,7 @@
             border-top: 1px dotted rgba(74, 246, 38, 0.2);
         }
         .hud-menu-lang-btn {
-            flex: 1; background: rgba(8, 14, 8, 0.9);
+            flex: 1; background: var(--panel-bg-alt);
             border: 1px solid rgba(74, 246, 38, 0.35);
             color: var(--text-green-dim); font-family: inherit;
             font-size: var(--text-sm); font-weight: bold; letter-spacing: 0.08em;
@@ -466,7 +445,7 @@
         .hud-menu-toggle { display: flex; gap: 6px; }
         .hud-menu-toggle-btn {
             min-height: 36px; min-width: 44px; padding: 6px 10px;
-            background: rgba(8, 14, 8, 0.9);
+            background: var(--panel-bg-alt);
             border: 1px solid rgba(74, 246, 38, 0.35);
             color: var(--text-green-dim); font-family: inherit;
             font-size: var(--text-sm); font-weight: bold;
@@ -499,7 +478,7 @@
         .left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; }
         .tool-btn {
             background-color: var(--hud-bg); border: 1px solid var(--hud-border);
-            color: #e8ffe8; width: 50px; min-height: var(--touch-min-h, 42px);
+            color: var(--badge-fg); width: 50px; min-height: var(--touch-min-h, 42px);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             font-size: var(--text-xxs); cursor: pointer; font-family: inherit;
             padding: var(--touch-pad-y, 6px) 4px; line-height: 1.4;
@@ -544,66 +523,66 @@
             padding: 10px 14px; font-size: var(--text-base); text-align: center; color: var(--text-green);
             line-height: var(--panel-line-height);
         }
-        .bottom-action-bar { height: 44px; display: flex; background-color: rgba(3, 5, 3, 0.95); border-top: 1px solid var(--hud-border); }
+        .bottom-action-bar { height: 44px; display: flex; background-color: var(--bar-bg); border-top: 1px solid var(--hud-border); }
         .action-tab {
             flex: 1; display: flex; align-items: center; justify-content: center;
-            font-size: var(--text-base); font-weight: bold; background: none; color: #555;
-            border: none; border-right: 1px solid rgba(74,246,38,0.2); font-family: inherit;
+            font-size: var(--text-base); font-weight: bold; background: none; color: var(--faint-fg);
+            border: none; border-right: 1px solid var(--tab-divider); font-family: inherit;
             letter-spacing: 0.06em;
         }
-        .action-tab.active { color: var(--text-green); background-color: rgba(74, 246, 38, 0.08); text-shadow: var(--text-glow); }
+        .action-tab.active { color: var(--text-green); background-color: var(--accent-hover-bg); text-shadow: var(--text-glow); }
 
         .quest-section-title {
-            font-size: var(--text-base); color: #7a9a72; text-transform: uppercase;
-            margin: 16px 0 8px 0; border-bottom: 1px solid rgba(74,246,38,0.25);
+            font-size: var(--text-base); color: var(--section-title-color); text-transform: uppercase;
+            margin: 16px 0 8px 0; border-bottom: 1px solid var(--divider-dotted);
             padding-bottom: 6px; letter-spacing: 0.12em;
         }
         .quest-card {
-            background: rgba(12, 18, 12, 0.75); border: 1px solid var(--hud-border);
+            background: var(--panel-bg); border: 1px solid var(--hud-border);
             padding: var(--panel-padding); margin-bottom: 10px; border-radius: 2px;
             font-size: var(--text-lg); line-height: var(--panel-line-height);
         }
         .quest-body { line-height: var(--panel-line-height); color: var(--text-green-dim); margin: 6px 0; }
         .btn-accept {
-            background: rgba(8, 14, 8, 0.9); border: 1px solid var(--text-green);
+            background: var(--panel-bg-alt); border: 1px solid var(--border-color);
             color: var(--text-green); padding: 8px 12px; font-size: var(--text-base);
             font-family: inherit; font-weight: var(--font-weight-bold); cursor: pointer; margin-top: 6px;
             letter-spacing: 0.05em; line-height: 1.5;
             transition: box-shadow 0.15s, background 0.15s;
         }
-        .btn-accept:hover { box-shadow: var(--neon-glow-strong); background: rgba(74, 246, 38, 0.08); }
+        .btn-accept:hover { box-shadow: var(--neon-glow-strong); background: var(--accent-hover-bg); }
         .btn-gps-lock {
-            background: rgba(30, 14, 8, 0.9); border: 1px solid var(--danger-orange);
+            background: var(--gps-btn-bg); border: 1px solid var(--danger-orange);
             color: var(--danger-orange); width: 100%; padding: 10px 12px;
             font-family: inherit; font-size: var(--text-base); font-weight: bold; margin-top: 8px;
             cursor: pointer; text-transform: uppercase; text-align: center;
-            text-shadow: 0 0 8px rgba(255, 85, 0, 0.5);
+            text-shadow: none;
             line-height: 1.5;
         }
 
         .form-group { margin-bottom: 14px; display: flex; flex-direction: column; gap: 4px; }
         .form-group label { font-size: var(--text-md); font-weight: var(--font-weight-bold); color: var(--text-green); letter-spacing: 0.06em; }
         .form-group input, .form-group textarea, .form-group select {
-            background-color: rgba(6, 10, 6, 0.95); border: 1px solid var(--hud-border);
-            color: #f0fff0; padding: 10px; font-family: inherit; font-size: var(--text-lg);
+            background-color: var(--input-bg); border: 1px solid var(--hud-border);
+            color: var(--text-body); padding: 10px; font-family: inherit; font-size: var(--text-lg);
             font-weight: var(--font-weight-normal);
-            line-height: var(--panel-line-height); box-shadow: inset 0 0 12px rgba(74, 246, 38, 0.04);
+            line-height: var(--panel-line-height); box-shadow: var(--input-inset-shadow);
             width: 100%; max-width: 100%; box-sizing: border-box;
         }
 
         .community-profile-card {
-            border: 1px solid rgba(255, 204, 0, 0.35);
-            background: rgba(14, 12, 8, 0.92);
+            border: 1px solid var(--community-border);
+            background: var(--card-community-bg);
             padding: 12px; margin-bottom: 8px; border-radius: 2px;
             line-height: var(--panel-line-height); font-size: var(--text-base);
         }
         .community-profile-card .com-admin-badge {
-            font-size: var(--text-xs); color: #ffcc00; letter-spacing: 0.08em; margin-top: 4px;
+            font-size: var(--text-xs); color: var(--accent-gold); letter-spacing: 0.08em; margin-top: 4px;
         }
         .community-members-title {
-            font-size: var(--text-xs); color: #666; letter-spacing: 0.12em;
+            font-size: var(--text-xs); color: var(--dim-fg); letter-spacing: 0.12em;
             margin: 10px 0 6px 0; text-transform: uppercase;
-            border-top: 1px dotted rgba(255,204,0,0.2); padding-top: 8px;
+            border-top: 1px dotted var(--community-divider); padding-top: 8px;
         }
         .community-members-row {
             display: flex; flex-direction: column; gap: 6px;
@@ -622,14 +601,14 @@
             width: 32px; height: 32px; font-size: var(--text-micro);
         }
         .community-member-row-name {
-            font-size: var(--text-xs); color: #888; line-height: 1.2;
+            font-size: var(--text-xs); color: var(--muted-fg); line-height: 1.2;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             max-width: 52px;
         }
         .community-member-row.is-self .community-member-row-name { color: var(--text-green); }
         .community-member-row.is-active {
-            background: rgba(74, 246, 38, 0.1);
-            box-shadow: inset 0 0 0 1px rgba(74, 246, 38, 0.55);
+            background: var(--active-row-bg);
+            box-shadow: inset 0 0 0 1px var(--active-row-border);
             border-radius: 2px;
         }
         .community-member-row.is-active .community-member-row-name {
@@ -637,9 +616,9 @@
         }
         .community-member-row.is-active .community-member-row-profile .avatar-box {
             border-color: var(--text-green);
-            box-shadow: 0 0 8px rgba(74, 246, 38, 0.45);
+            box-shadow: 0 0 8px var(--active-row-glow);
         }
-        .community-member-row.is-founder .community-member-row-profile .avatar-box { border-color: #ffcc00; }
+        .community-member-row.is-founder .community-member-row-profile .avatar-box { border-color: var(--accent-gold); }
         .community-member-row-wear {
             display: flex; flex-wrap: nowrap; gap: 6px;
             overflow-x: auto; flex: 1; min-width: 0; align-items: center;
@@ -651,9 +630,9 @@
             width: 32px; height: 32px; font-size: var(--text-lg);
         }
         .rank-next-hint {
-            font-size: var(--text-xs); color: #888; margin-top: 2px; line-height: 1.35;
+            font-size: var(--text-xs); color: var(--muted-fg); margin-top: 2px; line-height: 1.35;
         }
-        .rank-next-hint strong { color: #aaa; font-weight: normal; }
+        .rank-next-hint strong { color: var(--subtle-fg); font-weight: normal; }
         .profile-edit-panel {
             display: none; margin-top: 8px; padding-top: 8px;
             border-top: 1px dotted rgba(74,246,38,0.25);
@@ -666,38 +645,38 @@
         .mini-profile-card {
             display: flex; align-items: center; gap: 12px;
             border: 1px solid var(--hud-border); padding: 12px;
-            background: rgba(10, 16, 10, 0.92); margin-bottom: 0;
+            background: var(--card-profile-bg); margin-bottom: 0;
             line-height: var(--panel-line-height);
         }
         .shelter-profile-block {
             margin-bottom: 10px;
         }
         .wear-section-title {
-            font-size: var(--text-xs); color: #666; letter-spacing: 0.1em;
+            font-size: var(--text-xs); color: var(--dim-fg); letter-spacing: 0.1em;
             margin: 8px 0 5px 0; text-transform: uppercase;
         }
         .wear-items-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; align-items: flex-start; }
         .wear-compact-list {
-            font-size: var(--text-xs); color: #aaa; line-height: 1.55;
+            font-size: var(--text-xs); color: var(--subtle-fg); line-height: 1.55;
             max-height: 80px; overflow-y: auto; width: 100%;
         }
-        .wear-compact-list .wear-all-shared { color: #ffcc00; }
+        .wear-compact-list .wear-all-shared { color: var(--accent-gold); }
         .wear-item-chip {
             display: flex; flex-direction: column; align-items: center;
-            width: 52px; font-size: var(--text-xxs); color: #888; text-align: center; line-height: 1.25;
+            width: 52px; font-size: var(--text-xxs); color: var(--muted-fg); text-align: center; line-height: 1.25;
         }
         .wear-item-chip .avatar-box { width: 40px; height: 40px; margin-bottom: 3px; font-size: var(--text-heading); }
-        .wear-item-chip.is-shared { color: #ffcc00; }
-        .wear-item-chip.is-shared .avatar-box { border-color: #ffcc00; }
+        .wear-item-chip.is-shared { color: var(--accent-gold); }
+        .wear-item-chip.is-shared .avatar-box { border-color: var(--accent-gold); }
         .shelter-story-panel {
-            border: 1px solid rgba(74, 246, 38, 0.3);
-            background: rgba(8, 14, 10, 0.88);
+            border: 1px solid var(--hud-border);
+            background: var(--card-story-bg);
             padding: 12px; margin-bottom: 12px;
             font-size: var(--text-base); line-height: 1.55; color: var(--text-green-dim);
             border-radius: 2px;
         }
         .shelter-story-panel .story-tier-label {
-            font-size: var(--text-xs); color: #ffcc00; letter-spacing: 0.12em;
+            font-size: var(--text-xs); color: var(--accent-gold); letter-spacing: 0.12em;
             margin-bottom: 6px; text-transform: uppercase;
         }
         .terminal-code-row {
@@ -707,24 +686,24 @@
             flex: 1; letter-spacing: 0.2em; text-transform: uppercase;
             font-size: var(--text-heading); text-align: center;
         }
-        .terminal-entry-card { background: rgba(10, 14, 10, 0.55); }
+        .terminal-entry-card { background: var(--terminal-card-bg); }
         .pocta-popup .popup-desc { text-transform: none; letter-spacing: 0.02em; }
         .data-karta-block { margin-bottom: 12px; }
         .data-karta-search-wrap { position: relative; margin: 8px 0 10px; }
         .data-karta-search-label {
-            display: block; font-size: var(--text-xs); color: #666;
+            display: block; font-size: var(--text-xs); color: var(--dim-fg);
             text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 4px;
         }
         .data-karta-search {
             width: 100%; box-sizing: border-box;
-            background: rgba(6, 10, 6, 0.95); border: 1px solid var(--hud-border);
+            background: var(--input-bg); border: 1px solid var(--hud-border);
             color: var(--text-green); padding: 8px 10px; font-family: inherit; font-size: var(--text-base);
         }
         .data-karta-search:focus { outline: none; border-color: var(--text-green); box-shadow: var(--neon-glow); }
         .data-karta-suggest {
             display: none; position: absolute; top: calc(100% - 2px); left: 0; right: 0; z-index: 620;
             list-style: none; margin: 0; padding: 0;
-            background: rgba(6, 10, 6, 0.98); border: 1px solid var(--text-green);
+            background: var(--overlay-bg); border: 1px solid var(--border-color);
             max-height: 160px; overflow-y: auto; box-shadow: var(--neon-glow-strong);
         }
         .data-karta-suggest.visible { display: block; }
@@ -732,13 +711,13 @@
             padding: 8px 10px; font-size: var(--text-base); cursor: pointer;
             border-bottom: 1px dotted rgba(74,246,38,0.15); color: #ccc;
         }
-        .data-karta-suggest li:hover, .data-karta-suggest li:focus { background: rgba(74,246,38,0.1); color: var(--text-green); outline: none; }
-        .data-karta-suggest .data-karta-hint { color: #666; font-style: italic; cursor: default; }
-        .data-karta-suggest .data-karta-hint:hover { background: transparent; color: #666; }
+        .data-karta-suggest li:hover, .data-karta-suggest li:focus { background: var(--suggest-hover); color: var(--text-green); outline: none; }
+        .data-karta-suggest .data-karta-hint { color: var(--dim-fg); font-style: italic; cursor: default; }
+        .data-karta-suggest .data-karta-hint:hover { background: transparent; color: var(--dim-fg); }
         .data-karta-results { margin-top: 4px; }
         .data-karta-entry {
-            border: 1px solid rgba(74,246,38,0.18); margin-bottom: 8px;
-            background: rgba(8, 12, 8, 0.55);
+            border: 1px solid var(--divider-faint); margin-bottom: 8px;
+            background: var(--panel-bg);
         }
         .data-karta-entry-toggle {
             width: 100%; text-align: left; background: transparent; border: none;
@@ -748,15 +727,15 @@
         }
         .data-karta-entry-toggle .toggle-icon { font-size: var(--text-xs); color: var(--text-green-dim); transition: transform 0.15s; flex-shrink: 0; }
         .data-karta-entry.open .data-karta-entry-toggle .toggle-icon { transform: rotate(180deg); }
-        .data-karta-entry-body { padding: 0 12px 12px; font-size: var(--text-sm); color: #aaa; line-height: 1.55; }
+        .data-karta-entry-body { padding: 0 12px 12px; font-size: var(--text-sm); color: var(--dim-fg); line-height: 1.55; }
         .data-karta-entry-body p { margin: 0; white-space: normal; }
-        .data-karta-entry-body mark { background: rgba(74,246,38,0.22); color: inherit; padding: 0 1px; }
-        .data-karta-no-results { font-size: var(--text-sm); color: #666; margin: 8px 0; }
+        .data-karta-entry-body mark { background: var(--highlight-mark); color: inherit; padding: 0 1px; }
+        .data-karta-no-results { font-size: var(--text-sm); color: var(--dim-fg); margin: 8px 0; }
         .bottom-action-bar .action-tab { font-size: var(--text-xxs); padding: 0 4px; letter-spacing: 0.02em; }
         #btn-center-shelter { display: none; }
         .avatar-box {
-            width: 52px; height: 52px; border: 1px solid var(--text-green);
-            background: #0a0e0a; overflow: hidden;
+            width: 52px; height: 52px; border: 1px solid var(--border-color);
+            background: var(--surface-deep); overflow: hidden;
             display: flex; align-items: center; justify-content: center;
             font-size: var(--text-xs); flex-shrink: 0; text-align: center;
             box-shadow: 0 0 10px rgba(74, 246, 38, 0.25);
@@ -764,7 +743,7 @@
         .avatar-box img { width: 100%; height: 100%; object-fit: cover; }
 
         .chat-container {
-            border: 1px solid var(--hud-border); background: rgba(6, 10, 6, 0.95);
+            border: 1px solid var(--hud-border); background: var(--input-bg);
             height: 110px; display: flex; flex-direction: column; margin-bottom: 12px;
         }
         .chat-msg-box { flex: 1; padding: 10px; overflow-y: auto; font-size: var(--text-md); line-height: var(--panel-line-height); font-weight: var(--font-weight-normal); }
@@ -772,14 +751,14 @@
         .inventory-layout { display: flex; gap: 10px; margin-top: 8px; }
         .inventory-column { flex: 1; min-width: 0; }
         .inventory-column-title {
-            font-size: var(--text-sm); color: #8a9a88; text-transform: uppercase;
-            border-bottom: 1px solid rgba(74,246,38,0.3);
+            font-size: var(--text-sm); color: var(--stat-label-color); text-transform: uppercase;
+            border-bottom: 1px solid var(--divider-dotted);
             padding-bottom: 6px; margin-bottom: 8px; font-weight: bold; text-align: center;
             letter-spacing: 0.1em;
         }
 
         .item-craft-card {
-            border: 1px solid rgba(74, 246, 38, 0.25); background: rgba(10, 14, 10, 0.85);
+            border: 1px solid var(--hud-border); background: var(--item-card-bg);
             padding: 10px; margin-bottom: 8px;
             display: flex; flex-direction: column; gap: 6px;
             font-size: var(--text-base); position: relative; cursor: pointer;
@@ -788,21 +767,21 @@
         .item-main-row { display: flex; gap: 8px; }
         .item-img-box {
             width: 42px; height: 42px; border: 1px solid var(--hud-border);
-            background: #0a0e0a; display: flex; align-items: center; justify-content: center;
+            background: var(--surface-deep); display: flex; align-items: center; justify-content: center;
             font-size: var(--text-micro); overflow: hidden; flex-shrink: 0; text-align: center; position: relative;
         }
         .item-img-box img { width: 100%; height: 100%; object-fit: cover; }
 
         .blueprint-alert { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,85,0,0.75); color: #fff; font-size: var(--text-micro); font-weight: bold; display: flex; align-items: center; justify-content: center; text-align: center; font-family: inherit; line-height: 1.2; z-index: 2; text-transform: uppercase; }
 
-        .item-meta-info { font-size: var(--text-xs); color: #7a8a78; background: rgba(0,0,0,0.35); padding: 4px 6px; border-radius: 2px; margin-top: 4px; line-height: 1.5; }
-        .logistics-badge { display: inline-block; background: rgba(8,12,8,0.9); border: 1px solid var(--hud-border); padding: 3px 6px; font-size: var(--text-xs); border-radius: 2px; margin-right: 4px; margin-top: 4px; color: #e8ffe8; }
+        .item-meta-info { font-size: var(--text-xs); color: var(--meta-text-color); background: var(--meta-bg); padding: 4px 6px; border-radius: 2px; margin-top: 4px; line-height: 1.5; }
+        .logistics-badge { display: inline-block; background: var(--panel-bg-alt); border: 1px solid var(--hud-border); padding: 3px 6px; font-size: var(--text-xs); border-radius: 2px; margin-right: 4px; margin-top: 4px; color: var(--badge-fg); }
         .logistics-error { color: var(--danger-orange); font-weight: bold; font-size: var(--text-base); margin-top: 6px; display: none; line-height: 1.5; }
 
         .faction-table { width: 100%; border-collapse: collapse; font-size: var(--text-base); margin-bottom: 14px; text-align: left; line-height: var(--panel-line-height); }
         .faction-table th, .faction-table td { padding: 8px 6px; border-bottom: 1px solid rgba(74,246,38,0.2); }
         .lustrace-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 12px; }
-        .lustrace-box { border: 1px solid var(--hud-border); padding: 8px; font-size: var(--text-sm); text-align: center; background: rgba(8,12,8,0.9); cursor: pointer; min-width: 58px; line-height: 1.5; }
+        .lustrace-box { border: 1px solid var(--hud-border); padding: 8px; font-size: var(--text-sm); text-align: center; background: var(--panel-bg-alt); cursor: pointer; min-width: 58px; line-height: 1.5; }
 
         .sub-page { display: none; }
         .sub-page.active { display: block; }
@@ -831,13 +810,13 @@
             0% { transform: scale(0.4); opacity: 1; }
             100% { transform: scale(1.8); opacity: 0; }
         }
-        .countdown-timer { font-size: var(--text-md); color: var(--danger-orange); font-weight: bold; margin-top: 6px; font-family: inherit; background: rgba(26, 10, 6, 0.9); padding: 4px 8px; display: inline-block; border: 1px solid rgba(255,85,0,0.35); text-shadow: 0 0 8px rgba(255,85,0,0.4); }
+        .countdown-timer { font-size: var(--text-md); color: var(--danger-orange); font-weight: bold; margin-top: 6px; font-family: inherit; background: var(--countdown-bg); padding: 4px 8px; display: inline-block; border: 1px solid rgba(255,85,0,0.35); text-shadow: none; }
 
         .quest-card.quest-completed,
         .quest-card.quest-inactive {
-            background: rgba(10, 10, 10, 0.82);
-            border-color: rgba(90, 90, 90, 0.5);
-            opacity: 0.58;
+            background: var(--card-completed-bg);
+            border-color: var(--card-completed-border);
+            opacity: var(--completed-opacity);
         }
         .quest-card.quest-completed .quest-header,
         .quest-card.quest-completed .quest-body,
@@ -849,31 +828,31 @@
         .quest-card.quest-inactive .quest-body,
         .quest-card.quest-inactive .story-pos-status,
         .quest-card.quest-inactive .story-pos-community-note {
-            color: #666 !important;
+            color: var(--dim-fg) !important;
             text-shadow: none !important;
         }
-        .quest-completed-badge { color: #5a6a58; font-weight: bold; font-size: var(--text-md); line-height: var(--panel-line-height); text-shadow: none; }
-        .quest-reward-note { font-size: var(--text-sm); color: #555; margin: 8px 0; font-style: italic; line-height: var(--panel-line-height); }
+        .quest-completed-badge { color: var(--stat-dim-color); font-weight: bold; font-size: var(--text-md); line-height: var(--panel-line-height); text-shadow: none; }
+        .quest-reward-note { font-size: var(--text-sm); color: var(--faint-fg); margin: 8px 0; font-style: italic; line-height: var(--panel-line-height); }
         .story-pos-community-note { font-size: var(--text-sm); color: var(--text-green-dim); margin: 4px 0 6px 0; font-style: italic; line-height: 1.45; }
-        .quest-card.quest-inactive .story-pos-community-note { color: #555 !important; }
+        .quest-card.quest-inactive .story-pos-community-note { color: var(--faint-fg) !important; }
         .tier-symbols { letter-spacing: 2px; text-shadow: var(--text-glow); }
-        .specialization-line { color: #ffcc00 !important; font-weight: bold; text-shadow: 0 0 8px rgba(255, 204, 0, 0.4); }
-        .chronicle-entry { font-size: var(--text-sm); color: #8a9a88; border-left: 2px solid var(--hud-border); padding: 8px 10px; margin-bottom: 8px; background: rgba(0,0,0,0.25); line-height: var(--panel-line-height); }
-        .mission-log-entry { font-size: var(--text-xs); color: #6a7a68; padding: 4px 0; border-bottom: 1px dotted rgba(74,246,38,0.15); line-height: 1.55; }
-        .item-type-badge { font-size: var(--text-xxs); color: #7a8a78; text-transform: uppercase; letter-spacing: 0.08em; }
+        .specialization-line { color: var(--accent-gold) !important; font-weight: bold; text-shadow: none; }
+        .chronicle-entry { font-size: var(--text-sm); color: var(--stat-label-color); border-left: 2px solid var(--hud-border); padding: 8px 10px; margin-bottom: 8px; background: var(--chronicle-bg); line-height: var(--panel-line-height); }
+        .mission-log-entry { font-size: var(--text-xs); color: var(--stat-dim-color); padding: 4px 0; border-bottom: 1px dotted var(--divider-faint); line-height: 1.55; }
+        .item-type-badge { font-size: var(--text-xxs); color: var(--meta-text-color); text-transform: uppercase; letter-spacing: 0.08em; }
         .profile-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; font-size: var(--text-sm); line-height: var(--panel-line-height); }
-        .spec-breakdown { font-size: var(--text-xs); line-height: 1.6; color: #9aaa98; margin-top: 8px; border-top: 1px dotted rgba(74,246,38,0.2); padding-top: 8px; }
+        .spec-breakdown { font-size: var(--text-xs); line-height: 1.6; color: var(--stat-label-color); margin-top: 8px; border-top: 1px dotted var(--divider-dotted); padding-top: 8px; }
         .spec-breakdown strong { color: var(--text-green); text-shadow: var(--text-glow); }
-        .quest-assigner-badge { font-size: var(--text-sm); color: #ffcc00; margin-bottom: 6px; text-shadow: 0 0 6px rgba(255, 204, 0, 0.35); }
-        .item-history-block { font-size: var(--text-xxs); color: #6a7a68; margin-top: 6px; border-top: 1px dotted rgba(74,246,38,0.15); padding-top: 6px; max-height: 52px; overflow-y: auto; line-height: 1.55; }
+        .quest-assigner-badge { font-size: var(--text-sm); color: var(--accent-gold); margin-bottom: 6px; text-shadow: none; }
+        .item-history-block { font-size: var(--text-xxs); color: var(--stat-dim-color); margin-top: 6px; border-top: 1px dotted var(--divider-faint); padding-top: 6px; max-height: 52px; overflow-y: auto; line-height: 1.55; }
         .item-history-line { padding: 2px 0; }
         .item-rank-summary { font-size: var(--text-sm); color: var(--text-green); margin-top: 4px; font-weight: 600; }
         .item-detail-panel { display: none; margin-top: 6px; padding-top: 6px; border-top: 1px dotted rgba(74,246,38,0.2); }
         .item-detail-panel.open { display: block; }
         .btn-item-detail {
             width: 100%; margin-top: 6px; padding: 5px 8px;
-            background: rgba(8, 12, 8, 0.8); border: 1px solid rgba(74,246,38,0.35);
-            color: #8a9a88; font-family: inherit; font-size: var(--text-xs); font-weight: 600;
+            background: var(--hud-bg); border: 1px solid var(--border-color);
+            color: var(--stat-label-color); font-family: inherit; font-size: var(--text-xs); font-weight: 600;
             cursor: pointer; letter-spacing: 0.06em;
         }
         .btn-item-detail.open { color: var(--text-green); border-color: var(--hud-border); }
@@ -884,16 +863,16 @@
 
         #map-add-poi-bar, #map-measure-bar {
             display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
-            background: rgba(6, 10, 6, 0.97); border: 1px solid var(--xp-blue);
+            background: var(--overlay-bg); border: 1px solid var(--xp-blue);
             padding: 16px; box-sizing: border-box; border-radius: 2px;
             box-shadow: 0 0 14px rgba(0,136,255,0.4), 0 0 28px rgba(0,136,255,0.12);
             line-height: var(--panel-line-height);
         }
-        #map-measure-bar { border-color: #ffcc00; box-shadow: 0 0 14px rgba(255,204,0,0.35), 0 0 28px rgba(255,204,0,0.1); }
+        #map-measure-bar { border-color: var(--accent-gold); box-shadow: 0 0 14px rgba(255,204,0,0.35), 0 0 28px rgba(255,204,0,0.1); }
 
         .leaflet-tooltip.map-point-label {
-            background: rgba(6, 10, 6, 0.94) !important;
-            border: 1px solid var(--text-green) !important;
+            background: var(--overlay-bg) !important;
+            border: 1px solid var(--border-color) !important;
             color: var(--text-green) !important;
             font-family: 'IBM Plex Mono', monospace !important;
             font-weight: 600 !important;
@@ -909,22 +888,22 @@
         }
         .leaflet-tooltip.map-point-label::before { border-top-color: var(--text-green) !important; }
         .leaflet-tooltip.map-point-label.map-point-inactive {
-            color: #666 !important;
-            border-color: #555 !important;
+            color: var(--dim-fg) !important;
+            border-color: var(--faint-fg) !important;
             opacity: 0.7 !important;
             text-shadow: none !important;
             box-shadow: none !important;
         }
-        .leaflet-tooltip.map-point-label.map-point-inactive::before { border-top-color: #555 !important; }
+        .leaflet-tooltip.map-point-label.map-point-inactive::before { border-top-color: var(--faint-fg) !important; }
         .map-label-desc { color: var(--text-green-dim); font-size: var(--text-xs); display: block; margin-top: 3px; }
         .map-popup-body { font-size: var(--text-base); line-height: var(--panel-line-height); text-transform: none; letter-spacing: 0.03em; min-width: 150px; }
         .map-popup-body .popup-desc { color: var(--text-green-dim); margin: 0 0 8px 0; }
-        .map-popup-body .popup-desc-inactive { color: #555 !important; }
+        .map-popup-body .popup-desc-inactive { color: var(--faint-fg) !important; }
         .map-popup-body .popup-community-note { border-left: 2px solid rgba(74,246,38,0.25); padding-left: 8px; }
-        .map-popup-body .popup-inactive-tag { color: #555; font-style: italic; }
-        .map-popup-body .popup-meta { font-size: var(--text-xs); color: #8a9a88; margin-bottom: 8px; }
+        .map-popup-body .popup-inactive-tag { color: var(--faint-fg); font-style: italic; }
+        .map-popup-body .popup-meta { font-size: var(--text-xs); color: var(--stat-label-color); margin-bottom: 8px; }
         .map-popup-reset { width: 100%; margin-top: 6px; padding: 8px; font-size: var(--text-sm); font-family: inherit; background: rgba(30, 12, 8, 0.9); border: 1px solid var(--danger-orange); color: var(--danger-orange); cursor: pointer; font-weight: bold; line-height: 1.5; }
-        .map-popup-edit { width: 100%; margin-top: 6px; padding: 8px; font-size: var(--text-sm); font-family: inherit; background: rgba(8, 14, 8, 0.9); border: 1px solid var(--xp-blue); color: var(--xp-blue); cursor: pointer; font-weight: bold; }
+        .map-popup-edit { width: 100%; margin-top: 6px; padding: 8px; font-size: var(--text-sm); font-family: inherit; background: var(--panel-bg-alt); border: 1px solid var(--xp-blue); color: var(--xp-blue); cursor: pointer; font-weight: bold; }
         .poi-popup-img { max-width: 100%; max-height: 120px; border: 1px solid var(--hud-border); margin-bottom: 6px; display: block; border-radius: 2px; }
         .poi-popup-img-inactive { opacity: 0.45; filter: grayscale(0.85); }
         .story-pos-status { font-size: var(--text-sm); color: var(--text-green-dim); margin: 4px 0 8px 0; }
@@ -932,7 +911,7 @@
         .story-pos-actions .btn-accept { flex: 1 1 45%; margin-top: 0; font-size: var(--text-xs); padding: 6px 4px; }
         #map-story-bar, #poi-edit-bar, #story-pos-edit-bar {
             display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
-            background: rgba(6, 10, 6, 0.97); border: 1px solid var(--text-green);
+            background: var(--overlay-bg); border: 1px solid var(--border-color);
             padding: 14px; box-sizing: border-box; border-radius: 2px;
             box-shadow: var(--neon-glow-strong); max-height: 55vh; overflow-y: auto;
         }
@@ -940,13 +919,13 @@
         #story-pos-edit-bar { border-color: var(--text-green); }
         .story-map-row { border-bottom: 1px dotted rgba(74,246,38,0.2); padding: 8px 0; font-size: var(--text-base); }
         .story-map-row:last-child { border-bottom: none; }
-        .poi-preview-box { width: 64px; height: 64px; border: 1px solid var(--hud-border); background: #0a0e0a; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); margin: 6px auto; }
+        .poi-preview-box { width: 64px; height: 64px; border: 1px solid var(--hud-border); background: var(--surface-deep); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); margin: 6px auto; }
         .poi-preview-box img { width: 100%; height: 100%; object-fit: cover; }
 
         .quest-collapsible { margin-top: 8px; }
         .quest-section-toggle {
             width: 100%; text-align: left;
-            background: rgba(8, 12, 8, 0.92);
+            background: var(--hud-bg);
             border: 1px solid var(--hud-border);
             color: var(--text-green);
             padding: 10px 12px;
@@ -996,16 +975,16 @@
         }
         #map-targeting-bar {
             display:none; position:absolute; bottom:54px; left:5%; width:90%; z-index:500;
-            background:rgba(6,10,6,0.97); border:1px solid var(--text-green);
+            background:var(--overlay-bg); border:1px solid var(--text-green);
             padding:16px; box-sizing:border-box; text-align:center;
             box-shadow: var(--neon-glow-strong);
             border-radius:2px; line-height: var(--panel-line-height);
         }
 
         .leaflet-popup-content-wrapper {
-            background: rgba(6, 10, 6, 0.97) !important;
+            background: var(--overlay-bg) !important;
             color: var(--text-green) !important;
-            border: 1px solid var(--text-green) !important;
+            border: 1px solid var(--border-color) !important;
             border-radius: 2px !important;
             box-shadow: var(--neon-glow-strong) !important;
             font-family: 'IBM Plex Mono', monospace !important;
@@ -1014,7 +993,7 @@
             padding: 4px !important;
         }
         .leaflet-popup-content { margin: 10px 12px !important; text-transform: uppercase; letter-spacing: 0.06em; line-height: var(--panel-line-height); text-shadow: var(--text-glow); }
-        .leaflet-popup-tip { background: rgba(6, 10, 6, 0.97) !important; border-left: 1px solid var(--text-green) !important; border-bottom: 1px solid var(--text-green) !important; }
+        .leaflet-popup-tip { background: var(--overlay-bg) !important; border-left: 1px solid var(--text-green) !important; border-bottom: 1px solid var(--text-green) !important; }
 
         /* Plovoucí kompas — mapa HUD */
         #map-compass {
@@ -1096,7 +1075,7 @@
         .bottom-hud-wrapper.crt-surface { position: absolute; }
     </style>
 </head>
-<body class="theme-standard">
+<body class="theme-standard theme-dark">
 
     <div id="map"></div>
     
@@ -1105,7 +1084,7 @@
         <div id="map-targeting-bar">
         <div id="targeting-bar-title" style="font-size:var(--text-md); color:var(--text-green); margin-bottom:8px; font-weight:bold; text-transform:uppercase; text-shadow:var(--text-glow);">Taktický režim: Posuňte cíl do kříže</div>
         <button class="btn-accept" style="width:100%; padding:10px; border-color:var(--text-green); color:var(--text-green);" id="btn-lock-target">📍 POTVRDIT LOKACI (STŘED MAPY)</button>
-        <button class="btn-accept" style="width:100%; margin-top:8px; border-color:#888; color:#888; padding:8px;" onclick="cancelTargeting(); switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);">ZRUŠIT ZAMĚŘOVÁNÍ</button>
+        <button class="btn-accept" style="width:100%; margin-top:8px; border-color:var(--muted-fg); color:var(--muted-fg); padding:8px;" onclick="cancelTargeting(); switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);">ZRUŠIT ZAMĚŘOVÁNÍ</button>
     </div>
 
     <!-- PŘIHLÁŠOVACÍ BRÁNA -->
@@ -1137,6 +1116,11 @@
                         <span class="gate-settings-label" data-i18n="settings.compass">Kompas na mapě</span>
                         <button type="button" id="btn-gate-compass-show" onclick="patracSetCompassVisible(true)" data-i18n="settings.compassShow">Zobrazit</button>
                         <button type="button" id="btn-gate-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
+                    </div>
+                    <div class="gate-settings-row">
+                        <span class="gate-settings-label" data-i18n="settings.displayMode">Režim zobrazení</span>
+                        <button type="button" id="btn-gate-theme-light" onclick="patracSetDisplayMode('light')" data-i18n="settings.displayDay">Den</button>
+                        <button type="button" id="btn-gate-theme-dark" onclick="patracSetDisplayMode('dark')" data-i18n="settings.displayNight">Noc</button>
                     </div>
                 </div>
             </header>
@@ -1251,7 +1235,7 @@
                     <input type="file" id="input-file" accept="image/*" onchange="previewImage(this)">
                 </div>
                 <div style="display:flex; justify-content:center; margin: 8px 0 12px;">
-                    <div class="avatar-box" id="avatar-setup-preview" style="border-color:#333; color:#444; box-shadow:none;">NO DATA</div>
+                    <div class="avatar-box" id="avatar-setup-preview" style="border-color:#333; color:var(--panel-subtle); box-shadow:none;">NO DATA</div>
                 </div>
                 <div id="gate-register-error" class="gate-error"></div>
                 <button type="button" class="gate-btn-primary" id="btn-register-submit" onclick="saveProfileAndLaunch()" data-i18n="gate.register.submit">ZALOŽIT A VSTOUPIT</button>
@@ -1293,6 +1277,13 @@
                             <button type="button" class="hud-menu-toggle-btn" id="btn-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
                         </div>
                     </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.displayMode">Režim zobrazení</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-theme-light" onclick="patracSetDisplayMode('light')" data-i18n="settings.displayDay">Den</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-theme-dark" onclick="patracSetDisplayMode('dark')" data-i18n="settings.displayNight">Noc</button>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" class="hud-menu-item" onclick="patracLogout()" data-i18n="settings.logout">⏻ OHLÁSIT SE</button>
             </div>
@@ -1317,7 +1308,7 @@
 
     <div class="hud-element" id="map-tools-bar">
         <button class="tool-btn" style="border-color:var(--xp-blue); color:var(--xp-blue);" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
-        <button class="tool-btn" style="border-color:#ffcc00; color:#ffcc00;" onclick="openMeasurePanel()" title="Měření"><div>📏</div>MĚŘIT</button>
+        <button class="tool-btn" style="border-color:var(--accent-gold); color:var(--accent-gold);" onclick="openMeasurePanel()" title="Měření"><div>📏</div>MĚŘIT</button>
         <button class="tool-btn" style="border-color:var(--text-green); color:var(--text-green);" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
         <select id="map-tile-select" onchange="switchMapTile(this.value)" title="Globální mapa">
             <option value="satellite">🛰️ Sat</option>
@@ -1333,7 +1324,7 @@
         <div class="form-group" style="margin-bottom:6px;"><label>FOTO (VOLITELNĚ):</label><input type="file" id="poi-file" accept="image/*" onchange="previewPoiImage(this)"></div>
         <div class="poi-preview-box" id="poi-create-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--xp-blue); color:var(--xp-blue); padding:8px;" onclick="confirmAddMapPoi()">ULOŽIT BOD</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:#888; color:#888; padding:6px;" onclick="closeAddPoiPanel()">ZRUŠIT</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeAddPoiPanel()">ZRUŠIT</button>
     </div>
 
     <div id="poi-edit-bar">
@@ -1344,7 +1335,7 @@
         <div class="form-group" style="margin-bottom:4px;"><label>FOTO:</label><input type="file" id="poi-edit-file" accept="image/*" onchange="previewPoiEditImage(this)"></div>
         <div class="poi-preview-box" id="poi-edit-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--xp-blue); color:var(--xp-blue); padding:8px;" onclick="savePoiChanges()">ULOŽIT ZMĚNY</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:#888; color:#888; padding:6px;" onclick="closePoiEditor()">ZRUŠIT</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closePoiEditor()">ZRUŠIT</button>
     </div>
 
     <div id="story-pos-edit-bar">
@@ -1354,23 +1345,23 @@
         <div class="form-group" style="margin-bottom:4px;"><label>FOTO:</label><input type="file" id="story-pos-edit-file" accept="image/*" onchange="previewStoryPosEditImage(this)"></div>
         <div class="poi-preview-box" id="story-pos-edit-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--text-green); color:var(--text-green); padding:8px;" onclick="saveStoryPosChanges()">ULOŽIT POPIS</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:#888; color:#888; padding:6px;" onclick="closeStoryPosEditor()">ZRUŠIT</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeStoryPosEditor()">ZRUŠIT</button>
     </div>
 
     <div id="map-story-bar">
         <div style="font-size:var(--text-base); color:var(--text-green); font-weight:bold; margin-bottom:8px;">🧭 PRVOTNÍ POZICE — SPRÁVA BODŮ</div>
-        <p style="font-size:var(--text-sm); color:#aaa; margin:0 0 8px 0;">Tyto body jsou trvalé. Lze je znovu zaměřit nebo resetovat, nikdy nezmizí z hry.</p>
+        <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 8px 0;">Tyto body jsou trvalé. Lze je znovu zaměřit nebo resetovat, nikdy nezmizí z hry.</p>
         <div id="map-story-positions-list"></div>
-        <button class="btn-accept" style="width:100%; margin-top:8px; border-color:#888; color:#888; padding:6px;" onclick="closeStoryPositionsPanel()">ZAVŘÍT</button>
+        <button class="btn-accept" style="width:100%; margin-top:8px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeStoryPositionsPanel()">ZAVŘÍT</button>
     </div>
 
     <div id="map-measure-bar">
-        <div style="font-size:var(--text-base); color:#ffcc00; font-weight:bold; margin-bottom:6px;">📏 MĚŘENÍ VZDÁLENOSTI (VZDUCH ČAROU)</div>
-        <p style="font-size:var(--text-sm); color:#aaa; margin:0 0 6px 0;">Posuň mapu — zelený kříž ve středu = bod A / B.</p>
-        <button class="btn-accept" style="width:100%; border-color:#ffcc00; color:#ffcc00; padding:6px;" onclick="setMeasurePoint('A')">① BOD A (STŘED)</button>
-        <button class="btn-accept" style="width:100%; margin-top:4px; border-color:#ffcc00; color:#ffcc00; padding:6px;" onclick="setMeasurePoint('B')">② BOD B (STŘED)</button>
+        <div style="font-size:var(--text-base); color:var(--accent-gold); font-weight:bold; margin-bottom:6px;">📏 MĚŘENÍ VZDÁLENOSTI (VZDUCH ČAROU)</div>
+        <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 6px 0;">Posuň mapu — zelený kříž ve středu = bod A / B.</p>
+        <button class="btn-accept" style="width:100%; border-color:var(--accent-gold); color:var(--accent-gold); padding:6px;" onclick="setMeasurePoint('A')">① BOD A (STŘED)</button>
+        <button class="btn-accept" style="width:100%; margin-top:4px; border-color:var(--accent-gold); color:var(--accent-gold); padding:6px;" onclick="setMeasurePoint('B')">② BOD B (STŘED)</button>
         <div id="measure-result" style="font-size:var(--text-md); color:var(--text-green); margin-top:6px; text-align:center; min-height:14px; font-weight:600;"></div>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:#888; color:#888; padding:6px;" onclick="closeMeasurePanel()">ZAVŘÍT</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeMeasurePanel()">ZAVŘÍT</button>
     </div>
 
     <!-- Plovoucí kompas (mapa HUD) -->
@@ -1418,11 +1409,11 @@
             <div class="shelter-profile-block">
                 <div class="panel-content-inner">
                     <div class="community-profile-card" id="community-profile-card">
-                        <div><strong style="color:#ffcc00;">KOMUNITA:</strong> <span id="display-com-name">---</span> <span id="display-com-code" style="color:#666;font-size:var(--text-sm);"></span></div>
+                        <div><strong style="color:var(--accent-gold);">KOMUNITA:</strong> <span id="display-com-name">---</span> <span id="display-com-code" style="color:var(--dim-fg);font-size:var(--text-sm);"></span></div>
                         <div style="margin-top:4px;"><strong>HODNOST KOMUNITY:</strong> <span id="display-com-rank" style="color:var(--text-green);">—</span></div>
                         <div id="display-com-rank-next" class="rank-next-hint"></div>
                         <div><strong>SKÓRE MISÍ (CELKEM):</strong> <span id="display-com-missions" style="color:var(--xp-blue);">0</span></div>
-                        <div><strong>EFEKTIVITA TÝMU:</strong> <span id="display-com-efficiency" style="color:#ffcc00;">—</span></div>
+                        <div><strong>EFEKTIVITA TÝMU:</strong> <span id="display-com-efficiency" style="color:var(--accent-gold);">—</span></div>
                         <div id="com-admin-badge" class="com-admin-badge" style="display:none;">👑 Jsi správce komunity</div>
                         <div class="community-members-title">Pátrači v síti</div>
                         <div id="community-members-list" class="community-members-row"></div>
@@ -1430,7 +1421,7 @@
                     <div class="mini-profile-card">
                         <div class="avatar-box" id="avatar-game-preview"></div>
                         <div style="flex:1; font-size:var(--text-base); line-height: 1.3;">
-                            <div><strong>OPERATIVEC:</strong> <span id="display-player-name">---</span> <span id="display-player-code" style="color:#666;font-size:var(--text-sm);"></span></div>
+                            <div><strong>OPERATIVEC:</strong> <span id="display-player-name">---</span> <span id="display-player-code" style="color:var(--dim-fg);font-size:var(--text-sm);"></span></div>
                             <div><strong>HODNOST:</strong> <span id="display-rank" style="color:var(--text-green); font-weight:bold;">Zelenáč</span></div>
                             <div id="display-rank-next" class="rank-next-hint"></div>
                             <div class="profile-stats-grid" style="margin-top:3px;">
@@ -1439,20 +1430,20 @@
                             </div>
                             <div id="display-spec-local" class="spec-breakdown"></div>
                             <div id="display-spec-global" class="spec-breakdown"></div>
-                            <div id="display-specialization" style="display:none; font-size:var(--text-sm); color:#ffcc00; margin-top:2px;"></div>
+                            <div id="display-specialization" style="display:none; font-size:var(--text-sm); color:var(--accent-gold); margin-top:2px;"></div>
                         </div>
                     </div>
 
-                    <div class="operator-shelter-section quest-card" style="border-color:var(--danger-orange); background:rgba(30,14,6,0.75); margin-top:10px;">
+                    <div class="operator-shelter-section quest-card card-tone-operator" style="border-color:var(--danger-orange); margin-top:10px;">
                         <div class="quest-section-title" style="margin-top:0;color:var(--danger-orange);">⬡ SPRÁVA HRÁČŮ — REŽIM OPERÁTOR</div>
-                        <p style="font-size:var(--text-sm);color:#888;margin:0 0 8px 0;">Vyber člena a převezměte identitu pro editaci profilu, misí a inventáře.</p>
+                        <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 8px 0;">Vyber člena a převezměte identitu pro editaci profilu, misí a inventáře.</p>
                         <div class="operator-bot-tools">
-                            <p style="font-size:var(--text-sm);color:#888;margin:0 0 6px 0;">Rychlí testovací operativci pro vyzkoušení více hráčů — stačí jméno BOT1, BOT2…</p>
+                            <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 6px 0;">Rychlí testovací operativci pro vyzkoušení více hráčů — stačí jméno BOT1, BOT2…</p>
                             <button type="button" class="btn-accept" style="font-size:var(--text-xs);padding:6px 10px;border-color:var(--text-green);color:var(--text-green);" onclick="operatorAddBotOperative()">➕ PŘIDAT BOT OPERATIVEC</button>
                         </div>
                         <div id="operator-members-list"></div>
                         <div id="operator-edit-panel">
-                            <div style="font-size:var(--text-base);color:#ffcc00;font-weight:bold;margin-bottom:6px;" id="operator-edit-title">Editace hráče</div>
+                            <div style="font-size:var(--text-base);color:var(--accent-gold);font-weight:bold;margin-bottom:6px;" id="operator-edit-title">Editace hráče</div>
                             <div style="font-size:var(--text-sm);margin-bottom:6px;"><strong>Hodnost (lokální mise):</strong> <span id="operator-edit-rank">—</span> · <span id="operator-edit-missions">0</span> misí</div>
                             <div class="quest-section-title" style="margin-top:8px;font-size:var(--text-sm);">☑️ MISE (stav splnění)</div>
                             <div id="operator-mission-list" class="operator-mission-list"></div>
@@ -1472,7 +1463,7 @@
                             <div class="form-group"><label>👑 PŘEDAT SPRÁVCovství KOMUNITY</label>
                                 <select id="edit-transfer-admin"></select>
                             </div>
-                            <button type="button" class="btn-accept" style="width:100%;border-color:#ffcc00;color:#ffcc00;" onclick="transferCommunityAdmin()">Předat správcovství</button>
+                            <button type="button" class="btn-accept" style="width:100%;border-color:var(--accent-gold);color:var(--accent-gold);" onclick="transferCommunityAdmin()">Předat správcovství</button>
                         </div>
                         <button type="button" class="btn-accept" style="width:100%; margin-top:8px;" onclick="saveProfileEdits()">ULOŽIT ZMĚNY PROFILU</button>
                     </div>
@@ -1488,12 +1479,12 @@
 
                 <div class="quest-section-title">📜 KRONIKA OPERATIVCE</div>
                 <div id="chronicle-list" style="margin-bottom:8px; max-height:60px; overflow-y:auto;">
-                    <p style="font-size:var(--text-sm); color:#444; margin:0;">Zatím žádné záznamy o přestupu...</p>
+                    <p style="font-size:var(--text-sm); color:var(--panel-subtle); margin:0;">Zatím žádné záznamy o přestupu...</p>
                 </div>
 
                 <div class="quest-section-title">📋 ABSOLVOVANÉ MISE</div>
                 <div id="mission-log-list" style="max-height:160px; overflow-y:auto; margin-bottom:8px;">
-                    <p style="font-size:var(--text-sm); color:#444; margin:0;">Mise se zapisují do profilu po splnění...</p>
+                    <p style="font-size:var(--text-sm); color:var(--panel-subtle); margin:0;">Mise se zapisují do profilu po splnění...</p>
                 </div>
             </div>
         </div>
@@ -1517,7 +1508,7 @@
                     <span style="color:var(--xp-blue);">➕ ZAPSAT VLASTNÍ LOKACI & ÚKOL</span><span class="toggle-icon">▼</span>
                 </button>
                 <div id="section-custom-form" class="quest-section-body">
-                    <div class="quest-card" style="background: rgba(10,20,30,0.4); border-color: var(--xp-blue);">
+                    <div class="quest-card card-tone-info" style="border-color: var(--xp-blue);">
                         <div class="form-group"><label>NÁZEV LOKACE:</label><input type="text" id="custom-loc-name" placeholder="Např. Skrytý bunkr"></div>
                         <div class="form-group"><label>POPIS / MISE:</label><input type="text" id="custom-loc-desc" placeholder="Např. Prozkoumat vnitřní zásoby"></div>
                         <div class="form-group"><label>ZADAVATEL (SPECIALIZACE MISI):</label>
@@ -1551,7 +1542,7 @@
                     <span>📍 PRVOTNÍ POZICE (trvalé body mapy)</span><span class="toggle-icon">▼</span>
                 </button>
                 <div id="section-story-positions" class="quest-section-body open">
-                    <p style="font-size:var(--text-sm);color:#888;margin:0 0 8px 0;">Útočiště, voda, rozhledna… — vždy dostupné z mapy (🧭 POZICE).</p>
+                    <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 8px 0;">Útočiště, voda, rozhledna… — vždy dostupné z mapy (🧭 POZICE).</p>
                     <div id="story-positions-list"></div>
                 </div>
             </div>
@@ -1563,25 +1554,25 @@
         <div id="content-clan" style="display:none;">
             <div class="panel-content-inner">
 
-            <div id="clan-status-panel" class="quest-card" style="border-color:rgba(255,204,0,0.35); background:rgba(14,12,8,0.85); margin-bottom:12px;">
-                <div class="quest-section-title" style="margin-top:0;color:#ffcc00;">📊 STATUS KOMUNITY</div>
+            <div id="clan-status-panel" class="quest-card card-tone-operator" style="border-color:var(--community-border); margin-bottom:12px;">
+                <div class="quest-section-title" style="margin-top:0;color:var(--accent-gold);">📊 STATUS KOMUNITY</div>
                 <div style="font-size:var(--text-base);line-height:1.5;">
                     <div><strong>HODNOST:</strong> <span id="clan-status-rank" style="color:var(--text-green);">—</span></div>
                     <div id="clan-status-rank-next" class="rank-next-hint"></div>
                     <div><strong>Mise celkem:</strong> <span id="clan-status-missions" style="color:var(--xp-blue);">0</span></div>
-                    <div><strong>Efektivita týmu:</strong> <span id="clan-status-efficiency" style="color:#ffcc00;">—</span></div>
-                    <div style="font-size:var(--text-xs);color:#666;margin-top:4px;">Více členů = nižší efektivita = vyšší nároky na společný postup.</div>
+                    <div><strong>Efektivita týmu:</strong> <span id="clan-status-efficiency" style="color:var(--accent-gold);">—</span></div>
+                    <div style="font-size:var(--text-xs);color:var(--dim-fg);margin-top:4px;">Více členů = nižší efektivita = vyšší nároky na společný postup.</div>
                 </div>
             </div>
 
-            <div class="operator-clan-section quest-card" style="border-color:var(--danger-orange); background:rgba(30,14,6,0.75);">
+            <div class="operator-clan-section quest-card card-tone-operator" style="border-color:var(--danger-orange);">
                 <div class="quest-section-title" style="margin-top:0;color:var(--danger-orange);">⬡ NASTAVENÍ KOMUNITY — OPERÁTOR</div>
                 <div id="operator-balance-block" style="margin-bottom:0;">
                     <div class="form-group" style="margin-bottom:6px;">
                         <label>COMMUNITY_DIVISOR (průměr aktivních hráčů v týmu)</label>
                         <div style="display:flex;gap:6px;align-items:center;">
                             <input type="number" id="input-community-divisor" min="0.5" max="32" step="0.5" value="4" style="flex:1;">
-                            <button type="button" class="btn-accept" style="font-size:var(--text-xs);padding:6px 8px;border-color:#ffcc00;color:#ffcc00;" onclick="saveCommunityDivisor()">ULOŽIT</button>
+                            <button type="button" class="btn-accept" style="font-size:var(--text-xs);padding:6px 8px;border-color:var(--accent-gold);color:var(--accent-gold);" onclick="saveCommunityDivisor()">ULOŽIT</button>
                         </div>
                         <p class="operator-key-hint">Vzorec: Efektivní XP = součet misí ÷ (počet členů × divisor). Vyšší divisor = pomalejší postup.</p>
                         <p class="operator-key-hint" style="margin-top:6px;">Editace hráčů (mise, specializace, inventář) je v záložce 🏠 Útočiště.</p>
@@ -1597,7 +1588,7 @@
                 <div class="lustrace-box" onclick="lustrovat('Herbert', 'Zdravotník. Výroba protijedů.')">🧪 Herbert</div>
                 <div class="lustrace-box" onclick="lustrovat('Adam', 'Doprovod: Pes Kousy.')">👦 Adam</div>
             </div>
-            <div id="lustrace-output" style="font-size:var(--text-base); color:#aaa; margin-bottom:8px; font-style:italic; min-height:24px;">Klikni na jméno pro výpis spisu...</div>
+            <div id="lustrace-output" style="font-size:var(--text-base); color:var(--subtle-fg); margin-bottom:8px; font-style:italic; min-height:24px;">Klikni na jméno pro výpis spisu...</div>
 
             <div class="quest-section-title">💬 COM_NET: CHAT KOMUNITY</div>
             <div class="chat-container">
@@ -1609,8 +1600,8 @@
             </div>
 
             <div class="quest-section-title">🔄 PŘESTUP DO NOVÉ KOMUNITY</div>
-            <div class="quest-card" style="background:rgba(30,20,10,0.5); border-color:var(--danger-orange);">
-                <p style="font-size:var(--text-sm); color:#aaa; margin:0 0 6px 0;">Lokální hodnost se resetuje na Zelenáče. Globální zkušenost zůstává — Veterán/Legenda se obnoví automaticky.</p>
+            <div class="quest-card card-tone-warn" style="border-color:var(--danger-orange);">
+                <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 6px 0;">Lokální hodnost se resetuje na Zelenáče. Globální zkušenost zůstává — Veterán/Legenda se obnoví automaticky.</p>
                 <div class="form-group"><label>NOVÝ NÁZEV KOMUNITY:</label><input type="text" id="transfer-clan-name" placeholder="Např. Vlci..."></div>
                 <button class="btn-accept" style="width:100%; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="initiateClanTransfer()">Přestoupit do nové komunity</button>
             </div>
@@ -1620,7 +1611,7 @@
                 <thead><tr><th>Frakce</th><th>Vliv</th><th>Status</th></tr></thead>
                 <tbody>
                     <tr style="color:var(--text-green)"><td>🦭 Lachtani</td><td>+20</td><td>Přátelské</td></tr>
-                    <tr style="color:#aaa"><td>👻 Bubáci</td><td>0</td><td>Neutrální</td></tr>
+                    <tr style="color:var(--subtle-fg)"><td>👻 Bubáci</td><td>0</td><td>Neutrální</td></tr>
                     <tr style="color:var(--danger-orange)"><td>🐺 Vlci</td><td>-10</td><td>Nepřátelské</td></tr>
                 </tbody>
             </table>
@@ -1630,9 +1621,9 @@
         <!-- ZÁLOŽKA TERMINÁL (POCTA) -->
         <div id="content-terminal" style="display:none;">
             <div class="panel-content-inner">
-                <div class="quest-card" style="border-color:rgba(232,197,71,0.45); background:rgba(14,12,6,0.85);">
+                <div class="quest-card card-tone-terminal" style="border-color:rgba(232,197,71,0.45);">
                     <div class="quest-section-title" style="margin-top:0;color:#e8c547;">🖥️ TERMINÁL — ZADAT KÓD</div>
-                    <p style="font-size:var(--text-sm);color:#888;margin:0 0 10px 0;line-height:1.5;">6místný kód od Pocty nebo fázovaného úkolu. Po aktivaci se bod objeví na mapě — vlastní (plná barva) vs. sdílené (čárkovaně).</p>
+                    <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 10px 0;line-height:1.5;">6místný kód od Pocty nebo fázovaného úkolu. Po aktivaci se bod objeví na mapě — vlastní (plná barva) vs. sdílené (čárkovaně).</p>
                     <form id="terminal-code-form" autocomplete="off">
                         <div class="terminal-code-row">
                             <input type="text" id="terminal-code-input" maxlength="6" placeholder="ABC123" autocapitalize="characters" autocomplete="off">
@@ -1645,13 +1636,13 @@
                 <div class="quest-section-title">📡 AKTIVOVANÉ BODY</div>
                 <div id="terminal-activated-list"></div>
 
-                <div class="quest-section-title" style="margin-top:14px;font-size:var(--text-sm);color:#666;">PROTOTYP — VYTVOŘENÍ TESTU</div>
-                <div class="quest-card" style="border-color:#444;background:rgba(8,8,8,0.5);">
-                    <p style="font-size:var(--text-xs);color:#666;margin:0 0 8px 0;">Pro lokální test modulu POCTA (data zůstávají v tomto prohlížeči).</p>
+                <div class="quest-section-title" style="margin-top:14px;font-size:var(--text-sm);color:var(--dim-fg);">PROTOTYP — VYTVOŘENÍ TESTU</div>
+                <div class="quest-card card-tone-muted" style="border-color:var(--panel-subtle);">
+                    <p style="font-size:var(--text-xs);color:var(--dim-fg);margin:0 0 8px 0;">Pro lokální test modulu POCTA (data zůstávají v tomto prohlížeči).</p>
                     <div class="story-pos-actions">
                         <button type="button" class="btn-accept" id="terminal-sim-quest-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">✅ Simulovat odměnu z mise</button>
                         <button type="button" class="btn-accept" id="terminal-demo-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">🕯️ Nová Pocta</button>
-                        <button type="button" class="btn-accept" id="terminal-demo-quest" style="border-color:#888;color:#888;font-size:var(--text-xs);">❓ Nový fázovaný úkol</button>
+                        <button type="button" class="btn-accept" id="terminal-demo-quest" style="border-color:var(--muted-fg);color:var(--muted-fg);font-size:var(--text-xs);">❓ Nový fázovaný úkol</button>
                     </div>
                 </div>
             </div>
@@ -1689,7 +1680,7 @@
                 </div>
                 <div id="schránka-nápadů-box" class="data-karta-block quest-card">
                     <div class="quest-section-title" style="margin-top:0;">💡 SCHRÁNKA NÁPADŮ</div>
-                    <p style="font-size:var(--text-sm);color:#666;margin:0;">Nápady a poznámky ke hře — doplní se postupně.</p>
+                    <p style="font-size:var(--text-sm);color:var(--dim-fg);margin:0;">Nápady a poznámky ke hře — doplní se postupně.</p>
                 </div>
             </div>
         </div>
@@ -1702,7 +1693,7 @@
                     <span style="color:var(--text-green);">⚒️ VÝROBA NOVÉHO PŘEDMĚTU</span><span class="toggle-icon">▼</span>
                 </button>
                 <div id="section-craft" class="quest-section-body">
-            <div class="quest-card" style="background:rgba(20,30,20,0.5);">
+            <div class="quest-card card-tone-craft">
                 <div class="form-group"><label>NÁZEV PŘEDMĚTU (KLÍČE K MISÍM):</label><input type="text" id="craft-name" placeholder="Např. Sekera, Spacák, Lano..."></div>
                 <div class="form-group"><label>ZÁKLADNÍ POPIS SOUČÁSTKY:</label><input type="text" id="craft-desc" placeholder="Kovaná ocel s rukojeťí..."></div>
                 <div class="form-group"><label>SPECIÁLNÍ VLASTNOST:</label><input type="text" id="craft-spec" placeholder="Kovaná ocel s rukojetí..."></div>
@@ -1716,7 +1707,7 @@
                     <select id="craft-quest-bind">
                         <!-- Plní se dynamicky v JS -->
                     </select>
-                    <span id="craft-bind-hint" style="font-size:var(--text-xs); color:#666; margin-top:2px;">Talisman = odměna zamčená do splnění mise. Nástroj = přidá požadavek do batohu.</span>
+                    <span id="craft-bind-hint" style="font-size:var(--text-xs); color:var(--dim-fg); margin-top:2px;">Talisman = odměna zamčená do splnění mise. Nástroj = přidá požadavek do batohu.</span>
                 </div>
                 <div class="form-group"><label>FOTOGRAFIE PŘEDMĚTU:</label><input type="file" id="craft-file" accept="image/*" onchange="previewCraftImage(this)"></div>
                 <button class="btn-accept" style="width:100%; padding:6px;" onclick="craftCustomItem()">Vyrobit a zařadit do plánu</button>
@@ -1725,14 +1716,14 @@
             </div>
 
             <!-- OKNO PRO EDITACI LORE / FOTO -->
-            <div id="lore-edit-box" class="quest-card" style="display:none; border-color:var(--danger-orange); background:rgba(30,15,15,0.9);">
+            <div id="lore-edit-box" class="quest-card card-tone-danger" style="display:none; border-color:var(--danger-orange);">
                 <div style="color:var(--danger-orange); font-weight:bold; margin-bottom:5px;">📝 UPRAVIT VLASTNOSTI / LORE Z TERÉNU</div>
                 <input type="hidden" id="edit-item-index">
                 <div class="form-group"><label>ZÁPIS Z TERÉNU (PŘÍBĚHOVÁ POZNÁMKA):</label><textarea id="edit-item-lore" rows="2" placeholder="Hůl je potřísněná krví Ino..."></textarea></div>
                 <div class="form-group"><label>UPRAVIT/DOPLNIT FOTO PŘEDMĚTU:</label><input type="file" id="edit-item-file" accept="image/*" onchange="previewEditImage(this)"></div>
                 <div style="display:flex; gap:4px; margin-top:5px;">
                     <button class="btn-accept" style="flex:1; border-color:var(--text-green); color:var(--text-green);" onclick="saveItemLoreChanges()">Uložit zápis</button>
-                    <button class="btn-accept" style="flex:1; border-color:#888; color:#888;" onclick="closeLoreEditor()">Zrušit</button>
+                    <button class="btn-accept" style="flex:1; border-color:var(--muted-fg); color:var(--muted-fg);" onclick="closeLoreEditor()">Zrušit</button>
                 </div>
             </div>
 
@@ -2017,7 +2008,7 @@
             if (!placed) {
                 html += '<button class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue); width:100%; margin-bottom:4px;" onclick="placeQuestAtGps(\'' + questId + '\')">📍 ZAMĚŘIT POZICI (GPS)</button>';
                 if (canUseMapPlacement()) {
-                    html += '<button class="btn-accept" style="border-color:#888;color:#888; width:100%; margin-bottom:4px;" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: UMÍSTIT NA MAPĚ</button>';
+                    html += '<button class="btn-accept" style="border-color:var(--muted-fg);color:var(--muted-fg); width:100%; margin-bottom:4px;" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: UMÍSTIT NA MAPĚ</button>';
                 }
             } else {
                 html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green); width:100%; margin-bottom:4px;" onclick="completeQuestAtLocation(\'' + questId + '\')">✅ POTVRDIT VÝKON NA MÍSTĚ</button>';
@@ -2035,7 +2026,7 @@
                 html += '<div class="quest-completed-badge">✅ SPLNĚNO: ' + q.char + ' — ' + q.title + '</div>';
                 html += '<div class="quest-assigner-badge">📡 ' + getQuestAssignerBadge(q) + ' · náhodný rozkaz</div>';
                 html += '<div class="quest-reward-note">🎁 Odměna připsána. Postava si pamatuje tvůj výkon.</div>';
-                html += '<button class="btn-accept" style="width:100%; margin-top:4px; border-color:#888; color:#888;" onclick="dismissQuest(\'' + q.id + '\')">📁 ARCHIVOVAT</button>';
+                html += '<button class="btn-accept" style="width:100%; margin-top:4px; border-color:var(--muted-fg); color:var(--muted-fg);" onclick="dismissQuest(\'' + q.id + '\')">📁 ARCHIVOVAT</button>';
                 html += '</div>';
                 return html;
             }
@@ -2047,11 +2038,11 @@
             }
 
             var html = '<div class="quest-card" id="card-new-' + q.id + '" style="border-color:rgba(255,204,0,0.35);">';
-            html += '<div class="quest-assigner-badge">📡 ' + getQuestAssignerBadge(q) + ' · <span style="color:#ffcc00;">náhodný rozkaz</span></div>';
+            html += '<div class="quest-assigner-badge">📡 ' + getQuestAssignerBadge(q) + ' · <span style="color:var(--accent-gold);">náhodný rozkaz</span></div>';
 
             if (!isUnlocked) {
-                html += '<div class="quest-header" style="color:#666;">📻 PŘÍCHOZÍ SIGNÁL (' + q.char + ')</div>';
-                html += '<div style="font-size:var(--text-base);color:#888;margin:4px 0;">⏳ ' + q.time + '</div>';
+                html += '<div class="quest-header" style="color:var(--dim-fg);">📻 PŘÍCHOZÍ SIGNÁL (' + q.char + ')</div>';
+                html += '<div style="font-size:var(--text-base);color:var(--muted-fg);margin:4px 0;">⏳ ' + q.time + '</div>';
                 if (reqIcons) html += '<div style="margin:4px 0;">' + reqIcons + '</div>';
                 html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
                 html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 PŘIJMOUT ROZKAZ</button>';
@@ -2070,8 +2061,8 @@
 
         function renderRandomQuestsContent() {
             var list = getRandomQuestsList();
-            var html = '<p style="font-size:var(--text-sm);color:#888;margin:0 0 8px 0;">Náhodné impulzní mise od Roxy, Šéfa, Herberta, Ina a Adama.</p>';
-            html += '<button class="btn-accept" style="width:100%; margin-bottom:10px; border-color:#ffcc00; color:#ffcc00;" onclick="requestNewRandomQuest()">🎲 VYŽÁDAT NOVÝ ROZKAZ</button>';
+            var html = '<p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 8px 0;">Náhodné impulzní mise od Roxy, Šéfa, Herberta, Ina a Adama.</p>';
+            html += '<button class="btn-accept" style="width:100%; margin-bottom:10px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="requestNewRandomQuest()">🎲 VYŽÁDAT NOVÝ ROZKAZ</button>';
 
             var shown = 0;
             for (var i = 0; i < list.length; i++) {
@@ -2081,7 +2072,7 @@
                 shown++;
             }
             if (shown === 0) {
-                html += '<p style="font-size:var(--text-sm);color:#555;text-align:center;margin-bottom:8px;">Žádné náhodné rozkazy. Stiskni tlačítko výše.</p>';
+                html += '<p style="font-size:var(--text-sm);color:var(--faint-fg);text-align:center;margin-bottom:8px;">Žádné náhodné rozkazy. Stiskni tlačítko výše.</p>';
             }
             return html;
         }
@@ -2103,7 +2094,7 @@
                     html += '<div class="quest-completed-badge">✅ SPLNĚNO: ' + (q.char ? q.char + ' — ' : '') + q.title + '</div>';
                     html += '<div class="quest-assigner-badge">📡 ' + getQuestAssignerBadge(q) + '</div>';
                     html += '<div class="quest-reward-note">🎁 Odměna byla připsána do inventáře. Mise zapsána do profilu operativce.</div>';
-                    html += '<button class="btn-accept" style="width:100%; margin-top:4px; border-color:#888; color:#888;" onclick="dismissQuest(\'' + q.id + '\')">📁 ARCHIVOVAT ÚKOL</button>';
+                    html += '<button class="btn-accept" style="width:100%; margin-top:4px; border-color:var(--muted-fg); color:var(--muted-fg);" onclick="dismissQuest(\'' + q.id + '\')">📁 ARCHIVOVAT ÚKOL</button>';
                     html += '</div>';
                     continue;
                 }
@@ -2124,13 +2115,13 @@
                 html += '<div class="quest-assigner-badge">📡 Zadavatel: ' + getQuestAssignerBadge(q) + ' · vlastní</div>';
 
                 if (!isUnlocked) {
-                    html += '<div class="quest-header" style="color:#666;">🔒 NEODHALENÁ OPERACE (' + (q.char || 'Mise') + ')</div>';
+                    html += '<div class="quest-header" style="color:var(--dim-fg);">🔒 NEODHALENÁ OPERACE (' + (q.char || 'Mise') + ')</div>';
                     if (reqIcons !== "") {
                         html += '<div style="margin: 5px 0;">' + reqIcons + '</div>';
                     } else {
-                        html += '<div style="margin: 5px 0; font-size:var(--text-sm); color:#888;">(Nevyžaduje žádné specifické vybavení)</div>';
+                        html += '<div style="margin: 5px 0; font-size:var(--text-sm); color:var(--muted-fg);">(Nevyžaduje žádné specifické vybavení)</div>';
                     }
-                    html += '<div style="font-size:var(--text-base); color:#aaa; margin-bottom: 4px;">⏳ Předpokládaná doba: ' + q.time + '</div>';
+                    html += '<div style="font-size:var(--text-base); color:var(--subtle-fg); margin-bottom: 4px;">⏳ Předpokládaná doba: ' + q.time + '</div>';
                     html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
                     html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 SBALIT VĚCI A ODHALIT MISI</button>';
                 } else {
@@ -2290,7 +2281,7 @@
                 var count = stats[key] || 0;
                 if (count > 0) chips.push((ISSUER_LABELS[key] || key) + ': ' + count);
             }
-            if (chips.length === 0) return '<span style="color:#555;">Zatím žádné specializace</span>';
+            if (chips.length === 0) return '<span style="color:var(--faint-fg);">Zatím žádné specializace</span>';
             var total = totalMissions != null ? totalMissions : sumIssuerStats(stats);
             var tier = getTierFromMissionCount(total);
             var lead = getSpecialization(stats);
@@ -2299,7 +2290,7 @@
                 if (tier >= 5) {
                     html += '<div class="specialization-line" style="margin-top:2px;">🏆 ' + lead + '</div>';
                 } else {
-                    html += '<div style="margin-top:2px; color:#888;">Směr → ' + lead + '</div>';
+                    html += '<div style="margin-top:2px; color:var(--muted-fg);">Směr → ' + lead + '</div>';
                 }
             }
             return html;
@@ -2771,7 +2762,7 @@
             if (!el) return;
             var profile = getPlayerProfile();
             if (!profile.chronicle || profile.chronicle.length === 0) {
-                el.innerHTML = '<p style="font-size:var(--text-sm); color:#444; margin:0;">Zatím žádné záznamy o přestupu...</p>';
+                el.innerHTML = '<p style="font-size:var(--text-sm); color:var(--panel-subtle); margin:0;">Zatím žádné záznamy o přestupu...</p>';
                 return;
             }
             var html = '';
@@ -2787,7 +2778,7 @@
             if (!el) return;
             var profile = getPlayerProfile();
             if (!profile.missionLog || profile.missionLog.length === 0) {
-                el.innerHTML = '<p style="font-size:var(--text-sm); color:#444; margin:0;">Mise se zapisují do profilu po splnění...</p>';
+                el.innerHTML = '<p style="font-size:var(--text-sm); color:var(--panel-subtle); margin:0;">Mise se zapisují do profilu po splnění...</p>';
                 return;
             }
             var html = '';
@@ -2797,7 +2788,7 @@
                 var q = m.questId ? getQuestById(m.questId) : null;
                 var title = q ? q.title : (m.title || '—');
                 var charLabel = q ? (q.char || m.char) : (m.char || 'Mise');
-                html += '<div class="mission-log-entry">☣️ ' + charLabel + ': ' + title + ' <span style="color:#888;">(' + m.date + ')</span></div>';
+                html += '<div class="mission-log-entry">☣️ ' + charLabel + ': ' + title + ' <span style="color:var(--muted-fg);">(' + m.date + ')</span></div>';
             }
             el.innerHTML = html;
         }
@@ -2935,7 +2926,7 @@
         function buildWearRowHtml(items, extraClass, options) {
             options = options || {};
             if (!items || items.length === 0) {
-                return '<span style="font-size:var(--text-sm);color:#555;">Nic na sobě</span>';
+                return '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Nic na sobě</span>';
             }
 
             var compactThreshold = options.compactThreshold != null ? options.compactThreshold : 20;
@@ -2945,7 +2936,7 @@
                     var cItem = items[c];
                     var cName = cItem.name || '—';
                     var cCls = cItem.wornByAll ? 'wear-all-shared' : '';
-                    if (c > 0) listHtml += '<span style="color:#444;"> · </span>';
+                    if (c > 0) listHtml += '<span style="color:var(--panel-subtle);"> · </span>';
                     listHtml += '<span class="' + cCls + '" title="' + cName + (cItem.wornByAll ? ' (mají všichni)' : '') + '">' + cName + '</span>';
                 }
                 listHtml += '</div>';
@@ -2969,7 +2960,7 @@
 
         function buildCommunityMembersListHtml(members, activeUserId, founderId) {
             if (!members || members.length === 0) {
-                return '<span style="font-size:var(--text-sm);color:#555;">Zatím žádní pátrači</span>';
+                return '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Zatím žádní pátrači</span>';
             }
             var html = '';
             for (var m = 0; m < members.length; m++) {
@@ -3004,7 +2995,7 @@
             var founderId = comm ? comm.founder : '';
             var stats = getCommunityAggregateStats(comCode);
             if (stats.members.length === 0) {
-                membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:#555;">Zatím žádní pátrači</span>';
+                membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Zatím žádní pátrači</span>';
                 membersEl.classList.remove('is-scrollable');
                 return;
             }
@@ -3532,7 +3523,7 @@
                 } else {
                     html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + questId + '\')">🎯 ZAMĚŘIT (GPS)</button>';
                     if (canUseMapPlacement()) {
-                        html += '<button class="btn-accept" style="border-color:#888;color:#888;" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: MAPA</button>';
+                        html += '<button class="btn-accept" style="border-color:var(--muted-fg);color:var(--muted-fg);" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: MAPA</button>';
                     }
                 }
             }
@@ -3550,9 +3541,9 @@
                 var label = getQuestMapLabel(id);
                 var status = getStoryQuestStatusText(id);
                 var commNote = getStoryPosCommunityNote(id);
-                html += '<div class="story-map-row"><strong style="color:var(--text-green);">' + label + '</strong><br><span style="font-size:var(--text-sm);color:#aaa;">' + status + '</span>';
+                html += '<div class="story-map-row"><strong style="color:var(--text-green);">' + label + '</strong><br><span style="font-size:var(--text-sm);color:var(--subtle-fg);">' + status + '</span>';
                 if (commNote) {
-                    html += '<br><span style="font-size:var(--text-sm);color:#888;font-style:italic;">📢 ' + commNote + '</span>';
+                    html += '<br><span style="font-size:var(--text-sm);color:var(--muted-fg);font-style:italic;">📢 ' + commNote + '</span>';
                 }
                 html += '<div class="story-pos-actions" style="margin-top:6px;">';
                 var qStory = getQuestWithReq(gameQuests[id]);
@@ -3568,7 +3559,7 @@
                 } else {
                     html += '<button class="btn-accept" style="border-color:var(--text-green);color:var(--text-green);" onclick="startStoryQuestPlacement(\'' + id + '\')">🎯 Zaměřit (GPS)</button>';
                     if (canUseMapPlacement()) {
-                        html += '<button class="btn-accept" style="border-color:#888;color:#888;" onclick="activatePlacementMode(\'' + id + '\')">🗺️ Admin</button>';
+                        html += '<button class="btn-accept" style="border-color:var(--muted-fg);color:var(--muted-fg);" onclick="activatePlacementMode(\'' + id + '\')">🗺️ Admin</button>';
                     }
                 }
                 html += '</div></div>';
@@ -4386,7 +4377,7 @@
 
         function formatItemHistoryHtml(item) {
             if (item.itemType === 'tool' || !item.itemHistory || !item.itemHistory.length) return '';
-            var html = '<div class="item-history-block"><strong style="color:#888;">📜 HISTORIE:</strong>';
+            var html = '<div class="item-history-block"><strong style="color:var(--muted-fg);">📜 HISTORIE:</strong>';
             var limit = Math.min(item.itemHistory.length, 6);
             for (var i = 0; i < limit; i++) {
                 var h = item.itemHistory[i];
@@ -5173,7 +5164,7 @@
             var comCode = operatorComCode || localStorage.getItem('com_code') || '';
             var members = getCommunityMemberAccounts(comCode);
             if (members.length === 0) {
-                el.innerHTML = '<p style="font-size:var(--text-sm);color:#555;">V komunitě zatím nejsou registrovaní pátrači.</p>';
+                el.innerHTML = '<p style="font-size:var(--text-sm);color:var(--faint-fg);">V komunitě zatím nejsou registrovaní pátrači.</p>';
                 return;
             }
             var html = '';
@@ -5187,7 +5178,7 @@
                 var label = mem.account.playerName || mem.userId;
                 html += '<div class="' + cls + '">';
                 html += '<div class="avatar-box">' + avHtml + '</div>';
-                html += '<div style="flex:1;"><strong>' + label + '</strong><br><span style="font-size:var(--text-xs);color:#666;">';
+                html += '<div style="flex:1;"><strong>' + label + '</strong><br><span style="font-size:var(--text-xs);color:var(--dim-fg);">';
                 html += (isBotAccount(mem.account) ? '🤖 test · ' : '') + mem.userId + ' · ' + (mem.account.localMissions || 0) + ' misí</span></div>';
                 html += '<button type="button" class="btn-op-edit" onclick="enterOperatorEditPlayer(\'' + mem.userId.replace(/'/g, "\\'") + '\')">' + (mem.userId === currentlyEditingPlayerId ? '✎ EDITUJI' : 'PŘEVZÍT IDENTITU') + '</button>';
                 if (isBotAccount(mem.account)) {
@@ -5231,7 +5222,7 @@
                     mhtml += '<span>' + (quest.char ? quest.char + ': ' : '') + quest.title + '</span>';
                     mhtml += '</label>';
                 }
-                missionEl.innerHTML = mhtml || '<span style="font-size:var(--text-sm);color:#555;">Žádné definované mise</span>';
+                missionEl.innerHTML = mhtml || '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Žádné definované mise</span>';
             }
 
             var specEl = document.getElementById('operator-spec-grid');
@@ -5850,7 +5841,7 @@
                 var clanRankNext = document.getElementById('clan-status-rank-next');
                 if (comRankNext) comRankNext.textContent = '';
                 if (clanRankNext) clanRankNext.textContent = '';
-                if (membersEl) membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:#555;">Bez komunity</span>';
+                if (membersEl) membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Bez komunity</span>';
                 if (adminBadge) adminBadge.style.display = 'none';
                 return;
             }
@@ -5862,7 +5853,7 @@
 
             if (!membersEl) return;
             if (stats.members.length === 0) {
-                membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:#555;">Zatím žádní pátrači</span>';
+                membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Zatím žádní pátrači</span>';
                 membersEl.classList.remove('is-scrollable');
                 return;
             }
@@ -6525,7 +6516,7 @@
             var storyEl = document.getElementById('story-positions-list');
             if (activeEl) {
                 var activeHtml = renderActiveOrdersContent();
-                activeEl.innerHTML = activeHtml || '<p style="font-size:var(--text-sm);color:#555;text-align:center;">Žádné aktivní rozkazy. Vyžádej nový nebo vytvoř vlastní.</p>';
+                activeEl.innerHTML = activeHtml || '<p style="font-size:var(--text-sm);color:var(--faint-fg);text-align:center;">Žádné aktivní rozkazy. Vyžádej nový nebo vytvoř vlastní.</p>';
             }
             if (storyEl) {
                 storyEl.innerHTML = renderStoryPositionsContent();
@@ -6800,12 +6791,12 @@
                 html += '<div class="item-meta-info" style="color:#e8c547;">Terminálový kód: <strong style="letter-spacing:0.12em;">' + (item.poctaCode || '—') + '</strong></div>';
                 html += '<div class="item-meta-info">Fáze: ' + (item.poctaPhase === 'anchored' ? 'Ukotvená na mapě' : 'Neaktivovaná — čeká na ukotvení v terénu (GPS)') + '</div>';
                 if (item.lore) {
-                    html += '<div class="item-meta-info" style="color:#aaa;">' + item.lore + '</div>';
+                    html += '<div class="item-meta-info" style="color:var(--subtle-fg);">' + item.lore + '</div>';
                 }
                 return html;
             }
             if (item.spec) {
-                html += '<div style="font-size:var(--text-xs); color:#ffcc00; margin-top:2px;">✨ ' + item.spec + '</div>';
+                html += '<div style="font-size:var(--text-xs); color:var(--accent-gold); margin-top:2px;">✨ ' + item.spec + '</div>';
             }
             if (item.lore) {
                 html += '<div class="item-meta-info" style="color:var(--danger-orange);">☣️ ZÁpis: ' + item.lore + '</div>';
@@ -6889,7 +6880,7 @@
                     html += '<div class="item-img-box">' + imgHtml + blueprintWatermark + '</div>';
                     html += '<div style="flex:1;">';
                     html += '<strong>' + item.name + '</strong><br>';
-                    html += '<span style="font-size:var(--text-sm); color:#aaa; line-height:1.5;">' + item.desc + '</span>';
+                    html += '<span style="font-size:var(--text-sm); color:var(--subtle-fg); line-height:1.5;">' + item.desc + '</span>';
                     html += '</div></div>';
                     html += rankSummary;
                     if (showOpItemControls && !isComm && item.itemType !== 'tool') {
@@ -6905,19 +6896,19 @@
                     html += detailHtml;
                     html += '<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">';
                     if (item.itemType !== 'pocta') {
-                        html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:#ffcc00; color:#ffcc00;" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
+                        html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
                         html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT</button>';
                     } else if (isComm && item.poctaPhase !== 'anchored') {
-                        html += '<span style="font-size:var(--text-xs);color:#888;">Ukotvení GPS — brzy v další fázi modulu.</span>';
+                        html += '<span style="font-size:var(--text-xs);color:var(--muted-fg);">Ukotvení GPS — brzy v další fázi modulu.</span>';
                     }
                     html += '</div></div></div>';
                 }
-                return html === "" ? '<p style="font-size:var(--text-sm); color:#444; text-align:center;">Prázdno</p>' : html;
+                return html === "" ? '<p style="font-size:var(--text-sm); color:var(--panel-subtle); text-align:center;">Prázdno</p>' : html;
             }
 
             comContainer.innerHTML = buildHtml(comItems, true);
             if (isOperatorMode && !currentlyEditingPlayerId) {
-                persContainer.innerHTML = '<p style="font-size:var(--text-sm); color:#666; text-align:center;">V režimu operátor vyber hráče v záložce Útočiště → PŘEVZÍT IDENTITU.</p>';
+                persContainer.innerHTML = '<p style="font-size:var(--text-sm); color:var(--dim-fg); text-align:center;">V režimu operátor vyber hráče v záložce Útočiště → PŘEVZÍT IDENTITU.</p>';
             } else {
                 persContainer.innerHTML = buildHtml(persItems, false);
             }
@@ -7119,6 +7110,12 @@
         window.patracSetCompassVisible = function(visible) {
             import('./src/settings.js').then(function(mod) {
                 mod.setPatracCompassVisible(visible);
+            });
+        };
+
+        window.patracSetDisplayMode = function(mode) {
+            import('./src/settings.js').then(function(mod) {
+                mod.setPatracDisplayMode(mode);
             });
         };
 

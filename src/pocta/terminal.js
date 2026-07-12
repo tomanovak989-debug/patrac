@@ -50,7 +50,7 @@ export function renderTerminalPanel(ctx) {
     var entities = getActivatedEntities(ctx.userId, registry);
 
     if (entities.length === 0) {
-        listEl.innerHTML = '<p style="font-size:var(--text-sm);color:#555;margin:0;">Zatím žádné aktivované kódy. Zadej kód výše.</p>';
+        listEl.innerHTML = '<p style="font-size:var(--text-sm);color:var(--faint-fg);margin:0;">Zatím žádné aktivované kódy. Zadej kód výše.</p>';
         return;
     }
 

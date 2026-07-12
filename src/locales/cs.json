@@ -102,6 +102,9 @@
                      "compass":  "Kompas na mapě",
                      "compassShow":  "Zobrazit",
                      "compassHide":  "Skrýt",
+                     "displayMode":  "Režim zobrazení",
+                     "displayDay":  "Den",
+                     "displayNight":  "Noc",
                      "logout":  "⏻ OHLÁSIT SE"
                  },
     "quests":  {

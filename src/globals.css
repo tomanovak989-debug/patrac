@@ -1,0 +1,498 @@
+/**
+ * Barevná témata PÁTRAČ — Den (theme-light) / Noc (theme-dark)
+ * Základ: --bg-color, --text-color, --border-color
+ */
+
+body.theme-dark {
+    --bg-color: #000000;
+    --text-color: #00FF00;
+    --border-color: #003300;
+
+    --text-green: var(--text-color);
+    --text-green-dim: #8fd87a;
+    --text-body: #f0fff0;
+    --text-muted: #b8e8a8;
+    --text-label: #d8ffd0;
+    --muted-fg: #888888;
+    --dim-fg: #666666;
+    --subtle-fg: #aaaaaa;
+    --faint-fg: #555555;
+    --panel-subtle: #444444;
+
+    --hud-bg: rgba(8, 12, 8, 0.92);
+    --hud-border: var(--border-color);
+    --panel-bg: rgba(12, 18, 12, 0.88);
+    --panel-bg-alt: rgba(8, 14, 8, 0.9);
+    --bar-bg: rgba(3, 5, 3, 0.95);
+    --card-community-bg: rgba(14, 12, 8, 0.92);
+    --card-profile-bg: rgba(10, 16, 10, 0.92);
+    --card-story-bg: rgba(8, 14, 10, 0.88);
+    --card-completed-bg: rgba(10, 10, 10, 0.82);
+    --card-completed-border: rgba(90, 90, 90, 0.5);
+    --card-operator-bg: rgba(30, 14, 6, 0.75);
+    --card-terminal-bg: rgba(14, 12, 6, 0.85);
+    --card-muted-bg: rgba(8, 8, 8, 0.5);
+    --card-craft-bg: rgba(20, 30, 20, 0.5);
+    --card-info-bg: rgba(10, 20, 30, 0.4);
+
+    --input-bg: rgba(6, 10, 6, 0.95);
+    --surface-inset: rgba(6, 10, 6, 0.95);
+    --surface-deep: #0a0e0a;
+    --overlay-bg: rgba(6, 10, 6, 0.97);
+    --meta-bg: rgba(0, 0, 0, 0.35);
+    --chronicle-bg: rgba(0, 0, 0, 0.25);
+    --badge-fg: #e8ffe8;
+
+    --accent-gold: #ffcc00;
+    --accent-gold-dim: #c9a000;
+    --section-title-color: #7a9a72;
+    --stat-label-color: #8a9a88;
+    --stat-dim-color: #6a7a68;
+    --meta-text-color: #7a8a78;
+    --community-border: rgba(255, 204, 0, 0.35);
+    --community-divider: rgba(255, 204, 0, 0.2);
+    --active-row-bg: rgba(74, 246, 38, 0.1);
+    --active-row-border: rgba(74, 246, 38, 0.55);
+    --active-row-glow: rgba(74, 246, 38, 0.45);
+    --divider-dotted: rgba(74, 246, 38, 0.25);
+    --divider-faint: rgba(74, 246, 38, 0.15);
+    --tab-divider: rgba(74, 246, 38, 0.2);
+    --input-inset-shadow: inset 0 0 12px rgba(74, 246, 38, 0.04);
+    --highlight-mark: rgba(74, 246, 38, 0.22);
+    --suggest-hover: rgba(74, 246, 38, 0.1);
+    --terminal-card-bg: rgba(10, 14, 10, 0.55);
+    --item-card-bg: rgba(10, 14, 10, 0.85);
+    --warn-panel-bg: rgba(30, 20, 10, 0.5);
+    --danger-panel-bg: rgba(30, 15, 15, 0.9);
+    --countdown-bg: rgba(26, 10, 6, 0.9);
+    --gps-btn-bg: rgba(30, 14, 8, 0.9);
+
+    --gate-bg: #070707;
+    --gate-panel: #0c0c0c;
+    --gate-border: #2a2a2a;
+    --gate-text: #6a6a6a;
+    --gate-text-dim: #444444;
+    --gate-accent: #8a9488;
+    --gate-accent-hover: #a8b4a4;
+    --gate-input-bg: #050505;
+    --gate-heading: #9a9a9a;
+    --gate-divider: #1a1a1a;
+
+    --neon-glow: 0 0 8px rgba(0, 255, 0, 0.35), 0 0 20px rgba(0, 255, 0, 0.12), inset 0 0 30px rgba(0, 255, 0, 0.03);
+    --neon-glow-strong: 0 0 12px rgba(0, 255, 0, 0.55), 0 0 28px rgba(0, 255, 0, 0.2), inset 0 0 40px rgba(0, 255, 0, 0.05);
+    --text-glow: 0 0 4px rgba(0, 255, 0, 0.45), 0 0 10px rgba(0, 255, 0, 0.15);
+    --crt-scan-opacity: 0.7;
+    --accent-hover-bg: rgba(0, 255, 0, 0.08);
+    --accent-muted-bg: rgba(0, 255, 0, 0.05);
+    --completed-opacity: 0.58;
+}
+
+/* Denní režim — „Polní manuál“: světlé pozadí, tmavý text, vysoký kontrast */
+body.theme-light {
+    --bg-color: #F5F7F2;
+    --text-color: #0F1410;
+    --border-color: #3D4A42;
+
+    --text-green: #0A5C2E;
+    --text-green-dim: #1F3328;
+    --text-body: #0F1410;
+    --text-muted: #2A3530;
+    --text-label: #0F1410;
+    --muted-fg: #2A3530;
+    --dim-fg: #3A4540;
+    --subtle-fg: #2F3B35;
+    --faint-fg: #505850;
+    --panel-subtle: #6B756F;
+
+    --hud-bg: #FFFFFF;
+    --hud-border: #5A6B60;
+    --panel-bg: #FFFFFF;
+    --panel-bg-alt: #F0F3EE;
+    --bar-bg: #FFFFFF;
+    --card-community-bg: #FFFDF5;
+    --card-profile-bg: #FFFFFF;
+    --card-story-bg: #F4F7F4;
+    --card-completed-bg: #E4EAE4;
+    --card-completed-border: #9AA89A;
+    --card-operator-bg: #FFF5EB;
+    --card-terminal-bg: #FFFEF8;
+    --card-muted-bg: #ECEFEA;
+    --card-craft-bg: #F2F6F2;
+    --card-info-bg: #EEF3F8;
+
+    --input-bg: #FFFFFF;
+    --surface-inset: #F0F3EE;
+    --surface-deep: #E8EBE6;
+    --overlay-bg: #FFFFFF;
+    --meta-bg: #ECEFEA;
+    --chronicle-bg: #F0F3EE;
+    --badge-fg: #1F3328;
+
+    --accent-gold: #8B5A00;
+    --accent-gold-dim: #6B4500;
+    --section-title-color: #0A5C2E;
+    --stat-label-color: #2A3530;
+    --stat-dim-color: #3A4540;
+    --meta-text-color: #3A4540;
+    --community-border: #B8860B;
+    --community-divider: #C9A227;
+    --active-row-bg: #E2F0E6;
+    --active-row-border: #0A5C2E;
+    --active-row-glow: rgba(10, 92, 46, 0.25);
+    --divider-dotted: #9AA89A;
+    --divider-faint: #B8C4BA;
+    --tab-divider: #C5CEC7;
+    --highlight-mark: #C8E6C9;
+    --suggest-hover: #E2F0E6;
+    --terminal-card-bg: #F8FAF7;
+    --item-card-bg: #FFFFFF;
+    --warn-panel-bg: #FFF5EB;
+    --danger-panel-bg: #FFF0F0;
+    --countdown-bg: #FFF5EB;
+    --gps-btn-bg: #FFF5EB;
+
+    --gate-bg: #F5F7F2;
+    --gate-panel: #FFFFFF;
+    --gate-border: #5A6B60;
+    --gate-text: #0F1410;
+    --gate-text-dim: #3A4540;
+    --gate-accent: #0A5C2E;
+    --gate-accent-hover: #084422;
+    --gate-input-bg: #FFFFFF;
+    --gate-heading: #0F1410;
+    --gate-divider: #C5CEC7;
+
+    /* Neonové stínování rámečků — denní „fosfor“ na světlém pozadí */
+    --neon-glow:
+        0 0 0 1px rgba(10, 92, 46, 0.38),
+        0 0 10px rgba(10, 92, 46, 0.22),
+        0 0 26px rgba(10, 92, 46, 0.11),
+        0 2px 10px rgba(15, 20, 16, 0.07);
+    --neon-glow-strong:
+        0 0 0 1px rgba(10, 92, 46, 0.52),
+        0 0 16px rgba(10, 92, 46, 0.32),
+        0 0 36px rgba(10, 92, 46, 0.16),
+        0 4px 14px rgba(15, 20, 16, 0.09);
+    --neon-glow-soft:
+        0 0 0 1px rgba(10, 92, 46, 0.28),
+        0 0 8px rgba(10, 92, 46, 0.14);
+    --neon-glow-gold:
+        0 0 0 1px rgba(184, 134, 11, 0.55),
+        0 0 12px rgba(184, 134, 11, 0.28),
+        0 0 28px rgba(201, 162, 39, 0.14),
+        0 2px 10px rgba(15, 20, 16, 0.06);
+    --neon-glow-orange:
+        0 0 0 1px rgba(255, 85, 0, 0.42),
+        0 0 12px rgba(255, 85, 0, 0.22),
+        0 0 26px rgba(255, 120, 40, 0.12),
+        0 2px 10px rgba(15, 20, 16, 0.06);
+    --neon-glow-blue:
+        0 0 0 1px rgba(0, 136, 255, 0.45),
+        0 0 12px rgba(0, 136, 255, 0.24),
+        0 0 26px rgba(0, 136, 255, 0.12),
+        0 2px 10px rgba(15, 20, 16, 0.06);
+    --neon-bar-glow:
+        0 -1px 0 rgba(10, 92, 46, 0.25),
+        0 0 22px rgba(10, 92, 46, 0.14),
+        0 -4px 18px rgba(15, 20, 16, 0.05);
+    --text-glow: 0 0 14px rgba(10, 92, 46, 0.18);
+    --input-inset-shadow: inset 0 0 0 1px #C5CEC7, inset 0 0 8px rgba(10, 92, 46, 0.04);
+    --crt-scan-opacity: 0;
+    --accent-hover-bg: #E2F0E6;
+    --accent-muted-bg: #F0F3EE;
+    --completed-opacity: 0.85;
+}
+
+body.contrast-enhanced.theme-dark {
+    --gate-text: #c8d4c4;
+    --gate-text-dim: #a0b0a0;
+    --text-green-dim: #b8f0a8;
+}
+
+body.contrast-enhanced.theme-light {
+    --text-body: #000000;
+    --text-color: #000000;
+    --text-green: #064020;
+    --muted-fg: #1A1A1A;
+    --dim-fg: #2A2A2A;
+    --border-color: #2A2A2A;
+    --hud-border: #2A2A2A;
+}
+
+html,
+body {
+    background-color: var(--bg-color);
+    color: var(--text-body);
+}
+
+body.theme-light .crt-surface::before {
+    display: none;
+}
+
+body.theme-dark .crt-surface::before {
+    opacity: var(--crt-scan-opacity);
+}
+
+/* ── Sjednocení panelů v denním režimu ── */
+body.theme-light .hud-element,
+body.theme-light .quest-card,
+body.theme-light .mini-profile-card,
+body.theme-light .community-profile-card,
+body.theme-light .shelter-story-panel,
+body.theme-light .chat-container,
+body.theme-light .item-craft-card,
+body.theme-light .terminal-entry-card,
+body.theme-light .data-karta-entry {
+    color: var(--text-body);
+}
+
+body.theme-light .community-profile-card,
+body.theme-light .mini-profile-card,
+body.theme-light .shelter-story-panel {
+    background: var(--card-profile-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+body.theme-light .community-profile-card {
+    background: var(--card-community-bg) !important;
+    border-color: var(--community-border) !important;
+}
+
+body.theme-light .quest-card {
+    background: var(--panel-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+body.theme-light .quest-card.quest-completed,
+body.theme-light .quest-card.quest-inactive {
+    background: var(--card-completed-bg) !important;
+    border-color: var(--card-completed-border) !important;
+    opacity: var(--completed-opacity);
+}
+
+body.theme-light .rank-next-hint strong,
+body.theme-light .mini-profile-card strong {
+    color: var(--text-body);
+}
+
+/* ── Denní režim: neonové stínování rámečků ── */
+body.theme-light .hud-element,
+body.theme-light .quest-card,
+body.theme-light .mini-profile-card,
+body.theme-light .shelter-story-panel,
+body.theme-light .chat-container,
+body.theme-light .item-craft-card,
+body.theme-light .terminal-entry-card,
+body.theme-light .data-karta-entry,
+body.theme-light .lustrace-box,
+body.theme-light .setup-container,
+body.theme-light .chronicle-entry,
+body.theme-light .map-detail-panel,
+body.theme-light #map-targeting-bar,
+body.theme-light #map-add-poi-bar,
+body.theme-light #map-measure-bar,
+body.theme-light #poi-edit-bar,
+body.theme-light #story-pos-edit-bar {
+    box-shadow: var(--neon-glow);
+}
+
+body.theme-light .community-profile-card,
+body.theme-light .card-tone-terminal {
+    box-shadow: var(--neon-glow-gold) !important;
+}
+
+body.theme-light .card-tone-operator,
+body.theme-light .card-tone-warn,
+body.theme-light .card-tone-danger,
+body.theme-light .operator-shelter-section.quest-card,
+body.theme-light .operator-clan-section.quest-card {
+    box-shadow: var(--neon-glow-orange) !important;
+}
+
+body.theme-light .card-tone-info {
+    box-shadow: var(--neon-glow-blue) !important;
+}
+
+body.theme-light .gate-inner {
+    box-shadow: var(--neon-glow-strong);
+    border: 1px solid var(--gate-border);
+}
+
+body.theme-light .avatar-box {
+    box-shadow: var(--neon-glow-soft);
+}
+
+body.theme-light .btn-accept {
+    box-shadow: var(--neon-glow-soft);
+    transition: box-shadow 0.18s ease, background 0.15s ease;
+}
+
+body.theme-light .btn-accept:hover {
+    box-shadow: var(--neon-glow-strong);
+}
+
+body.theme-light .tool-btn {
+    box-shadow: var(--neon-glow-soft);
+}
+
+body.theme-light .tool-btn:hover {
+    box-shadow: var(--neon-glow);
+}
+
+body.theme-light .bottom-action-bar {
+    background-color: var(--bar-bg) !important;
+    border-top-color: var(--border-color) !important;
+    box-shadow: var(--neon-bar-glow) !important;
+}
+
+body.theme-light .action-tab.active {
+    color: var(--text-green);
+    background-color: var(--accent-hover-bg);
+    box-shadow: inset 0 0 14px rgba(10, 92, 46, 0.1), 0 0 10px rgba(10, 92, 46, 0.12);
+    text-shadow: var(--text-glow);
+}
+
+body.theme-light .quest-section-title,
+body.theme-light .top-status-bar,
+body.theme-light .inventory-column-title {
+    text-shadow: var(--text-glow);
+}
+
+body.theme-light .community-member-row.is-active {
+    background: var(--active-row-bg) !important;
+    box-shadow:
+        inset 0 0 0 1px var(--active-row-border),
+        0 0 14px rgba(10, 92, 46, 0.18) !important;
+}
+
+body.theme-light .community-member-row.is-active .community-member-row-profile .avatar-box,
+body.theme-light .community-member-row.is-founder .community-member-row-profile .avatar-box {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 12px rgba(184, 134, 11, 0.35) !important;
+}
+
+body.theme-light .form-group input:focus,
+body.theme-light .form-group textarea:focus,
+body.theme-light .form-group select:focus,
+body.theme-light .data-karta-search:focus,
+body.theme-light .gate-form-group input:focus,
+body.theme-light .gate-form-group textarea:focus,
+body.theme-light .gate-form-group select:focus {
+    border-color: var(--text-green) !important;
+    box-shadow: var(--input-inset-shadow), var(--neon-glow-strong) !important;
+    outline: none;
+}
+
+body.theme-light .data-karta-suggest {
+    box-shadow: var(--neon-glow-strong) !important;
+    border-color: var(--text-green) !important;
+}
+
+body.theme-light .hud-menu-dropdown {
+    box-shadow: var(--neon-glow-strong);
+}
+
+body.theme-light .leaflet-tooltip.map-point-label {
+    box-shadow: var(--neon-glow) !important;
+    text-shadow: var(--text-glow) !important;
+}
+
+body.theme-light .quest-card.quest-completed,
+body.theme-light .quest-card.quest-inactive {
+    box-shadow:
+        0 0 0 1px rgba(154, 168, 154, 0.6),
+        0 0 8px rgba(10, 92, 46, 0.08) !important;
+}
+
+body.theme-light .action-tab {
+    color: var(--dim-fg);
+    border-right-color: var(--tab-divider) !important;
+}
+
+body.theme-light .quest-section-title {
+    color: var(--section-title-color) !important;
+    border-bottom-color: var(--divider-dotted) !important;
+}
+
+body.theme-light .specialization-line,
+body.theme-light .wear-compact-list .wear-all-shared,
+body.theme-light .wear-item-chip.is-shared,
+body.theme-light .community-profile-card .com-admin-badge,
+body.theme-light .quest-assigner-badge {
+    color: var(--accent-gold) !important;
+}
+
+body.theme-light .chronicle-entry,
+body.theme-light .mission-log-entry,
+body.theme-light .item-history-block,
+body.theme-light .spec-breakdown,
+body.theme-light .item-type-badge,
+body.theme-light .btn-item-detail {
+    color: var(--stat-label-color) !important;
+}
+
+body.theme-light .chronicle-entry {
+    background: var(--chronicle-bg) !important;
+}
+
+body.theme-light .item-meta-info {
+    background: var(--meta-bg) !important;
+    color: var(--meta-text-color) !important;
+    box-shadow: var(--neon-glow-soft);
+}
+
+body.theme-light .form-group input,
+body.theme-light .form-group textarea,
+body.theme-light .form-group select {
+    box-shadow: var(--input-inset-shadow) !important;
+    color: var(--text-body) !important;
+}
+
+body.theme-light .btn-gps-lock,
+body.theme-light .countdown-timer {
+    background: var(--countdown-bg) !important;
+    text-shadow: none !important;
+    box-shadow: var(--neon-glow-orange);
+}
+
+body.theme-light .data-karta-suggest li {
+    color: var(--text-body) !important;
+}
+
+body.theme-light .data-karta-entry-body {
+    color: var(--dim-fg) !important;
+}
+
+body.theme-light .data-karta-entry-body mark {
+    background: var(--highlight-mark) !important;
+}
+
+body.theme-light .top-status-bar,
+body.theme-light #gps-status-text {
+    color: var(--text-green) !important;
+}
+
+body.theme-light .gate-container::before {
+    opacity: 0.15;
+}
+
+body.theme-light .gate-divider {
+    background: var(--gate-divider) !important;
+}
+
+body.theme-light .mini-profile-card,
+body.theme-light .community-profile-card,
+body.theme-light .profile-stats-grid,
+body.theme-light .rank-next-hint,
+body.theme-light .wear-section-title {
+    color: var(--text-body);
+}
+
+/* Utility třídy pro tónované karty (nahrazují inline rgba) */
+.card-tone-operator { background: var(--card-operator-bg) !important; }
+.card-tone-terminal { background: var(--card-terminal-bg) !important; border-color: var(--community-border) !important; }
+.card-tone-muted { background: var(--card-muted-bg) !important; }
+.card-tone-craft { background: var(--card-craft-bg) !important; }
+.card-tone-info { background: var(--card-info-bg) !important; }
+.card-tone-warn { background: var(--warn-panel-bg) !important; }
+.card-tone-danger { background: var(--danger-panel-bg) !important; }

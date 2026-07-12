@@ -102,6 +102,9 @@
                      "compass":  "Map compass",
                      "compassShow":  "Show",
                      "compassHide":  "Hide",
+                     "displayMode":  "Display mode",
+                     "displayDay":  "Day",
+                     "displayNight":  "Night",
                      "logout":  "⏻ LOG OUT"
                  },
     "quests":  {
