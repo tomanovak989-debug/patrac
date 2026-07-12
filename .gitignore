@@ -1,2 +1,5 @@
 start-server.bat
 node_modules/
+.env.local
+.env*.local
+src/lib/firebase.config.js
