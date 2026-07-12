@@ -50,7 +50,7 @@ export function renderTerminalPanel(ctx) {
     var entities = getActivatedEntities(ctx.userId, registry);
 
     if (entities.length === 0) {
-        listEl.innerHTML = '<p style="font-size:9px;color:#555;margin:0;">Zatím žádné aktivované kódy. Zadej kód výše.</p>';
+        listEl.innerHTML = '<p style="font-size:var(--text-sm);color:#555;margin:0;">Zatím žádné aktivované kódy. Zadej kód výše.</p>';
         return;
     }
 
@@ -60,12 +60,12 @@ export function renderTerminalPanel(ctx) {
         var own = isOwner(e, ctx.userId);
         var border = own ? 'rgba(232,197,71,0.45)' : 'rgba(136,136,136,0.35)';
         html += '<div class="quest-card terminal-entry-card" style="margin-bottom:8px;border-color:' + border + ';">';
-        html += '<div style="font-size:8px;color:#888;">' + entityTypeLabel(e) + ' · ' + (own ? 'Moje' : 'Sdílené') + '</div>';
-        html += '<div class="quest-header" style="font-size:10px;margin-top:2px;">' + escapeHtml(e.title) + '</div>';
-        html += '<div style="font-size:9px;color:#aaa;">Kód: <strong style="color:var(--text-green);letter-spacing:0.12em;">' + escapeHtml(e.code) + '</strong> · ' + entityPhaseLabel(e) + '</div>';
+        html += '<div style="font-size:var(--text-xs);color:#888;">' + entityTypeLabel(e) + ' · ' + (own ? 'Moje' : 'Sdílené') + '</div>';
+        html += '<div class="quest-header" style="font-size:var(--text-base);margin-top:2px;">' + escapeHtml(e.title) + '</div>';
+        html += '<div style="font-size:var(--text-sm);color:#aaa;">Kód: <strong style="color:var(--text-green);letter-spacing:0.12em;">' + escapeHtml(e.code) + '</strong> · ' + entityPhaseLabel(e) + '</div>';
         html += '<div class="story-pos-actions" style="margin-top:6px;">';
         if (e.lat != null && e.lng != null) {
-            html += '<button type="button" class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue);font-size:8px;padding:6px 4px;" onclick="patracTerminalPanTo(\'' + escapeHtml(e.code) + '\')">🗺️ MAPA</button>';
+            html += '<button type="button" class="btn-accept" style="border-color:var(--xp-blue);color:var(--xp-blue);font-size:var(--text-xs);padding:6px 4px;" onclick="patracTerminalPanTo(\'' + escapeHtml(e.code) + '\')">🗺️ MAPA</button>';
         }
         html += '</div></div>';
     }

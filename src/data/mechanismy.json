@@ -1,0 +1,70 @@
+{
+  "entries": [
+    {
+      "id": "uvod",
+      "title": "Úvod do hry",
+      "keywords": ["start", "úvod", "přihlášení", "registrace"],
+      "body": "PÁTRAČ běží v prohlížeči na telefonu nebo počítači. Po spuštění se přihlásíš volacím ID a heslem, nebo se zaregistruješ a připojíš ke komunitě.\n\nHra stojí na fyzickém pohybu v terénu — mapa a úkoly dávají smysl, až když na místa opravdu dojdeš. GPS potvrzuje, že operace proběhla v reálném světě."
+    },
+    {
+      "id": "zalozky",
+      "title": "Spodní lišta — záložky",
+      "keywords": ["záložky", "menu", "navigace", "lišta"],
+      "body": "Spodní lišta má sedm sekcí:\n\n🏠 Útočiště — profil, statistiky, rychlý stav.\n🗺️ Úkoly — mise, vlastní rozkazy, příběhové body.\n📡 Mapa HUD — celoobrazovka mapy s kompasem.\n👥 Komunita — chat, členové, správa.\n🖥️ Terminál — zadávání kódů (POCTA).\n📂 Data — Lore, Postapopedie, Mechanismus hry.\n🎒 Inventář — osobní a komunitní předměty, výroba."
+    },
+    {
+      "id": "mapa-gps",
+      "title": "Mapa a GPS",
+      "keywords": ["mapa", "gps", "kompas", "marker", "poloha", "hud"],
+      "body": "Mapa zobrazuje body komunity, mise a aktivované entity z Terminálu. Kompas lze v nastavení skrýt; při otevřených panelech jde pod overlay.\n\nTelefon průběžně aktualizuje tvou polohu (modrý marker). U splnění úkolu musíš být v dosahu cíle — typicky do ~80 m. Běžný hráč zakládá body z GPS; operátor (správce) může použít střed mapy."
+    },
+    {
+      "id": "ukoly",
+      "title": "Úkoly a mise",
+      "keywords": ["úkol", "mise", "rozkaz", "splnění", "quest"],
+      "body": "V záložce Úkoly vidíš aktivní rozkazy — příběhové i vlastní komunity.\n\nSplnění: dojdi na místo (GPS), otevři misi a potvrď výkon. Vlastní úkoly lze svázat s existujícím bodem na mapě (dropdown pozic).\n\nPo splnění se mohou odemknout předměty v inventáři nebo přijít odměna Pocty do komunitního batohu."
+    },
+    {
+      "id": "inventar",
+      "title": "Inventář a výroba",
+      "keywords": ["inventář", "předmět", "výroba", "talisman", "nástroj"],
+      "body": "Inventář má dvě části: osobní batoh a komunitní sklad.\n\nV sekci výroby vytvoříš nový předmět — talisman (vzácný, s hodností) nebo nástroj (logistická podmínka). Předmět lze navázat na úkol; do splnění mise zůstane zamčený.\n\nU předmětů s lore textem uvidíš tlačítko 📝 LORE — to je popis konkrétní věci, ne panel Lore ve Data."
+    },
+    {
+      "id": "hodnosti-xp",
+      "title": "Hodnosti a XP",
+      "keywords": ["xp", "hodnost", "level", "zkušenost", "statistiky"],
+      "body": "Za splněné mise a operace získáváš zkušenostní body. Ty posouvají hodnost pátrače v profilu.\n\nHodnosti jsou kosmeticko-motivační — neblokují přístup k mapě. Talismany mohou mít vlastní tier vázaný na příběh."
+    },
+    {
+      "id": "pocta-terminal",
+      "title": "POCTA a Terminál",
+      "keywords": ["pocta", "terminál", "kód", "šest", "aktivace", "poc"],
+      "body": "Terminál přijímá 6místné kódy (písmena A–Z a číslice, bez snadno zaměnitelných znaků).\n\nPo zadání:\n• Fázovaný úkol — objeví se marker (nejdřív šedý / záhadný).\n• Pocta — pokud je ukotvená, lze číst kroniku návštěv.\n\nPocta v inventáři komunity: neaktivovaná → po ukotvení v terénu (GPS) bod na mapě. Odměny Pocty mohou přijít po splnění vybraných misí (Herbert, Šéf, Ino).\n\nUkotvení, plná kronika a finální splnění fázovaného úkolu na místě — funkce se doplňují v dalších verzích."
+    },
+    {
+      "id": "komunita-chat",
+      "title": "Komunita a chat",
+      "keywords": ["komunita", "chat", "člen", "správce", "kód komunity"],
+      "body": "Komunita sdílí chat, inventář a body na mapě. Správce zakládá úkoly, schvaluje členy a spravuje profil komunity.\n\nOperátorský klíč pro editaci mapy není v běžném profilu správce — režim operátora se řídí oprávněním v aplikaci."
+    },
+    {
+      "id": "data-vyhledavani",
+      "title": "Data — vyhledávání",
+      "keywords": ["data", "lore", "postapopedie", "hledat", "vyhledávání"],
+      "body": "Záložka Data obsahuje tři vyhledávací panely:\n\n📜 Lore — příběhové záznamy světa.\n🌆 Postapopedie — encyklopedie pojmů po kolapsu.\n⚙️ Mechanismus hry — tento návod k ovládání.\n\nDo vyhledávacího pole napiš alespoň 3 znaky (např. „Poc“) — zobrazí se všechny záznamy, které sedí na název, klíčová slova nebo text. Klikni na řádek v nápovědě nebo v seznamu pro detail."
+    },
+    {
+      "id": "nastaveni",
+      "title": "Nastavení",
+      "keywords": ["nastavení", "kompas", "jazyk", "profil", "gps"],
+      "body": "V nastavení profilu lze měnit jazyk, avatar a zobrazení kompasu (zobrazit / skrýt).\n\nPovol GPS v prohlížeči — bez polohy neověříš splnění mise v terénu. Při testování na počítači bez GPS použij režim operátora, pokud ho máš k dispozici."
+    },
+    {
+      "id": "tipy",
+      "title": "Tipy pro terén",
+      "keywords": ["tip", "baterie", "offline", "bezpečnost", "terén"],
+      "body": "• Nech si zapnutou polohu a dostatečnou baterii na výpravu.\n• Sdílej důležité body s komunitou — mapa roste společně.\n• Kódy z Terminálu si zapisuj z letáků a misí; každý kód je unikátní.\n• Lore u předmětu v inventáři ≠ panel Lore ve Data — jde o dva různé zdroje textů."
+    }
+  ]
+}

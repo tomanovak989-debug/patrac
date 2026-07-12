@@ -6,7 +6,12 @@ export function getTextSize() {
 
 export function applyTextSize(size) {
     size = size === 'large' ? 'large' : 'default';
-    document.body.classList.toggle('text-size-large', size === 'large');
+    document.body.classList.remove('theme-standard', 'theme-large', 'text-size-large');
+    if (size === 'large') {
+        document.body.classList.add('theme-large', 'text-size-large');
+    } else {
+        document.body.classList.add('theme-standard');
+    }
     localStorage.setItem('patrac_text_size', size);
     updateTextSizeButtons(size);
 }

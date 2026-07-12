@@ -1,0 +1,40 @@
+{
+  "entries": [
+    {
+      "id": "kdo-je-patrac",
+      "title": "Kdo je pátrač",
+      "keywords": ["pátrač", "hráč", "operátor", "role", "identita"],
+      "body": "Nejsi turista. Jsi pátrač — někdo, kdo chodí terénem, zapisuje souřadnice, sdílí signál s ostatními a pomáhá komunitě znovu zmapovat svět po kolapsu.\n\nPátrač není sběrač bodů. Je to role důvěry: tvoje GPS záznamy a deníky operací jsou důkaz, že místo existuje a že tam někdo byl."
+    },
+    {
+      "id": "cyklus-operace",
+      "title": "Základní cyklus operace",
+      "keywords": ["mise", "úkol", "gps", "mapa", "rozkaz", "terén"],
+      "body": "Typický cyklus v terénu:\n\n1. Přijmi rozkaz od postavy nebo vlastní komunity.\n2. Dojdi na místo fyzicky — GPS potvrzuje realitu.\n3. Zaměř bod, zapiš stav, sdílej s ostatními.\n4. Buduj síť útočišť, zdrojů a orientačních bodů.\n\nBez fyzického výkonu se svět neposune — aplikace jen zapisuje, co se stalo v reálném prostoru."
+    },
+    {
+      "id": "proc-existujeme",
+      "title": "Proč existujeme",
+      "keywords": ["kolaps", "mapy", "síť", "fragmenty", "úkryt", "voda"],
+      "body": "Oficiální mapy a sítě selhaly. Zůstaly fragmenty: staré cesty, opuštěné chaty, místa s vodou a úkrytem.\n\nPátrači tyto fragmenty spojují do živé sítě — bez korporací, bez reklam, bez iluze, že někdo přijde zachránit. Každý nový bod na mapě je malá oprava reality."
+    },
+    {
+      "id": "cervene-informace",
+      "title": "Co se neříká na briefingu",
+      "keywords": ["tajemství", "centrála", "virus", "frakce", "odemykání"],
+      "body": "Veřejný briefing neobsahuje plný původ viru, identitu všech frakcí ani to, co se stalo s Centrálou.\n\nTy informace se odemykají až v terénu — signálem, který musíš nejdřív zachytit sám. Některé záznamy najdeš v Postapopedii, jiné až po splnění misí nebo aktivaci kódů v Terminálu."
+    },
+    {
+      "id": "pocta-lore",
+      "title": "Pocta — paměť míst",
+      "keywords": ["pocta", "artefakt", "památka", "kronika", "ukotvení"],
+      "body": "Pocta je vzácný příběhový artefakt. Není to běžný předmět z batohu — nese jméno, místo a vzpomínku.\n\nNeaktivovaná Pocta čeká v inventáři komunity. Po ukotvení v terénu (GPS) se stane bodem na mapě s kronikou návštěv. Historie se ukládá do archivu památek — i když Poctu někdo vyzvedne a vrátí do batohu."
+    },
+    {
+      "id": "signal-terminál",
+      "title": "Signál a Terminál",
+      "keywords": ["terminál", "kód", "signál", "šifra", "aktivace"],
+      "body": "Terminál přijímá šestimístné kódy z letáků, zpráv nebo od spolupátračů. Správný kód může odhalit úkol na mapě, otevřít historii Pocty nebo spustit fázi mise.\n\nKódy nejsou hesla do menu — jsou to klíče k místům a příběhům, které existují až poté, co je někdo v terénu aktivuje."
+    }
+  ]
+}

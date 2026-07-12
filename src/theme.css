@@ -1,0 +1,78 @@
+/**
+ * Typografické téma PÁTRAČ — theme-standard / theme-large
+ * Všechny velikosti textu používají CSS proměnné; v režimu large se škálují společně.
+ */
+
+:root,
+body.theme-standard {
+    --text-micro: 6px;
+    --text-xxs: 7px;
+    --text-xs: 8px;
+    --text-sm: 9px;
+    --text-base: 10px;
+    --text-md: 11px;
+    --text-lg: 12px;
+    --text-heading: 14px;
+    --text-title: 22px;
+    --text-lead: 18px;
+    --text-icon-lg: 24px;
+
+    /* Zpětná kompatibilita se staršími názvy */
+    --font-size-base: var(--text-base);
+    --font-size-sm: var(--text-sm);
+    --font-size-heading: var(--text-heading);
+    --font-size-title: var(--text-title);
+
+    --touch-min-h: 40px;
+    --touch-pad-y: 10px;
+    --touch-pad-x: 14px;
+}
+
+body.theme-large,
+body.text-size-large {
+    --text-micro: 10px;
+    --text-xxs: 11px;
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 16px;
+    --text-md: 17px;
+    --text-lg: 18px;
+    --text-heading: 20px;
+    --text-title: 26px;
+    --text-lead: 24px;
+    --text-icon-lg: 28px;
+
+    --touch-min-h: 48px;
+    --touch-pad-y: 14px;
+    --touch-pad-x: 18px;
+}
+
+html {
+    font-size: var(--text-base);
+}
+
+body {
+    font-size: 1rem;
+}
+
+/* Utility — pro inline styly a dynamický HTML */
+.text-micro { font-size: var(--text-micro); }
+.text-xxs { font-size: var(--text-xxs); }
+.text-xs { font-size: var(--text-xs); }
+.text-sm { font-size: var(--text-sm); }
+.text-base { font-size: var(--text-base); }
+.text-md { font-size: var(--text-md); }
+.text-lg { font-size: var(--text-lg); }
+.text-heading { font-size: var(--text-heading); }
+.text-title { font-size: var(--text-title); }
+
+body.theme-large .hud-menu-lang-btn,
+body.theme-large .hud-menu-toggle-btn {
+    min-height: var(--touch-min-h);
+}
+
+body.theme-large .gate-form-group input,
+body.theme-large .gate-form-group select,
+body.theme-large .gate-form-group textarea {
+    min-height: var(--touch-min-h);
+}

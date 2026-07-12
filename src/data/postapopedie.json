@@ -1,0 +1,52 @@
+{
+  "entries": [
+    {
+      "id": "patrac-pojem",
+      "title": "PÁTRAČ (pojem)",
+      "keywords": ["pátrač", "definice", "role", "síť"],
+      "body": "PÁTRAČ — mobilní nástroj a současně název role v poli.\n\nJako aplikace: taktická mapa, lokální úkoly, společný deník operací.\n\nJako role: člověk, který fyzicky ověřuje místa a sdílí data se svou komunitou. Bez pátračů zůstávají mapy mrtvé."
+    },
+    {
+      "id": "utociste",
+      "title": "Útočiště",
+      "keywords": ["útočiště", "základna", "komunita", "domov"],
+      "body": "Útočiště je domovská záložka hráče — profil, statistiky, rychlý přehled stavu operace.\n\nV lore: fyzické místo (chatr, bunkr, tábor), kde komunita shromažďuje zásoby a plánuje výpravy. V aplikaci reprezentuje tvůj osobní střed před výjezdem do terénu."
+    },
+    {
+      "id": "komunita",
+      "title": "Komunita",
+      "keywords": ["komunita", "klan", "skupina", "spolupráce", "inventář"],
+      "body": "Komunita je skupina pátračů sdílející společný inventář, chat a mapové body.\n\nKaždá komunita má kód pro připojení. Správce může zakládat úkoly, schvalovat členy a spravovat společné předměty včetně Pocty."
+    },
+    {
+      "id": "kolaps",
+      "title": "Kolaps",
+      "keywords": ["kolaps", "postapokalypsa", "pád", "krize"],
+      "body": "Období, kdy přestaly fungovat centrální systémy — doprava, energie, oficiální mapy i nouzové linky.\n\nPřesný den a příčina nejsou v otevřených záznamech. Pátrači pracují s tím, co zůstalo: terénem, GPS a vzájemnou důvěrou."
+    },
+    {
+      "id": "centrála",
+      "title": "Centrála",
+      "keywords": ["centrála", "tajné", "frakce", "velení"],
+      "body": "Zmíněná entita z doby před plným kolapsem. Oficiální záznamy o její podobě a osudu jsou [REDAKOVÁNO].\n\nV terénu se objevují stopy — staré antény, opuštěné relé, kódy v Terminálu. Postupným mapováním může komunita složit obraz z fragmentů."
+    },
+    {
+      "id": "pocta-encyklopedie",
+      "title": "Pocta (encyklopedicky)",
+      "keywords": ["pocta", "artefakt", "fáze", "ukotvení", "archiv"],
+      "body": "Vzácný příběhový artefakt se dvěma fázemi:\n\n• Neaktivovaná — leží v inventáři komunity.\n• Ukotvená — spotřebuje se při vložení na mapě na místě (GPS).\n\nUkotvená Pocta sbírá záznamy návštěv (kronika). Vyzvednutí vrátí artefakt do inventáře; archiv památek zůstává."
+    },
+    {
+      "id": "fazovany-ukol",
+      "title": "Fázovaný úkol",
+      "keywords": ["úkol", "fáze", "záhada", "kód", "mise"],
+      "body": "Speciální typ mise aktivované kódem v Terminálu:\n\n1. Záhada — šedý marker na mapě, text neznámý.\n2. Aktivní — po fyzickém příchodu (GPS) se odhalí popis a úkol lze plnit.\n3. Splněný — bod zůstává v historii operace.\n\nVlastník úkolu (autor kódu) má rozšířená práva nad obsahem."
+    },
+    {
+      "id": "gps-overeni",
+      "title": "GPS ověření",
+      "keywords": ["gps", "poloha", "terén", "radius", "ověření"],
+      "body": "Mechanismus, kterým hra váže akce na reálné místo. Splnění mise, ukotvení Pocty nebo založení bodu běžným hráčem vyžaduje, aby telefon hlásil polohu v dosahu cíle (typicky desítky metrů).\n\nOperátor (správce mapy) může některé akce provádět ze středu mapy — simulace velení z tábora."
+    }
+  ]
+}

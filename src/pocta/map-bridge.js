@@ -104,12 +104,12 @@ function buildPopupHtml(entity, userId, near) {
             if (near) {
                 html += '<p class="popup-desc">' + (entity.story || 'Kronika místa.') + '</p>';
                 if (entity.visitLogs && entity.visitLogs.length) {
-                    html += '<div style="font-size:8px;color:#aaa;margin-top:6px;">Poslední návštěva: ' + entity.visitLogs[entity.visitLogs.length - 1].date + '</div>';
+                    html += '<div style="font-size:var(--text-xs);color:#aaa;margin-top:6px;">Poslední návštěva: ' + entity.visitLogs[entity.visitLogs.length - 1].date + '</div>';
                 }
                 if (own) {
-                    html += '<p style="font-size:8px;color:#888;margin-top:4px;">Jsi na místě — můžeš zapisovat do kroniky (brzy).</p>';
+                    html += '<p style="font-size:var(--text-xs);color:#888;margin-top:4px;">Jsi na místě — můžeš zapisovat do kroniky (brzy).</p>';
                 } else {
-                    html += '<p style="font-size:8px;color:#888;margin-top:4px;">Jsi host — můžeš číst kroniku, ne editovat.</p>';
+                    html += '<p style="font-size:var(--text-xs);color:#888;margin-top:4px;">Jsi host — můžeš číst kroniku, ne editovat.</p>';
                 }
             } else {
                 html += '<p class="popup-desc">Pocta ukotvena. Přibliž se na místo (~50 m) pro čtení kroniky.</p>';
@@ -125,7 +125,7 @@ function buildPopupHtml(entity, userId, near) {
             html += '<strong style="color:#4af626;">' + entity.title + '</strong>';
             html += '<p class="popup-desc">' + (entity.desc || '') + '</p>';
             if (near) {
-                html += '<p style="font-size:8px;color:#888;">Na místě — splnění brzy.</p>';
+                html += '<p style="font-size:var(--text-xs);color:#888;">Na místě — splnění brzy.</p>';
             }
         } else {
             html += '<strong style="color:#666;">Splněno</strong>';
