@@ -3223,13 +3223,32 @@
             if (size > PATRAC_ACCOUNTS_MAX_BYTES) {
                 throw new Error('Příliš mnoho účtů v síti (' + Math.round(size / 1024) + ' KB). Smaž staré testovací účty — RESET.');
             }
-            if (safeLocalStorageSet('patrac_accounts', json)) return;
+            if (safeLocalStorageSet('patrac_accounts', json)) {
+                pushAccountsToCloud(slim);
+                return;
+            }
 
             cleanPatracStorageAggressive();
-            if (safeLocalStorageSet('patrac_accounts', json)) return;
+            if (safeLocalStorageSet('patrac_accounts', json)) {
+                pushAccountsToCloud(slim);
+                return;
+            }
 
             var usage = getLocalStorageUsageBytes();
             throw new Error('localStorage je plné (~' + Math.round(usage / 1024) + ' KB). Vymaž data prohlížeče nebo použij ☠ RESET.');
+        }
+
+        function pushAccountsToCloud(accounts) {
+            import('./src/services/accountService.js').then(function(mod) {
+                for (var userId in accounts) {
+                    if (!accounts.hasOwnProperty(userId)) continue;
+                    mod.saveAccountToCloud(userId, accounts[userId]).catch(function(err) {
+                        console.warn('[cloud] account sync', userId, err);
+                    });
+                }
+            }).catch(function(err) {
+                console.warn('[cloud] accountService', err);
+            });
         }
 
         function isQuestCompleted(quest) {
@@ -4801,6 +4820,16 @@
 
         function savePatracCommunities(comms) {
             localStorage.setItem('patrac_communities', JSON.stringify(comms));
+            import('./src/services/communityService.js').then(function(mod) {
+                for (var code in comms) {
+                    if (!comms.hasOwnProperty(code)) continue;
+                    mod.saveCommunityToCloud(code, comms[code]).catch(function(err) {
+                        console.warn('[cloud] community sync', code, err);
+                    });
+                }
+            }).catch(function(err) {
+                console.warn('[cloud] communityService', err);
+            });
         }
 
         function getAllUsedPatracCodes() {
@@ -4885,6 +4914,13 @@
                 ok = safeLocalStorageSet(getPatracItemsCommunityKey(comCode), JSON.stringify(list));
             }
             if (ok) ok = safeLocalStorageSet('items_community', JSON.stringify(list));
+            if (ok && comCode) {
+                import('./src/services/communityService.js').then(function(mod) {
+                    return mod.saveCommunityInventory(comCode, list);
+                }).catch(function(err) {
+                    console.warn('[cloud] inventory sync', comCode, err);
+                });
+            }
             return ok;
         }
 
@@ -5568,6 +5604,40 @@
             if (!code) return null;
             var comms = getPatracCommunities();
             return comms[code.toUpperCase()] || null;
+        }
+
+        function findCommunityByCodeWithCloud(code) {
+            var local = findCommunityByCode(code);
+            if (local) return Promise.resolve(local);
+            return import('./src/services/communityService.js').then(function(mod) {
+                return mod.fetchCommunityMeta(code).then(function(cloud) {
+                    if (!cloud) return null;
+                    var comms = getPatracCommunities();
+                    comms[code.toUpperCase()] = cloud;
+                    localStorage.setItem('patrac_communities', JSON.stringify(comms));
+                    return cloud;
+                });
+            }).catch(function() {
+                return null;
+            });
+        }
+
+        function initCloudSyncAsync() {
+            var comCode = localStorage.getItem('com_code') || operatorComCode || '';
+            if (!comCode) return;
+            import('./src/services/communityService.js').then(function(mod) {
+                return mod.hydrateCommunityFromCloud(comCode);
+            }).then(function(result) {
+                if (result && result.ok) {
+                    try { reconcileCommunityInventory(comCode); } catch (e) { console.warn(e); }
+                    try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
+                    if (typeof window.patracPoctaReloadMap === 'function') {
+                        window.patracPoctaReloadMap();
+                    }
+                }
+            }).catch(function(err) {
+                console.warn('[cloud] hydrate community', err);
+            });
         }
 
         function findAccountByEmail(email) {
@@ -6260,30 +6330,62 @@
                 showGateError('gate-login-error', 'gate.errors.loginMissingId');
                 return;
             }
+
+            function finishLogin() {
+                applyAccountToLocalStorage(userId);
+                var storedProfile = getUserProfileData(userId);
+                applyUserProfileDataToSession(userId, storedProfile);
+                reconcileCommunityInventory(localStorage.getItem('com_code') || '');
+                isOperatorMode = false;
+                operatorComCode = '';
+                currentlyEditingPlayerId = null;
+                operatorEditDraft = null;
+                operatorEditDirty = false;
+                launchGame();
+            }
+
             var accounts = getPatracAccounts();
             var acc = accounts[userId];
-            if (!acc) {
+            if (acc) {
+                if (acc.pass && acc.pass !== pass) {
+                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
+                    return;
+                }
+                if (!acc.pass && pass) {
+                    showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
+                    return;
+                }
+                finishLogin();
+                return;
+            }
+
+            var loginBtn = document.querySelector('#gate-login button.gate-btn-primary');
+            if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'PŘIPOJOVÁNÍ…'; }
+
+            import('./src/services/accountService.js').then(function(mod) {
+                return mod.fetchAccountFromCloud(userId);
+            }).then(function(cloudAcc) {
+                if (!cloudAcc) {
+                    showGateError('gate-login-error', 'gate.errors.loginUnknownId');
+                    return;
+                }
+                if (cloudAcc.pass && cloudAcc.pass !== pass) {
+                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
+                    return;
+                }
+                if (!cloudAcc.pass && pass) {
+                    showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
+                    return;
+                }
+                accounts[userId] = slimPatracAccount(cloudAcc);
+                savePatracAccounts(accounts);
+                finishLogin();
+            }).catch(function(err) {
+                console.warn('[cloud] login fetch', err);
                 showGateError('gate-login-error', 'gate.errors.loginUnknownId');
-                return;
-            }
-            if (acc.pass && acc.pass !== pass) {
-                showGateError('gate-login-error', 'gate.errors.loginBadPass');
-                return;
-            }
-            if (!acc.pass && pass) {
-                showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
-                return;
-            }
-            applyAccountToLocalStorage(userId);
-            var storedProfile = getUserProfileData(userId);
-            applyUserProfileDataToSession(userId, storedProfile);
-            reconcileCommunityInventory(localStorage.getItem('com_code') || '');
-            isOperatorMode = false;
-            operatorComCode = '';
-            currentlyEditingPlayerId = null;
-            operatorEditDraft = null;
-            operatorEditDirty = false;
-            launchGame();
+            }).finally(function() {
+                if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'DEŠIFROVAT A VSTOUPIT'; }
+            });
         }
 
         function switchSetupPage(id) {
@@ -6331,27 +6433,48 @@
                     showGateError('gate-register-error', 'gate.errors.registerMissingComName');
                     return;
                 }
+                continueRegisterAfterCommunityCheck(comName, comCode, comMode, userId, email, pass, playerName);
             } else {
                 comCode = (document.getElementById('input-com-code').value || '').trim().toUpperCase();
                 if (comCode.length !== 5) {
                     showGateError('gate-register-error', 'gate.errors.registerBadComCode');
                     return;
                 }
-                var existingComm = findCommunityByCode(comCode);
-                if (!existingComm) {
+                var submitBtnEarly = document.getElementById('btn-register-submit');
+                if (submitBtnEarly) { submitBtnEarly.disabled = true; submitBtnEarly.textContent = 'OVĚŘUJI KOMUNITU…'; }
+                findCommunityByCodeWithCloud(comCode).then(function(existingComm) {
+                    if (!existingComm) {
+                        showGateError('gate-register-error', 'gate.errors.registerUnknownCom');
+                        if (submitBtnEarly) { submitBtnEarly.disabled = false; submitBtnEarly.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                        return;
+                    }
+                    continueRegisterAfterCommunityCheck(existingComm.name, comCode, comMode, userId, email, pass, playerName);
+                }).catch(function() {
                     showGateError('gate-register-error', 'gate.errors.registerUnknownCom');
-                    return;
-                }
-                comName = existingComm.name;
+                    if (submitBtnEarly) { submitBtnEarly.disabled = false; submitBtnEarly.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                });
             }
+            } catch (err) {
+                console.error('saveProfileAndLaunch', err);
+                showGateError('gate-register-error', 'gate.errors.registerFailed', { msg: err.message || err });
+                var btn = document.getElementById('btn-register-submit');
+                if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+            }
+        }
 
+        function continueRegisterAfterCommunityCheck(comName, comCode, comMode, userId, email, pass, playerName) {
+            try {
             var accounts = getPatracAccounts();
             if (accounts[userId]) {
                 showGateError('gate-register-error', 'gate.errors.registerIdTaken');
+                var btnTaken = document.getElementById('btn-register-submit');
+                if (btnTaken) { btnTaken.disabled = false; btnTaken.textContent = 'ZALOŽIT A VSTOUPIT'; }
                 return;
             }
             if (isEmailTaken(email)) {
                 showGateError('gate-register-error', 'gate.errors.registerEmailTaken');
+                var btnEmail = document.getElementById('btn-register-submit');
+                if (btnEmail) { btnEmail.disabled = false; btnEmail.textContent = 'ZALOŽIT A VSTOUPIT'; }
                 return;
             }
 
@@ -6402,7 +6525,7 @@
             alert(msg);
             launchGame();
             } catch (err) {
-                console.error('saveProfileAndLaunch', err);
+                console.error('continueRegisterAfterCommunityCheck', err);
                 showGateError('gate-register-error', 'gate.errors.registerFailed', { msg: err.message || err });
                 var btn = document.getElementById('btn-register-submit');
                 if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
@@ -6466,6 +6589,7 @@
             renderOperatorClanUI();
 
             initPoctaModuleAsync();
+            initCloudSyncAsync();
             initDataKartaAsync();
 
             var tabBtn = document.querySelectorAll('.bottom-action-bar button')[0];
@@ -6540,7 +6664,8 @@
                     switchMainTab: switchMainTab,
                     getCommunityItemsRaw: getCommunityItemsRaw,
                     saveCommunityItemsRaw: saveCommunityItemsRaw,
-                    loadCustomCraftedItems: loadCustomCraftedItems
+                    loadCustomCraftedItems: loadCustomCraftedItems,
+                    resolveCommunityItemAtDisplayIndex: resolveCommunityItemAtDisplayIndex
                 });
             }).catch(function(err) {
                 console.error('initPoctaModule', err);
@@ -7041,7 +7166,7 @@
                         html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
                         html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT</button>';
                     } else if (isComm && item.poctaPhase !== 'anchored') {
-                        html += '<span style="font-size:var(--text-xs);color:var(--muted-fg);">Ukotvení GPS — brzy v další fázi modulu.</span>';
+                        html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:#e8c547; color:#e8c547;" onclick="event.stopPropagation(); patracAnchorPoctaFromInventory(' + i + ')">📍 UKOTVIT NA GPS</button>';
                     }
                     html += '</div></div></div>';
                 }

@@ -1,10 +1,13 @@
 import { POCTA_PHASE } from './constants.js';
-import { savePoctaVisit, getPoctaVisits, uploadPhoto } from '../services/dataService.js';
 import { canReadPoctaLogs, canWritePoctaLog } from './permissions.js';
 import { loadRegistry, upsertEntity } from './storage.js';
 import { createVisitLog, isPoctaEntity } from './types.js';
 
 var LOCAL_CACHE_LIMIT = 20;
+
+async function getDataService() {
+    return import('../services/dataService.js');
+}
 
 function escapeHtml(str) {
     if (str == null) return '';
@@ -162,7 +165,8 @@ export function buildPoctaChronicleSection(entity, userId, near) {
 
 export async function loadChronicleForPocta(poctaId, localVisitLogs) {
     try {
-        var cloud = await getPoctaVisits(poctaId);
+        var ds = await getDataService();
+        var cloud = await ds.getPoctaVisits(poctaId);
         return mergeVisits(cloud, localVisitLogs || []);
     } catch (err) {
         console.warn('[chronicle] Cloud nedostupný, používám lokální cache.', err);
@@ -187,7 +191,8 @@ export async function submitPoctaVisit(options) {
 
     var photoUrl = null;
     if (photoFile) {
-        photoUrl = await uploadPhoto(photoFile);
+        var dsUpload = await getDataService();
+        photoUrl = await dsUpload.uploadPhoto(photoFile);
     }
 
     var locationPayload = null;
@@ -196,7 +201,8 @@ export async function submitPoctaVisit(options) {
     }
 
     try {
-        var saved = await savePoctaVisit({
+        var dsSave = await getDataService();
+        var saved = await dsSave.savePoctaVisit({
             poctaId: entity.id,
             text: text,
             timestamp: Date.now(),

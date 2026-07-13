@@ -2,6 +2,7 @@ import { bindTerminalUi, renderTerminalPanel, submitTerminalCode, terminalPanTo 
 import { onGpsProximityTick, reloadPoctaMapMarkers } from './map-bridge.js';
 import { loadRegistry } from './storage.js';
 import { maybeGrantPoctaForQuest, simulateQuestPoctaReward } from './quest-rewards.js';
+import { anchorPoctaFromInventory } from './anchoring.js';
 
 function getContext() {
     return {
@@ -17,7 +18,8 @@ export function initPoctaModule(bridge) {
         mapMarkerRegistry: {},
         lastUserPosition: null,
         distanceMeters: null,
-        switchMainTab: null
+        switchMainTab: null,
+        resolveCommunityItemAtDisplayIndex: null
     }, bridge || {});
 
     var ctx = getContext();
@@ -45,6 +47,21 @@ export function initPoctaModule(bridge) {
     window.patracSimulateQuestPoctaReward = function() {
         var result = simulateQuestPoctaReward();
         return result.ok ? result.entity : null;
+    };
+    window.patracAnchorPoctaFromInventory = function(displayIndex) {
+        var c = getContext();
+        return anchorPoctaFromInventory(displayIndex, c.userId).then(function(result) {
+            if (result.ok) {
+                var b = window.patracPoctaBridge || {};
+                if (typeof b.loadCustomCraftedItems === 'function') {
+                    b.loadCustomCraftedItems();
+                }
+                alert('🕯️ Pocta ukotvena na mapě.\n\n→ záložka 🗺️ Mapa');
+            } else {
+                alert(result.error || 'Ukotvení selhalo.');
+            }
+            return result;
+        });
     };
 
     return { registry: loadRegistry(), ctx: ctx };

@@ -73,6 +73,11 @@ export function upsertEntity(entity, registry) {
     registry.entities[code] = entity;
     registry.byId[entity.id] = code;
     saveRegistry(registry);
+    import('../services/poctaEntityService.js').then(function(mod) {
+        return mod.savePoctaEntity(entity);
+    }).catch(function(err) {
+        console.warn('[storage] cloud sync entity', err);
+    });
     return registry;
 }
 
@@ -137,10 +142,29 @@ export function saveTerminalState(userId, state) {
     writeJson(terminalStateKey(userId), state);
 }
 
-export function activateCodeForUser(userId, code, registry) {
+export async function resolveEntityByCode(code, registry) {
     registry = registry || loadRegistry();
     code = normalizeCode(code);
     var entity = findEntityByCode(code, registry);
+    if (entity) return entity;
+
+    try {
+        var mod = await import('../services/poctaEntityService.js');
+        var cloud = await mod.fetchPoctaEntityByCode(code);
+        if (cloud) {
+            var imported = importEntityPayload(cloud, registry);
+            if (imported.ok && imported.entity) return imported.entity;
+        }
+    } catch (err) {
+        console.warn('[storage] cloud entity lookup', err);
+    }
+    return null;
+}
+
+export async function activateCodeForUser(userId, code, registry) {
+    registry = registry || loadRegistry();
+    code = normalizeCode(code);
+    var entity = await resolveEntityByCode(code, registry);
     if (!entity) return { ok: false, error: 'Kód nenalezen v síti PÁTRAČ.' };
 
     var state = loadTerminalState(userId);

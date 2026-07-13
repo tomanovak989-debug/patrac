@@ -76,7 +76,7 @@ export function renderTerminalPanel(ctx) {
     }
 }
 
-export function submitTerminalCode(rawCode, ctx) {
+export async function submitTerminalCode(rawCode, ctx) {
     var msgEl = document.getElementById('terminal-last-message');
     var code = normalizeCode(rawCode);
     if (!isValidCodeFormat(code)) {
@@ -84,7 +84,7 @@ export function submitTerminalCode(rawCode, ctx) {
         return { ok: false, error: 'invalid_format' };
     }
 
-    var result = activateCodeForUser(ctx.userId, code);
+    var result = await activateCodeForUser(ctx.userId, code);
     if (!result.ok) {
         if (msgEl) {
             msgEl.textContent = result.error || 'Kód nenalezen.';
@@ -107,7 +107,7 @@ export function submitTerminalCode(rawCode, ctx) {
     return result;
 }
 
-export function createDemoPocta(ctx) {
+export async function createDemoPocta(ctx) {
     var result = grantPoctaToCommunity({
         questId: 'demo_pocta_' + Date.now(),
         questTitle: 'Demonstrace',
@@ -117,10 +117,14 @@ export function createDemoPocta(ctx) {
         userName: ctx.userName,
         force: true
     });
-    return result.ok ? result.entity : null;
+    if (!result.ok || !result.entity) return null;
+    await activateCodeForUser(ctx.userId, result.entity.code);
+    reloadPoctaMapMarkers(ctx.userId);
+    renderTerminalPanel(ctx);
+    return result.entity;
 }
 
-export function createDemoCodedQuest(ctx) {
+export async function createDemoCodedQuest(ctx) {
     var pos = window.patracPoctaBridge && window.patracPoctaBridge.lastUserPosition;
     var entity = createAndStoreCodedQuest({
         ownerUserId: ctx.userId,
@@ -131,7 +135,7 @@ export function createDemoCodedQuest(ctx) {
         lat: pos ? pos.lat + 0.001 : 49.716,
         lng: pos ? pos.lng + 0.001 : 13.221
     });
-    activateCodeForUser(ctx.userId, entity.code);
+    await activateCodeForUser(ctx.userId, entity.code);
     reloadPoctaMapMarkers(ctx.userId);
     renderTerminalPanel(ctx);
     return entity;
@@ -144,7 +148,9 @@ export function bindTerminalUi(ctx) {
         form.addEventListener('submit', function(ev) {
             ev.preventDefault();
             var input = document.getElementById('terminal-code-input');
-            submitTerminalCode(input ? input.value : '', ctx);
+            submitTerminalCode(input ? input.value : '', ctx).catch(function(err) {
+                console.error('[terminal] submit', err);
+            });
         });
     }
 
@@ -152,15 +158,16 @@ export function bindTerminalUi(ctx) {
     if (demoPoctaBtn && !demoPoctaBtn._poctaBound) {
         demoPoctaBtn._poctaBound = true;
         demoPoctaBtn.addEventListener('click', function() {
-            var entity = createDemoPocta(ctx);
-            var msgEl = document.getElementById('terminal-last-message');
-            if (entity && msgEl) {
-                msgEl.textContent = 'Pocta v inventáři komunity. Kód: ' + entity.code;
-                msgEl.dataset.sticky = '1';
-            }
-            alert(entity
-                ? '🕯️ Pocta „' + entity.title + '“ je ve skladu komunity (neaktivovaná).\nKód: ' + entity.code + '\n\n→ záložka 🎒 Inventář'
-                : 'Nepodařilo se vytvořit Poctu.');
+            createDemoPocta(ctx).then(function(entity) {
+                var msgEl = document.getElementById('terminal-last-message');
+                if (entity && msgEl) {
+                    msgEl.textContent = 'Pocta v inventáři komunity. Kód: ' + entity.code + ' — ukotvi v 🎒 Inventář.';
+                    msgEl.dataset.sticky = '1';
+                }
+                alert(entity
+                    ? '🕯️ Pocta „' + entity.title + '“ je ve skladu komunity.\nKód: ' + entity.code + '\n\n→ 🎒 Inventář → UKOTVIT NA GPS'
+                    : 'Nepodařilo se vytvořit Poctu.');
+            });
         });
     }
 
@@ -187,8 +194,9 @@ export function bindTerminalUi(ctx) {
     if (demoQuestBtn && !demoQuestBtn._poctaBound) {
         demoQuestBtn._poctaBound = true;
         demoQuestBtn.addEventListener('click', function() {
-            var entity = createDemoCodedQuest(ctx);
-            alert('❓ Fázovaný úkol vytvořen a aktivován.\nKód: ' + entity.code + '\n\nNa mapě uvidíš šedý marker Záhada.');
+            createDemoCodedQuest(ctx).then(function(entity) {
+                alert('❓ Fázovaný úkol vytvořen a aktivován.\nKód: ' + entity.code + '\n\nNa mapě uvidíš šedý marker Záhada.');
+            });
         });
     }
 
