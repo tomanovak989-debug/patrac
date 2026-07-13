@@ -688,6 +688,22 @@
         }
         .terminal-entry-card { background: var(--terminal-card-bg); }
         .pocta-popup .popup-desc { text-transform: none; letter-spacing: 0.02em; }
+        .pocta-chronicle { margin-top: 8px; border-top: 1px dotted var(--divider-faint); padding-top: 8px; }
+        .pocta-chronicle-heading { font-size: var(--text-xs); color: #e8c547; margin-bottom: 6px; font-weight: bold; }
+        .pocta-chronicle-items { max-height: 120px; overflow-y: auto; margin-bottom: 8px; }
+        .pocta-chronicle-item { font-size: var(--text-xs); color: var(--dim-fg); border-left: 2px solid rgba(232,197,71,0.35); padding: 4px 0 4px 8px; margin-bottom: 6px; }
+        .pocta-chronicle-meta { color: var(--stat-label-color); margin-bottom: 2px; }
+        .pocta-chronicle-text { margin: 0; line-height: 1.45; white-space: pre-wrap; }
+        .pocta-chronicle-photo-link { display: inline-block; margin-top: 4px; font-size: var(--text-xxs); color: var(--xp-blue); }
+        .pocta-chronicle-local-tag { color: var(--danger-orange); font-size: var(--text-xxs); }
+        .pocta-chronicle-hint, .pocta-chronicle-empty, .pocta-chronicle-loading, .pocta-chronicle-error { font-size: var(--text-xs); color: var(--faint-fg); margin: 0; }
+        .pocta-chronicle-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+        .pocta-chronicle-label { font-size: var(--text-xxs); color: var(--stat-label-color); }
+        .pocta-chronicle-input { width: 100%; box-sizing: border-box; font-family: inherit; font-size: var(--text-xs); background: var(--panel-bg-alt); color: var(--text-green); border: 1px solid var(--hud-border); padding: 6px; resize: vertical; min-height: 48px; }
+        .pocta-chronicle-file { font-size: var(--text-xxs); color: var(--dim-fg); }
+        .pocta-chronicle-submit { font-family: inherit; font-size: var(--text-xs); padding: 6px 8px; background: rgba(232,197,71,0.12); border: 1px solid #e8c547; color: #e8c547; cursor: pointer; font-weight: bold; }
+        .pocta-chronicle-submit:disabled { opacity: 0.5; cursor: wait; }
+        .pocta-chronicle-status { font-size: var(--text-xxs); color: var(--dim-fg); margin: 0; min-height: 1.2em; }
         .data-karta-block { margin-bottom: 12px; }
         .data-karta-search-wrap { position: relative; margin: 8px 0 10px; }
         .data-karta-search-label {
@@ -1761,7 +1777,8 @@
             "i18next": "https://esm.sh/i18next@25.4.2",
             "firebase/app": "https://esm.sh/firebase@11.6.0/app",
             "firebase/firestore": "https://esm.sh/firebase@11.6.0/firestore",
-            "firebase/storage": "https://esm.sh/firebase@11.6.0/storage"
+            "firebase/storage": "https://esm.sh/firebase@11.6.0/storage",
+            "browser-image-compression": "https://esm.sh/browser-image-compression@2.0.2"
         }
     }
     </script>

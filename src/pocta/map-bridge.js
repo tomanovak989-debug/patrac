@@ -4,6 +4,10 @@ import {
     POCTA_PHASE,
     POCTA_VISIT_RADIUS_M
 } from './constants.js';
+import {
+    buildPoctaChronicleSection,
+    initPoctaChroniclePopup
+} from './chronicle.js';
 import { isOwner } from './permissions.js';
 import {
     findEntityByCode,
@@ -103,14 +107,7 @@ function buildPopupHtml(entity, userId, near) {
         if (entity.phase === POCTA_PHASE.ANCHORED) {
             if (near) {
                 html += '<p class="popup-desc">' + (entity.story || 'Kronika místa.') + '</p>';
-                if (entity.visitLogs && entity.visitLogs.length) {
-                    html += '<div style="font-size:var(--text-xs);color:#aaa;margin-top:6px;">Poslední návštěva: ' + entity.visitLogs[entity.visitLogs.length - 1].date + '</div>';
-                }
-                if (own) {
-                    html += '<p style="font-size:var(--text-xs);color:#888;margin-top:4px;">Jsi na místě — můžeš zapisovat do kroniky (brzy).</p>';
-                } else {
-                    html += '<p style="font-size:var(--text-xs);color:#888;margin-top:4px;">Jsi host — můžeš číst kroniku, ne editovat.</p>';
-                }
+                html += buildPoctaChronicleSection(entity, userId, near);
             } else {
                 html += '<p class="popup-desc">Pocta ukotvena. Přibliž se na místo (~50 m) pro čtení kroniky.</p>';
             }
@@ -175,7 +172,10 @@ export function renderEntityOnMap(entity, userId) {
         className: 'map-point-label' + (style.dashArray ? ' map-point-inactive' : ''),
         offset: [0, -10]
     });
-    marker.bindPopup(buildPopupHtml(entity, userId, near), { maxWidth: 240, minWidth: 170 });
+    marker.bindPopup(buildPopupHtml(entity, userId, near), { maxWidth: 300, minWidth: 200 });
+    marker.on('popupopen', function() {
+        initPoctaChroniclePopup(entity, userId, checkProximityForEntity(entity));
+    });
     marker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         var out = document.getElementById('map-sensor-output');
