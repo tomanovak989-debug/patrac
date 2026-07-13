@@ -122,7 +122,9 @@ export function renderChronicleListHtml(visits) {
         html += '</div>';
         html += '<p class="pocta-chronicle-text">' + escapeHtml(v.text) + '</p>';
         if (v.photoUrl) {
-            html += '<a href="' + escapeHtml(v.photoUrl) + '" target="_blank" rel="noopener noreferrer" class="pocta-chronicle-photo-link">📷 Fotografie</a>';
+            html += '<span class="pocta-chronicle-thumb-wrap" title="Klikni pro zvětšení">';
+            html += '<img class="pocta-chronicle-thumb" src="' + escapeHtml(v.photoUrl) + '" alt="Fotografie z kroniky">';
+            html += '</span>';
         }
         html += '</article>';
     }

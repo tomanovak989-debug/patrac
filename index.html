@@ -920,8 +920,35 @@
         .map-popup-body .popup-meta { font-size: var(--text-xs); color: var(--stat-label-color); margin-bottom: 8px; }
         .map-popup-reset { width: 100%; margin-top: 6px; padding: 8px; font-size: var(--text-sm); font-family: inherit; background: rgba(30, 12, 8, 0.9); border: 1px solid var(--danger-orange); color: var(--danger-orange); cursor: pointer; font-weight: bold; line-height: 1.5; }
         .map-popup-edit { width: 100%; margin-top: 6px; padding: 8px; font-size: var(--text-sm); font-family: inherit; background: var(--panel-bg-alt); border: 1px solid var(--xp-blue); color: var(--xp-blue); cursor: pointer; font-weight: bold; }
-        .poi-popup-img { max-width: 100%; max-height: 120px; border: 1px solid var(--hud-border); margin-bottom: 6px; display: block; border-radius: 2px; }
+        .poi-popup-img { max-width: 100%; max-height: 180px; border: 1px solid var(--hud-border); margin-bottom: 6px; display: block; border-radius: 2px; cursor: zoom-in; }
         .poi-popup-img-inactive { opacity: 0.45; filter: grayscale(0.85); }
+        .item-img-box img, .avatar-box img, .poi-preview-box img { cursor: zoom-in; }
+        .photo-lightbox-overlay {
+            display: none; position: fixed; inset: 0; z-index: 100000;
+            background: rgba(0, 0, 0, 0.92); align-items: center; justify-content: center;
+            flex-direction: column; padding: 16px; box-sizing: border-box;
+        }
+        .photo-lightbox-overlay.open { display: flex; }
+        .photo-lightbox-img {
+            max-width: min(98vw, 2560px); max-height: 88vh; width: auto; height: auto;
+            object-fit: contain; border: 2px solid var(--hud-border);
+            box-shadow: 0 0 24px rgba(74, 246, 38, 0.25); border-radius: 2px;
+            image-rendering: auto;
+            -webkit-user-select: none; user-select: none;
+            touch-action: pan-x pan-y pinch-zoom;
+        }
+        .photo-lightbox-close {
+            position: absolute; top: 12px; right: 12px; width: 40px; height: 40px;
+            font-family: inherit; font-size: var(--text-lg); font-weight: bold;
+            background: rgba(20, 20, 20, 0.9); border: 1px solid var(--hud-border);
+            color: var(--text-green); cursor: pointer; border-radius: 2px; z-index: 2;
+        }
+        .photo-lightbox-caption {
+            margin: 10px 0 0; max-width: min(96vw, 1200px); text-align: center;
+            font-size: var(--text-sm); color: var(--dim-fg); line-height: 1.4;
+        }
+        .pocta-chronicle-thumb-wrap { display: block; margin-top: 6px; cursor: zoom-in; }
+        .pocta-chronicle-thumb { max-width: 100%; max-height: 140px; border: 1px solid var(--hud-border); border-radius: 2px; display: block; }
         .story-pos-status { font-size: var(--text-sm); color: var(--text-green-dim); margin: 4px 0 8px 0; }
         .story-pos-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
         .story-pos-actions .btn-accept { flex: 1 1 45%; margin-top: 0; font-size: var(--text-xs); padding: 6px 4px; }
@@ -1755,6 +1782,12 @@
             </div>
             </div>
         </div>
+    </div>
+
+    <div id="photo-lightbox" class="photo-lightbox-overlay" role="dialog" aria-modal="true" aria-label="Zvětšená fotografie" hidden>
+        <button type="button" class="photo-lightbox-close" onclick="closePhotoLightbox()" aria-label="Zavřít">✕</button>
+        <img class="photo-lightbox-img" src="" alt="">
+        <p class="photo-lightbox-caption"></p>
     </div>
 
     <!-- SPODNÍ PANEL -->
@@ -3648,7 +3681,7 @@
 
         function previewPoiImage(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], 480, 0.72, function(result) {
+            compressImageFile(input.files[0], PHOTO_PLACE_MAX_PX, PHOTO_PLACE_QUALITY, function(result) {
                 base64PoiImg = result;
                 document.getElementById('poi-create-preview').innerHTML = '<img src="' + result + '">';
             });
@@ -3656,7 +3689,7 @@
 
         function previewPoiEditImage(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], 480, 0.72, function(result) {
+            compressImageFile(input.files[0], PHOTO_PLACE_MAX_PX, PHOTO_PLACE_QUALITY, function(result) {
                 base64PoiEditImg = result;
                 document.getElementById('poi-edit-preview').innerHTML = '<img src="' + result + '">';
             });
@@ -3688,7 +3721,7 @@
 
         function previewStoryPosEditImage(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], 480, 0.72, function(result) {
+            compressImageFile(input.files[0], PHOTO_PLACE_MAX_PX, PHOTO_PLACE_QUALITY, function(result) {
                 base64StoryPosEditImg = result;
                 storyPosEditHadImg = true;
                 document.getElementById('story-pos-edit-preview').innerHTML = '<img src="' + result + '">';
@@ -4491,7 +4524,7 @@
 
         function previewImage(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], 128, 0.62, function(result) {
+            compressImageFile(input.files[0], PHOTO_AVATAR_MAX_PX, PHOTO_AVATAR_QUALITY, function(result) {
                 base64Avatar = result;
                 var prev = document.getElementById('avatar-setup-preview');
                 if (prev) prev.innerHTML = '<img src="' + result + '">';
@@ -4504,7 +4537,7 @@
             if (file.size > 800000) {
                 alert('Foto je velké — zmenším ho pro uložení.');
             }
-            compressImageFile(file, 400, 0.72, function(result) {
+            compressImageFile(file, PHOTO_ITEM_MAX_PX, PHOTO_ITEM_QUALITY, function(result) {
                 base64CraftImg = result;
             });
         }
@@ -4522,7 +4555,10 @@
                     var canvas = document.createElement('canvas');
                     canvas.width = w;
                     canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    var ctx = canvas.getContext('2d');
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, 0, 0, w, h);
                     callback(canvas.toDataURL('image/jpeg', quality));
                 };
                 img.onerror = function() { callback(e.target.result); };
@@ -4530,6 +4566,13 @@
             };
             reader.readAsDataURL(file);
         }
+
+        var PHOTO_PLACE_MAX_PX = 2560;
+        var PHOTO_PLACE_QUALITY = 0.92;
+        var PHOTO_AVATAR_MAX_PX = 768;
+        var PHOTO_AVATAR_QUALITY = 0.9;
+        var PHOTO_ITEM_MAX_PX = 1600;
+        var PHOTO_ITEM_QUALITY = 0.9;
 
         function previewEditImage(input) {
             if (input.files && input.files[0]) {
@@ -5936,7 +5979,7 @@
 
         function previewProfileEditAvatar(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], 128, 0.62, function(result) {
+            compressImageFile(input.files[0], PHOTO_AVATAR_MAX_PX, PHOTO_AVATAR_QUALITY, function(result) {
                 base64ProfileEditAvatar = result;
             });
         }
@@ -7144,7 +7187,78 @@
 
         window.renderQuestList = renderQuestList;
 
+        function openPhotoLightbox(src, caption) {
+            if (!src) return;
+            var overlay = document.getElementById('photo-lightbox');
+            if (!overlay) return;
+            var img = overlay.querySelector('.photo-lightbox-img');
+            var cap = overlay.querySelector('.photo-lightbox-caption');
+            if (img) {
+                img.src = src;
+                img.alt = caption || 'Fotografie';
+            }
+            if (cap) {
+                cap.textContent = caption || '';
+                cap.style.display = caption ? 'block' : 'none';
+            }
+            overlay.hidden = false;
+            overlay.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePhotoLightbox() {
+            var overlay = document.getElementById('photo-lightbox');
+            if (!overlay) return;
+            overlay.classList.remove('open');
+            overlay.hidden = true;
+            var img = overlay.querySelector('.photo-lightbox-img');
+            if (img) img.src = '';
+            document.body.style.overflow = '';
+        }
+
+        function isPhotoLightboxTarget(img) {
+            if (!img || img.tagName !== 'IMG' || !img.src) return false;
+            if (img.closest('.photo-lightbox-overlay')) return false;
+            return !!(
+                img.classList.contains('poi-popup-img') ||
+                img.closest('.item-img-box') ||
+                img.closest('.avatar-box') ||
+                img.closest('.poi-preview-box') ||
+                img.closest('.pocta-chronicle-thumb-wrap')
+            );
+        }
+
+        function initPhotoLightbox() {
+            if (document.body._photoLightboxBound) return;
+            document.body._photoLightboxBound = true;
+
+            document.addEventListener('click', function(e) {
+                if (!isPhotoLightboxTarget(e.target)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var img = e.target;
+                openPhotoLightbox(img.src, img.alt || img.title || '');
+            });
+
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closePhotoLightbox();
+            });
+
+            var overlay = document.getElementById('photo-lightbox');
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    if (e.target === overlay || e.target.classList.contains('photo-lightbox-close')) {
+                        closePhotoLightbox();
+                    }
+                });
+            }
+        }
+
+        window.openPhotoLightbox = openPhotoLightbox;
+        window.closePhotoLightbox = closePhotoLightbox;
+
         window.onload = async function() {
+            initPhotoLightbox();
             if (window.__patracI18nBoot) await window.__patracI18nBoot;
             try { migratePatracAccountsStorage(); } catch (e) { console.warn('migratePatracAccountsStorage', e); }
             initGateOperatorTrigger();

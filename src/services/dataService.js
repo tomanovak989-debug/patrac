@@ -17,6 +17,56 @@ const ENTRIES_COLLECTION = 'entries';
 const POCTA_VISITS_COLLECTION = 'pocta_visits';
 const PHOTOS_STORAGE_PATH = 'photos';
 
+/** Ostrost pro mobil — delší hrana v px, JPEG kvalita, horní strop souboru (MB). */
+const PHOTO_MAX_EDGE_PX = 2560;
+const PHOTO_QUALITY = 0.92;
+const PHOTO_MAX_SIZE_MB = 8;
+const PHOTO_MAX_INPUT_MB = 25;
+const PHOTO_MIN_EDGE_PX = 640;
+
+function readImageDimensions(blob) {
+    return new Promise(function(resolve, reject) {
+        var url = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function() {
+            resolve({
+                width: img.naturalWidth || img.width,
+                height: img.naturalHeight || img.height
+            });
+            URL.revokeObjectURL(url);
+        };
+        img.onerror = function() {
+            URL.revokeObjectURL(url);
+            reject(new Error('Nepodařilo se načíst rozměry fotky.'));
+        };
+        img.src = url;
+    });
+}
+
+async function ensurePhotoMinDimensions(original, compressed) {
+    try {
+        var dims = await readImageDimensions(compressed);
+        var longEdge = Math.max(dims.width, dims.height);
+        if (longEdge >= PHOTO_MIN_EDGE_PX) return compressed;
+
+        var retry = await imageCompression(original, {
+            maxWidthOrHeight: PHOTO_MAX_EDGE_PX,
+            initialQuality: 0.95,
+            maxSizeMB: PHOTO_MAX_SIZE_MB,
+            alwaysKeepResolution: true,
+            useWebWorker: false,
+            fileType: 'image/jpeg',
+            preserveExif: false
+        });
+        var retryDims = await readImageDimensions(retry);
+        if (Math.max(retryDims.width, retryDims.height) > longEdge) return retry;
+        return compressed;
+    } catch (err) {
+        console.warn('[dataService] ensurePhotoMinDimensions:', err);
+        return compressed;
+    }
+}
+
 /**
  * Normalizuje timestamp na číslo (ms od epochy) pro konzistentní řazení.
  * @param {number|Date|import('firebase/firestore').Timestamp|null|undefined} value
@@ -84,18 +134,31 @@ export async function uploadPhoto(file) {
             throw new Error('Neplatný soubor pro nahrání.');
         }
 
+        if (file.size > PHOTO_MAX_INPUT_MB * 1024 * 1024) {
+            throw new Error('Fotka je příliš velká (max. ' + PHOTO_MAX_INPUT_MB + ' MB).');
+        }
+
         var compressed = await imageCompression(file, {
-            maxWidthOrHeight: 1200,
-            initialQuality: 0.8,
-            useWebWorker: true
+            maxWidthOrHeight: PHOTO_MAX_EDGE_PX,
+            initialQuality: PHOTO_QUALITY,
+            maxSizeMB: PHOTO_MAX_SIZE_MB,
+            alwaysKeepResolution: true,
+            useWebWorker: false,
+            fileType: 'image/jpeg',
+            preserveExif: false
         });
 
+        compressed = await ensurePhotoMinDimensions(file, compressed);
+
         var originalName = (file.name || 'photo.jpg').replace(/[^\w.-]/g, '_');
+        if (!/\.(jpe?g|png|webp)$/i.test(originalName)) {
+            originalName += '.jpg';
+        }
         var storagePath = PHOTOS_STORAGE_PATH + '/' + Date.now() + '_' + originalName;
         var storageRef = ref(storage, storagePath);
 
         await uploadBytes(storageRef, compressed, {
-            contentType: compressed.type || 'image/jpeg'
+            contentType: 'image/jpeg'
         });
 
         return await getDownloadURL(storageRef);
