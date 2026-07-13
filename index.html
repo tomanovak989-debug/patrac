@@ -1501,7 +1501,7 @@
                         <div class="form-group"><label>POZICIONÁLNÍ POPIS</label><textarea id="edit-player-desc" rows="2"></textarea></div>
                         <div class="form-group"><label>EMAIL (OBNOVA HESLA)</label><input type="email" id="edit-player-email"></div>
                         <div class="form-group"><label>NOVÉ HESLO (volitelně)</label><input type="password" id="edit-player-pass" placeholder="nechat prázdné = beze změny"></div>
-                        <div class="form-group"><label>AVATAR</label><input type="file" id="edit-player-avatar" accept="image/*" onchange="previewProfileEditAvatar(this)"></div>
+                        <div class="form-group"><label>AVATAR</label><input type="file" id="edit-player-avatar" accept="image/*" onchange="previewProfileEditAvatar(this)"><div class="avatar-box" id="profile-edit-avatar-preview" style="margin-top:6px;width:64px;height:64px;">—</div></div>
                         <div id="profile-admin-block" style="display:none; margin-top:8px; padding-top:8px; border-top:1px dotted rgba(255,204,0,0.25);">
                             <div class="form-group"><label>👑 PŘEDAT SPRÁVCovství KOMUNITY</label>
                                 <select id="edit-transfer-admin"></select>
@@ -1820,6 +1820,7 @@
     <script>
         var map = null, userMarker = null;
         var base64Avatar = "", base64CraftImg = "", base64EditImg = "", base64PoiImg = "", base64PoiEditImg = "", base64StoryPosEditImg = "";
+        var pendingCraftPhotoFile = null;
         var storyPosEditHadImg = false;
         var localChatData = ["System: Taktická síť zapnuta."];
         var activeTargetingQuest = null;
@@ -2870,7 +2871,14 @@
         }
 
         var PATRAC_ACCOUNTS_MAX_BYTES = 100000;
-        var PATRAC_AVATAR_MAX_BYTES = 60000;
+        var PATRAC_AVATAR_MAX_BYTES = 120000;
+
+        var PHOTO_PLACE_MAX_PX = 2560;
+        var PHOTO_PLACE_QUALITY = 0.92;
+        var PHOTO_AVATAR_MAX_PX = 768;
+        var PHOTO_AVATAR_QUALITY = 0.9;
+        var PHOTO_ITEM_MAX_PX = 1600;
+        var PHOTO_ITEM_QUALITY = 0.9;
 
         function storageByteLength(str) {
             if (!str) return 0;
@@ -4524,7 +4532,11 @@
 
         function previewImage(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], PHOTO_AVATAR_MAX_PX, PHOTO_AVATAR_QUALITY, function(result) {
+            compressAvatarForStorage(input.files[0], function(result) {
+                if (!result) {
+                    alert('Avatar se nepodařilo zpracovat. Zkus menší nebo jinou fotku.');
+                    return;
+                }
                 base64Avatar = result;
                 var prev = document.getElementById('avatar-setup-preview');
                 if (prev) prev.innerHTML = '<img src="' + result + '">';
@@ -4532,10 +4544,14 @@
         }
 
         function previewCraftImage(input) {
-            if (!input.files || !input.files[0]) return;
+            if (!input.files || !input.files[0]) {
+                pendingCraftPhotoFile = null;
+                return;
+            }
+            pendingCraftPhotoFile = input.files[0];
             var file = input.files[0];
             if (file.size > 800000) {
-                alert('Foto je velké — zmenším ho pro uložení.');
+                alert('Foto je větší — při uložení se zkomprimuje a nahraje do cloudu.');
             }
             compressImageFile(file, PHOTO_ITEM_MAX_PX, PHOTO_ITEM_QUALITY, function(result) {
                 base64CraftImg = result;
@@ -4567,12 +4583,36 @@
             reader.readAsDataURL(file);
         }
 
-        var PHOTO_PLACE_MAX_PX = 2560;
-        var PHOTO_PLACE_QUALITY = 0.92;
-        var PHOTO_AVATAR_MAX_PX = 768;
-        var PHOTO_AVATAR_QUALITY = 0.9;
-        var PHOTO_ITEM_MAX_PX = 1600;
-        var PHOTO_ITEM_QUALITY = 0.9;
+        function compressAvatarForStorage(file, callback) {
+            var steps = [
+                { px: PHOTO_AVATAR_MAX_PX, q: PHOTO_AVATAR_QUALITY },
+                { px: 512, q: 0.88 },
+                { px: 384, q: 0.82 }
+            ];
+            var stepIdx = 0;
+            function tryNext() {
+                if (stepIdx >= steps.length) {
+                    callback(null);
+                    return;
+                }
+                var step = steps[stepIdx++];
+                compressImageFile(file, step.px, step.q, function(result) {
+                    if (result && storageByteLength(result) <= PATRAC_AVATAR_MAX_BYTES) {
+                        callback(result);
+                    } else {
+                        tryNext();
+                    }
+                });
+            }
+            tryNext();
+        }
+
+        function updateAvatarPreviewElements(dataUrl) {
+            var gamePrev = document.getElementById('avatar-game-preview');
+            if (gamePrev) gamePrev.innerHTML = dataUrl ? '<img src="' + dataUrl + '">' : '—';
+            var editPrev = document.getElementById('profile-edit-avatar-preview');
+            if (editPrev) editPrev.innerHTML = dataUrl ? '<img src="' + dataUrl + '">' : '—';
+        }
 
         function previewEditImage(input) {
             if (input.files && input.files[0]) {
@@ -5974,13 +6014,20 @@
             if (descEl) descEl.value = localStorage.getItem('player_desc') || '';
             if (emailEl) emailEl.value = acc.email || '';
             base64ProfileEditAvatar = '';
+            var av = localStorage.getItem('player_avatar') || '';
+            updateAvatarPreviewElements(av);
             populateTransferAdminSelect();
         }
 
         function previewProfileEditAvatar(input) {
             if (!input.files || !input.files[0]) return;
-            compressImageFile(input.files[0], PHOTO_AVATAR_MAX_PX, PHOTO_AVATAR_QUALITY, function(result) {
+            compressAvatarForStorage(input.files[0], function(result) {
+                if (!result) {
+                    alert('Avatar se nepodařilo zpracovat. Zkus menší nebo jinou fotku.');
+                    return;
+                }
                 base64ProfileEditAvatar = result;
+                updateAvatarPreviewElements(result);
             });
         }
 
@@ -6016,11 +6063,16 @@
             saveUserDesc(session, newDesc);
             if (newDesc) localStorage.setItem('player_desc', newDesc);
             else localStorage.removeItem('player_desc');
-            if (base64ProfileEditAvatar) saveUserAvatar(session, base64ProfileEditAvatar);
+            if (base64ProfileEditAvatar) {
+                if (!saveUserAvatar(session, base64ProfileEditAvatar)) {
+                    alert('Avatar se nepodařilo uložit — localStorage je plné nebo je fotka příliš velká.');
+                    return;
+                }
+            }
 
             document.getElementById('display-player-name').textContent = newName;
             if (localStorage.getItem('player_avatar')) {
-                document.getElementById('avatar-game-preview').innerHTML = '<img src="' + localStorage.getItem('player_avatar') + '">';
+                updateAvatarPreviewElements(localStorage.getItem('player_avatar'));
             }
             renderCommunityProfile();
             alert('Profil operativce uložen.');
@@ -6746,6 +6798,12 @@
         window.switchMapTile = switchMapTile;
 
         function craftCustomItem() {
+            craftCustomItemAsync().catch(function(err) {
+                alert('Chyba při výrobě: ' + (err.message || err));
+            });
+        }
+
+        async function craftCustomItemAsync() {
             try {
                 var nameEl = document.getElementById('craft-name');
                 var descEl = document.getElementById('craft-desc');
@@ -6767,6 +6825,26 @@
                 if (!desc) { alert('Zadej popis předmětu!'); descEl.focus(); return; }
                 if (!spec) spec = '—';
 
+                var imgValue = '';
+                var photoCloud = false;
+                if (pendingCraftPhotoFile) {
+                    try {
+                        var photoMod = await import('./src/services/dataService.js');
+                        imgValue = await photoMod.uploadPhoto(pendingCraftPhotoFile);
+                        photoCloud = !!imgValue;
+                    } catch (uploadErr) {
+                        console.warn('craftCustomItem uploadPhoto:', uploadErr);
+                        if (base64CraftImg) {
+                            imgValue = base64CraftImg;
+                        } else {
+                            alert('Fotku se nepodařilo nahrát do cloudu. Zkus znovu, nebo ulož předmět bez fotky.');
+                            return;
+                        }
+                    }
+                } else {
+                    imgValue = base64CraftImg || '';
+                }
+
                 var comItems = getCommunityItemsRaw().slice();
                 var isTalisman = (itemType === 'talisman');
                 var isLocked = (bind !== 'none' && isTalisman);
@@ -6781,7 +6859,7 @@
                     desc: desc,
                     spec: spec,
                     bind: bind,
-                    img: base64CraftImg || '',
+                    img: imgValue,
                     lore: '',
                     locked: isLocked,
                     itemType: itemType,
@@ -6811,6 +6889,7 @@
                 descEl.value = '';
                 if (specEl) specEl.value = '';
                 base64CraftImg = '';
+                pendingCraftPhotoFile = null;
                 var fileEl = document.getElementById('craft-file');
                 if (fileEl) fileEl.value = '';
                 bindEl.value = 'none';
@@ -6822,6 +6901,7 @@
                 rebuildSelectOptions();
 
                 var msg = '✅ Předmět „' + name + '“ uložen do inventáře komunity.';
+                if (photoCloud) msg += '\n📷 Fotka uložena v cloudu (Firebase Storage).';
                 if (itemType === 'tool' && bind !== 'none') {
                     msg += '\n📋 Mise vyžaduje v batohu: ' + name;
                 } else if (isLocked) {
@@ -6830,7 +6910,6 @@
                 alert(msg);
             } catch (err) {
                 alert('Chyba při výrobě: ' + (err.message || err));
-                console.error('craftCustomItem', err);
             }
         }
 
