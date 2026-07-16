@@ -1233,7 +1233,7 @@
                 </div>
                 <div class="gate-form-group">
                     <label for="input-recover-pass" data-i18n="gate.recover.passwordLabel">Nové heslo</label>
-                    <input type="password" id="input-recover-pass" data-i18n-placeholder="gate.recover.passwordPlaceholder" placeholder="min. 4 znaky" autocomplete="new-password">
+                    <input type="password" id="input-recover-pass" data-i18n-placeholder="gate.recover.passwordPlaceholder" placeholder="min. 6 znaků" autocomplete="new-password">
                 </div>
                 <div class="gate-form-group">
                     <label for="input-recover-pass2" data-i18n="gate.recover.password2Label">Potvrzení hesla</label>
@@ -1255,7 +1255,7 @@
                 </div>
                 <div class="gate-form-group">
                     <label for="input-gate-password" data-i18n="gate.register.passwordLabel">Heslo</label>
-                    <input type="password" id="input-gate-password" data-i18n-placeholder="gate.register.passwordPlaceholder" placeholder="min. 4 znaky" autocomplete="new-password">
+                    <input type="password" id="input-gate-password" data-i18n-placeholder="gate.register.passwordPlaceholder" placeholder="min. 6 znaků" autocomplete="new-password">
                 </div>
                 <div class="gate-form-group">
                     <label for="input-gate-password2" data-i18n="gate.register.password2Label">Potvrzení hesla</label>
@@ -6989,7 +6989,7 @@
             if (!newName) { alert('Jméno operativce je povinné.'); return; }
             if (!isValidEmail(newEmail)) { alert('Zadej platný email.'); return; }
             if (isEmailTaken(newEmail, session)) { alert('Tento email už používá jiný účet.'); return; }
-            if (newPass && newPass.length < 4) { alert('Nové heslo musí mít alespoň 4 znaky.'); return; }
+            if (newPass && newPass.length < 6) { alert('Nové heslo musí mít alespoň 6 znaků (Firebase).'); return; }
 
             acc.playerName = newName;
             acc.email = newEmail;
@@ -7073,20 +7073,18 @@
                 showGateError('gate-recover-error', 'gate.errors.recoverBadEmail');
                 return;
             }
-            if (pass.length < 4) {
-                showGateError('gate-recover-error', 'gate.errors.recoverShortPass');
-                return;
-            }
             if (pass.length < 6) {
-                showGateError('gate-recover-error', 'Nové heslo musí mít alespoň 6 znaků (požadavek Firebase).');
+                showGateError('gate-recover-error', 'gate.errors.recoverShortPass');
                 return;
             }
             if (pass !== pass2) {
                 showGateError('gate-recover-error', 'gate.errors.recoverPassMismatch');
                 return;
             }
+            var localAcc = getPatracAccounts()[userId] || null;
+
             import('./src/services/authService.js').then(function(mod) {
-                return mod.recoverPatracPassword(userId, email, pass);
+                return mod.recoverPatracPassword(userId, email, pass, localAcc);
             }).then(function() {
                 var accounts = getPatracAccounts();
                 if (accounts[userId]) {
@@ -7299,7 +7297,7 @@
                 showGateError('gate-register-error', 'gate.errors.registerBadEmail');
                 return;
             }
-            if (pass.length < 4) {
+            if (pass.length < 6) {
                 showGateError('gate-register-error', 'gate.errors.registerShortPass');
                 return;
             }
@@ -7389,7 +7387,7 @@
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'ZPRACOVÁVÁM…'; }
 
             import('./src/services/authService.js').then(function(authMod) {
-                return authMod.registerPatracAuth(userId, pass);
+                return authMod.registerPatracAuth(userId, pass, email);
             }).then(function() {
                 var playerCode = generatePatracCode();
                 if (comMode === 'create') {

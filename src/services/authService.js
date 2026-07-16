@@ -1,5 +1,5 @@
 /**
- * Firebase Auth pro PÁTRAČ — syntetický e-mail z patrac userId, mapování uid ↔ userId.
+ * Firebase Auth pro PÁTRAČ — přihlášení přes registrační e-mail + mapování uid ↔ userId.
  */
 import {
     signInAnonymously,
@@ -19,11 +19,26 @@ export function normalizePatracUserId(raw) {
     return String(raw || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/^\.+|\.+$/g, '');
 }
 
-/** Technický e-mail pro Firebase — není tvoje schránka. */
+function isValidAuthEmail(email) {
+    email = String(email || '').trim().toLowerCase();
+    return email.length > 3 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/** Záložní technický e-mail (starší účty) — preferuj registrační e-mail. */
 export function patracIdToLoginEmail(userId) {
     var safe = normalizePatracUserId(userId).replace(/[^a-z0-9]/g, '');
     if (!safe) safe = 'operativec';
     return 'patrac_' + safe + '@example.com';
+}
+
+function resolveLoginEmail(userId, acc, mapping) {
+    if (mapping && mapping.loginEmail && isValidAuthEmail(mapping.loginEmail)) {
+        return String(mapping.loginEmail).trim().toLowerCase();
+    }
+    if (acc && acc.email && isValidAuthEmail(acc.email)) {
+        return String(acc.email).trim().toLowerCase();
+    }
+    return patracIdToLoginEmail(userId);
 }
 
 function getAuthInstance() {
@@ -44,10 +59,12 @@ async function signInWithKnownEmail(loginEmail, password) {
     return signInWithEmailAndPassword(auth, loginEmail, password);
 }
 
-async function createPatracAuthUser(userId, password) {
+async function createPatracAuthUser(userId, password, preferredEmail) {
     var auth = getAuthInstance();
     await signOutAnonymousIfNeeded();
-    var loginEmail = patracIdToLoginEmail(userId);
+    var loginEmail = isValidAuthEmail(preferredEmail)
+        ? String(preferredEmail).trim().toLowerCase()
+        : patracIdToLoginEmail(userId);
     try {
         return await createUserWithEmailAndPassword(auth, loginEmail, password);
     } catch (createErr) {
@@ -60,10 +77,35 @@ async function createPatracAuthUser(userId, password) {
                 { code: 'auth/weak-password' }
             );
         }
-        if (createErr && createErr.code === 'auth/invalid-email') {
+        throw createErr;
+    }
+}
+
+async function createOrResetAuthUser(loginEmail, newPassword, legacyPassword) {
+    var auth = getAuthInstance();
+    await signOutAnonymousIfNeeded();
+    loginEmail = String(loginEmail || '').trim().toLowerCase();
+    if (!isValidAuthEmail(loginEmail)) {
+        throw Object.assign(new Error('Neplatný registrační e-mail.'), { code: 'auth/invalid-email' });
+    }
+    try {
+        return await createUserWithEmailAndPassword(auth, loginEmail, newPassword);
+    } catch (createErr) {
+        if (createErr && createErr.code === 'auth/email-already-in-use') {
+            if (legacyPassword) {
+                var signed = await signInWithEmailAndPassword(auth, loginEmail, legacyPassword);
+                await updatePassword(signed.user, newPassword);
+                return signed;
+            }
             throw Object.assign(
-                new Error('Chyba technického e-mailu pro Firebase. Kontaktuj správce.'),
-                { code: 'auth/invalid-email' }
+                new Error('Účet ve Firebase už existuje — zkus se přihlásit starým heslem, nebo kontaktuj správce.'),
+                { code: 'auth/email-already-in-use' }
+            );
+        }
+        if (createErr && createErr.code === 'auth/weak-password') {
+            throw Object.assign(
+                new Error('Nové heslo musí mít alespoň 6 znaků (požadavek Firebase).'),
+                { code: 'auth/weak-password' }
             );
         }
         throw createErr;
@@ -150,9 +192,11 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
     if (!acc) {
         throw Object.assign(new Error('Neznámé ID operativce.'), { code: 'auth/user-not-found' });
     }
+
+    var mapping = await fetchPatracIdMapping(userId);
+    var loginEmail = resolveLoginEmail(userId, acc, mapping);
+
     if (acc.firebaseUid) {
-        var mapping = await fetchPatracIdMapping(userId);
-        var loginEmail = (mapping && mapping.loginEmail) || patracIdToLoginEmail(userId);
         var cred = await signInWithKnownEmail(loginEmail, password);
         await savePatracIdMapping(userId, cred.user.uid, loginEmail);
         return cred.user;
@@ -160,8 +204,9 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
 
     verifyLegacyPassword(acc, password);
 
-    var loginEmail = patracIdToLoginEmail(userId);
-    var cred = await createPatracAuthUser(userId, password);
+    var cred = await createPatracAuthUser(userId, password, acc.email);
+    loginEmail = resolveLoginEmail(userId, acc, null);
+    if (cred.user.email) loginEmail = cred.user.email.toLowerCase();
     await savePatracIdMapping(userId, cred.user.uid, loginEmail);
 
     var cleaned = Object.assign({}, acc, {
@@ -175,14 +220,21 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
     return cred.user;
 }
 
-export async function registerPatracAuth(userId, password) {
+export async function registerPatracAuth(userId, password, email) {
     userId = normalizePatracUserId(userId);
+    email = String(email || '').trim().toLowerCase();
     if (!userId || !password) {
         throw new Error('Chybí ID nebo heslo.');
     }
+    if (!isValidAuthEmail(email)) {
+        throw new Error('Zadej platný registrační e-mail.');
+    }
+    if (password.length < 6) {
+        throw new Error('Heslo musí mít alespoň 6 znaků (požadavek Firebase).');
+    }
 
-    var cred = await createPatracAuthUser(userId, password);
-    await savePatracIdMapping(userId, cred.user.uid, patracIdToLoginEmail(userId));
+    var cred = await createPatracAuthUser(userId, password, email);
+    await savePatracIdMapping(userId, cred.user.uid, email);
     return cred.user;
 }
 
@@ -211,7 +263,7 @@ export async function signInPatracAuth(userId, password, localLegacyAcc) {
     }
 
     var mapping = await fetchPatracIdMapping(userId);
-    var loginEmail = (mapping && mapping.loginEmail) || patracIdToLoginEmail(userId);
+    var loginEmail = resolveLoginEmail(userId, legacyAcc, mapping);
     try {
         var cred = await signInWithKnownEmail(loginEmail, password);
         await savePatracIdMapping(userId, cred.user.uid, loginEmail);
@@ -224,17 +276,31 @@ export async function signInPatracAuth(userId, password, localLegacyAcc) {
     }
 }
 
-export async function recoverPatracPassword(userId, email, newPassword) {
+/**
+ * @param {object|null} localLegacyAcc — účet z localStorage, pokud cloud read selže
+ */
+export async function recoverPatracPassword(userId, email, newPassword, localLegacyAcc) {
     userId = normalizePatracUserId(userId);
     email = String(email || '').trim().toLowerCase();
     if (!userId || !email || !newPassword) {
         throw new Error('Vyplň ID, e-mail a nové heslo.');
     }
+    if (!isValidAuthEmail(email)) {
+        throw new Error('Zadej platný registrační e-mail.');
+    }
     if (newPassword.length < 6) {
         throw new Error('Nové heslo musí mít alespoň 6 znaků (požadavek Firebase).');
     }
 
-    var acc = await fetchLegacyAccountFromCloud(userId);
+    var acc = null;
+    try {
+        acc = await fetchLegacyAccountFromCloud(userId);
+    } catch (e) {
+        console.warn('[auth] recover account read', e);
+    }
+    if (!acc && localLegacyAcc) {
+        acc = localLegacyAcc;
+    }
     if (!acc) {
         throw new Error('Neznámé ID operativce.');
     }
@@ -242,13 +308,26 @@ export async function recoverPatracPassword(userId, email, newPassword) {
         throw new Error('E-mail neodpovídá tomuto ID.');
     }
 
-    await signOutAnonymousIfNeeded();
-    await createPatracAuthUser(userId, newPassword);
-    await savePatracIdMapping(userId, getAuthInstance().currentUser.uid, patracIdToLoginEmail(userId));
+    var mapping = await fetchPatracIdMapping(userId);
+    var legacyPass = acc.pass || '';
+    var cred;
+
+    if (mapping && mapping.loginEmail && mapping.loginEmail.toLowerCase() !== email) {
+        try {
+            cred = await createOrResetAuthUser(mapping.loginEmail, newPassword, legacyPass);
+        } catch (oldErr) {
+            console.warn('[auth] recover legacy login email', oldErr);
+            cred = await createOrResetAuthUser(email, newPassword, legacyPass);
+        }
+    } else {
+        cred = await createOrResetAuthUser(email, newPassword, legacyPass);
+    }
+
+    await savePatracIdMapping(userId, cred.user.uid, email);
 
     var cleaned = Object.assign({}, acc, {
         email: email,
-        firebaseUid: getCurrentFirebaseUid(),
+        firebaseUid: cred.user.uid,
         userId: userId,
         updatedAt: Date.now()
     });
