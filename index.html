@@ -1393,6 +1393,7 @@
         <div class="form-group" style="margin-bottom:4px;"><label>FOTO:</label><input type="file" id="poi-edit-file" accept="image/*" onchange="previewPoiEditImage(this)"></div>
         <div class="poi-preview-box" id="poi-edit-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--xp-blue); color:var(--xp-blue); padding:8px;" onclick="savePoiChanges()">ULOŽIT ZMĚNY</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--danger-orange); color:var(--danger-orange); padding:6px;" onclick="deleteMapPoiFromEditor()">🗑️ SMAZAT BOD</button>
         <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closePoiEditor()">ZRUŠIT</button>
     </div>
 
@@ -3717,6 +3718,7 @@
                     html += '<p class="popup-meta">(Zatím bez poznámky — doplň v editoru)</p>';
                 }
                 html += '<button type="button" class="map-popup-edit" onclick="openPoiEditor(\'' + meta.id + '\')">📝 UPRAVIT POZNÁMKU / FOTO</button>';
+                html += '<button type="button" class="map-popup-reset" onclick="deleteMapPoi(\'' + meta.id + '\')">🗑️ SMAZAT BOD</button>';
             } else {
                 if (faded) {
                     html += '<p class="popup-meta popup-inactive-tag">⏸ Neaktivní · mise splněna</p>';
@@ -4022,6 +4024,31 @@
             renderQuestList();
             document.getElementById('map-sensor-output').innerHTML = '📢 Popis komunity: ' + getQuestMapLabel(questId);
             syncCommunityPoisToCloud();
+        }
+
+        function deleteMapPoi(poiId) {
+            var found = getPoiById(poiId);
+            if (!found) return;
+            var label = found.poi.name || poiId;
+            if (!confirm('Smazat bod „' + label + '“?\nSouvisející fotka v cloudu bude také odstraněna.')) return;
+
+            found.list.splice(found.index, 1);
+            localStorage.setItem('map_free_pois', JSON.stringify(found.list));
+
+            if (map && mapMarkerRegistry[poiId] && mapPointsLayer) {
+                mapPointsLayer.removeLayer(mapMarkerRegistry[poiId]);
+                delete mapMarkerRegistry[poiId];
+            }
+
+            closePoiEditor();
+            closeAddPoiPanel();
+            document.getElementById('map-sensor-output').innerHTML = '🗑️ Smazáno: ' + label;
+            syncCommunityPoisToCloud();
+        }
+
+        function deleteMapPoiFromEditor() {
+            var poiId = document.getElementById('poi-edit-id').value;
+            if (poiId) deleteMapPoi(poiId);
         }
 
         function savePoiChanges() {
@@ -7237,6 +7264,8 @@
         window.closeStoryPositionsPanel = closeStoryPositionsPanel;
         window.openPoiEditor = openPoiEditor;
         window.savePoiChanges = savePoiChanges;
+        window.deleteMapPoi = deleteMapPoi;
+        window.deleteMapPoiFromEditor = deleteMapPoiFromEditor;
         window.closePoiEditor = closePoiEditor;
         window.openStoryPosEditor = openStoryPosEditor;
         window.saveStoryPosChanges = saveStoryPosChanges;

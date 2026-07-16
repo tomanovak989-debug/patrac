@@ -92,6 +92,12 @@ export function applyCloudPoisToLocalStorage(pois) {
 
 async function resolvePoiImageUrl(poi, previousImgUrl) {
     var pending = poi.img || poi.imgUrl || '';
+    if (!pending) {
+        if (previousImgUrl && isHttpUrl(previousImgUrl)) {
+            deleteStorageFileByUrl(previousImgUrl).catch(function() {});
+        }
+        return '';
+    }
     if (isDataUrl(pending)) {
         if (previousImgUrl && isHttpUrl(previousImgUrl) && previousImgUrl !== pending) {
             deleteStorageFileByUrl(previousImgUrl).catch(function() {});
@@ -101,6 +107,34 @@ async function resolvePoiImageUrl(poi, previousImgUrl) {
     if (isHttpUrl(pending)) return pending;
     if (isHttpUrl(poi.imgUrl)) return poi.imgUrl;
     return '';
+}
+
+function collectPoiImageUrls(pois) {
+    var urls = {};
+    var list = Array.isArray(pois) ? pois : [];
+    for (var i = 0; i < list.length; i++) {
+        var poi = normalizeCloudPoi(list[i]);
+        if (poi && poi.imgUrl) urls[poi.imgUrl] = true;
+    }
+    return urls;
+}
+
+/**
+ * Smaže fotky ve Storage, které už nejsou v novém seznamu POI.
+ */
+async function deleteOrphanedPoiPhotos(existingPois, nextPois) {
+    var nextUrls = collectPoiImageUrls(nextPois);
+    var existing = Array.isArray(existingPois) ? existingPois : [];
+
+    for (var i = 0; i < existing.length; i++) {
+        var old = normalizeCloudPoi(existing[i]);
+        if (!old || !old.imgUrl || nextUrls[old.imgUrl]) continue;
+        try {
+            await deleteStorageFileByUrl(old.imgUrl);
+        } catch (err) {
+            console.warn('[poiService] delete orphan photo', old.imgUrl, err);
+        }
+    }
 }
 
 /**
@@ -143,7 +177,9 @@ export async function saveCommunityPoisToCloud(comCode, pois, previousImgById) {
     if (!comCode) return;
     await ensureFirebaseAuth();
 
+    var existing = await fetchCommunityPoisFromCloud(comCode);
     var prepared = await preparePoisForCloud(pois, previousImgById);
+    await deleteOrphanedPoiPhotos(existing, prepared);
     await setDoc(doc(getDb(), COLLECTION, comCode), {
         pois: prepared,
         poisUpdatedAt: Date.now(),
