@@ -15,14 +15,15 @@ import { firebaseConfig } from '../lib/firebase.config.js';
 
 const PATRAC_IDS_COLLECTION = 'patrac_ids';
 const USERS_COLLECTION = 'users';
+/** Doména jen pro Firebase Auth — není to tvůj e-mail, nic se tam neposílá. */
+const AUTH_EMAIL_DOMAIN = 'patrac-auth.example.com';
 
-function authEmailDomain() {
-    var projectId = firebaseConfig.projectId || 'patrac-app';
-    return projectId + '.firebaseapp.com';
+export function normalizePatracUserId(raw) {
+    return String(raw || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/^\.+|\.+$/g, '');
 }
 
 function sanitizeEmailLocalPart(userId) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     var safe = userId
         .replace(/[^a-z0-9._-]/g, '_')
         .replace(/^[._-]+|[._-]+$/g, '')
@@ -32,15 +33,19 @@ function sanitizeEmailLocalPart(userId) {
 }
 
 export function patracIdToLoginEmail(userId) {
-    return sanitizeEmailLocalPart(userId) + '@' + authEmailDomain();
+    return sanitizeEmailLocalPart(userId) + '@' + AUTH_EMAIL_DOMAIN;
 }
 
-/** Starší formát — pro zpětnou kompatibilitu po migraci. */
-export function patracIdToLegacyLoginEmail(userId) {
-    userId = String(userId || '').trim().toLowerCase();
-    var safe = userId.replace(/[^a-z0-9._-]/g, '_').replace(/^[._-]+|[._-]+$/g, '');
-    if (!safe) safe = 'operativec';
-    return safe + '@patrac-auth.invalid';
+/** Starší formáty — zpětná kompatibilita po migraci. */
+export function patracLegacyLoginEmails(userId) {
+    userId = normalizePatracUserId(userId);
+    var safe = userId.replace(/[^a-z0-9._-]/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'operativec';
+    var projectId = firebaseConfig.projectId || 'patrac-app';
+    return [
+        safe + '@patrac-auth.invalid',
+        'patrac.' + safe + '@' + projectId + '.firebaseapp.com',
+        safe + '@' + projectId + '.firebaseapp.com'
+    ];
 }
 
 function getAuthInstance() {
@@ -49,12 +54,16 @@ function getAuthInstance() {
 
 async function signInWithPatracEmail(userId, password) {
     var auth = getAuthInstance();
-    var emails = [patracIdToLoginEmail(userId), patracIdToLegacyLoginEmail(userId)];
+    var emails = [patracIdToLoginEmail(userId)].concat(patracLegacyLoginEmails(userId));
+    var mapping = await fetchPatracIdMapping(userId);
+    if (mapping && mapping.loginEmail) {
+        emails.unshift(mapping.loginEmail);
+    }
     var seen = {};
     var lastErr = null;
     for (var i = 0; i < emails.length; i++) {
         var email = emails[i];
-        if (seen[email]) continue;
+        if (!email || seen[email]) continue;
         seen[email] = true;
         try {
             return await signInWithEmailAndPassword(auth, email, password);
@@ -125,7 +134,7 @@ export async function fetchPatracIdMapping(userId) {
 }
 
 export async function registerPatracAuth(userId, password) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     if (!userId || !password) {
         throw new Error('Chybí ID nebo heslo.');
     }
@@ -143,7 +152,7 @@ export async function registerPatracAuth(userId, password) {
 }
 
 export async function signInPatracAuth(userId, password) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     if (!userId || !password) {
         throw new Error('Chybí ID nebo heslo.');
     }
@@ -161,7 +170,7 @@ export async function signInPatracAuth(userId, password) {
         return cred.user;
     } catch (err) {
         var code = err && err.code ? err.code : '';
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-email') {
             return upgradeLegacyAccountToFirebaseAuth(userId, password);
         }
         throw err;
