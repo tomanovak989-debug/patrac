@@ -3094,11 +3094,41 @@
             refreshCommunityMembersFromCloud(scrollToActive);
         }
 
+        function reconcileCommunityMembersList(comCode) {
+            comCode = (comCode || localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
+            if (!comCode) return;
+            var comms = getPatracCommunities();
+            var comm = comms[comCode];
+            if (!comm) return;
+
+            var accounts = getPatracAccounts();
+            var merged = Array.isArray(comm.members) ? comm.members.slice() : [];
+            var seen = {};
+            for (var i = 0; i < merged.length; i++) {
+                if (merged[i]) seen[merged[i]] = true;
+            }
+
+            for (var id in accounts) {
+                if (!accounts.hasOwnProperty(id)) continue;
+                if ((accounts[id].comCode || '').toUpperCase() === comCode && !seen[id]) {
+                    merged.push(id);
+                    seen[id] = true;
+                }
+            }
+
+            if (merged.length !== (comm.members || []).length) {
+                comm.members = merged;
+                comms[comCode] = comm;
+                savePatracCommunities(comms);
+            }
+        }
+
         function refreshCommunityMembersFromCloud(scrollToActive) {
             var membersEl = document.getElementById('community-members-list');
             if (!membersEl) return;
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
+            reconcileCommunityMembersList(comCode);
             var stats = getCommunityAggregateStats(comCode);
             if (stats.members.length === 0) {
                 membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Zatím žádní pátrači</span>';
@@ -3142,6 +3172,7 @@
             if (!membersEl) return;
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
+            reconcileCommunityMembersList(comCode);
             var activeUserId = getActiveInventoryUserId() || localStorage.getItem('patrac_session') || '';
             var comm = getCurrentCommunityRecord();
             var founderId = comm ? comm.founder : '';
@@ -5005,6 +5036,7 @@
             syncCurrentAccountMissionStats();
             syncCurrentAccountWearLoadout();
             try { localStorage.removeItem('patrac_session'); } catch (e) {}
+            localStorage.setItem('items_personal', '[]');
 
             isOperatorMode = false;
             operatorComCode = '';
@@ -5318,22 +5350,50 @@
             };
         }
 
+        function setUserPersonalItemsLocal(userId, items) {
+            if (!userId) return;
+            var list = Array.isArray(items) ? items : [];
+            safeLocalStorageSet(getPatracItemsPersonalKey(userId), JSON.stringify(list));
+            if (userId === localStorage.getItem('patrac_session')) {
+                safeLocalStorageSet('items_personal', JSON.stringify(list));
+            }
+        }
+
+        function loadUserPersonalItemsIntoSession(userId) {
+            if (!userId) {
+                localStorage.setItem('items_personal', '[]');
+                return [];
+            }
+            var key = getPatracItemsPersonalKey(userId);
+            if (localStorage.getItem(key) !== null) {
+                var existing = getUserPersonalItems(userId);
+                localStorage.setItem('items_personal', JSON.stringify(existing));
+                return existing;
+            }
+
+            var accounts = getPatracAccounts();
+            var accountIds = Object.keys(accounts);
+            var legacy = getSafeItems('items_personal');
+            var items = [];
+
+            if (accountIds.length === 1 && accountIds[0] === userId && legacy.length > 0) {
+                items = legacy.slice();
+                saveUserPersonalItems(userId, items);
+            } else {
+                setUserPersonalItemsLocal(userId, []);
+            }
+
+            return items;
+        }
+
         function getUserPersonalItems(userId) {
             if (!userId) return [];
             var raw = localStorage.getItem(getPatracItemsPersonalKey(userId));
-            if (raw) {
+            if (raw !== null) {
                 try {
                     var parsed = JSON.parse(raw);
                     if (Array.isArray(parsed)) return parsed;
                 } catch (e) {}
-            }
-            var session = localStorage.getItem('patrac_session');
-            if (userId === session) {
-                var legacy = getSafeItems('items_personal');
-                if (legacy.length > 0) {
-                    saveUserPersonalItems(userId, legacy);
-                    return legacy.slice();
-                }
             }
             return [];
         }
@@ -5925,6 +5985,7 @@
                     try { renderCommunityProfile(); } catch (e) { console.warn(e); }
                 }
                 if (comCode) {
+                    try { reconcileCommunityMembersList(comCode); } catch (e) { console.warn(e); }
                     try { reconcileCommunityInventory(comCode); } catch (e) { console.warn(e); }
                     try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
                     try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
@@ -6050,6 +6111,10 @@
             savePatracAccounts(accounts);
             addMemberToCommunity(comCode, userId);
             saveUserProfileData(userId, createDefaultUserProfileData(userId));
+            reconcileCommunityMembersList(comCode);
+            pushPlayerCloudAsync(function(mod) {
+                return mod.savePlayerToCloud(userId, { playerName: botName });
+            });
 
             renderOperatorMemberList();
             renderCommunityProfile();
@@ -6342,6 +6407,7 @@
             }
 
             applyCommunityRankToDisplays(comCode);
+            reconcileCommunityMembersList(comCode);
             var stats = getCommunityAggregateStats(comCode);
 
             if (adminBadge) adminBadge.style.display = isCommunityAdmin(session) ? 'block' : 'none';
@@ -6590,6 +6656,7 @@
             var desc = localStorage.getItem(getPatracDescKey(userId)) || '';
             if (desc) localStorage.setItem('player_desc', desc);
             else localStorage.removeItem('player_desc');
+            loadUserPersonalItemsIntoSession(userId);
             return true;
         }
 
@@ -6852,6 +6919,8 @@
             var avatarSaved = true;
             if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
             applyAccountToLocalStorage(userId);
+            setUserPersonalItemsLocal(userId, []);
+            saveUserProfileData(userId, createDefaultUserProfileData(userId));
 
             try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
 
@@ -6869,7 +6938,6 @@
             currentlyEditingPlayerId = null;
             operatorEditDraft = null;
             operatorEditDirty = false;
-            syncSessionUserToStorage();
 
             Promise.all([
                 import('./src/services/playerService.js').then(function(mod) {

@@ -6,8 +6,31 @@ import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
 
 const COLLECTION = 'communities';
 
-function normalizeComCode(comCode) {
-    return String(comCode || '').trim().toUpperCase();
+function mergeUniqueMemberIds() {
+    var lists = Array.prototype.slice.call(arguments);
+    var out = [];
+    var seen = {};
+    for (var l = 0; l < lists.length; l++) {
+        var list = lists[l];
+        if (!Array.isArray(list)) continue;
+        for (var i = 0; i < list.length; i++) {
+            var id = String(list[i] || '').trim();
+            if (!id || seen[id]) continue;
+            seen[id] = true;
+            out.push(id);
+        }
+    }
+    return out;
+}
+
+function membersChanged(before, after) {
+    var a = mergeUniqueMemberIds(before);
+    var b = mergeUniqueMemberIds(after);
+    if (a.length !== b.length) return true;
+    for (var i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return true;
+    }
+    return false;
 }
 
 export async function saveCommunityToCloud(comCode, community) {
@@ -73,16 +96,25 @@ export async function hydrateCommunityFromCloud(comCode) {
     }
 
     var existing = comms[comCode] || {};
+    var cloudMembers = Array.isArray(data.members) ? data.members.slice() : [];
+    var localMembers = Array.isArray(existing.members) ? existing.members.slice() : [];
+    var mergedMembers = mergeUniqueMemberIds(cloudMembers, localMembers);
+
     comms[comCode] = {
         name: data.name || existing.name || '',
         code: comCode,
         founder: data.founder || existing.founder || '',
-        members: Array.isArray(data.members) && data.members.length
-            ? data.members.slice()
-            : (existing.members || []),
+        members: mergedMembers,
         createdAt: data.createdAt || existing.createdAt || new Date().toISOString()
     };
     localStorage.setItem('patrac_communities', JSON.stringify(comms));
+
+    if (membersChanged(cloudMembers, mergedMembers)) {
+        await setDoc(doc(getDb(), COLLECTION, comCode), {
+            members: mergedMembers,
+            updatedAt: Date.now()
+        }, { merge: true });
+    }
 
     if (Array.isArray(data.inventory)) {
         var invKey = 'patrac_items_community_' + comCode;
