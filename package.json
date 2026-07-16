@@ -4,7 +4,9 @@
   "description": "PÁTRAČ — síť znovuobjevení",
   "scripts": {
     "env:firebase": "node scripts/generate-firebase-config.mjs",
-    "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage"
+    "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage",
+    "build": "echo Static site — no build step",
+    "vercel-build": "echo Static site — no build step"
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",
