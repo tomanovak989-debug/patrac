@@ -2066,8 +2066,8 @@
         function confirmRandomQuestDone(questId) {
             var q = getQuestById(questId);
             if (!q || !isRandomQuestId(questId)) return;
-            if (localStorage.getItem('unlocked_story_' + questId) !== 'true') {
-                alert('Nejdřív odhal misi tlačítkem SBALIT VĚCI.');
+            if (!isQuestUnlockedForPlayer(questId)) {
+                alert('Nejdřív musí někdo z komunity spustit rozkaz.');
                 return;
             }
             completeQuestAtLocation(questId);
@@ -2103,7 +2103,7 @@
                 return html;
             }
 
-            var isUnlocked = localStorage.getItem('unlocked_story_' + q.id) === 'true';
+            var isUnlocked = isQuestUnlockedForPlayer(q.id);
             var reqIcons = '';
             for (var r = 0; r < q.req.length; r++) {
                 reqIcons += '<span class="logistics-badge">📦 ' + q.req[r] + '</span>';
@@ -2113,13 +2113,18 @@
             html += '<div class="quest-assigner-badge">📡 ' + getQuestAssignerBadge(q) + ' · <span style="color:var(--accent-gold);">náhodný rozkaz</span></div>';
 
             if (!isUnlocked) {
-                html += '<div class="quest-header" style="color:var(--dim-fg);">📻 PŘÍCHOZÍ SIGNÁL (' + q.char + ')</div>';
-                html += '<div style="font-size:var(--text-base);color:var(--muted-fg);margin:4px 0;">⏳ ' + q.time + '</div>';
-                if (reqIcons) html += '<div style="margin:4px 0;">' + reqIcons + '</div>';
-                html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
-                html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 PŘIJMOUT ROZKAZ</button>';
+                if (isQuestMissedByPlayer(q.id)) {
+                    html += '<div class="logistics-error" style="display:block;margin:4px 0;">⏱ Lhůta vypršela — rank za tuto misi nezískáš.</div>';
+                } else {
+                    html += '<div class="quest-header" style="color:var(--dim-fg);">📻 PŘÍCHOZÍ SIGNÁL (' + q.char + ')</div>';
+                    html += '<div style="font-size:var(--text-base);color:var(--muted-fg);margin:4px 0;">⏳ ' + q.time + '</div>';
+                    if (reqIcons) html += '<div style="margin:4px 0;">' + reqIcons + '</div>';
+                    html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
+                    html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 SPUSTIT PRO KOMUNITU</button>';
+                }
             } else {
                 html += '<div class="quest-header">📻 ' + q.char + ': ' + q.title + '</div>';
+                html += renderCommunityQuestStatusHtml(q.id, q);
                 html += '<div class="quest-body" style="margin-top:4px;">' + q.desc + '</div>';
                 html += '<div class="countdown-timer">⏳ AKTIVNÍ (' + q.time + ')</div>';
                 if (reqIcons) html += '<div style="margin:4px 0;">' + reqIcons + '</div>';
@@ -2171,7 +2176,7 @@
                     continue;
                 }
 
-                var isUnlocked = localStorage.getItem('unlocked_story_' + q.id) === 'true';
+                var isUnlocked = isQuestUnlockedForPlayer(q.id);
                 var reqIcons = "";
 
                 for (var r = 0; r < q.req.length; r++) {
@@ -2187,17 +2192,22 @@
                 html += '<div class="quest-assigner-badge">📡 Zadavatel: ' + getQuestAssignerBadge(q) + ' · vlastní</div>';
 
                 if (!isUnlocked) {
-                    html += '<div class="quest-header" style="color:var(--dim-fg);">🔒 NEODHALENÁ OPERACE (' + (q.char || 'Mise') + ')</div>';
-                    if (reqIcons !== "") {
-                        html += '<div style="margin: 5px 0;">' + reqIcons + '</div>';
+                    if (isQuestMissedByPlayer(q.id)) {
+                        html += '<div class="logistics-error" style="display:block;margin:4px 0;">⏱ Lhůta vypršela — rank za tuto misi nezískáš.</div>';
                     } else {
-                        html += '<div style="margin: 5px 0; font-size:var(--text-sm); color:var(--muted-fg);">(Nevyžaduje žádné specifické vybavení)</div>';
+                        html += '<div class="quest-header" style="color:var(--dim-fg);">🔒 NEODHALENÁ OPERACE (' + (q.char || 'Mise') + ')</div>';
+                        if (reqIcons !== "") {
+                            html += '<div style="margin: 5px 0;">' + reqIcons + '</div>';
+                        } else {
+                            html += '<div style="margin: 5px 0; font-size:var(--text-sm); color:var(--muted-fg);">(Nevyžaduje žádné specifické vybavení)</div>';
+                        }
+                        html += '<div style="font-size:var(--text-base); color:var(--subtle-fg); margin-bottom: 4px;">⏳ Předpokládaná doba: ' + q.time + '</div>';
+                        html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
+                        html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 SPUSTIT PRO KOMUNITU</button>';
                     }
-                    html += '<div style="font-size:var(--text-base); color:var(--subtle-fg); margin-bottom: 4px;">⏳ Předpokládaná doba: ' + q.time + '</div>';
-                    html += '<div class="logistics-error" id="log-err-' + q.id + '"></div>';
-                    html += '<button class="btn-accept" onclick="attemptStartQuest(\'' + q.id + '\')">🔓 SBALIT VĚCI A ODHALIT MISI</button>';
                 } else {
                     html += '<div class="quest-header">📡 ' + (q.char ? q.char + ': ' : '') + q.title + '</div>';
+                    html += renderCommunityQuestStatusHtml(q.id, q);
                     html += '<div class="quest-body" style="margin-top:4px;">' + q.desc + '</div>';
                     html += '<div class="countdown-timer">⏳ LIMIT OPERACE SPUŠTĚN (' + q.time + ')</div>';
                     html += '<div class="quest-footer" style="margin-top:5px;">' + renderQuestActionButtons(q.id) + '</div>';
@@ -3378,6 +3388,154 @@
             });
         }
 
+        function parseQuestTimeToMs(timeStr) {
+            var raw = String(timeStr || '').trim().toLowerCase();
+            var m = /^(\d+(?:\.\d+)?)\s*(h|m|min|d)?$/.exec(raw);
+            if (!m) return 2 * 3600000;
+            var n = parseFloat(m[1]);
+            var unit = m[2] || 'h';
+            if (unit === 'm' || unit === 'min') return n * 60000;
+            if (unit === 'd') return n * 86400000;
+            return n * 3600000;
+        }
+
+        function getCommunityLaunchedQuests() {
+            var comCode = (localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
+            if (!comCode) return {};
+            try {
+                var raw = localStorage.getItem('patrac_quest_launched_' + comCode);
+                if (raw) return JSON.parse(raw) || {};
+            } catch (e) {}
+            return {};
+        }
+
+        function setCommunityLaunchedQuests(launched) {
+            var comCode = (localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
+            if (!comCode) return;
+            localStorage.setItem('patrac_quest_launched_' + comCode, JSON.stringify(launched || {}));
+        }
+
+        function getLaunchedQuestEntry(questId) {
+            var launched = getCommunityLaunchedQuests();
+            return launched[questId] || null;
+        }
+
+        function isCommunityQuestType(questId) {
+            return !!(questId && !gameQuests[questId]);
+        }
+
+        function isQuestLaunchedCommunityWide(questId) {
+            var entry = getLaunchedQuestEntry(questId);
+            return !!(entry && !entry.closed);
+        }
+
+        function isQuestRunExpired(questId) {
+            var entry = getLaunchedQuestEntry(questId);
+            if (!entry) return false;
+            if (entry.closed) return true;
+            return Date.now() > (entry.expiresAt || 0);
+        }
+
+        function getPlayerQuestMissedMap(userId) {
+            userId = userId || localStorage.getItem('patrac_session') || '';
+            if (!userId) return {};
+            try {
+                var raw = localStorage.getItem('patrac_quest_missed_' + userId);
+                if (raw) return JSON.parse(raw) || {};
+            } catch (e) {}
+            return {};
+        }
+
+        function isQuestMissedByPlayer(questId, userId) {
+            var missed = getPlayerQuestMissedMap(userId);
+            return !!missed[questId];
+        }
+
+        function markQuestMissedByPlayer(questId, userId) {
+            userId = userId || localStorage.getItem('patrac_session') || '';
+            if (!userId || !questId) return;
+            var missed = getPlayerQuestMissedMap(userId);
+            missed[questId] = Date.now();
+            localStorage.setItem('patrac_quest_missed_' + userId, JSON.stringify(missed));
+        }
+
+        function launchCommunityQuest(questId, q) {
+            var launched = getCommunityLaunchedQuests();
+            var now = Date.now();
+            launched[questId] = {
+                startedAt: now,
+                expiresAt: now + parseQuestTimeToMs(q.time),
+                startedBy: localStorage.getItem('patrac_session') || '',
+                startedByName: localStorage.getItem('player_name') || 'Operativec',
+                closed: false
+            };
+            setCommunityLaunchedQuests(launched);
+        }
+
+        function processCommunityQuestExpiries() {
+            var launched = getCommunityLaunchedQuests();
+            var now = Date.now();
+            var session = localStorage.getItem('patrac_session') || '';
+            var changed = false;
+            var playerChanged = false;
+
+            for (var questId in launched) {
+                if (!Object.prototype.hasOwnProperty.call(launched, questId)) continue;
+                var entry = launched[questId];
+                if (!entry || entry.closed) continue;
+                if (now <= (entry.expiresAt || 0)) continue;
+
+                entry.closed = true;
+                changed = true;
+
+                if (session) {
+                    var q = getQuestById(questId);
+                    if (q && !isQuestCompleted(q) && !isQuestMissedByPlayer(questId, session)) {
+                        markQuestMissedByPlayer(questId, session);
+                        playerChanged = true;
+                    }
+                }
+            }
+
+            if (changed) setCommunityLaunchedQuests(launched);
+            if (changed) syncCommunityQuestsToCloud();
+            if (playerChanged) syncPlayerQuestProgressToCloud();
+            return changed || playerChanged;
+        }
+
+        function isQuestUnlockedForPlayer(questId) {
+            if (gameQuests[questId]) {
+                return localStorage.getItem('unlocked_story_' + questId) === 'true';
+            }
+            if (isQuestMissedByPlayer(questId)) return false;
+            if (isQuestLaunchedCommunityWide(questId) && !isQuestRunExpired(questId)) return true;
+            return localStorage.getItem('unlocked_story_' + questId) === 'true';
+        }
+
+        function formatQuestCountdown(questId) {
+            var entry = getLaunchedQuestEntry(questId);
+            if (!entry || entry.closed) return '';
+            var left = (entry.expiresAt || 0) - Date.now();
+            if (left <= 0) return 'vypršelo';
+            var mins = Math.ceil(left / 60000);
+            if (mins >= 60) return Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min';
+            return mins + ' min';
+        }
+
+        function renderCommunityQuestStatusHtml(questId, q) {
+            if (!isCommunityQuestType(questId)) return '';
+            if (isQuestCompleted(q)) return '';
+            if (isQuestMissedByPlayer(questId)) {
+                return '<div class="logistics-error" style="display:block;margin:4px 0;">⏱ Lhůta vypršela — rank za tuto misi nezískáš.</div>';
+            }
+            var entry = getLaunchedQuestEntry(questId);
+            if (!entry) return '';
+            var starter = entry.startedByName || entry.startedBy || 'komunita';
+            var cd = formatQuestCountdown(questId);
+            return '<div style="font-size:var(--text-sm);color:var(--accent-gold);margin:4px 0;">📡 Spuštěno: ' + starter + ' · zbývá ~' + cd + '</div>' +
+                '<div style="font-size:var(--text-xs);color:var(--muted-fg);margin-bottom:4px;">Každý pátrač musí potvrdit výkon na místě sám — jinak rank nezíská.</div>';
+        }
+
         function enrichQuestWithCoords(quest) {
             if (!quest || !quest.id) return quest;
             var copy = JSON.parse(JSON.stringify(quest));
@@ -3409,6 +3567,7 @@
                 random: random,
                 dismissed: getDismissedQuests(),
                 reqOverrides: getQuestReqOverrides(),
+                launched: getCommunityLaunchedQuests(),
                 updatedAt: Date.now()
             };
         }
@@ -3443,6 +3602,7 @@
             for (var r = 0; r < randomQuests.length; r++) markUnlocked(randomQuests[r].id);
 
             var done = snapshotQuestDoneFromLocalStorage();
+            var missed = getPlayerQuestMissedMap(userId);
 
             var terminal = { activatedCodes: [], poctaInventoryIds: [] };
             try {
@@ -3462,7 +3622,8 @@
                 },
                 quests: {
                     done: done,
-                    unlocked: unlocked
+                    unlocked: unlocked,
+                    missed: missed
                 },
                 terminal: terminal
             };
@@ -3499,6 +3660,7 @@
                     }
                     if (payload.quests) {
                         mod.applyCommunityQuestsToLocalStorage(payload.quests);
+                        try { processCommunityQuestExpiries(); } catch (e) { console.warn(e); }
                         try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
                         try { renderQuestList(); } catch (e) { console.warn(e); }
                     }
@@ -3640,6 +3802,11 @@
             if (!quest || !quest.id) return false;
             if (isQuestDismissed(quest.id)) return false;
             if (isQuestCompleted(quest)) return false;
+            if (isQuestMissedByPlayer(quest.id)) return false;
+            if (isCommunityQuestType(quest.id)) {
+                if (isQuestLaunchedCommunityWide(quest.id) && !isQuestRunExpired(quest.id)) return true;
+                return false;
+            }
             return true;
         }
 
@@ -4612,15 +4779,38 @@
             rebuildCustomLocLinkSelect();
             ensureRandomQuests();
             loadCustomCraftedItems();
+            syncPlayerQuestProgressToCloud();
             return poctaReward;
         }
 
         function completeQuestAtLocation(questId) {
+            processCommunityQuestExpiries();
             var q = getQuestById(questId);
             if (!q) return;
+
+            if (isQuestMissedByPlayer(questId)) {
+                alert('Lhůta vypršela — rank za tuto misi už nezískáš.');
+                renderQuestList();
+                return;
+            }
+
+            if (isCommunityQuestType(questId)) {
+                if (!isQuestLaunchedCommunityWide(questId)) {
+                    alert('Nejdřív musí někdo z komunity spustit rozkaz.');
+                    return;
+                }
+                if (isQuestRunExpired(questId)) {
+                    markQuestMissedByPlayer(questId);
+                    syncPlayerQuestProgressToCloud();
+                    alert('Lhůta pro potvrzení na místě vypršela — rank se nezapíše.');
+                    renderQuestList();
+                    return;
+                }
+            }
+
             if (!isUserNearQuest(questId)) return;
             var poctaReward = finalizeQuestComplete(q);
-            var msg = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Odměna v inventáři.';
+            var msg = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Rank a odměna jsou zapsány tobě.';
             if (poctaReward) {
                 msg += '\n\n🕯️ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
             }
@@ -7324,6 +7514,7 @@
         }
 
         function renderQuestList() {
+            try { processCommunityQuestExpiries(); } catch (e) { console.warn(e); }
             var activeEl = document.getElementById('active-quests-list');
             var storyEl = document.getElementById('story-positions-list');
             if (activeEl) {
@@ -7336,8 +7527,20 @@
         }
 
         function attemptStartQuest(questId) {
+            processCommunityQuestExpiries();
             var q = getQuestById(questId);
             if (!q) return;
+
+            if (isCommunityQuestType(questId) && isQuestLaunchedCommunityWide(questId)) {
+                alert('Rozkaz už běží pro celou komunitu. Dojeď na místo a potvrď výkon sám — rank se zapisuje každému zvlášť.');
+                renderQuestList();
+                return;
+            }
+
+            if (isQuestMissedByPlayer(questId)) {
+                alert('Lhůta pro tento rozkaz už vypršela.');
+                return;
+            }
 
             var personalItems = getCurrentPersonalItems();
             var missing = [];
@@ -7365,6 +7568,13 @@
             }
 
             if (errEl) errEl.style.display = "none";
+
+            if (isCommunityQuestType(questId)) {
+                launchCommunityQuest(questId, q);
+                syncCommunityQuestsToCloud();
+                alert('📡 Rozkaz spuštěn pro celou komunitu!\nVšichni ho vidí — každý musí na místě potvrdit výkon sám, jinak rank nezíská.');
+            }
+
             localStorage.setItem('unlocked_story_' + q.id, 'true');
             renderQuestList();
             syncPlayerQuestProgressToCloud();

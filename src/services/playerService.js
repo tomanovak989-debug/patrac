@@ -134,6 +134,13 @@ export function applyPlayerProgressFromCloud(userId, data) {
             if (!Object.prototype.hasOwnProperty.call(unlocked, unlockId)) continue;
             if (unlocked[unlockId]) localStorage.setItem('unlocked_story_' + unlockId, 'true');
         }
+        var missed = data.quests.missed || {};
+        var missedKey = 'patrac_quest_missed_' + userId;
+        try {
+            localStorage.setItem(missedKey, JSON.stringify(missed));
+        } catch (e) {
+            console.warn('[playerService] quest missed cache', e);
+        }
     }
 
     if (data.terminal && typeof data.terminal === 'object') {

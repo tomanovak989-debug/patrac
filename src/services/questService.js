@@ -42,6 +42,7 @@ export function normalizeCommunityQuests(raw) {
             random: [],
             dismissed: [],
             reqOverrides: {},
+            launched: {},
             updatedAt: 0
         };
     }
@@ -70,15 +71,38 @@ export function normalizeCommunityQuests(raw) {
         }
     }
 
+        return {
+            version: raw.version || 1,
+            story: story,
+            custom: custom,
+            random: random,
+            dismissed: Array.isArray(raw.dismissed) ? raw.dismissed.slice() : [],
+            reqOverrides: raw.reqOverrides && typeof raw.reqOverrides === 'object' ? raw.reqOverrides : {},
+            launched: raw.launched && typeof raw.launched === 'object' ? raw.launched : {},
+            updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0
+        };
+    }
+
+function normalizeLaunchedEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
     return {
-        version: raw.version || 1,
-        story: story,
-        custom: custom,
-        random: random,
-        dismissed: Array.isArray(raw.dismissed) ? raw.dismissed.slice() : [],
-        reqOverrides: raw.reqOverrides && typeof raw.reqOverrides === 'object' ? raw.reqOverrides : {},
-        updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0
+        startedAt: typeof raw.startedAt === 'number' ? raw.startedAt : 0,
+        expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : 0,
+        startedBy: raw.startedBy ? String(raw.startedBy) : '',
+        startedByName: typeof raw.startedByName === 'string' ? raw.startedByName : '',
+        closed: !!raw.closed
     };
+}
+
+function normalizeLaunchedMap(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (var id in raw) {
+        if (!Object.prototype.hasOwnProperty.call(raw, id)) continue;
+        var entry = normalizeLaunchedEntry(raw[id]);
+        if (entry) out[id] = entry;
+    }
+    return out;
 }
 
 function mergeStoryMaps(a, b) {
@@ -145,6 +169,27 @@ function mergeReqOverrides(a, b) {
     return Object.assign({}, a || {}, b || {});
 }
 
+function mergeLaunchedMaps(a, b) {
+    a = normalizeLaunchedMap(a);
+    b = normalizeLaunchedMap(b);
+    var out = Object.assign({}, a);
+    for (var id in b) {
+        if (!Object.prototype.hasOwnProperty.call(b, id)) continue;
+        var incoming = b[id];
+        var existing = out[id];
+        if (!existing) {
+            out[id] = incoming;
+            continue;
+        }
+        if (existing.closed && !incoming.closed) {
+            out[id] = incoming;
+        } else if (!existing.closed && !incoming.closed) {
+            out[id] = (incoming.startedAt || 0) >= (existing.startedAt || 0) ? incoming : existing;
+        }
+    }
+    return out;
+}
+
 export function mergeCommunityQuests(cloudQuests, localQuests) {
     cloudQuests = normalizeCommunityQuests(cloudQuests);
     localQuests = normalizeCommunityQuests(localQuests);
@@ -155,6 +200,7 @@ export function mergeCommunityQuests(cloudQuests, localQuests) {
         random: mergeQuestLists(cloudQuests.random, localQuests.random),
         dismissed: mergeUniqueStrings(cloudQuests.dismissed, localQuests.dismissed),
         reqOverrides: mergeReqOverrides(cloudQuests.reqOverrides, localQuests.reqOverrides),
+        launched: mergeLaunchedMaps(cloudQuests.launched, localQuests.launched),
         updatedAt: Math.max(cloudQuests.updatedAt || 0, localQuests.updatedAt || 0, Date.now())
     });
 }
@@ -187,6 +233,12 @@ export function applyCommunityQuestsToLocalStorage(quests) {
     localStorage.setItem('random_quests_list', JSON.stringify(data.random));
     localStorage.setItem('dismissed_quests', JSON.stringify(data.dismissed));
     localStorage.setItem('quest_req_overrides', JSON.stringify(data.reqOverrides));
+
+    var comCode = '';
+    try { comCode = (localStorage.getItem('com_code') || '').toUpperCase(); } catch (e) {}
+    if (comCode) {
+        localStorage.setItem('patrac_quest_launched_' + comCode, JSON.stringify(data.launched || {}));
+    }
 
     for (var c = 0; c < data.custom.length; c++) {
         applyQuestCoords(data.custom[c].id, data.custom[c].lat, data.custom[c].lng);
