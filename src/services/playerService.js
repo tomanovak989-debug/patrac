@@ -70,10 +70,97 @@ export async function hydratePlayerFromCloud(userId) {
     }
 
     if (Array.isArray(data.wear)) {
-        localStorage.setItem('patrac_wear_' + userId, JSON.stringify(data.wear));
+        localStorage.setItem('patrac_wear_' + userId, data.wear);
     }
 
+    applyPlayerProgressFromCloud(userId, data);
+
     return { ok: true };
+}
+
+function getPatracProfileKey(userId) {
+    return 'patrac_profile_' + userId;
+}
+
+function getTerminalStateKey(userId) {
+    return 'patrac_terminal_' + userId;
+}
+
+/**
+ * Aplikuje missions, quests a terminal stav z Firestore do localStorage.
+ */
+export function applyPlayerProgressFromCloud(userId, data) {
+    userId = normalizeUserId(userId);
+    if (!userId || !data) return;
+    var isSession = localStorage.getItem('patrac_session') === userId;
+
+    if (data.missions && typeof data.missions === 'object') {
+        var missions = data.missions;
+        try {
+            var profileRaw = localStorage.getItem('player_profile');
+            var profile = profileRaw ? JSON.parse(profileRaw) : {};
+            profile.localMissions = missions.localMissions || 0;
+            profile.globalMissions = missions.globalMissions != null ? missions.globalMissions : (missions.localMissions || 0);
+            profile.localIssuerStats = missions.localIssuerStats || profile.localIssuerStats || {};
+            profile.globalIssuerStats = missions.globalIssuerStats || profile.globalIssuerStats || {};
+            if (Array.isArray(missions.missionLog)) profile.missionLog = missions.missionLog.slice();
+            localStorage.setItem('player_profile', JSON.stringify(profile));
+        } catch (e) {
+            console.warn('[playerService] player_profile missions', e);
+        }
+
+        try {
+            var storedRaw = localStorage.getItem(getPatracProfileKey(userId));
+            var stored = storedRaw ? JSON.parse(storedRaw) : {};
+            stored.localMissions = missions.localMissions || 0;
+            stored.globalMissions = missions.globalMissions != null ? missions.globalMissions : (missions.localMissions || 0);
+            stored.localIssuerStats = missions.localIssuerStats || stored.localIssuerStats || {};
+            stored.globalIssuerStats = missions.globalIssuerStats || stored.globalIssuerStats || {};
+            if (Array.isArray(missions.missionLog)) stored.missionLog = missions.missionLog.slice();
+            localStorage.setItem(getPatracProfileKey(userId), JSON.stringify(stored));
+        } catch (e) {
+            console.warn('[playerService] patrac_profile missions', e);
+        }
+    }
+
+    if (data.quests && typeof data.quests === 'object') {
+        var done = data.quests.done || {};
+        for (var questId in done) {
+            if (!Object.prototype.hasOwnProperty.call(done, questId)) continue;
+            if (done[questId]) localStorage.setItem('quest_done_' + questId, 'true');
+        }
+        var unlocked = data.quests.unlocked || {};
+        for (var unlockId in unlocked) {
+            if (!Object.prototype.hasOwnProperty.call(unlocked, unlockId)) continue;
+            if (unlocked[unlockId]) localStorage.setItem('unlocked_story_' + unlockId, 'true');
+        }
+    }
+
+    if (data.terminal && typeof data.terminal === 'object') {
+        var terminal = {
+            activatedCodes: Array.isArray(data.terminal.activatedCodes) ? data.terminal.activatedCodes.slice() : [],
+            poctaInventoryIds: Array.isArray(data.terminal.poctaInventoryIds) ? data.terminal.poctaInventoryIds.slice() : []
+        };
+        localStorage.setItem(getTerminalStateKey(userId), JSON.stringify(terminal));
+    }
+}
+
+export async function syncPlayerProgressToCloud(userId, progress) {
+    userId = normalizeUserId(userId);
+    if (!userId || !progress) return;
+    await savePlayerToCloud(userId, progress);
+}
+
+export async function syncPlayerTerminal(userId, terminalState) {
+    userId = normalizeUserId(userId);
+    if (!userId) return;
+    await savePlayerToCloud(userId, {
+        terminal: {
+            activatedCodes: Array.isArray(terminalState.activatedCodes) ? terminalState.activatedCodes.slice() : [],
+            poctaInventoryIds: Array.isArray(terminalState.poctaInventoryIds) ? terminalState.poctaInventoryIds.slice() : [],
+            updatedAt: Date.now()
+        }
+    });
 }
 
 /**
@@ -119,6 +206,28 @@ export async function syncPlayerFromLocalStorage(userId) {
 
     if (!Array.isArray(payload.inventory)) payload.inventory = [];
     if (!Array.isArray(payload.wear)) payload.wear = [];
+
+    try {
+        var profileRaw = localStorage.getItem(getPatracProfileKey(userId));
+        if (profileRaw) {
+            var profile = JSON.parse(profileRaw);
+            payload.missions = {
+                localMissions: profile.localMissions || 0,
+                globalMissions: profile.globalMissions != null ? profile.globalMissions : (profile.localMissions || 0),
+                localIssuerStats: profile.localIssuerStats || {},
+                globalIssuerStats: profile.globalIssuerStats || {},
+                missionLog: profile.missionLog || []
+            };
+            if (profile.questDone) {
+                payload.quests = { done: profile.questDone, unlocked: {} };
+            }
+        }
+    } catch (e) {}
+
+    try {
+        var termRaw = localStorage.getItem(getTerminalStateKey(userId));
+        if (termRaw) payload.terminal = JSON.parse(termRaw);
+    } catch (e) {}
 
     await savePlayerToCloud(userId, payload);
 }

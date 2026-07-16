@@ -1954,6 +1954,7 @@
 
         function saveRandomQuestsList(list) {
             localStorage.setItem('random_quests_list', JSON.stringify(list));
+            syncCommunityQuestsToCloud();
         }
 
         function isRandomQuestId(questId) {
@@ -2764,6 +2765,7 @@
             renderQuestList();
             rebuildCustomLocLinkSelect();
             reloadAllMapPoints();
+            syncCommunityQuestsToCloud();
         }
 
         function hasStoredQuestCoords(questId) {
@@ -3373,6 +3375,138 @@
                 if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
             }).catch(function(err) {
                 console.warn('[cloud] pois sync', err);
+            });
+        }
+
+        function enrichQuestWithCoords(quest) {
+            if (!quest || !quest.id) return quest;
+            var copy = JSON.parse(JSON.stringify(quest));
+            var lat = localStorage.getItem('point_' + quest.id + '_lat');
+            var lng = localStorage.getItem('point_' + quest.id + '_lng');
+            copy.lat = lat ? parseFloat(lat) : null;
+            copy.lng = lng ? parseFloat(lng) : null;
+            return copy;
+        }
+
+        function collectCommunityQuestsForCloud() {
+            var story = {};
+            var storyIds = getStoryQuestIds();
+            for (var i = 0; i < storyIds.length; i++) {
+                var id = storyIds[i];
+                var lat = localStorage.getItem('point_' + id + '_lat');
+                var lng = localStorage.getItem('point_' + id + '_lng');
+                story[id] = {
+                    lat: lat ? parseFloat(lat) : null,
+                    lng: lng ? parseFloat(lng) : null
+                };
+            }
+            var custom = getSafeJSON('custom_quests_list').map(enrichQuestWithCoords);
+            var random = getRandomQuestsList().map(enrichQuestWithCoords);
+            return {
+                version: 1,
+                story: story,
+                custom: custom,
+                random: random,
+                dismissed: getDismissedQuests(),
+                reqOverrides: getQuestReqOverrides(),
+                updatedAt: Date.now()
+            };
+        }
+
+        function syncCommunityQuestsToCloud() {
+            var comCode = localStorage.getItem('com_code') || operatorComCode || '';
+            if (!comCode) return;
+            var quests = collectCommunityQuestsForCloud();
+            import('./src/services/questService.js').then(function(mod) {
+                return mod.saveCommunityQuestsToCloud(comCode, quests);
+            }).then(function() {
+                if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
+                if (typeof renderQuestList === 'function') renderQuestList();
+            }).catch(function(err) {
+                console.warn('[cloud] quests sync', err);
+            });
+        }
+
+        function collectPlayerQuestProgressForCloud(userId) {
+            userId = userId || localStorage.getItem('patrac_session') || '';
+            if (!userId) return null;
+            var data = getUserProfileData(userId);
+            var unlocked = {};
+            function markUnlocked(id) {
+                if (localStorage.getItem('unlocked_story_' + id) === 'true') unlocked[id] = true;
+            }
+            var storyIds = getStoryQuestIds();
+            for (var s = 0; s < storyIds.length; s++) markUnlocked(storyIds[s]);
+            var customQuests = getSafeJSON('custom_quests_list');
+            for (var c = 0; c < customQuests.length; c++) markUnlocked(customQuests[c].id);
+            var randomQuests = getRandomQuestsList();
+            for (var r = 0; r < randomQuests.length; r++) markUnlocked(randomQuests[r].id);
+
+            var done = snapshotQuestDoneFromLocalStorage();
+
+            var terminal = { activatedCodes: [], poctaInventoryIds: [] };
+            try {
+                var termRaw = localStorage.getItem('patrac_terminal_' + userId);
+                if (termRaw) terminal = JSON.parse(termRaw);
+            } catch (e) {}
+            if (!Array.isArray(terminal.activatedCodes)) terminal.activatedCodes = [];
+            if (!Array.isArray(terminal.poctaInventoryIds)) terminal.poctaInventoryIds = [];
+
+            return {
+                missions: {
+                    localMissions: data.localMissions || 0,
+                    globalMissions: data.globalMissions != null ? data.globalMissions : (data.localMissions || 0),
+                    localIssuerStats: data.localIssuerStats || emptyIssuerStats(),
+                    globalIssuerStats: data.globalIssuerStats || emptyIssuerStats(),
+                    missionLog: data.missionLog || []
+                },
+                quests: {
+                    done: done,
+                    unlocked: unlocked
+                },
+                terminal: terminal
+            };
+        }
+
+        function syncPlayerQuestProgressToCloud() {
+            var userId = localStorage.getItem('patrac_session') || '';
+            if (!userId || isOperatorMode) return;
+            var progress = collectPlayerQuestProgressForCloud(userId);
+            if (!progress) return;
+            import('./src/services/playerService.js').then(function(mod) {
+                return mod.syncPlayerProgressToCloud(userId, progress);
+            }).catch(function(err) {
+                console.warn('[cloud] player quest sync', err);
+            });
+        }
+
+        var patracCommunityUnsubscribe = null;
+
+        function startCommunityRealtimeSync(comCode) {
+            comCode = (comCode || localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
+            if (!comCode) return;
+            import('./src/services/questService.js').then(function(mod) {
+                if (patracCommunityUnsubscribe) {
+                    patracCommunityUnsubscribe();
+                    patracCommunityUnsubscribe = null;
+                }
+                return mod.subscribeCommunityRealtime(comCode, function(payload) {
+                    if (Array.isArray(payload.inventory)) {
+                        var invKey = 'patrac_items_community_' + comCode;
+                        localStorage.setItem(invKey, JSON.stringify(payload.inventory));
+                        localStorage.setItem('items_community', JSON.stringify(payload.inventory));
+                        try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
+                    }
+                    if (payload.quests) {
+                        mod.applyCommunityQuestsToLocalStorage(payload.quests);
+                        try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
+                        try { renderQuestList(); } catch (e) { console.warn(e); }
+                    }
+                }).then(function(unsub) {
+                    patracCommunityUnsubscribe = unsub;
+                });
+            }).catch(function(err) {
+                console.warn('[cloud] community realtime', err);
             });
         }
 
@@ -4129,6 +4263,8 @@
             renderStoryPositionsList();
             document.getElementById('map-sensor-output').innerHTML = '↺ Reset: ' + getQuestMapLabel(questId);
             syncCommunityPoisToCloud();
+            syncCommunityQuestsToCloud();
+            syncPlayerQuestProgressToCloud();
         }
 
         function getAvailablePositionPoints() {
@@ -4213,6 +4349,7 @@
         function saveQuestCoords(questId, lat, lng) {
             localStorage.setItem('point_' + questId + '_lat', lat);
             localStorage.setItem('point_' + questId + '_lng', lng);
+            syncCommunityQuestsToCloud();
         }
 
         function getMapPointMeta(id, lat, lng) {
@@ -5468,6 +5605,7 @@
             };
             var ok = safeLocalStorageSet(getPatracProfileKey(userId), JSON.stringify(store));
             saveUserPersonalItems(userId, data.itemsPersonal || []);
+            syncPlayerQuestProgressToCloud();
             return ok;
         }
 
@@ -5972,6 +6110,11 @@
                         });
                     });
                 });
+                chain = chain.then(function() {
+                    return import('./src/services/questService.js').then(function(mod) {
+                        return mod.hydrateCommunityQuestsFromCloud(comCode, collectCommunityQuestsForCloud());
+                    });
+                });
             }
 
             chain.then(function() {
@@ -5989,9 +6132,11 @@
                     try { reconcileCommunityInventory(comCode); } catch (e) { console.warn(e); }
                     try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
                     try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
+                    try { renderQuestList(); } catch (e) { console.warn(e); }
                     if (typeof window.patracPoctaReloadMap === 'function') {
                         window.patracPoctaReloadMap();
                     }
+                    try { startCommunityRealtimeSync(comCode); } catch (e) { console.warn(e); }
                 }
             }).catch(function(err) {
                 console.warn('[cloud] hydrate', err);
@@ -7222,6 +7367,7 @@
             if (errEl) errEl.style.display = "none";
             localStorage.setItem('unlocked_story_' + q.id, 'true');
             renderQuestList();
+            syncPlayerQuestProgressToCloud();
         }
 
         function activateTargeting(char) {
@@ -7316,6 +7462,7 @@
             rebuildSelectOptions();
             rebuildCustomLocLinkSelect();
             renderQuestList();
+            syncCommunityQuestsToCloud();
 
             var msg = "Operace vytvořena.\nZadavatel: " + assignerChar + " (" + (SPECIALIZATION_MAP[assignerKey] || '') + ")";
             if (req.length) msg += "\nPožadavek: " + req.join(', ');

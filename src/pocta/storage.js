@@ -140,6 +140,11 @@ export function loadTerminalState(userId) {
 
 export function saveTerminalState(userId, state) {
     writeJson(terminalStateKey(userId), state);
+    import('../services/playerService.js').then(function(mod) {
+        return mod.syncPlayerTerminal(userId, state);
+    }).catch(function(err) {
+        console.warn('[storage] terminal cloud sync', err);
+    });
 }
 
 export async function resolveEntityByCode(code, registry) {
