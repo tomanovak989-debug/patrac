@@ -83,6 +83,44 @@ export function normalizeCommunityQuests(raw) {
         };
     }
 
+function normalizeLaunchedCompletion(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var lat = raw.lat != null ? parseFloat(raw.lat) : null;
+    var lng = raw.lng != null ? parseFloat(raw.lng) : null;
+    if (typeof lat !== 'number' || isNaN(lat) || typeof lng !== 'number' || isNaN(lng)) return null;
+    return {
+        lat: lat,
+        lng: lng,
+        at: typeof raw.at === 'number' ? raw.at : 0,
+        name: typeof raw.name === 'string' ? raw.name : ''
+    };
+}
+
+function normalizeLaunchedCompletions(raw) {
+    var out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (var userId in raw) {
+        if (!Object.prototype.hasOwnProperty.call(raw, userId)) continue;
+        var entry = normalizeLaunchedCompletion(raw[userId]);
+        if (entry) out[String(userId)] = entry;
+    }
+    return out;
+}
+
+function normalizePendingPosition(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var lat = raw.lat != null ? parseFloat(raw.lat) : null;
+    var lng = raw.lng != null ? parseFloat(raw.lng) : null;
+    if (typeof lat !== 'number' || isNaN(lat) || typeof lng !== 'number' || isNaN(lng)) return null;
+    return {
+        lat: lat,
+        lng: lng,
+        confirmedBy: raw.confirmedBy ? String(raw.confirmedBy) : '',
+        confirmedByName: typeof raw.confirmedByName === 'string' ? raw.confirmedByName : '',
+        confirmedAt: typeof raw.confirmedAt === 'number' ? raw.confirmedAt : 0
+    };
+}
+
 function normalizeLaunchedEntry(raw) {
     if (!raw || typeof raw !== 'object') return null;
     return {
@@ -90,7 +128,10 @@ function normalizeLaunchedEntry(raw) {
         expiresAt: typeof raw.expiresAt === 'number' ? raw.expiresAt : 0,
         startedBy: raw.startedBy ? String(raw.startedBy) : '',
         startedByName: typeof raw.startedByName === 'string' ? raw.startedByName : '',
-        closed: !!raw.closed
+        closed: !!raw.closed,
+        completions: normalizeLaunchedCompletions(raw.completions),
+        pendingPosition: normalizePendingPosition(raw.pendingPosition),
+        positionApplied: !!raw.positionApplied
     };
 }
 
@@ -183,8 +224,28 @@ function mergeLaunchedMaps(a, b) {
         }
         if (existing.closed && !incoming.closed) {
             out[id] = incoming;
-        } else if (!existing.closed && !incoming.closed) {
+            continue;
+        }
+        if (!existing.closed && !incoming.closed) {
+            var newer = (incoming.startedAt || 0) >= (existing.startedAt || 0) ? incoming : existing;
+            var older = newer === incoming ? existing : incoming;
+            newer.completions = Object.assign({}, older.completions || {}, newer.completions || {});
+            if (!newer.pendingPosition && older.pendingPosition) {
+                newer.pendingPosition = older.pendingPosition;
+            }
+            out[id] = newer;
+            continue;
+        }
+        if (existing.closed && incoming.closed) {
             out[id] = (incoming.startedAt || 0) >= (existing.startedAt || 0) ? incoming : existing;
+            continue;
+        }
+        if (!existing.closed && incoming.closed && (incoming.startedAt || 0) === (existing.startedAt || 0)) {
+            incoming.completions = Object.assign({}, existing.completions || {}, incoming.completions || {});
+            if (!incoming.pendingPosition && existing.pendingPosition) {
+                incoming.pendingPosition = existing.pendingPosition;
+            }
+            out[id] = incoming;
         }
     }
     return out;
