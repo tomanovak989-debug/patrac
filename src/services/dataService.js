@@ -16,6 +16,7 @@ import { getDb, getFirebaseStorage, ensureFirebaseAuth } from '../lib/firebase.j
 const ENTRIES_COLLECTION = 'entries';
 const POCTA_VISITS_COLLECTION = 'pocta_visits';
 const PHOTOS_STORAGE_PATH = 'photos';
+const AVATARS_STORAGE_PATH = 'avatars';
 
 /** Ostrost pro mobil — delší hrana v px, JPEG kvalita, cílový strop souboru (MB). */
 const PHOTO_MAX_EDGE_PX = 1920;
@@ -23,6 +24,10 @@ const PHOTO_QUALITY = 0.88;
 const PHOTO_MAX_SIZE_MB = 0.5;
 const PHOTO_MAX_INPUT_MB = 25;
 const PHOTO_MIN_EDGE_PX = 640;
+
+const AVATAR_MAX_EDGE_PX = 768;
+const AVATAR_QUALITY = 0.88;
+const AVATAR_MAX_SIZE_MB = 0.12;
 
 function readImageDimensions(blob) {
     return new Promise(function(resolve, reject) {
@@ -170,6 +175,68 @@ export async function uploadPhoto(file) {
         if (err instanceof Error) throw err;
         throw new Error('Nepodařilo se nahrát fotografii.');
     }
+}
+
+/**
+ * Převede data URL (base64) na Blob pro upload.
+ * @param {string} dataUrl
+ * @returns {Promise<Blob>}
+ */
+export function dataUrlToBlob(dataUrl) {
+    return fetch(dataUrl).then(function(res) {
+        return res.blob();
+    });
+}
+
+/**
+ * Nahraje avatar operativce do Storage (avatars/{userId}.jpg).
+ * @param {string} userId
+ * @param {File|Blob} fileOrBlob
+ * @returns {Promise<string>}
+ */
+export async function uploadAvatar(userId, fileOrBlob) {
+    try {
+        await ensureFirebaseAuth();
+        userId = String(userId || '').trim();
+        if (!userId) throw new Error('Chybí ID hráče.');
+        if (!fileOrBlob || !(fileOrBlob instanceof Blob)) {
+            throw new Error('Neplatný soubor avataru.');
+        }
+
+        var compressed = await imageCompression(fileOrBlob, {
+            maxWidthOrHeight: AVATAR_MAX_EDGE_PX,
+            initialQuality: AVATAR_QUALITY,
+            maxSizeMB: AVATAR_MAX_SIZE_MB,
+            alwaysKeepResolution: false,
+            useWebWorker: false,
+            fileType: 'image/jpeg',
+            preserveExif: false
+        });
+
+        var storagePath = AVATARS_STORAGE_PATH + '/' + userId + '.jpg';
+        var storageRef = ref(getFirebaseStorage(), storagePath);
+
+        await uploadBytes(storageRef, compressed, {
+            contentType: 'image/jpeg'
+        });
+
+        return await getDownloadURL(storageRef);
+    } catch (err) {
+        console.error('[dataService] uploadAvatar:', err);
+        if (err instanceof Error) throw err;
+        throw new Error('Nepodařilo se nahrát avatar.');
+    }
+}
+
+/**
+ * Nahraje avatar z base64 data URL.
+ * @param {string} userId
+ * @param {string} dataUrl
+ * @returns {Promise<string>}
+ */
+export async function uploadAvatarFromDataUrl(userId, dataUrl) {
+    var blob = await dataUrlToBlob(dataUrl);
+    return uploadAvatar(userId, blob);
 }
 
 /**

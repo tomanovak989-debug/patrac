@@ -2922,6 +2922,9 @@
                 if (slim) wear.push(slim);
             }
             try { safeLocalStorageSet(getPatracWearKey(session), JSON.stringify(wear)); } catch (e) { console.warn(e); }
+            pushPlayerCloudAsync(function(mod) {
+                return mod.syncPlayerWear(session, wear);
+            });
         }
 
         function getMemberWearLoadout(userId) {
@@ -3132,20 +3135,61 @@
 
         function saveUserAvatar(userId, dataUrl) {
             if (!userId || !dataUrl) return true;
+            if (/^https?:\/\//i.test(dataUrl)) {
+                if (safeLocalStorageSet(getPatracAvatarKey(userId), dataUrl)) {
+                    safeLocalStorageSet('player_avatar', dataUrl);
+                    pushPlayerCloudAsync(function(mod) {
+                        return mod.syncPlayerAvatarUrl(userId, dataUrl);
+                    });
+                    return true;
+                }
+                cleanPatracStorageAggressive();
+                if (safeLocalStorageSet(getPatracAvatarKey(userId), dataUrl)) {
+                    safeLocalStorageSet('player_avatar', dataUrl);
+                    pushPlayerCloudAsync(function(mod) {
+                        return mod.syncPlayerAvatarUrl(userId, dataUrl);
+                    });
+                    return true;
+                }
+                return false;
+            }
             if (storageByteLength(dataUrl) > PATRAC_AVATAR_MAX_BYTES) {
                 console.warn('Avatar příliš velký, neukládám.');
                 return false;
             }
             if (safeLocalStorageSet(getPatracAvatarKey(userId), dataUrl)) {
                 safeLocalStorageSet('player_avatar', dataUrl);
+                pushUserAvatarDataUrlToCloud(userId, dataUrl);
                 return true;
             }
             cleanPatracStorageAggressive();
             if (safeLocalStorageSet(getPatracAvatarKey(userId), dataUrl)) {
                 safeLocalStorageSet('player_avatar', dataUrl);
+                pushUserAvatarDataUrlToCloud(userId, dataUrl);
                 return true;
             }
             return false;
+        }
+
+        function pushPlayerCloudAsync(work) {
+            import('./src/services/playerService.js').then(work).catch(function(err) {
+                console.warn('[cloud] player sync', err);
+            });
+        }
+
+        function pushUserAvatarDataUrlToCloud(userId, dataUrl) {
+            Promise.all([
+                import('./src/services/dataService.js'),
+                import('./src/services/playerService.js')
+            ]).then(function(mods) {
+                return mods[0].uploadAvatarFromDataUrl(userId, dataUrl).then(function(url) {
+                    safeLocalStorageSet(getPatracAvatarKey(userId), url);
+                    safeLocalStorageSet('player_avatar', url);
+                    return mods[1].syncPlayerAvatarUrl(userId, url);
+                });
+            }).catch(function(err) {
+                console.warn('[cloud] avatar upload', err);
+            });
         }
 
         function saveUserDesc(userId, desc) {
@@ -3153,6 +3197,9 @@
             var text = (desc || '').trim().slice(0, 500);
             if (text) safeLocalStorageSet(getPatracDescKey(userId), text);
             else try { localStorage.removeItem(getPatracDescKey(userId)); } catch (e) {}
+            pushPlayerCloudAsync(function(mod) {
+                return mod.syncPlayerDesc(userId, text);
+            });
         }
 
         function cleanPatracStorageAggressive() {
@@ -4883,7 +4930,11 @@
 
         function saveUserPersonalItems(userId, items) {
             if (!userId) return;
-            safeLocalStorageSet(getPatracItemsPersonalKey(userId), JSON.stringify(items || []));
+            var list = items || [];
+            safeLocalStorageSet(getPatracItemsPersonalKey(userId), JSON.stringify(list));
+            pushPlayerCloudAsync(function(mod) {
+                return mod.syncPlayerInventory(userId, list);
+            });
         }
 
         function getCommunityItemsRaw() {
@@ -5625,11 +5676,36 @@
 
         function initCloudSyncAsync() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
-            if (!comCode) return;
-            import('./src/services/communityService.js').then(function(mod) {
-                return mod.hydrateCommunityFromCloud(comCode);
-            }).then(function(result) {
-                if (result && result.ok) {
+            var session = localStorage.getItem('patrac_session') || '';
+            var chain = Promise.resolve();
+
+            if (session) {
+                chain = chain.then(function() {
+                    return import('./src/services/playerService.js').then(function(mod) {
+                        return mod.hydratePlayerFromCloud(session);
+                    });
+                });
+            }
+
+            if (comCode) {
+                chain = chain.then(function() {
+                    return import('./src/services/communityService.js').then(function(mod) {
+                        return mod.hydrateCommunityFromCloud(comCode);
+                    });
+                });
+            }
+
+            chain.then(function() {
+                if (session) {
+                    try { applyAccountToLocalStorage(session); } catch (e) { console.warn(e); }
+                    var av = localStorage.getItem('player_avatar');
+                    if (av) {
+                        var prev = document.getElementById('avatar-game-preview');
+                        if (prev) prev.innerHTML = '<img src="' + av + '">';
+                    }
+                    try { renderCommunityProfile(); } catch (e) { console.warn(e); }
+                }
+                if (comCode) {
                     try { reconcileCommunityInventory(comCode); } catch (e) { console.warn(e); }
                     try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
                     if (typeof window.patracPoctaReloadMap === 'function') {
@@ -5637,7 +5713,7 @@
                     }
                 }
             }).catch(function(err) {
-                console.warn('[cloud] hydrate community', err);
+                console.warn('[cloud] hydrate', err);
             });
         }
 
@@ -6507,6 +6583,10 @@
             var avatarSaved = true;
             if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
             applyAccountToLocalStorage(userId);
+
+            pushPlayerCloudAsync(function(mod) {
+                return mod.syncPlayerFromLocalStorage(userId);
+            });
 
             var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
             if (comMode === 'create') {
