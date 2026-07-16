@@ -11,72 +11,63 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getDb, getFirebaseAuth, resetAnonymousAuthPromise } from '../lib/firebase.js';
-import { firebaseConfig } from '../lib/firebase.config.js';
 
 const PATRAC_IDS_COLLECTION = 'patrac_ids';
 const USERS_COLLECTION = 'users';
-/** Doména jen pro Firebase Auth — není to tvůj e-mail, nic se tam neposílá. */
-const AUTH_EMAIL_DOMAIN = 'patrac-auth.example.com';
 
 export function normalizePatracUserId(raw) {
     return String(raw || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/^\.+|\.+$/g, '');
 }
 
-function sanitizeEmailLocalPart(userId) {
-    userId = normalizePatracUserId(userId);
-    var safe = userId
-        .replace(/[^a-z0-9._-]/g, '_')
-        .replace(/^[._-]+|[._-]+$/g, '')
-        .replace(/_{2,}/g, '_');
-    if (!safe) safe = 'operativec';
-    return 'patrac.' + safe;
-}
-
+/** Technický e-mail pro Firebase — není tvoje schránka. */
 export function patracIdToLoginEmail(userId) {
-    return sanitizeEmailLocalPart(userId) + '@' + AUTH_EMAIL_DOMAIN;
-}
-
-/** Starší formáty — zpětná kompatibilita po migraci. */
-export function patracLegacyLoginEmails(userId) {
-    userId = normalizePatracUserId(userId);
-    var safe = userId.replace(/[^a-z0-9._-]/g, '_').replace(/^[._-]+|[._-]+$/g, '') || 'operativec';
-    var projectId = firebaseConfig.projectId || 'patrac-app';
-    return [
-        safe + '@patrac-auth.invalid',
-        'patrac.' + safe + '@' + projectId + '.firebaseapp.com',
-        safe + '@' + projectId + '.firebaseapp.com'
-    ];
+    var safe = normalizePatracUserId(userId).replace(/[^a-z0-9]/g, '');
+    if (!safe) safe = 'operativec';
+    return 'patrac_' + safe + '@example.com';
 }
 
 function getAuthInstance() {
     return getFirebaseAuth();
 }
 
-async function signInWithPatracEmail(userId, password) {
+async function signOutAnonymousIfNeeded() {
     var auth = getAuthInstance();
-    var emails = [patracIdToLoginEmail(userId)].concat(patracLegacyLoginEmails(userId));
-    var mapping = await fetchPatracIdMapping(userId);
-    if (mapping && mapping.loginEmail) {
-        emails.unshift(mapping.loginEmail);
+    if (auth.currentUser && auth.currentUser.isAnonymous) {
+        await signOut(auth);
+        resetAnonymousAuthPromise();
     }
-    var seen = {};
-    var lastErr = null;
-    for (var i = 0; i < emails.length; i++) {
-        var email = emails[i];
-        if (!email || seen[email]) continue;
-        seen[email] = true;
-        try {
-            return await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) {
-            lastErr = err;
-            if (err && err.code === 'auth/invalid-email') continue;
-            if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password')) {
-                continue;
-            }
-            throw err;
+}
+
+async function signInWithKnownEmail(loginEmail, password) {
+    var auth = getAuthInstance();
+    await signOutAnonymousIfNeeded();
+    return signInWithEmailAndPassword(auth, loginEmail, password);
+}
+
+async function createPatracAuthUser(userId, password) {
+    var auth = getAuthInstance();
+    await signOutAnonymousIfNeeded();
+    var loginEmail = patracIdToLoginEmail(userId);
+    try {
+        return await createUserWithEmailAndPassword(auth, loginEmail, password);
+    } catch (createErr) {
+        if (createErr && createErr.code === 'auth/email-already-in-use') {
+            return signInWithEmailAndPassword(auth, loginEmail, password);
         }
+        if (createErr && createErr.code === 'auth/weak-password') {
+            throw Object.assign(
+                new Error('Firebase vyžaduje heslo alespoň 6 znaků. Použij „Obnova hesla“ a nastav delší heslo.'),
+                { code: 'auth/weak-password' }
+            );
+        }
+        if (createErr && createErr.code === 'auth/invalid-email') {
+            throw Object.assign(
+                new Error('Chyba technického e-mailu pro Firebase. Kontaktuj správce.'),
+                { code: 'auth/invalid-email' }
+            );
+        }
+        throw createErr;
     }
-    throw lastErr || new Error('Přihlášení selhalo.');
 }
 
 export function getCurrentFirebaseUid() {
@@ -84,9 +75,6 @@ export function getCurrentFirebaseUid() {
     return user && !user.isAnonymous ? user.uid : '';
 }
 
-/**
- * Anonymní session pro veřejné čtení (ověření kódu komunity před registrací).
- */
 export async function ensureAnonymousAuth() {
     var auth = getAuthInstance();
     if (auth.currentUser) return auth.currentUser;
@@ -94,9 +82,6 @@ export async function ensureAnonymousAuth() {
     return cred.user;
 }
 
-/**
- * Vyžaduje přihlášeného pátrače (ne anonymního).
- */
 export async function ensurePatracAuth() {
     var auth = getAuthInstance();
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
@@ -106,7 +91,7 @@ export async function ensurePatracAuth() {
 }
 
 export async function savePatracIdMapping(userId, firebaseUid, loginEmail) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     firebaseUid = String(firebaseUid || '').trim();
     if (!userId || !firebaseUid) return;
 
@@ -125,7 +110,7 @@ export async function savePatracIdMapping(userId, firebaseUid, loginEmail) {
 }
 
 export async function fetchPatracIdMapping(userId) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     if (!userId) return null;
     await ensureAnonymousAuth();
     var snap = await getDoc(doc(getDb(), PATRAC_IDS_COLLECTION, userId));
@@ -133,88 +118,50 @@ export async function fetchPatracIdMapping(userId) {
     return snap.data();
 }
 
-export async function registerPatracAuth(userId, password) {
+async function fetchLegacyAccountFromCloud(userId) {
     userId = normalizePatracUserId(userId);
-    if (!userId || !password) {
-        throw new Error('Chybí ID nebo heslo.');
-    }
-
-    var auth = getAuthInstance();
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
-        await signOut(auth);
-        resetAnonymousAuthPromise();
-    }
-
-    var loginEmail = patracIdToLoginEmail(userId);
-    var cred = await createUserWithEmailAndPassword(auth, loginEmail, password);
-    await savePatracIdMapping(userId, cred.user.uid, loginEmail);
-    return cred.user;
-}
-
-export async function signInPatracAuth(userId, password) {
-    userId = normalizePatracUserId(userId);
-    if (!userId || !password) {
-        throw new Error('Chybí ID nebo heslo.');
-    }
-
-    var auth = getAuthInstance();
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
-        await signOut(auth);
-        resetAnonymousAuthPromise();
-    }
-
-    var loginEmail = patracIdToLoginEmail(userId);
-    try {
-        var cred = await signInWithPatracEmail(userId, password);
-        await savePatracIdMapping(userId, cred.user.uid, loginEmail);
-        return cred.user;
-    } catch (err) {
-        var code = err && err.code ? err.code : '';
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/invalid-email') {
-            return upgradeLegacyAccountToFirebaseAuth(userId, password);
-        }
-        throw err;
-    }
-}
-
-/**
- * Migrace starého účtu s heslem ve Firestore → Firebase Auth, heslo z cloudu smaže.
- */
-async function upgradeLegacyAccountToFirebaseAuth(userId, password) {
     await ensureAnonymousAuth();
-    var accSnap = await getDoc(doc(getDb(), 'accounts', userId));
-    if (!accSnap.exists()) {
-        throw Object.assign(new Error('Neznámé ID operativce.'), { code: 'auth/user-not-found' });
-    }
-    var acc = accSnap.data();
-    if (acc.firebaseUid) {
-        throw Object.assign(new Error('Špatné heslo.'), { code: 'auth/wrong-password' });
-    }
+    var snap = await getDoc(doc(getDb(), 'accounts', userId));
+    if (!snap.exists()) return null;
+    return snap.data();
+}
+
+function isLegacyAccount(acc) {
+    return !!(acc && !acc.firebaseUid);
+}
+
+function verifyLegacyPassword(acc, password) {
     if (acc.pass && acc.pass !== password) {
         throw Object.assign(new Error('Špatné heslo.'), { code: 'auth/wrong-password' });
     }
     if (!acc.pass && !password) {
-        throw Object.assign(new Error('Účet nemá heslo — zadej nové heslo v obnově.'), { code: 'auth/wrong-password' });
+        throw Object.assign(new Error('Účet nemá heslo — použij obnovu hesla.'), { code: 'auth/wrong-password' });
+    }
+}
+
+/**
+ * Migrace účtu z původní verze (heslo ve Firestore) → Firebase Auth.
+ */
+async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
+    userId = normalizePatracUserId(userId);
+    if (!acc) {
+        acc = await fetchLegacyAccountFromCloud(userId);
+    }
+    if (!acc) {
+        throw Object.assign(new Error('Neznámé ID operativce.'), { code: 'auth/user-not-found' });
+    }
+    if (acc.firebaseUid) {
+        var mapping = await fetchPatracIdMapping(userId);
+        var loginEmail = (mapping && mapping.loginEmail) || patracIdToLoginEmail(userId);
+        var cred = await signInWithKnownEmail(loginEmail, password);
+        await savePatracIdMapping(userId, cred.user.uid, loginEmail);
+        return cred.user;
     }
 
-    var auth = getAuthInstance();
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
-        await signOut(auth);
-        resetAnonymousAuthPromise();
-    }
+    verifyLegacyPassword(acc, password);
 
     var loginEmail = patracIdToLoginEmail(userId);
-    var cred;
-    try {
-        cred = await createUserWithEmailAndPassword(auth, loginEmail, password);
-    } catch (createErr) {
-        if (createErr.code === 'auth/email-already-in-use') {
-            cred = await signInWithEmailAndPassword(auth, loginEmail, password);
-        } else {
-            throw createErr;
-        }
-    }
-
+    var cred = await createPatracAuthUser(userId, password);
     await savePatracIdMapping(userId, cred.user.uid, loginEmail);
 
     var cleaned = Object.assign({}, acc, {
@@ -228,55 +175,80 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password) {
     return cred.user;
 }
 
+export async function registerPatracAuth(userId, password) {
+    userId = normalizePatracUserId(userId);
+    if (!userId || !password) {
+        throw new Error('Chybí ID nebo heslo.');
+    }
+
+    var cred = await createPatracAuthUser(userId, password);
+    await savePatracIdMapping(userId, cred.user.uid, patracIdToLoginEmail(userId));
+    return cred.user;
+}
+
+/**
+ * @param {string} userId
+ * @param {string} password
+ * @param {object|null} localLegacyAcc — účet z localStorage (původní verze)
+ */
+export async function signInPatracAuth(userId, password, localLegacyAcc) {
+    userId = normalizePatracUserId(userId);
+    if (!userId || !password) {
+        throw new Error('Chybí ID nebo heslo.');
+    }
+
+    var cloudAcc = null;
+    try {
+        cloudAcc = await fetchLegacyAccountFromCloud(userId);
+    } catch (e) {
+        console.warn('[auth] legacy account read', e);
+    }
+
+    var legacyAcc = cloudAcc || localLegacyAcc || null;
+
+    if (isLegacyAccount(legacyAcc)) {
+        return upgradeLegacyAccountToFirebaseAuth(userId, password, legacyAcc);
+    }
+
+    var mapping = await fetchPatracIdMapping(userId);
+    var loginEmail = (mapping && mapping.loginEmail) || patracIdToLoginEmail(userId);
+    try {
+        var cred = await signInWithKnownEmail(loginEmail, password);
+        await savePatracIdMapping(userId, cred.user.uid, loginEmail);
+        return cred.user;
+    } catch (err) {
+        if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password')) {
+            return upgradeLegacyAccountToFirebaseAuth(userId, password, legacyAcc);
+        }
+        throw err;
+    }
+}
+
 export async function recoverPatracPassword(userId, email, newPassword) {
-    userId = String(userId || '').trim().toLowerCase();
+    userId = normalizePatracUserId(userId);
     email = String(email || '').trim().toLowerCase();
     if (!userId || !email || !newPassword) {
         throw new Error('Vyplň ID, e-mail a nové heslo.');
     }
-    if (newPassword.length < 4) {
-        throw new Error('Heslo musí mít alespoň 4 znaky.');
+    if (newPassword.length < 6) {
+        throw new Error('Nové heslo musí mít alespoň 6 znaků (požadavek Firebase).');
     }
 
-    await ensureAnonymousAuth();
-    var accSnap = await getDoc(doc(getDb(), 'accounts', userId));
-    if (!accSnap.exists()) {
+    var acc = await fetchLegacyAccountFromCloud(userId);
+    if (!acc) {
         throw new Error('Neznámé ID operativce.');
     }
-    var acc = accSnap.data();
     if ((acc.email || '').toLowerCase() !== email) {
         throw new Error('E-mail neodpovídá tomuto ID.');
     }
 
-    var auth = getAuthInstance();
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
-        await signOut(auth);
-        resetAnonymousAuthPromise();
-    }
-
-    var loginEmail = patracIdToLoginEmail(userId);
-
-    if (!acc.firebaseUid) {
-        try {
-            await createUserWithEmailAndPassword(auth, loginEmail, newPassword);
-        } catch (createErr) {
-            if (createErr.code === 'auth/email-already-in-use') {
-                var cred = await signInWithEmailAndPassword(auth, loginEmail, acc.pass || newPassword);
-                if (!acc.pass || acc.pass !== newPassword) {
-                    await updatePassword(cred.user, newPassword);
-                }
-            } else {
-                throw createErr;
-            }
-        }
-        await savePatracIdMapping(userId, auth.currentUser.uid, loginEmail);
-    } else {
-        throw new Error('Účet už běží přes Firebase Auth. Přihlas se starým heslem a změň ho v profilu.');
-    }
+    await signOutAnonymousIfNeeded();
+    await createPatracAuthUser(userId, newPassword);
+    await savePatracIdMapping(userId, getAuthInstance().currentUser.uid, patracIdToLoginEmail(userId));
 
     var cleaned = Object.assign({}, acc, {
         email: email,
-        firebaseUid: auth.currentUser ? auth.currentUser.uid : acc.firebaseUid,
+        firebaseUid: getCurrentFirebaseUid(),
         userId: userId,
         updatedAt: Date.now()
     });

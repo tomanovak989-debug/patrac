@@ -7077,6 +7077,10 @@
                 showGateError('gate-recover-error', 'gate.errors.recoverShortPass');
                 return;
             }
+            if (pass.length < 6) {
+                showGateError('gate-recover-error', 'Nové heslo musí mít alespoň 6 znaků (požadavek Firebase).');
+                return;
+            }
             if (pass !== pass2) {
                 showGateError('gate-recover-error', 'gate.errors.recoverPassMismatch');
                 return;
@@ -7235,8 +7239,10 @@
             var loginBtn = document.querySelector('#gate-login button.gate-btn-primary');
             if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'PŘIPOJOVÁNÍ…'; }
 
+            var localAcc = getPatracAccounts()[userId] || null;
+
             import('./src/services/authService.js').then(function(authMod) {
-                return authMod.signInPatracAuth(userId, pass);
+                return authMod.signInPatracAuth(userId, pass, localAcc);
             }).then(function() {
                 return import('./src/services/accountService.js').then(function(accMod) {
                     return accMod.fetchAccountFromCloud(userId);
@@ -7257,6 +7263,8 @@
                 console.warn('[auth] login', err);
                 if ((err && err.code === 'auth/wrong-password') || (err && err.message && err.message.indexOf('Špatné heslo') !== -1)) {
                     showGateError('gate-login-error', 'gate.errors.loginBadPass');
+                } else if (err && err.code === 'auth/weak-password') {
+                    showGateError('gate-login-error', err.message);
                 } else if (err && err.code === 'auth/user-not-found') {
                     showGateError('gate-login-error', 'gate.errors.loginUnknownId');
                 } else {
