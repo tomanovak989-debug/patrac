@@ -9,7 +9,7 @@ import {
     orderBy,
     where
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
 import { getDb, getFirebaseStorage, ensureFirebaseAuth } from '../lib/firebase.js';
 
@@ -237,6 +237,49 @@ export async function uploadAvatar(userId, fileOrBlob) {
 export async function uploadAvatarFromDataUrl(userId, dataUrl) {
     var blob = await dataUrlToBlob(dataUrl);
     return uploadAvatar(userId, blob);
+}
+
+function storagePathFromDownloadUrl(fileUrl) {
+    if (!fileUrl || typeof fileUrl !== 'string') return null;
+    if (fileUrl.indexOf('data:') === 0) return null;
+    try {
+        var u = new URL(fileUrl);
+        if (u.hostname !== 'firebasestorage.googleapis.com') return null;
+        var match = u.pathname.match(/\/o\/(.+)$/);
+        if (!match || !match[1]) return null;
+        return decodeURIComponent(match[1]);
+    } catch (e) {
+        return null;
+    }
+}
+
+/**
+ * Smaže soubor ve Firebase Storage podle veřejné download URL (photos/ nebo avatars/).
+ * @param {string} fileUrl
+ * @returns {Promise<boolean>}
+ */
+export async function deleteStorageFileByUrl(fileUrl) {
+    var storagePath = storagePathFromDownloadUrl(fileUrl);
+    if (!storagePath) return false;
+
+    var allowed = storagePath.indexOf(PHOTOS_STORAGE_PATH + '/') === 0
+        || storagePath.indexOf(AVATARS_STORAGE_PATH + '/') === 0;
+    if (!allowed) {
+        console.warn('[dataService] deleteStorageFileByUrl: nepovolená cesta', storagePath);
+        return false;
+    }
+
+    try {
+        await ensureFirebaseAuth();
+        var storageRef = ref(getFirebaseStorage(), storagePath);
+        await deleteObject(storageRef);
+        return true;
+    } catch (err) {
+        if (err && err.code === 'storage/object-not-found') return false;
+        console.error('[dataService] deleteStorageFileByUrl:', err);
+        if (err instanceof Error) throw err;
+        throw new Error('Nepodařilo se smazat soubor ve Storage.');
+    }
 }
 
 /**

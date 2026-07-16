@@ -1181,6 +1181,7 @@
                 <button type="button" class="gate-btn-primary" onclick="patracLogin()" data-i18n="gate.login.submit">DEŠIFROVAT A VSTOUPIT</button>
                 <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-register')" data-i18n="gate.login.register">REGISTRACE NOVÉHO PÁTRAČE</button>
                 <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;" onclick="switchGatePage('gate-recover')" data-i18n="gate.login.recover">[ OBNOVA HESLA PŘES EMAIL ]</button>
+                <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:8px;color:var(--danger-orange);" onclick="hardResetData()">☠ RESET — SMAZAT DATA V PROHLÍŽEČI</button>
                 <a class="gate-link" href="predstaveni.html" data-i18n="gate.login.projectStatus">[STATUS: PŘEDSTAVENÍ PROJEKTU]</a>
             </div>
 
@@ -3417,10 +3418,15 @@
         }
 
         function hardResetData() {
-            if (confirm("Smazat veškerý postup klanu a začít znovu?")) {
-                localStorage.clear();
-                window.location.reload();
-            }
+            var msg = 'Smazat veškerá lokální data v tomto prohlížeči?\n\n'
+                + '• Smaže se postup, účty a inventář v tomto zařízení.\n'
+                + '• Data ve Firebase (cloud) zůstanou — starý účet lze znovu načíst přihlášením.\n'
+                + '• Pro úplně nový start zvol při registraci NOVÉ ID operativce.\n\n'
+                + 'Pokračovat?';
+            if (!confirm(msg)) return;
+            try { sessionStorage.setItem('patrac_after_local_reset', '1'); } catch (e) {}
+            localStorage.clear();
+            window.location.reload();
         }
 
         function ensureMapPanes() {
@@ -5677,9 +5683,15 @@
         function initCloudSyncAsync() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             var session = localStorage.getItem('patrac_session') || '';
+            var skipPlayerHydrate = false;
+            try {
+                skipPlayerHydrate = sessionStorage.getItem('patrac_fresh_register') === '1';
+                if (skipPlayerHydrate) sessionStorage.removeItem('patrac_fresh_register');
+            } catch (e) {}
+
             var chain = Promise.resolve();
 
-            if (session) {
+            if (session && !skipPlayerHydrate) {
                 chain = chain.then(function() {
                     return import('./src/services/playerService.js').then(function(mod) {
                         return mod.hydratePlayerFromCloud(session);
@@ -6540,6 +6552,26 @@
         }
 
         function continueRegisterAfterCommunityCheck(comName, comCode, comMode, userId, email, pass, playerName) {
+            var submitBtn = document.getElementById('btn-register-submit');
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'OVĚŘUJI ID…'; }
+
+            import('./src/services/accountService.js').then(function(mod) {
+                return mod.fetchAccountFromCloud(userId);
+            }).then(function(cloudAcc) {
+                if (cloudAcc) {
+                    showGateError('gate-register-error',
+                        'ID „' + userId + '“ už existuje v cloudu. Přihlas se, nebo zvol jiné ID operativce.');
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                    return;
+                }
+                finishRegisterAfterCloudCheck(comName, comCode, comMode, userId, email, pass, playerName);
+            }).catch(function(err) {
+                console.warn('[cloud] register id check', err);
+                finishRegisterAfterCloudCheck(comName, comCode, comMode, userId, email, pass, playerName);
+            });
+        }
+
+        function finishRegisterAfterCloudCheck(comName, comCode, comMode, userId, email, pass, playerName) {
             try {
             var accounts = getPatracAccounts();
             if (accounts[userId]) {
@@ -6584,9 +6616,7 @@
             if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
             applyAccountToLocalStorage(userId);
 
-            pushPlayerCloudAsync(function(mod) {
-                return mod.syncPlayerFromLocalStorage(userId);
-            });
+            try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
 
             var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
             if (comMode === 'create') {
@@ -6603,10 +6633,21 @@
             operatorEditDraft = null;
             operatorEditDirty = false;
             syncSessionUserToStorage();
-            alert(msg);
-            launchGame();
+
+            Promise.all([
+                import('./src/services/playerService.js').then(function(mod) {
+                    return mod.syncPlayerFromLocalStorage(userId);
+                })
+            ]).then(function() {
+                alert(msg);
+                launchGame();
+            }).catch(function(err) {
+                console.warn('[cloud] register sync', err);
+                alert(msg);
+                launchGame();
+            });
             } catch (err) {
-                console.error('continueRegisterAfterCommunityCheck', err);
+                console.error('finishRegisterAfterCloudCheck', err);
                 showGateError('gate-register-error', 'gate.errors.registerFailed', { msg: err.message || err });
                 var btn = document.getElementById('btn-register-submit');
                 if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
@@ -7306,6 +7347,15 @@
             loadCustomCraftedItems();
         }
 
+        function deleteItemCloudPhotoAsync(imgUrl) {
+            if (!imgUrl || typeof imgUrl !== 'string' || imgUrl.indexOf('data:') === 0) return;
+            import('./src/services/dataService.js').then(function(mod) {
+                return mod.deleteStorageFileByUrl(imgUrl);
+            }).catch(function(err) {
+                console.warn('[cloud] delete item photo', err);
+            });
+        }
+
         function destroyItem(index, isComm) {
             if (isComm) {
                 var resolved = resolveCommunityItemAtDisplayIndex(index);
@@ -7314,15 +7364,18 @@
                     return;
                 }
             }
-            if (confirm("Zničit věc klanu?")) {
+            var confirmMsg = isComm ? 'Zničit věc z inventáře komunity?' : 'Zničit věc z batohu?';
+            if (confirm(confirmMsg)) {
                 if (isComm) {
                     var resolved = resolveCommunityItemAtDisplayIndex(index);
                     if (!resolved) return;
+                    deleteItemCloudPhotoAsync(resolved.item.img);
                     var raw = getCommunityItemsRaw().slice();
                     raw.splice(resolved.rawIdx, 1);
                     saveCommunityItemsRaw(raw);
                 } else {
                     var list = getCurrentPersonalItems().slice();
+                    if (list[index]) deleteItemCloudPhotoAsync(list[index].img);
                     list.splice(index, 1);
                     saveCurrentPersonalItems(list);
                 }
@@ -7548,6 +7601,13 @@
             try { migratePatracAccountsStorage(); } catch (e) { console.warn('migratePatracAccountsStorage', e); }
             initGateOperatorTrigger();
             migrateLegacyPatracAccount();
+            try {
+                if (sessionStorage.getItem('patrac_after_local_reset') === '1') {
+                    sessionStorage.removeItem('patrac_after_local_reset');
+                    showGateError('gate-login-error',
+                        'Lokální data smazána. Pro nový start zaregistruj NOVÉ ID operativce. Starý účet ve Firebase zůstává — obnoví se přihlášením.');
+                }
+            } catch (e) {}
             var session = localStorage.getItem('patrac_session');
             if (session && getPatracAccounts()[session]) {
                 applyAccountToLocalStorage(session);
