@@ -24,19 +24,32 @@ function isValidAuthEmail(email) {
     return email.length > 3 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-/** Záložní technický e-mail (starší účty) — preferuj registrační e-mail. */
+/** Staré syntetické e-maily — Firebase je odmítá (invalid-email). */
+function isSyntheticLoginEmail(email) {
+    email = String(email || '').trim().toLowerCase();
+    if (!email) return true;
+    return email.endsWith('@example.com')
+        || email.endsWith('@patrac-auth.invalid')
+        || email.indexOf('@patrac-auth.') !== -1
+        || email.endsWith('.firebaseapp.com');
+}
+
+/** Záložní technický e-mail — jen nouzově, preferuj registrační e-mail. */
 export function patracIdToLoginEmail(userId) {
     var safe = normalizePatracUserId(userId).replace(/[^a-z0-9]/g, '');
     if (!safe) safe = 'operativec';
-    return 'patrac_' + safe + '@example.com';
+    return safe + '@users.noreply.github.com';
 }
 
 function resolveLoginEmail(userId, acc, mapping) {
-    if (mapping && mapping.loginEmail && isValidAuthEmail(mapping.loginEmail)) {
-        return String(mapping.loginEmail).trim().toLowerCase();
+    if (mapping && mapping.registrationEmail && isValidAuthEmail(mapping.registrationEmail)) {
+        return String(mapping.registrationEmail).trim().toLowerCase();
     }
     if (acc && acc.email && isValidAuthEmail(acc.email)) {
         return String(acc.email).trim().toLowerCase();
+    }
+    if (mapping && mapping.loginEmail && isValidAuthEmail(mapping.loginEmail) && !isSyntheticLoginEmail(mapping.loginEmail)) {
+        return String(mapping.loginEmail).trim().toLowerCase();
     }
     return patracIdToLoginEmail(userId);
 }
@@ -62,9 +75,10 @@ async function signInWithKnownEmail(loginEmail, password) {
 async function createPatracAuthUser(userId, password, preferredEmail) {
     var auth = getAuthInstance();
     await signOutAnonymousIfNeeded();
-    var loginEmail = isValidAuthEmail(preferredEmail)
-        ? String(preferredEmail).trim().toLowerCase()
-        : patracIdToLoginEmail(userId);
+    var loginEmail = String(preferredEmail || '').trim().toLowerCase();
+    if (!isValidAuthEmail(loginEmail) || isSyntheticLoginEmail(loginEmail)) {
+        throw new Error('Účet vyžaduje platný registrační e-mail — použij obnovu hesla.');
+    }
     try {
         return await createUserWithEmailAndPassword(auth, loginEmail, password);
     } catch (createErr) {
@@ -132,15 +146,22 @@ export async function ensurePatracAuth() {
     throw new Error('Nejsi přihlášen — obnov stránku a přihlas se znovu.');
 }
 
-export async function savePatracIdMapping(userId, firebaseUid, loginEmail) {
+export async function savePatracIdMapping(userId, firebaseUid, loginEmail, registrationEmail) {
     userId = normalizePatracUserId(userId);
     firebaseUid = String(firebaseUid || '').trim();
     if (!userId || !firebaseUid) return;
 
+    loginEmail = String(loginEmail || '').trim().toLowerCase();
+    registrationEmail = String(registrationEmail || loginEmail || '').trim().toLowerCase();
+    if (isSyntheticLoginEmail(registrationEmail) && isValidAuthEmail(loginEmail) && !isSyntheticLoginEmail(loginEmail)) {
+        registrationEmail = loginEmail;
+    }
+
     var batch = {
         userId: userId,
         firebaseUid: firebaseUid,
-        loginEmail: loginEmail || patracIdToLoginEmail(userId),
+        loginEmail: loginEmail || registrationEmail || patracIdToLoginEmail(userId),
+        registrationEmail: registrationEmail || '',
         updatedAt: Date.now()
     };
 
@@ -198,7 +219,7 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
 
     if (acc.firebaseUid) {
         var cred = await signInWithKnownEmail(loginEmail, password);
-        await savePatracIdMapping(userId, cred.user.uid, loginEmail);
+        await savePatracIdMapping(userId, cred.user.uid, loginEmail, acc.email);
         return cred.user;
     }
 
@@ -207,7 +228,7 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
     var cred = await createPatracAuthUser(userId, password, acc.email);
     loginEmail = resolveLoginEmail(userId, acc, null);
     if (cred.user.email) loginEmail = cred.user.email.toLowerCase();
-    await savePatracIdMapping(userId, cred.user.uid, loginEmail);
+    await savePatracIdMapping(userId, cred.user.uid, loginEmail, acc.email);
 
     var cleaned = Object.assign({}, acc, {
         firebaseUid: cred.user.uid,
@@ -234,7 +255,7 @@ export async function registerPatracAuth(userId, password, email) {
     }
 
     var cred = await createPatracAuthUser(userId, password, email);
-    await savePatracIdMapping(userId, cred.user.uid, email);
+    await savePatracIdMapping(userId, cred.user.uid, email, email);
     return cred.user;
 }
 
@@ -266,7 +287,7 @@ export async function signInPatracAuth(userId, password, localLegacyAcc) {
     var loginEmail = resolveLoginEmail(userId, legacyAcc, mapping);
     try {
         var cred = await signInWithKnownEmail(loginEmail, password);
-        await savePatracIdMapping(userId, cred.user.uid, loginEmail);
+        await savePatracIdMapping(userId, cred.user.uid, loginEmail, legacyAcc && legacyAcc.email ? legacyAcc.email : '');
         return cred.user;
     } catch (err) {
         if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password')) {
@@ -302,28 +323,27 @@ export async function recoverPatracPassword(userId, email, newPassword, localLeg
         acc = localLegacyAcc;
     }
     if (!acc) {
-        throw new Error('Neznámé ID operativce.');
+        var mappingForVerify = null;
+        try {
+            mappingForVerify = await fetchPatracIdMapping(userId);
+        } catch (mapErr) {
+            console.warn('[auth] recover mapping read', mapErr);
+        }
+        if (mappingForVerify && (mappingForVerify.registrationEmail || '').toLowerCase() === email) {
+            acc = { email: email, pass: localLegacyAcc && localLegacyAcc.pass ? localLegacyAcc.pass : '' };
+        }
+    }
+    if (!acc) {
+        throw new Error('Neznámé ID operativce — zkus se přihlásit na stejném zařízení, kde jsi se registroval.');
     }
     if ((acc.email || '').toLowerCase() !== email) {
         throw new Error('E-mail neodpovídá tomuto ID.');
     }
 
-    var mapping = await fetchPatracIdMapping(userId);
     var legacyPass = acc.pass || '';
-    var cred;
+    var cred = await createOrResetAuthUser(email, newPassword, legacyPass);
 
-    if (mapping && mapping.loginEmail && mapping.loginEmail.toLowerCase() !== email) {
-        try {
-            cred = await createOrResetAuthUser(mapping.loginEmail, newPassword, legacyPass);
-        } catch (oldErr) {
-            console.warn('[auth] recover legacy login email', oldErr);
-            cred = await createOrResetAuthUser(email, newPassword, legacyPass);
-        }
-    } else {
-        cred = await createOrResetAuthUser(email, newPassword, legacyPass);
-    }
-
-    await savePatracIdMapping(userId, cred.user.uid, email);
+    await savePatracIdMapping(userId, cred.user.uid, email, email);
 
     var cleaned = Object.assign({}, acc, {
         email: email,

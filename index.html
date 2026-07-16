@@ -1841,6 +1841,10 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
+        var PATRAC_BUILD = '20260717b';
+        function importAuthService() {
+            return import('./src/services/authService.js?v=' + PATRAC_BUILD);
+        }
         var base64Avatar = "", base64CraftImg = "", base64EditImg = "", base64PoiImg = "", base64PoiEditImg = "", base64StoryPosEditImg = "";
         var pendingCraftPhotoFile = null;
         var storyPosEditHadImg = false;
@@ -5507,7 +5511,7 @@
             syncSessionUserToStorage();
             syncCurrentAccountMissionStats();
             syncCurrentAccountWearLoadout();
-            import('./src/services/authService.js').then(function(mod) {
+            importAuthService().then(function(mod) {
                 return mod.signOutPatracAuth();
             }).catch(function(err) {
                 console.warn('[auth] logout', err);
@@ -7083,7 +7087,7 @@
             }
             var localAcc = getPatracAccounts()[userId] || null;
 
-            import('./src/services/authService.js').then(function(mod) {
+            importAuthService().then(function(mod) {
                 return mod.recoverPatracPassword(userId, email, pass, localAcc);
             }).then(function() {
                 var accounts = getPatracAccounts();
@@ -7239,7 +7243,7 @@
 
             var localAcc = getPatracAccounts()[userId] || null;
 
-            import('./src/services/authService.js').then(function(authMod) {
+            importAuthService().then(function(authMod) {
                 return authMod.signInPatracAuth(userId, pass, localAcc);
             }).then(function() {
                 return import('./src/services/accountService.js').then(function(accMod) {
@@ -7386,7 +7390,7 @@
             var submitBtn = document.getElementById('btn-register-submit');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'ZPRACOVÁVÁM…'; }
 
-            import('./src/services/authService.js').then(function(authMod) {
+            importAuthService().then(function(authMod) {
                 return authMod.registerPatracAuth(userId, pass, email);
             }).then(function() {
                 var playerCode = generatePatracCode();

@@ -39,6 +39,13 @@ service cloud.firestore {
         && resource.data.get('firebaseUid', '') == '';
     }
 
+    function canReadAccountForRecovery(userId) {
+      return isSignedIn()
+        && resource.data.email is string
+        && resource.data.email.size() > 3
+        && !('pass' in resource.data);
+    }
+
     match /users/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;
       allow create: if isSignedIn()
@@ -58,7 +65,7 @@ service cloud.firestore {
     }
 
     match /accounts/{userId} {
-      allow read: if isOwner(userId) || isLegacyAccountRead(userId);
+      allow read: if isOwner(userId) || isLegacyAccountRead(userId) || canReadAccountForRecovery(userId);
       allow create: if isSignedIn()
         && request.resource.data.firebaseUid == request.auth.uid
         && request.resource.data.userId == userId
