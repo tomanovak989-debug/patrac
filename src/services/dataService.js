@@ -239,6 +239,16 @@ export async function uploadAvatarFromDataUrl(userId, dataUrl) {
     return uploadAvatar(userId, blob);
 }
 
+/**
+ * Nahraje fotku místa z base64 data URL do Storage (photos/).
+ * @param {string} dataUrl
+ * @returns {Promise<string>}
+ */
+export async function uploadPhotoFromDataUrl(dataUrl) {
+    var blob = await dataUrlToBlob(dataUrl);
+    return uploadPhoto(blob);
+}
+
 function storagePathFromDownloadUrl(fileUrl) {
     if (!fileUrl || typeof fileUrl !== 'string') return null;
     if (fileUrl.indexOf('data:') === 0) return null;

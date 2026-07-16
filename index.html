@@ -3263,6 +3263,87 @@
             });
         }
 
+        function collectCommunityPoisForCloud() {
+            var session = localStorage.getItem('patrac_session') || '';
+            var playerName = localStorage.getItem('player_name') || 'Operativec';
+            var pois = [];
+            var free = getSafeJSON('map_free_pois');
+            for (var i = 0; i < free.length; i++) {
+                var p = free[i];
+                if (!p || !p.id) continue;
+                var img = p.img || '';
+                pois.push({
+                    id: p.id,
+                    type: 'free',
+                    name: p.name || '',
+                    note: p.note || p.desc || '',
+                    img: img,
+                    imgUrl: /^https?:\/\//.test(img) ? img : '',
+                    lat: p.lat,
+                    lng: p.lng,
+                    creatorUserId: p.creatorUserId || session,
+                    creatorName: p.creator || playerName,
+                    createdAt: p.createdAt || Date.now(),
+                    updatedAt: Date.now()
+                });
+            }
+            var storyIds = getStoryQuestIds();
+            for (var s = 0; s < storyIds.length; s++) {
+                var questId = storyIds[s];
+                var note = getStoryPosCommunityNote(questId);
+                var imgS = getStoryPosCommunityImg(questId);
+                if (!note && !imgS) continue;
+                var lat = parseFloat(localStorage.getItem('point_' + questId + '_lat'));
+                var lng = parseFloat(localStorage.getItem('point_' + questId + '_lng'));
+                pois.push({
+                    id: 'story_' + questId,
+                    type: 'story',
+                    questId: questId,
+                    name: getQuestMapLabel(questId),
+                    note: note,
+                    img: imgS,
+                    imgUrl: /^https?:\/\//.test(imgS) ? imgS : '',
+                    lat: isNaN(lat) ? null : lat,
+                    lng: isNaN(lng) ? null : lng,
+                    creatorUserId: session,
+                    creatorName: playerName,
+                    updatedAt: Date.now()
+                });
+            }
+            return pois;
+        }
+
+        function getPreviousPoiImgById() {
+            var map = {};
+            var free = getSafeJSON('map_free_pois');
+            for (var i = 0; i < free.length; i++) {
+                if (free[i].id && /^https?:\/\//.test(free[i].img || '')) {
+                    map[free[i].id] = free[i].img;
+                }
+            }
+            var storyIds = getStoryQuestIds();
+            for (var s = 0; s < storyIds.length; s++) {
+                var qid = storyIds[s];
+                var img = getStoryPosCommunityImg(qid);
+                if (/^https?:\/\//.test(img)) map['story_' + qid] = img;
+            }
+            return map;
+        }
+
+        function syncCommunityPoisToCloud() {
+            var comCode = localStorage.getItem('com_code') || operatorComCode || '';
+            if (!comCode) return;
+            var pois = collectCommunityPoisForCloud();
+            var previousImgById = getPreviousPoiImgById();
+            import('./src/services/poiService.js').then(function(mod) {
+                return mod.saveCommunityPoisToCloud(comCode, pois, previousImgById);
+            }).then(function() {
+                if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
+            }).catch(function(err) {
+                console.warn('[cloud] pois sync', err);
+            });
+        }
+
         function pushUserAvatarDataUrlToCloud(userId, dataUrl) {
             Promise.all([
                 import('./src/services/dataService.js'),
@@ -3940,6 +4021,7 @@
             renderStoryPositionsList();
             renderQuestList();
             document.getElementById('map-sensor-output').innerHTML = '📢 Popis komunity: ' + getQuestMapLabel(questId);
+            syncCommunityPoisToCloud();
         }
 
         function savePoiChanges() {
@@ -3956,6 +4038,7 @@
             renderPointOnMap(poiId, found.poi.lat, found.poi.lng, found.poi.name, found.poi.note || '');
             closePoiEditor();
             document.getElementById('map-sensor-output').innerHTML = '📝 Upraveno: ' + name;
+            syncCommunityPoisToCloud();
         }
 
         function resetStoryQuestPosition(questId) {
@@ -3987,6 +4070,7 @@
             rebuildCustomLocLinkSelect();
             renderStoryPositionsList();
             document.getElementById('map-sensor-output').innerHTML = '↺ Reset: ' + getQuestMapLabel(questId);
+            syncCommunityPoisToCloud();
         }
 
         function getAvailablePositionPoints() {
@@ -4513,6 +4597,7 @@
             closeAddPoiPanel();
             document.getElementById('map-sensor-output').innerHTML = '📍 Nový bod: ' + name;
             alert('Bod „' + name + '“ uložen. Poznámku a foto doplníš kdykoli v detailu bodu.');
+            syncCommunityPoisToCloud();
         }
 
         function openMeasurePanel() {
@@ -5790,6 +5875,16 @@
                         return mod.hydrateCommunityFromCloud(comCode);
                     });
                 });
+                chain = chain.then(function() {
+                    return import('./src/services/poiService.js').then(function(mod) {
+                        return mod.hydrateCommunityPoisFromCloud(comCode).then(function(result) {
+                            if (result.ok) return result;
+                            var localPois = collectCommunityPoisForCloud();
+                            if (!localPois.length) return result;
+                            return mod.saveCommunityPoisToCloud(comCode, localPois, getPreviousPoiImgById());
+                        });
+                    });
+                });
             }
 
             chain.then(function() {
@@ -5805,6 +5900,7 @@
                 if (comCode) {
                     try { reconcileCommunityInventory(comCode); } catch (e) { console.warn(e); }
                     try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
+                    try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
                     if (typeof window.patracPoctaReloadMap === 'function') {
                         window.patracPoctaReloadMap();
                     }
