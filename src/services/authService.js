@@ -11,21 +11,63 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { getDb, getFirebaseAuth, resetAnonymousAuthPromise } from '../lib/firebase.js';
+import { firebaseConfig } from '../lib/firebase.config.js';
 
-const PATRAC_EMAIL_SUFFIX = '@patrac-auth.invalid';
 const PATRAC_IDS_COLLECTION = 'patrac_ids';
 const USERS_COLLECTION = 'users';
 
-let authInitPromise = null;
+function authEmailDomain() {
+    var projectId = firebaseConfig.projectId || 'patrac-app';
+    return projectId + '.firebaseapp.com';
+}
+
+function sanitizeEmailLocalPart(userId) {
+    userId = String(userId || '').trim().toLowerCase();
+    var safe = userId
+        .replace(/[^a-z0-9._-]/g, '_')
+        .replace(/^[._-]+|[._-]+$/g, '')
+        .replace(/_{2,}/g, '_');
+    if (!safe) safe = 'operativec';
+    return 'patrac.' + safe;
+}
+
+export function patracIdToLoginEmail(userId) {
+    return sanitizeEmailLocalPart(userId) + '@' + authEmailDomain();
+}
+
+/** Starší formát — pro zpětnou kompatibilitu po migraci. */
+export function patracIdToLegacyLoginEmail(userId) {
+    userId = String(userId || '').trim().toLowerCase();
+    var safe = userId.replace(/[^a-z0-9._-]/g, '_').replace(/^[._-]+|[._-]+$/g, '');
+    if (!safe) safe = 'operativec';
+    return safe + '@patrac-auth.invalid';
+}
 
 function getAuthInstance() {
     return getFirebaseAuth();
 }
 
-export function patracIdToLoginEmail(userId) {
-    userId = String(userId || '').trim().toLowerCase();
-    var safe = userId.replace(/[^a-z0-9._-]/g, '_');
-    return safe + PATRAC_EMAIL_SUFFIX;
+async function signInWithPatracEmail(userId, password) {
+    var auth = getAuthInstance();
+    var emails = [patracIdToLoginEmail(userId), patracIdToLegacyLoginEmail(userId)];
+    var seen = {};
+    var lastErr = null;
+    for (var i = 0; i < emails.length; i++) {
+        var email = emails[i];
+        if (seen[email]) continue;
+        seen[email] = true;
+        try {
+            return await signInWithEmailAndPassword(auth, email, password);
+        } catch (err) {
+            lastErr = err;
+            if (err && err.code === 'auth/invalid-email') continue;
+            if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password')) {
+                continue;
+            }
+            throw err;
+        }
+    }
+    throw lastErr || new Error('Přihlášení selhalo.');
 }
 
 export function getCurrentFirebaseUid() {
@@ -114,7 +156,7 @@ export async function signInPatracAuth(userId, password) {
 
     var loginEmail = patracIdToLoginEmail(userId);
     try {
-        var cred = await signInWithEmailAndPassword(auth, loginEmail, password);
+        var cred = await signInWithPatracEmail(userId, password);
         await savePatracIdMapping(userId, cred.user.uid, loginEmail);
         return cred.user;
     } catch (err) {
