@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
-import { getDb, getFirebaseStorage } from '../lib/firebase.js';
+import { getDb, getFirebaseStorage, ensureFirebaseAuth } from '../lib/firebase.js';
 
 const ENTRIES_COLLECTION = 'entries';
 const POCTA_VISITS_COLLECTION = 'pocta_visits';
@@ -91,6 +91,7 @@ function normalizeTimestamp(value) {
  */
 export async function saveEntry(entryData) {
     try {
+        await ensureFirebaseAuth();
         if (!entryData || typeof entryData !== 'object') {
             throw new Error('Chybí data záznamu.');
         }
@@ -130,6 +131,8 @@ export async function saveEntry(entryData) {
  */
 export async function uploadPhoto(file) {
     try {
+        await ensureFirebaseAuth();
+
         if (!file || !(file instanceof Blob)) {
             throw new Error('Neplatný soubor pro nahrání.');
         }
@@ -175,6 +178,7 @@ export async function uploadPhoto(file) {
  */
 export async function getAllEntries() {
     try {
+        await ensureFirebaseAuth();
         var q = query(
             collection(getDb(), ENTRIES_COLLECTION),
             orderBy('timestamp', 'desc')
@@ -205,6 +209,7 @@ export async function getAllEntries() {
  */
 export async function savePoctaVisit(visitData) {
     try {
+        await ensureFirebaseAuth();
         if (!visitData || typeof visitData !== 'object') {
             throw new Error('Chybí data návštěvy.');
         }
@@ -255,6 +260,7 @@ export async function savePoctaVisit(visitData) {
  */
 export async function getPoctaVisits(poctaId) {
     try {
+        await ensureFirebaseAuth();
         if (!poctaId) {
             throw new Error('Chybí ID Pocty.');
         }

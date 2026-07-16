@@ -2,7 +2,7 @@
  * Komunity a společný inventář ve Firestore — první krok k více uživatelům.
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getDb } from '../lib/firebase.js';
+import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
 
 const COLLECTION = 'communities';
 
@@ -13,6 +13,7 @@ function normalizeComCode(comCode) {
 export async function saveCommunityToCloud(comCode, community) {
     comCode = normalizeComCode(comCode);
     if (!comCode || !community) return;
+    await ensureFirebaseAuth();
     var payload = {
         name: community.name || '',
         code: comCode,
@@ -27,6 +28,7 @@ export async function saveCommunityToCloud(comCode, community) {
 export async function saveCommunityInventory(comCode, items) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return;
+    await ensureFirebaseAuth();
     await setDoc(doc(getDb(), COLLECTION, comCode), {
         inventory: Array.isArray(items) ? items : [],
         inventoryUpdatedAt: Date.now(),
@@ -37,6 +39,7 @@ export async function saveCommunityInventory(comCode, items) {
 export async function fetchCommunityMeta(comCode) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return null;
+    await ensureFirebaseAuth();
     var snap = await getDoc(doc(getDb(), COLLECTION, comCode));
     if (!snap.exists()) return null;
     var data = snap.data();
@@ -56,6 +59,7 @@ export async function fetchCommunityMeta(comCode) {
 export async function hydrateCommunityFromCloud(comCode) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return { ok: false };
+    await ensureFirebaseAuth();
 
     var snap = await getDoc(doc(getDb(), COLLECTION, comCode));
     if (!snap.exists()) return { ok: false };
