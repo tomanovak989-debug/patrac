@@ -11,7 +11,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import imageCompression from 'browser-image-compression';
-import { db, storage } from '../lib/firebase.js';
+import { getDb, getFirebaseStorage } from '../lib/firebase.js';
 
 const ENTRIES_COLLECTION = 'entries';
 const POCTA_VISITS_COLLECTION = 'pocta_visits';
@@ -107,7 +107,7 @@ export async function saveEntry(entryData) {
             photoUrl: entryData.photoUrl ?? null
         };
 
-        var docRef = await addDoc(collection(db, ENTRIES_COLLECTION), payload);
+        var docRef = await addDoc(collection(getDb(), ENTRIES_COLLECTION), payload);
 
         return {
             id: docRef.id,
@@ -155,7 +155,7 @@ export async function uploadPhoto(file) {
             originalName += '.jpg';
         }
         var storagePath = PHOTOS_STORAGE_PATH + '/' + Date.now() + '_' + originalName;
-        var storageRef = ref(storage, storagePath);
+        var storageRef = ref(getFirebaseStorage(), storagePath);
 
         await uploadBytes(storageRef, compressed, {
             contentType: 'image/jpeg'
@@ -176,7 +176,7 @@ export async function uploadPhoto(file) {
 export async function getAllEntries() {
     try {
         var q = query(
-            collection(db, ENTRIES_COLLECTION),
+            collection(getDb(), ENTRIES_COLLECTION),
             orderBy('timestamp', 'desc')
         );
         var snapshot = await getDocs(q);
@@ -229,7 +229,7 @@ export async function savePoctaVisit(visitData) {
             userName: visitData.userName || 'Operativec'
         };
 
-        var docRef = await addDoc(collection(db, POCTA_VISITS_COLLECTION), payload);
+        var docRef = await addDoc(collection(getDb(), POCTA_VISITS_COLLECTION), payload);
 
         return {
             id: docRef.id,
@@ -260,7 +260,7 @@ export async function getPoctaVisits(poctaId) {
         }
 
         var q = query(
-            collection(db, POCTA_VISITS_COLLECTION),
+            collection(getDb(), POCTA_VISITS_COLLECTION),
             where('poctaId', '==', poctaId)
         );
         var snapshot = await getDocs(q);

@@ -2,7 +2,7 @@
  * Cloud registry Pocta a fázovaných úkolů — sdílení kódů mezi zařízeními.
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase.js';
+import { getDb } from '../lib/firebase.js';
 
 const COLLECTION = 'pocta_entities';
 
@@ -17,13 +17,13 @@ export async function savePoctaEntity(entity) {
         code: code,
         updatedAt: Date.now()
     });
-    await setDoc(doc(db, COLLECTION, code), payload, { merge: true });
+    await setDoc(doc(getDb(), COLLECTION, code), payload, { merge: true });
 }
 
 export async function fetchPoctaEntityByCode(code) {
     code = normalizeCode(code);
     if (!code) return null;
-    var snap = await getDoc(doc(db, COLLECTION, code));
+    var snap = await getDoc(doc(getDb(), COLLECTION, code));
     if (!snap.exists()) return null;
     return snap.data();
 }

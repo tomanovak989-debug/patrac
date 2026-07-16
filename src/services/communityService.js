@@ -2,7 +2,7 @@
  * Komunity a společný inventář ve Firestore — první krok k více uživatelům.
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase.js';
+import { getDb } from '../lib/firebase.js';
 
 const COLLECTION = 'communities';
 
@@ -21,13 +21,13 @@ export async function saveCommunityToCloud(comCode, community) {
         createdAt: community.createdAt || new Date().toISOString(),
         updatedAt: Date.now()
     };
-    await setDoc(doc(db, COLLECTION, comCode), payload, { merge: true });
+    await setDoc(doc(getDb(), COLLECTION, comCode), payload, { merge: true });
 }
 
 export async function saveCommunityInventory(comCode, items) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return;
-    await setDoc(doc(db, COLLECTION, comCode), {
+    await setDoc(doc(getDb(), COLLECTION, comCode), {
         inventory: Array.isArray(items) ? items : [],
         inventoryUpdatedAt: Date.now(),
         updatedAt: Date.now()
@@ -37,7 +37,7 @@ export async function saveCommunityInventory(comCode, items) {
 export async function fetchCommunityMeta(comCode) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return null;
-    var snap = await getDoc(doc(db, COLLECTION, comCode));
+    var snap = await getDoc(doc(getDb(), COLLECTION, comCode));
     if (!snap.exists()) return null;
     var data = snap.data();
     return {
@@ -57,7 +57,7 @@ export async function hydrateCommunityFromCloud(comCode) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return { ok: false };
 
-    var snap = await getDoc(doc(db, COLLECTION, comCode));
+    var snap = await getDoc(doc(getDb(), COLLECTION, comCode));
     if (!snap.exists()) return { ok: false };
 
     var data = snap.data();

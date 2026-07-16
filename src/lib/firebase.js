@@ -1,6 +1,6 @@
 /**
  * Firebase — Firestore + Storage (bez Analytics).
- * Konfigurace z .env.local → npm run env:firebase → firebase.config.js
+ * Služby se inicializují lazy, aby selhání jedné neblokovalo druhou.
  */
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
@@ -9,10 +9,21 @@ import { firebaseConfig } from './firebase.config.js';
 
 const app = initializeApp(firebaseConfig);
 
-/** Firestore databáze */
-export const db = getFirestore(app);
+let dbInstance = null;
+let storageInstance = null;
 
-/** Firebase Storage */
-export const storage = getStorage(app);
+export function getDb() {
+    if (!dbInstance) {
+        dbInstance = getFirestore(app);
+    }
+    return dbInstance;
+}
+
+export function getFirebaseStorage() {
+    if (!storageInstance) {
+        storageInstance = getStorage(app);
+    }
+    return storageInstance;
+}
 
 export { app };
