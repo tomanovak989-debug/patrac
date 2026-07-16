@@ -17,10 +17,10 @@ const ENTRIES_COLLECTION = 'entries';
 const POCTA_VISITS_COLLECTION = 'pocta_visits';
 const PHOTOS_STORAGE_PATH = 'photos';
 
-/** Ostrost pro mobil — delší hrana v px, JPEG kvalita, horní strop souboru (MB). */
-const PHOTO_MAX_EDGE_PX = 2560;
-const PHOTO_QUALITY = 0.92;
-const PHOTO_MAX_SIZE_MB = 8;
+/** Ostrost pro mobil — delší hrana v px, JPEG kvalita, cílový strop souboru (MB). */
+const PHOTO_MAX_EDGE_PX = 1920;
+const PHOTO_QUALITY = 0.88;
+const PHOTO_MAX_SIZE_MB = 0.5;
 const PHOTO_MAX_INPUT_MB = 25;
 const PHOTO_MIN_EDGE_PX = 640;
 
@@ -51,7 +51,7 @@ async function ensurePhotoMinDimensions(original, compressed) {
 
         var retry = await imageCompression(original, {
             maxWidthOrHeight: PHOTO_MAX_EDGE_PX,
-            initialQuality: 0.95,
+            initialQuality: 0.9,
             maxSizeMB: PHOTO_MAX_SIZE_MB,
             alwaysKeepResolution: true,
             useWebWorker: false,
