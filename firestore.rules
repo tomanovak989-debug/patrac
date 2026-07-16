@@ -1,0 +1,113 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function patracUserId() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.patracUserId
+        : '';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && patracUserId() == userId;
+    }
+
+    function communityData(comCode) {
+      return get(/databases/$(database)/documents/communities/$(comCode)).data;
+    }
+
+    function isCommunityMember(comCode) {
+      return isSignedIn()
+        && patracUserId() != ''
+        && patracUserId() in communityData(comCode).members;
+    }
+
+    function isCommunityFounder(comCode) {
+      return isSignedIn()
+        && patracUserId() != ''
+        && communityData(comCode).founder == patracUserId();
+    }
+
+    function isLegacyAccountRead(userId) {
+      return isSignedIn()
+        && resource.data.get('firebaseUid', '') == '';
+    }
+
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && request.resource.data.patracUserId is string
+        && request.resource.data.patracUserId.size() > 0;
+      allow update: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /patrac_ids/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.firebaseUid == request.auth.uid
+        && request.resource.data.userId == userId;
+      allow update: if isSignedIn()
+        && resource.data.firebaseUid == request.auth.uid;
+    }
+
+    match /accounts/{userId} {
+      allow read: if isOwner(userId) || isLegacyAccountRead(userId);
+      allow create: if isSignedIn()
+        && request.resource.data.firebaseUid == request.auth.uid
+        && request.resource.data.userId == userId
+        && !('pass' in request.resource.data);
+      allow update: if isOwner(userId)
+        && !('pass' in request.resource.data);
+    }
+
+    match /players/{userId} {
+      allow read: if isSignedIn() && (
+        isOwner(userId)
+        || (patracUserId() != ''
+          && resource.data.comCode is string
+          && isCommunityMember(resource.data.comCode))
+      );
+      allow create: if isSignedIn()
+        && request.resource.data.firebaseUid == request.auth.uid
+        && request.resource.data.userId == userId;
+      allow update: if isOwner(userId);
+    }
+
+    match /communities/{comCode} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.founder == patracUserId()
+        && patracUserId() in request.resource.data.members;
+      allow update: if isCommunityMember(comCode)
+        || (isSignedIn()
+          && patracUserId() != ''
+          && patracUserId() in request.resource.data.members
+          && !(patracUserId() in resource.data.members));
+      allow delete: if isCommunityFounder(comCode);
+    }
+
+    match /pocta_entities/{code} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && patracUserId() != '';
+    }
+
+    match /pocta_visits/{visitId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && patracUserId() != '';
+      allow update, delete: if false;
+    }
+
+    match /entries/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && patracUserId() != '';
+      allow update, delete: if false;
+    }
+  }
+}

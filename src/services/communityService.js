@@ -3,6 +3,7 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth } from './authService.js';
 
 const COLLECTION = 'communities';
 
@@ -36,7 +37,7 @@ function membersChanged(before, after) {
 export async function saveCommunityToCloud(comCode, community) {
     comCode = normalizeComCode(comCode);
     if (!comCode || !community) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var payload = {
         name: community.name || '',
         code: comCode,
@@ -51,7 +52,7 @@ export async function saveCommunityToCloud(comCode, community) {
 export async function saveCommunityInventory(comCode, items) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     await setDoc(doc(getDb(), COLLECTION, comCode), {
         inventory: Array.isArray(items) ? items : [],
         inventoryUpdatedAt: Date.now(),

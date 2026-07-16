@@ -3,6 +3,7 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth } from './authService.js';
 
 const COLLECTION = 'pocta_entities';
 
@@ -12,7 +13,7 @@ function normalizeCode(code) {
 
 export async function savePoctaEntity(entity) {
     if (!entity || !entity.code) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var code = normalizeCode(entity.code);
     var payload = Object.assign({}, entity, {
         code: code,

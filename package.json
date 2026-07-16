@@ -3,7 +3,8 @@
   "private": true,
   "description": "PÁTRAČ — síť znovuobjevení",
   "scripts": {
-    "env:firebase": "node scripts/generate-firebase-config.mjs"
+    "env:firebase": "node scripts/generate-firebase-config.mjs",
+    "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage"
   },
   "dependencies": {
     "browser-image-compression": "^2.0.2",

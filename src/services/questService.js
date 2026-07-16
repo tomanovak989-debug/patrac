@@ -4,6 +4,7 @@
  */
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth } from './authService.js';
 
 const COLLECTION = 'communities';
 const STORY_QUEST_IDS = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
@@ -312,7 +313,7 @@ export function applyCommunityQuestsToLocalStorage(quests) {
 export async function saveCommunityQuestsToCloud(comCode, quests) {
     comCode = normalizeComCode(comCode);
     if (!comCode || !quests) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var payload = normalizeCommunityQuests(Object.assign({}, quests, { updatedAt: Date.now() }));
     await setDoc(doc(getDb(), COLLECTION, comCode), {
         quests: payload,

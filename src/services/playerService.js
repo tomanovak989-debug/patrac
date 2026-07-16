@@ -3,6 +3,7 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth, getCurrentFirebaseUid } from './authService.js';
 
 const COLLECTION = 'players';
 
@@ -13,11 +14,20 @@ function normalizeUserId(userId) {
 export async function savePlayerToCloud(userId, payload) {
     userId = normalizeUserId(userId);
     if (!userId || !payload) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var data = Object.assign({}, payload, {
         userId: userId,
+        firebaseUid: getCurrentFirebaseUid(),
         updatedAt: Date.now()
     });
+    if (!data.comCode) {
+        try {
+            var accounts = JSON.parse(localStorage.getItem('patrac_accounts') || '{}');
+            if (accounts[userId] && accounts[userId].comCode) {
+                data.comCode = accounts[userId].comCode;
+            }
+        } catch (e) {}
+    }
     await setDoc(doc(getDb(), COLLECTION, userId), data, { merge: true });
 }
 
@@ -38,6 +48,7 @@ export async function hydratePlayerFromCloud(userId) {
     userId = normalizeUserId(userId);
     if (!userId) return { ok: false };
 
+    await ensurePatracAuth();
     var data = await fetchPlayerFromCloud(userId);
     if (!data) return { ok: false };
 

@@ -4,6 +4,7 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth } from './authService.js';
 import { uploadPhotoFromDataUrl, deleteStorageFileByUrl } from './dataService.js';
 
 const COLLECTION = 'communities';
@@ -175,7 +176,7 @@ export async function preparePoisForCloud(pois, previousImgById) {
 export async function saveCommunityPoisToCloud(comCode, pois, previousImgById) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
 
     var existing = await fetchCommunityPoisFromCloud(comCode);
     var prepared = await preparePoisForCloud(pois, previousImgById);

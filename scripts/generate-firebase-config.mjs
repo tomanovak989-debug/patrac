@@ -17,7 +17,8 @@ const KEYS = [
     ['NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', 'storageBucket'],
     ['NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID', 'messagingSenderId'],
     ['NEXT_PUBLIC_FIREBASE_APP_ID', 'appId'],
-    ['NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID', 'measurementId']
+    ['NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID', 'measurementId'],
+    ['NEXT_PUBLIC_FIREBASE_APP_CHECK_RECAPTCHA_SITE_KEY', 'appCheckRecaptchaSiteKey']
 ];
 
 if (!existsSync(envPath)) {
@@ -43,6 +44,9 @@ const config = {};
 for (const [envKey, configKey] of KEYS) {
     const val = env[envKey];
     if (!val) {
+        if (configKey === 'appCheckRecaptchaSiteKey' || configKey === 'measurementId') {
+            continue;
+        }
         console.error('V .env.local chybí:', envKey);
         process.exit(1);
     }

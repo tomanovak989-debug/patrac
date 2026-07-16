@@ -1224,6 +1224,10 @@
                 <div id="gate-recover-error" class="gate-error"></div>
                 <p style="font-size:var(--text-sm);color:var(--gate-text-dim);margin:0 0 14px 0;line-height:1.5;" data-i18n="gate.recover.hint">Email slouží pouze k obnově přístupu. Nové heslo se uloží k tvému účtu.</p>
                 <div class="gate-form-group">
+                    <label for="input-recover-id">Uživatelské ID operativce</label>
+                    <input type="text" id="input-recover-id" placeholder="identifikátor pátrače" autocomplete="username">
+                </div>
+                <div class="gate-form-group">
                     <label for="input-recover-email" data-i18n="gate.recover.emailLabel">Registrační email</label>
                     <input type="email" id="input-recover-email" data-i18n-placeholder="gate.recover.emailPlaceholder" placeholder="stejný jako při registraci" autocomplete="email">
                 </div>
@@ -1828,6 +1832,7 @@
             "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js",
             "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js",
             "firebase/storage": "https://www.gstatic.com/firebasejs/11.6.0/firebase-storage.js",
+            "firebase/app-check": "https://www.gstatic.com/firebasejs/11.6.0/firebase-app-check.js",
             "browser-image-compression": "https://esm.sh/browser-image-compression@2.0.2"
         }
     }
@@ -5502,6 +5507,11 @@
             syncSessionUserToStorage();
             syncCurrentAccountMissionStats();
             syncCurrentAccountWearLoadout();
+            import('./src/services/authService.js').then(function(mod) {
+                return mod.signOutPatracAuth();
+            }).catch(function(err) {
+                console.warn('[auth] logout', err);
+            });
             try { localStorage.removeItem('patrac_session'); } catch (e) {}
             localStorage.setItem('items_personal', '[]');
 
@@ -7051,9 +7061,14 @@
 
         function patracRecoverPassword() {
             hideGateError('gate-recover-error');
+            var userId = normalizePatracId(document.getElementById('input-recover-id').value);
             var email = normalizeEmail(document.getElementById('input-recover-email').value);
             var pass = document.getElementById('input-recover-pass').value;
             var pass2 = document.getElementById('input-recover-pass2').value;
+            if (!userId) {
+                showGateError('gate-recover-error', 'Zadej uživatelské ID operativce.');
+                return;
+            }
             if (!isValidEmail(email)) {
                 showGateError('gate-recover-error', 'gate.errors.recoverBadEmail');
                 return;
@@ -7066,16 +7081,21 @@
                 showGateError('gate-recover-error', 'gate.errors.recoverPassMismatch');
                 return;
             }
-            var found = findAccountByEmail(email);
-            if (!found) {
-                showGateError('gate-recover-error', 'gate.errors.recoverUnknownEmail');
-                return;
-            }
-            var accounts = getPatracAccounts();
-            accounts[found.userId].pass = pass;
-            savePatracAccounts(accounts);
-            alert('Heslo obnoveno. Přihlas se svým uživatelským ID: ' + found.userId);
-            switchGatePage('gate-login');
+            import('./src/services/authService.js').then(function(mod) {
+                return mod.recoverPatracPassword(userId, email, pass);
+            }).then(function() {
+                var accounts = getPatracAccounts();
+                if (accounts[userId]) {
+                    accounts[userId].pass = pass;
+                    accounts[userId].email = email;
+                    savePatracAccounts(accounts);
+                }
+                alert('Heslo obnoveno. Přihlas se svým uživatelským ID: ' + userId);
+                switchGatePage('gate-login');
+            }).catch(function(err) {
+                console.warn('[auth] recover', err);
+                showGateError('gate-recover-error', err.message || 'Obnova hesla selhala.');
+            });
         }
 
         function gateErr(key, opts) {
@@ -7212,45 +7232,36 @@
                 launchGame();
             }
 
-            var accounts = getPatracAccounts();
-            var acc = accounts[userId];
-            if (acc) {
-                if (acc.pass && acc.pass !== pass) {
-                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
-                    return;
-                }
-                if (!acc.pass && pass) {
-                    showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
-                    return;
-                }
-                finishLogin();
-                return;
-            }
-
             var loginBtn = document.querySelector('#gate-login button.gate-btn-primary');
             if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'PŘIPOJOVÁNÍ…'; }
 
-            import('./src/services/accountService.js').then(function(mod) {
-                return mod.fetchAccountFromCloud(userId);
+            import('./src/services/authService.js').then(function(authMod) {
+                return authMod.signInPatracAuth(userId, pass);
+            }).then(function() {
+                return import('./src/services/accountService.js').then(function(accMod) {
+                    return accMod.fetchAccountFromCloud(userId);
+                });
             }).then(function(cloudAcc) {
-                if (!cloudAcc) {
+                var accounts = getPatracAccounts();
+                if (cloudAcc) {
+                    accounts[userId] = slimPatracAccount(Object.assign({}, cloudAcc, { pass: pass }));
+                } else if (!accounts[userId]) {
                     showGateError('gate-login-error', 'gate.errors.loginUnknownId');
                     return;
                 }
-                if (cloudAcc.pass && cloudAcc.pass !== pass) {
-                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
-                    return;
+                if (accounts[userId]) {
+                    savePatracAccounts(accounts);
                 }
-                if (!cloudAcc.pass && pass) {
-                    showGateError('gate-login-error', 'gate.errors.loginNoPassNeeded');
-                    return;
-                }
-                accounts[userId] = slimPatracAccount(cloudAcc);
-                savePatracAccounts(accounts);
                 finishLogin();
             }).catch(function(err) {
-                console.warn('[cloud] login fetch', err);
-                showGateError('gate-login-error', 'gate.errors.loginUnknownId');
+                console.warn('[auth] login', err);
+                if ((err && err.code === 'auth/wrong-password') || (err && err.message && err.message.indexOf('Špatné heslo') !== -1)) {
+                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
+                } else if (err && err.code === 'auth/user-not-found') {
+                    showGateError('gate-login-error', 'gate.errors.loginUnknownId');
+                } else {
+                    showGateError('gate-login-error', err.message || 'gate.errors.loginUnknownId');
+                }
             }).finally(function() {
                 if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'DEŠIFROVAT A VSTOUPIT'; }
             });
@@ -7369,62 +7380,68 @@
             var submitBtn = document.getElementById('btn-register-submit');
             if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'ZPRACOVÁVÁM…'; }
 
-            var playerCode = generatePatracCode();
-            if (comMode === 'create') {
-                comCode = registerPatracCommunity(comName, userId);
-            } else {
-                addMemberToCommunity(comCode, userId);
-            }
+            import('./src/services/authService.js').then(function(authMod) {
+                return authMod.registerPatracAuth(userId, pass);
+            }).then(function() {
+                var playerCode = generatePatracCode();
+                if (comMode === 'create') {
+                    comCode = registerPatracCommunity(comName, userId);
+                } else {
+                    addMemberToCommunity(comCode, userId);
+                }
 
-            var profile = getPlayerProfile();
-            profile.currentClan = comName;
-            savePlayerProfile(profile);
+                var profile = getPlayerProfile();
+                profile.currentClan = comName;
+                savePlayerProfile(profile);
 
-            var descText = document.getElementById('input-desc').value.trim();
-            accounts[userId] = slimPatracAccount({
-                pass: pass,
-                email: email,
-                comName: comName,
-                comCode: comCode,
-                playerName: playerName,
-                playerCode: playerCode
-            });
-            savePatracAccounts(accounts);
-            saveUserDesc(userId, descText);
-            var avatarSaved = true;
-            if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
-            applyAccountToLocalStorage(userId);
-            setUserPersonalItemsLocal(userId, []);
-            saveUserProfileData(userId, createDefaultUserProfileData(userId));
+                var descText = document.getElementById('input-desc').value.trim();
+                accounts[userId] = slimPatracAccount({
+                    pass: pass,
+                    email: email,
+                    comName: comName,
+                    comCode: comCode,
+                    playerName: playerName,
+                    playerCode: playerCode
+                });
+                savePatracAccounts(accounts);
+                saveUserDesc(userId, descText);
+                var avatarSaved = true;
+                if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
+                applyAccountToLocalStorage(userId);
+                setUserPersonalItemsLocal(userId, []);
+                saveUserProfileData(userId, createDefaultUserProfileData(userId));
 
-            try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
+                try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
 
-            var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
-            if (comMode === 'create') {
-                msg += '\nKód komunity: ' + comCode + '\n(Sdílej ho s dalšími pátrači pro připojení.)';
-            } else {
-                msg += '\nPřipojeno ke komunitě: ' + comName + ' [' + comCode + ']';
-            }
-            if (base64Avatar && !avatarSaved) {
-                msg += '\n\n(Poznámka: avatar se nevešel do úložiště — účet funguje bez fotky.)';
-            }
-            isOperatorMode = false;
-            operatorComCode = '';
-            currentlyEditingPlayerId = null;
-            operatorEditDraft = null;
-            operatorEditDirty = false;
+                var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
+                if (comMode === 'create') {
+                    msg += '\nKód komunity: ' + comCode + '\n(Sdílej ho s dalšími pátrači pro připojení.)';
+                } else {
+                    msg += '\nPřipojeno ke komunitě: ' + comName + ' [' + comCode + ']';
+                }
+                if (base64Avatar && !avatarSaved) {
+                    msg += '\n\n(Poznámka: avatar se nevešel do úložiště — účet funguje bez fotky.)';
+                }
+                isOperatorMode = false;
+                operatorComCode = '';
+                currentlyEditingPlayerId = null;
+                operatorEditDraft = null;
+                operatorEditDirty = false;
 
-            Promise.all([
-                import('./src/services/playerService.js').then(function(mod) {
+                return import('./src/services/playerService.js').then(function(mod) {
                     return mod.syncPlayerFromLocalStorage(userId);
-                })
-            ]).then(function() {
-                alert(msg);
-                launchGame();
+                }).then(function() {
+                    alert(msg);
+                    launchGame();
+                });
             }).catch(function(err) {
-                console.warn('[cloud] register sync', err);
-                alert(msg);
-                launchGame();
+                console.warn('[auth] register', err);
+                var errMsg = err.message || 'Registrace selhala.';
+                if (err.code === 'auth/email-already-in-use') {
+                    errMsg = 'ID „' + userId + '“ už existuje. Přihlas se, nebo zvol jiné ID.';
+                }
+                showGateError('gate-register-error', errMsg);
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
             });
             } catch (err) {
                 console.error('finishRegisterAfterCloudCheck', err);
