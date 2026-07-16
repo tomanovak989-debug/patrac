@@ -619,6 +619,20 @@
             box-shadow: 0 0 8px var(--active-row-glow);
         }
         .community-member-row.is-founder .community-member-row-profile .avatar-box { border-color: var(--accent-gold); }
+        .community-member-row-text {
+            min-width: 0; flex: 1;
+        }
+        .community-member-row-desc {
+            font-size: var(--text-xs);
+            color: var(--subtle-fg);
+            line-height: 1.35;
+            margin-top: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+        }
         .community-member-row-wear {
             display: flex; flex-wrap: nowrap; gap: 6px;
             overflow-x: auto; flex: 1; min-width: 0; align-items: center;
@@ -2928,8 +2942,23 @@
             });
         }
 
+        function escapeHtmlText(str) {
+            return String(str || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
         function getMemberWearLoadout(userId) {
             if (!userId) return [];
+            try {
+                var wearRaw = localStorage.getItem(getPatracWearKey(userId));
+                if (wearRaw) {
+                    var cached = JSON.parse(wearRaw);
+                    if (Array.isArray(cached) && cached.length) return cached;
+                }
+            } catch (e) {}
             var personal = (userId === getActiveInventoryUserId())
                 ? getCurrentPersonalItems()
                 : getUserPersonalItems(userId);
@@ -3036,13 +3065,22 @@
                 var rowCls = 'community-member-row';
                 if (mem.userId === activeUserId) rowCls += ' is-active is-self';
                 if (mem.userId === founderId) rowCls += ' is-founder';
-                var label = (mem.account.playerName || mem.userId).split(' ')[0];
+                var displayName = mem.account.playerName
+                    || localStorage.getItem('patrac_member_name_' + mem.userId)
+                    || mem.userId;
+                var label = displayName.split(' ')[0];
+                var desc = localStorage.getItem(getPatracDescKey(mem.userId)) || '';
                 var wear = getMemberWearLoadout(mem.userId);
                 var rowId = mem.userId === activeUserId ? ' id="community-member-active"' : '';
-                html += '<div class="' + rowCls + '"' + rowId + ' data-user-id="' + mem.userId + '" title="' + (mem.account.playerName || '') + '">';
+                html += '<div class="' + rowCls + '"' + rowId + ' data-user-id="' + mem.userId + '" title="' + escapeHtmlText(mem.account.playerName || '') + (desc ? '\n' + desc : '') + '">';
                 html += '<div class="community-member-row-profile">';
                 html += '<div class="avatar-box">' + avHtml + '</div>';
-                html += '<span class="community-member-row-name">' + label + '</span>';
+                html += '<div class="community-member-row-text">';
+                html += '<span class="community-member-row-name">' + escapeHtmlText(label) + '</span>';
+                if (desc) {
+                    html += '<div class="community-member-row-desc">' + escapeHtmlText(desc) + '</div>';
+                }
+                html += '</div>';
                 html += '</div>';
                 html += '<div class="community-member-row-wear">';
                 html += buildWearRowHtml(wear, '');
@@ -3052,6 +3090,53 @@
         }
 
         function refreshCommunityMembersPanel(scrollToActive) {
+            refreshCommunityMembersFromCloud(scrollToActive);
+        }
+
+        function refreshCommunityMembersFromCloud(scrollToActive) {
+            var membersEl = document.getElementById('community-members-list');
+            if (!membersEl) return;
+            var comCode = localStorage.getItem('com_code') || operatorComCode || '';
+            if (!comCode) return;
+            var stats = getCommunityAggregateStats(comCode);
+            if (stats.members.length === 0) {
+                membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Zatím žádní pátrači</span>';
+                membersEl.classList.remove('is-scrollable');
+                return;
+            }
+
+            var userIds = stats.members.map(function(m) { return m.userId; });
+            membersEl.innerHTML = '<span style="font-size:var(--text-sm);color:var(--faint-fg);">Načítám profily z cloudu…</span>';
+
+            import('./src/services/playerService.js').then(function(mod) {
+                return mod.fetchPlayersPublicProfiles(userIds).then(function(profiles) {
+                    for (var uid in profiles) {
+                        if (!profiles.hasOwnProperty(uid)) continue;
+                        mod.cacheMemberProfileLocally(uid, profiles[uid]);
+                        if (profiles[uid].playerName) {
+                            localStorage.setItem('patrac_member_name_' + uid, profiles[uid].playerName);
+                        }
+                    }
+                    return import('./src/services/accountService.js').then(function(accMod) {
+                        return Promise.all(userIds.map(function(uid) {
+                            if (localStorage.getItem('patrac_member_name_' + uid)) return null;
+                            return accMod.fetchAccountFromCloud(uid).then(function(acc) {
+                                if (acc && acc.playerName) {
+                                    localStorage.setItem('patrac_member_name_' + uid, acc.playerName);
+                                }
+                            }).catch(function() {});
+                        }));
+                    }).then(function() {
+                        renderCommunityMembersListDom(scrollToActive);
+                    });
+                });
+            }).catch(function(err) {
+                console.warn('[cloud] member profiles', err);
+                renderCommunityMembersListDom(scrollToActive);
+            });
+        }
+
+        function renderCommunityMembersListDom(scrollToActive) {
             var membersEl = document.getElementById('community-members-list');
             if (!membersEl) return;
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
@@ -5926,9 +6011,34 @@
         function getCommunityMemberAccounts(comCode) {
             if (!comCode) return [];
             var accounts = getPatracAccounts();
+            var comm = findCommunityByCode(comCode);
             var list = [];
+            var seen = {};
+
+            if (comm && Array.isArray(comm.members)) {
+                for (var m = 0; m < comm.members.length; m++) {
+                    var memberId = comm.members[m];
+                    if (!memberId || seen[memberId]) continue;
+                    seen[memberId] = true;
+                    var acc = accounts[memberId];
+                    if (!acc) {
+                        acc = {
+                            pass: '',
+                            email: '',
+                            comName: comm.name || '',
+                            comCode: comCode,
+                            playerName: localStorage.getItem('patrac_member_name_' + memberId) || memberId,
+                            playerCode: '',
+                            localMissions: 0
+                        };
+                    }
+                    list.push({ userId: memberId, account: acc });
+                }
+            }
+
             for (var id in accounts) {
-                if (accounts.hasOwnProperty(id) && accounts[id].comCode === comCode) {
+                if (!accounts.hasOwnProperty(id)) continue;
+                if (accounts[id].comCode === comCode && !seen[id]) {
                     list.push({ userId: id, account: accounts[id] });
                 }
             }
@@ -6219,9 +6329,13 @@
             }
 
             localStorage.setItem('player_name', newName);
+            localStorage.setItem('patrac_member_name_' + session, newName);
             saveUserDesc(session, newDesc);
             if (newDesc) localStorage.setItem('player_desc', newDesc);
             else localStorage.removeItem('player_desc');
+            pushPlayerCloudAsync(function(mod) {
+                return mod.savePlayerToCloud(session, { playerName: newName, desc: newDesc });
+            });
             if (base64ProfileEditAvatar) {
                 if (!saveUserAvatar(session, base64ProfileEditAvatar)) {
                     alert('Avatar se nepodařilo uložit — localStorage je plné nebo je fotka příliš velká.');
