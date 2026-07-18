@@ -2669,7 +2669,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bg';
+        var PATRAC_BUILD = '20260719bh';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5366,6 +5366,7 @@
         window.patracToggleCompass = function() {
             var next = localStorage.getItem('patrac_compass_visible') === 'false';
             localStorage.setItem('patrac_compass_visible', next ? 'true' : 'false');
+            if (next) setCompassWidgetExpanded(true);
             updateMapCompassDisplay();
         };
 
@@ -6577,9 +6578,10 @@
             if (!compass) return;
             var userWants = localStorage.getItem('patrac_compass_visible') !== 'false';
             var show = userWants && _mapToolsTabActive;
+            if (show) setCompassWidgetExpanded(true);
             compass.style.display = show ? 'block' : 'none';
             var fab = document.getElementById('fab-compass');
-            if (fab) fab.classList.toggle('is-active', show);
+            if (fab) fab.classList.toggle('is-active', show && userWants);
         }
         window.updateMapCompassDisplay = updateMapCompassDisplay;
 
