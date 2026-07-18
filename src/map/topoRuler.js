@@ -255,15 +255,16 @@ function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
     var lblOk = document.getElementById('topo-roamer-lbl');
-    if (g.getAttribute('data-built') === 'neon-v8' && lblOk) return;
-    g.setAttribute('data-built', 'neon-v8');
+    if (g.getAttribute('data-built') === 'neon-v9' && lblOk) return;
+    g.setAttribute('data-built', 'neon-v9');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var vns = ' vector-effect="non-scaling-stroke"';
     var geo = '';
     var lbl = '';
-    geo += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
-    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
+    /* SW roh (průsečík) = 0; stupnice do východu a severu — jako papírový roamer v km čtverci. */
+    geo += '<polygon points="' + O + ',' + O + ' ' + (O + L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O + L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
     geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
     var i;
     for (i = 0; i <= 20; i++) {
@@ -272,8 +273,8 @@ function buildRoamerScales() {
         var mid = i % 2 === 0;
         var th = big ? 5 : (mid ? 3 : 2);
         var sw = big ? 0.55 : 0.35;
-        geo += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
-        geo += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+        geo += '<line x1="' + (O + t) + '" y1="' + O + '" x2="' + (O + t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+        geo += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O - th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
     }
     function lblText(ox, oy, text, anchor, weight) {
         var a = anchor || 'middle';
@@ -282,14 +283,14 @@ function buildRoamerScales() {
     }
     lbl += lblText(O, O + 10, '0', 'middle', true);
     for (i = 1; i <= 9; i++) {
-        lbl += lblText(O - i * 10, O + 10, String(i));
+        lbl += lblText(O + i * 10, O + 10, String(i));
     }
-    lbl += lblText(O - L, O + 10, '1000', 'middle', false);
-    lbl += lblText(O + 8, O + 2, '0', 'start', true);
+    lbl += lblText(O + L, O + 10, '1000', 'middle', false);
+    lbl += lblText(O - 8, O + 2, '0', 'end', true);
     for (i = 1; i <= 9; i++) {
-        lbl += lblText(O + 8, O - i * 10 + 2, String(i), 'start', false);
+        lbl += lblText(O - 8, O - i * 10 + 2, String(i), 'end', false);
     }
-    lbl += lblText(O + 8, O - L + 2, '1000', 'start', false);
+    lbl += lblText(O - 8, O - L + 2, '1000', 'end', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
     syncRoamerLabels(1, 0);
 }

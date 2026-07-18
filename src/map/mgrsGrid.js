@@ -61,6 +61,14 @@ function mgrsKmDigits(easting, northing) {
     };
 }
 
+function pad5utmVal(v) {
+    var n = Math.round(v) % 100000;
+    if (n < 0) n += 100000;
+    var s = String(n);
+    while (s.length < 5) s = '0' + s;
+    return s;
+}
+
 function drawGrid() {
     if (!_map || !_layer || !_visible) {
         clearLayer();
@@ -88,6 +96,7 @@ function drawGrid() {
     var latHint = center.lat;
     var labelZoom = zoom >= 14;
     var squareZoom = zoom >= 12;
+    var cellLabelZoom = zoom >= 13;
 
     for (var e = eMin; e <= eMax; e += step) {
         var p1 = utmToLatLng(e, nMin, zone, latHint);
@@ -142,6 +151,25 @@ function drawGrid() {
                 interactive: false,
                 pane: 'mapGridPane'
             }));
+        }
+    }
+
+    if (cellLabelZoom) {
+        for (var ec = eMin; ec < eMax; ec += step) {
+            for (var nc = nMin; nc < nMax; nc += step) {
+                var e5 = pad5utmVal(ec);
+                var n5 = pad5utmVal(nc);
+                var ptCell = utmToLatLng(ec + step * 0.5, nc + step * 0.5, zone, latHint);
+                _layer.addLayer(window.L.marker([ptCell.lat, ptCell.lng], {
+                    icon: window.L.divIcon({
+                        className: 'mgrs-grid-label mgrs-grid-cell',
+                        html: '<span><b>E</b>' + e5 + '<br><b>N</b>' + n5 + '</span>',
+                        iconSize: [0, 0]
+                    }),
+                    interactive: false,
+                    pane: 'mapGridPane'
+                }));
+            }
         }
     }
 
