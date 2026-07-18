@@ -11,6 +11,19 @@ export function isOwner(entity, userId) {
     return getViewerRole(entity, userId) === ROLE.OWNER;
 }
 
+export function isSameCommunityAsEntity(entity) {
+    if (!entity || !entity.ownerComCode) return false;
+    var comCode = (localStorage.getItem('com_code') || '').toUpperCase();
+    return comCode && String(entity.ownerComCode).toUpperCase() === comCode;
+}
+
+/** Ukotvit může vlastník nebo kdokoli ve stejné komunitě (Pocta je ve skladu komunity). */
+export function canAnchorPocta(entity, userId) {
+    if (!isPoctaEntity(entity)) return false;
+    if (isOwner(entity, userId)) return true;
+    return isSameCommunityAsEntity(entity);
+}
+
 export function canEditPocta(entity, userId) {
     return isPoctaEntity(entity) && isOwner(entity, userId);
 }

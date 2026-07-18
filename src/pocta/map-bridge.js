@@ -11,7 +11,7 @@ import {
 import { isOwner } from './permissions.js';
 import {
     findEntityByCode,
-    getActivatedEntities,
+    getMapVisibleEntities,
     loadRegistry,
     saveRegistry,
     upsertEntity
@@ -189,7 +189,7 @@ export function renderEntityOnMap(entity, userId) {
 
 export function reloadPoctaMapMarkers(userId) {
     var registry = loadRegistry();
-    var entities = getActivatedEntities(userId, registry);
+    var entities = getMapVisibleEntities(userId, registry);
     for (var i = 0; i < entities.length; i++) {
         var entity = entities[i];
         entity = maybeAdvanceCodedQuestOnProximity(entity, registry) || entity;
@@ -201,7 +201,7 @@ export function reloadPoctaMapMarkers(userId) {
 
 export function onGpsProximityTick(userId) {
     var registry = loadRegistry();
-    var entities = getActivatedEntities(userId, registry);
+    var entities = getMapVisibleEntities(userId, registry);
     var changed = false;
     for (var i = 0; i < entities.length; i++) {
         var before = entities[i].phase;

@@ -19,6 +19,7 @@ export function initPoctaModule(bridge) {
         lastUserPosition: null,
         distanceMeters: null,
         switchMainTab: null,
+        startGeolocation: null,
         resolveCommunityItemAtDisplayIndex: null
     }, bridge || {});
 

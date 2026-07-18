@@ -1,4 +1,5 @@
 import {
+    POCTA_PHASE,
     POCTA_REGISTRY_VERSION,
     POCTA_STORAGE_KEY,
     TERMINAL_STATE_PREFIX
@@ -187,6 +188,51 @@ export function getActivatedEntities(userId, registry) {
     for (var i = 0; i < state.activatedCodes.length; i++) {
         var entity = registry.entities[state.activatedCodes[i]];
         if (entity) list.push(entity);
+    }
+    return list;
+}
+
+/** Všechny ukotvené Pocty stejné komunity — viditelné na mapě bez zadání kódu v terminálu. */
+export function getCommunityAnchoredPoctas(registry) {
+    registry = registry || loadRegistry();
+    var comCode = (localStorage.getItem('com_code') || '').toUpperCase();
+    if (!comCode) return [];
+    var list = [];
+    for (var code in registry.entities) {
+        if (!Object.prototype.hasOwnProperty.call(registry.entities, code)) continue;
+        var entity = registry.entities[code];
+        if (!isPoctaEntity(entity)) continue;
+        if (entity.phase !== POCTA_PHASE.ANCHORED) continue;
+        if (String(entity.ownerComCode || '').toUpperCase() !== comCode) continue;
+        list.push(entity);
+    }
+    return list;
+}
+
+export function getMapVisibleEntities(userId, registry) {
+    registry = registry || loadRegistry();
+    var seen = {};
+    var list = [];
+
+    var communityPoctas = getCommunityAnchoredPoctas(registry);
+    for (var c = 0; c < communityPoctas.length; c++) {
+        seen[communityPoctas[c].code] = true;
+        list.push(communityPoctas[c]);
+    }
+
+    var activated = getActivatedEntities(userId, registry);
+    for (var i = 0; i < activated.length; i++) {
+        var entity = activated[i];
+        if (!entity || seen[entity.code]) continue;
+        if (isCodedQuestEntity(entity)) {
+            list.push(entity);
+            seen[entity.code] = true;
+            continue;
+        }
+        if (isPoctaEntity(entity) && entity.phase === POCTA_PHASE.ANCHORED) {
+            list.push(entity);
+            seen[entity.code] = true;
+        }
     }
     return list;
 }

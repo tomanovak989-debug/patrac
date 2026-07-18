@@ -1,5 +1,5 @@
 import { POCTA_PHASE } from './constants.js';
-import { isOwner } from './permissions.js';
+import { canAnchorPocta } from './permissions.js';
 import { syncInventoryItemPhase } from './rewards.js';
 import { reloadPoctaMapMarkers } from './map-bridge.js';
 import {
@@ -18,6 +18,34 @@ function getFreshGpsPosition() {
     return pos;
 }
 
+function requestFreshGpsPosition(timeoutMs) {
+    var cached = getFreshGpsPosition();
+    if (cached) return Promise.resolve(cached);
+
+    return new Promise(function(resolve) {
+        if (!navigator.geolocation) {
+            resolve(null);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                var pos = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude,
+                    accuracy: position.coords.accuracy || 30,
+                    ts: Date.now()
+                };
+                var bridge = window.patracPoctaBridge || {};
+                bridge.lastUserPosition = pos;
+                if (typeof window.patracPoctaOnGps === 'function') window.patracPoctaOnGps();
+                resolve(pos);
+            },
+            function() { resolve(null); },
+            { enableHighAccuracy: true, timeout: timeoutMs || 20000, maximumAge: 0 }
+        );
+    });
+}
+
 export async function anchorPoctaAtPosition(poctaId, userId) {
     userId = userId || localStorage.getItem('patrac_session') || '';
     var registry = loadRegistry();
@@ -26,18 +54,25 @@ export async function anchorPoctaAtPosition(poctaId, userId) {
     if (!entity || !isPoctaEntity(entity)) {
         return { ok: false, error: 'Pocta nenalezena v registru.' };
     }
-    if (!isOwner(entity, userId)) {
-        return { ok: false, error: 'Ukotvit může jen vlastník Pocty.' };
+    if (!canAnchorPocta(entity, userId)) {
+        return { ok: false, error: 'Ukotvit může člen stejné komunity, který má Poctu ve skladu.' };
     }
     if (entity.phase === POCTA_PHASE.ANCHORED) {
         return { ok: false, error: 'Pocta je už ukotvená na mapě.' };
     }
 
-    var pos = getFreshGpsPosition();
+    var bridge = window.patracPoctaBridge || {};
+    if (typeof bridge.switchMainTab === 'function') {
+        var mapBtn = document.querySelectorAll('.bottom-action-bar button')[2];
+        bridge.switchMainTab('map-only', mapBtn);
+    }
+    if (typeof bridge.startGeolocation === 'function') bridge.startGeolocation();
+
+    var pos = await requestFreshGpsPosition(20000);
     if (!pos) {
         return {
             ok: false,
-            error: 'GPS není k dispozici. Otevři mapu a počkej na fix polohy (do 2 min).'
+            error: 'GPS není k dispozici. Otevři záložku Mapa, povol polohu v prohlížeči a zkus znovu (do 20 s).'
         };
     }
 
