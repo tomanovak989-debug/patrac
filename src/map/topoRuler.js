@@ -2,7 +2,7 @@
  * Topografické pravítko — NATO GTA, sever nahoru, MGRS ze středu kříže.
  */
 
-import { formatMgrs, latLngToMgrs } from './mgrsCoords.js';
+import { formatMgrs, latLngToMgrs, latLngToUtm, utmToLatLng } from './mgrsCoords.js';
 
 var _deps = null;
 var _layer = null;
@@ -32,6 +32,7 @@ var mapObjs = {
     lines: [],
     hitLines: [],
     labels: [],
+    readouts: [],
     markers: {}
 };
 
@@ -81,9 +82,11 @@ function clearMapGraphics() {
     for (k = 0; k < mapObjs.lines.length; k++) _layer.removeLayer(mapObjs.lines[k]);
     for (k = 0; k < mapObjs.hitLines.length; k++) _layer.removeLayer(mapObjs.hitLines[k]);
     for (k = 0; k < mapObjs.labels.length; k++) _layer.removeLayer(mapObjs.labels[k]);
+    for (k = 0; k < mapObjs.readouts.length; k++) _layer.removeLayer(mapObjs.readouts[k]);
     mapObjs.lines = [];
     mapObjs.hitLines = [];
     mapObjs.labels = [];
+    mapObjs.readouts = [];
     for (k in mapObjs.markers) {
         if (mapObjs.markers.hasOwnProperty(k)) _layer.removeLayer(mapObjs.markers[k]);
     }
@@ -112,6 +115,112 @@ function pointerEventToLatLng(e) {
     return map.containerPointToLatLng(pt);
 }
 
+function pad5utm(v) {
+    var n = Math.round(v) % 100000;
+    if (n < 0) n += 100000;
+    var s = String(n);
+    while (s.length < 5) s = '0' + s;
+    return s.slice(-5);
+}
+
+function roundUtm50(e, n) {
+    return {
+        e: Math.round(e / 50) * 50,
+        n: Math.round(n / 50) * 50
+    };
+}
+
+function formatFullMgrs50(lat, lng) {
+    var utm = latLngToUtm(lat, lng);
+    var r = roundUtm50(utm.easting, utm.northing);
+    var pt = utmToLatLng(r.e, r.n, utm.zone, lat);
+    var raw = latLngToMgrs(pt.lat, pt.lng, 5).replace(/\s/g, '').toUpperCase();
+    var i = 0;
+    while (i < raw.length && raw.charAt(i) >= '0' && raw.charAt(i) <= '9') i++;
+    var head = raw.substring(0, i) + raw.charAt(i) + raw.substring(i + 1, i + 3);
+    i += 3;
+    var rest = raw.substring(i);
+    var half = rest.length / 2;
+    return head + ' ' + rest.substring(0, half) + ' ' + rest.substring(half);
+}
+
+function addGridReadoutLabel(lat, lng, text, kind) {
+    if (!_layer || !window.L) return;
+    var marker = window.L.marker([lat, lng], {
+        icon: window.L.divIcon({
+            className: 'topo-roamer-readout topo-roamer-readout-' + kind,
+            html: '<span>' + text + '</span>',
+            iconSize: [0, 0]
+        }),
+        pane: 'mapMeasurePane',
+        interactive: false
+    }).addTo(_layer);
+    mapObjs.readouts.push(marker);
+}
+
+function renderGridReadouts() {
+    if (!state.positionLocked) return;
+    var ll = getRulerOriginLatLng();
+    if (!ll) return;
+    var utm = latLngToUtm(ll.lat, ll.lng);
+    var E0 = utm.easting;
+    var N0 = utm.northing;
+    var zone = utm.zone;
+    var range = 1000;
+
+    var nLine = Math.ceil(N0 / 1000) * 1000;
+    if (Math.abs(nLine - N0) < 0.5) nLine += 1000;
+    for (; nLine <= N0 + range + 0.5; nLine += 1000) {
+        if (nLine - N0 > range + 0.5) break;
+        var pN = utmToLatLng(E0, nLine, zone, ll.lat);
+        addGridReadoutLabel(pN.lat, pN.lng, pad5utm(nLine), 'northing');
+    }
+
+    var eLine = Math.floor(E0 / 1000) * 1000;
+    if (Math.abs(eLine - E0) < 0.5) eLine -= 1000;
+    else if (eLine >= E0) eLine -= 1000;
+    for (; eLine >= E0 - range - 0.5; eLine -= 1000) {
+        if (E0 - eLine > range + 0.5) break;
+        var pE = utmToLatLng(eLine, N0, zone, ll.lat);
+        addGridReadoutLabel(pE.lat, pE.lng, pad5utm(eLine), 'easting');
+    }
+}
+
+function buildRoamerScales() {
+    var g = document.getElementById('topo-roamer-scales');
+    if (!g || g.getAttribute('data-built') === '1') return;
+    g.setAttribute('data-built', '1');
+    var O = 130;
+    var L = KM_SQUARE_SVG_PX;
+    var h = '';
+    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(74,246,38,0.07)" stroke="#4af626" stroke-width="1.3"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="#4af626" stroke-width="1.2"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="#4af626" stroke-width="1.2"/>';
+    var i;
+    for (i = 0; i <= 20; i++) {
+        var t = i * (L / 20);
+        var big = i % 10 === 0;
+        var mid = i % 2 === 0;
+        var th = big ? 8 : (mid ? 5 : 3);
+        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="#4af626" stroke-width="' + (big ? 1.1 : 0.75) + '"/>';
+        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="#4af626" stroke-width="' + (big ? 1.1 : 0.75) + '"/>';
+    }
+    h += '<text x="' + O + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    for (i = 1; i <= 9; i++) {
+        h += '<text x="' + (O - i * 10) + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+    }
+    h += '<text x="' + (O - L) + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
+    h += '<text x="' + (O + 10) + '" y="' + (O + 3) + '" text-anchor="start" fill="#4af626" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    for (i = 1; i <= 9; i++) {
+        h += '<text x="' + (O + 10) + '" y="' + (O - i * 10 + 3) + '" text-anchor="start" fill="#4af626" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+    }
+    h += '<text x="' + (O + 10) + '" y="' + (O - L + 3) + '" text-anchor="start" fill="#4af626" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
+    h += '<text x="' + (O - L * 0.52) + '" y="' + (O - L + 14) + '" text-anchor="middle" fill="#4af626" font-size="10" font-weight="700" font-family="IBM Plex Mono,monospace">GTA NATO</text>';
+    h += '<circle cx="' + O + '" cy="' + O + '" r="14" fill="none" stroke="#4af626" stroke-width="1" opacity="0.85"/>';
+    h += '<circle cx="' + O + '" cy="' + O + '" r="6" fill="none" stroke="#4af626" stroke-width="1.2"/>';
+    g.innerHTML = h;
+}
+
 function syncAnchorFromCenter() {
     var ll = getRulerOriginLatLng();
     if (ll) state.anchor = ll;
@@ -136,7 +245,9 @@ function renderRouteOnMap() {
 
     clearMapGraphics();
     var map = getMap();
-    if (!map || !_layer || !state.anchor) return;
+    if (!map || !_layer) return;
+    if (state.positionLocked) renderGridReadouts();
+    if (!state.anchor) return;
 
     var pts = chainPoints();
     if (pts.length < 1) return;
@@ -461,7 +572,7 @@ function updateRulerPlateVisual() {
     var centerLl = getRulerOriginLatLng();
     if (mgrsEl && centerLl) {
         try {
-            mgrsEl.textContent = formatMgrs(latLngToMgrs(centerLl.lat, centerLl.lng, 3));
+            mgrsEl.textContent = formatFullMgrs50(centerLl.lat, centerLl.lng);
         } catch (e) {
             mgrsEl.textContent = '—';
         }
@@ -888,6 +999,7 @@ export function initTopoRuler(deps) {
     if (scaleSel) scaleSel.value = String(state.mapScale);
     refreshRouteSelect();
     updateLockUi();
+    buildRoamerScales();
     initInteractions();
     bindMapEvents();
     renderAll();
@@ -910,6 +1022,10 @@ export function updateTopoRulerDisplay(show) {
 
 export function getTopoRulerState() {
     return state;
+}
+
+export function formatRulerMgrs50(lat, lng) {
+    return formatFullMgrs50(lat, lng);
 }
 
 export function getRulerCenterLatLng() {
