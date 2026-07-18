@@ -32,6 +32,8 @@ var _bearingDragging = false;
 var _widgetDragging = false;
 var _fabLongPressFired = false;
 var _mapZooming = false;
+var _zoomSettleTimer = null;
+var _zoomVisualLl = null;
 
 function getMap() {
     return _deps && _deps.getMap ? _deps.getMap() : null;
@@ -188,9 +190,44 @@ function rulerSceneTransformCss(scale, rotDeg) {
     return parts.join(' ');
 }
 
+function beginMapZoom() {
+    if (_zoomSettleTimer) {
+        clearTimeout(_zoomSettleTimer);
+        _zoomSettleTimer = null;
+    }
+    _mapZooming = true;
+    if (state.positionLocked && state.anchor) {
+        _zoomVisualLl = { lat: state.anchor.lat, lng: state.anchor.lng };
+    } else {
+        var ll = getRulerOriginLatLng();
+        _zoomVisualLl = ll ? { lat: ll.lat, lng: ll.lng } : null;
+    }
+}
+
+function endMapZoomSoon() {
+    if (_zoomSettleTimer) clearTimeout(_zoomSettleTimer);
+    _zoomSettleTimer = setTimeout(function() {
+        _mapZooming = false;
+        _zoomVisualLl = null;
+        _zoomSettleTimer = null;
+    }, 300);
+}
+
+function getVisualCenterLl() {
+    if (_mapZooming && _zoomVisualLl) return _zoomVisualLl;
+    if (state.positionLocked && state.anchor) return state.anchor;
+    return getRulerOriginLatLng();
+}
+
 function getPlateCenterScreenPoint() {
-    var root = document.getElementById('map-topo-ruler');
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
+    if (plateWrap) {
+        var rect = plateWrap.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+            return { x: rect.left + rect.width * 0.5, y: rect.top + rect.height * 0.5 };
+        }
+    }
+    var root = document.getElementById('map-topo-ruler');
     if (!root || !plateWrap) return null;
     var rootLeft = parseFloat(root.style.left);
     var rootTop = parseFloat(root.style.top);
@@ -562,9 +599,7 @@ function updateRulerPlateVisual() {
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
 
-    var centerLl = (state.positionLocked && state.anchor)
-        ? state.anchor
-        : getRulerOriginLatLng();
+    var centerLl = getVisualCenterLl();
     var gridRot = centerLl ? gridRotDegForRoamer(centerLl.lat, centerLl.lng) : 0;
     var kmScale = centerLl ? roamerScaleAt(centerLl.lat, centerLl.lng) : 1;
 
@@ -599,7 +634,7 @@ function updateRulerPlateVisual() {
         }
     });
 
-    syncCoordFieldsFromPosition();
+    if (!_mapZooming) syncCoordFieldsFromPosition();
 
     var brng = getBearingDeg();
     if (degEl) {
@@ -645,7 +680,7 @@ function updateRulerWidgetPosition() {
     root.style.bottom = 'auto';
 
     if (state.positionLocked && state.anchor) {
-        syncScreenFromAnchor();
+        if (!_mapZooming) syncScreenFromAnchor();
         updateRulerPlateVisual();
         renderBearingOnMap();
         return;
@@ -664,7 +699,7 @@ function updateRulerWidgetPosition() {
     applyRulerScreenPos();
 
     updateRulerPlateVisual();
-    if (!state.positionLocked) syncAnchorFromCenter();
+    if (!state.positionLocked && !_mapZooming) syncAnchorFromCenter();
     renderBearingOnMap();
 }
 
@@ -1030,13 +1065,13 @@ function bindMapEvents() {
     var map = getMap();
     if (!map) return;
     _bound = true;
-    map.on('zoomstart', function() { _mapZooming = true; });
+    map.on('zoomstart', beginMapZoom);
     map.on('zoomend', function() {
-        _mapZooming = false;
         onMapZoom();
+        endMapZoomSoon();
     });
     map.on('zoom zoomanim', onMapZoom);
-    map.on('move moveend resize', onMapPanOrResize);
+    map.on('move moveend viewreset resize', onMapPanOrResize);
 }
 
 function onMapZoom() {
