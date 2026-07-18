@@ -11,9 +11,9 @@ var _bound = false;
 var PLATE_PX = 260;
 /** Strana 1 km čtverce ve SVG/CSS px (při scale=1); po zamknutí = 1 km na mapě. */
 var KM_SQUARE_SVG_PX = 100;
-var ORANGE = '#ff5500';
-var ORANGE_DIM = '#ff9944';
-var ORANGE_GLOW = 'rgba(255, 85, 0, 0.55)';
+var NEON = '#78ff66';
+var NEON_DIM = '#b8ffb0';
+var NEON_GLOW = 'rgba(107, 255, 90, 0.55)';
 
 var state = {
     expanded: true,
@@ -190,36 +190,33 @@ function renderGridReadouts() {
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'orange-v2') return;
-    g.setAttribute('data-built', 'orange-v2');
+    if (g.getAttribute('data-built') === 'neon-v3') return;
+    g.setAttribute('data-built', 'neon-v3');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var h = '';
-    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(255,85,0,0.06)" stroke="' + ORANGE + '" stroke-width="0.85"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + ORANGE + '" stroke-width="0.75"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + ORANGE + '" stroke-width="0.75"/>';
+    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(107,255,90,0.05)" stroke="' + NEON + '" stroke-width="0.55"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"/>';
     var i;
     for (i = 0; i <= 20; i++) {
         var t = i * (L / 20);
         var big = i % 10 === 0;
         var mid = i % 2 === 0;
-        var th = big ? 6 : (mid ? 4 : 2);
-        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + ORANGE + '" stroke-width="' + (big ? 0.85 : 0.55) + '"/>';
-        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + ORANGE + '" stroke-width="' + (big ? 0.85 : 0.55) + '"/>';
+        var th = big ? 5 : (mid ? 3 : 2);
+        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
+        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
     }
-    h += '<text x="' + O + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    h += '<text x="' + O + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5.5" font-weight="600" font-family="IBM Plex Mono,monospace">0</text>';
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O - i * 10) + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        h += '<text x="' + (O - i * 10) + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5.5" font-family="IBM Plex Mono,monospace">' + i + '</text>';
     }
-    h += '<text x="' + (O - L) + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
-    h += '<text x="' + (O + 10) + '" y="' + (O + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    h += '<text x="' + (O - L) + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5" font-family="IBM Plex Mono,monospace">1000</text>';
+    h += '<text x="' + (O + 8) + '" y="' + (O + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5.5" font-weight="600" font-family="IBM Plex Mono,monospace">0</text>';
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O + 10) + '" y="' + (O - i * 10 + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        h += '<text x="' + (O + 8) + '" y="' + (O - i * 10 + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5.5" font-family="IBM Plex Mono,monospace">' + i + '</text>';
     }
-    h += '<text x="' + (O + 10) + '" y="' + (O - L + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
-    h += '<text x="' + (O - L * 0.52) + '" y="' + (O - L + 14) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="10" font-weight="700" font-family="IBM Plex Mono,monospace">GTA NATO</text>';
-    h += '<circle cx="' + O + '" cy="' + O + '" r="14" fill="none" stroke="' + ORANGE + '" stroke-width="0.75" opacity="0.9"/>';
-    h += '<circle cx="' + O + '" cy="' + O + '" r="6" fill="none" stroke="' + ORANGE + '" stroke-width="0.9"/>';
+    h += '<text x="' + (O + 8) + '" y="' + (O - L + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5" font-family="IBM Plex Mono,monospace">1000</text>';
     g.innerHTML = h;
 }
 
@@ -279,6 +276,9 @@ function setMapInteractionEnabled(on) {
         if (on) map.touchZoom.enable();
         else map.touchZoom.disable();
     }
+    if (on && typeof window !== 'undefined' && typeof window.ensureMapTouchPan === 'function') {
+        window.ensureMapTouchPan();
+    }
 }
 
 function renderRouteOnMap() {
@@ -294,7 +294,7 @@ function renderRouteOnMap() {
     if (state.positionLocked || state.target || state.waypoints.length) {
         mapObjs.markers.anchor = window.L.marker([state.anchor.lat, state.anchor.lng], {
             draggable: !state.positionLocked,
-            icon: dotIcon(ORANGE_DIM, 12),
+            icon: dotIcon(NEON_DIM, 12),
             pane: 'mapMeasurePane'
         }).addTo(_layer);
         mapObjs.markers.anchor.bindTooltip('Střed pravítka', { direction: 'top' });
@@ -313,7 +313,7 @@ function renderRouteOnMap() {
             var wpId = wp.id;
             mapObjs.markers[wpId] = window.L.marker([wp.lat, wp.lng], {
                 draggable: true,
-                icon: dotIcon(ORANGE, 12),
+                icon: dotIcon(NEON, 12),
                 pane: 'mapMeasurePane',
                 wpId: wpId,
                 riseOnHover: true,
@@ -363,12 +363,12 @@ function renderRouteOnMap() {
             totalM += segM;
             var coords = [[a.lat, a.lng], [b.lat, b.lng]];
             var line = window.L.polyline(coords, {
-                color: ORANGE, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane'
+                color: NEON, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane'
             }).addTo(_layer);
             mapObjs.lines.push(line);
 
             var hitLine = window.L.polyline(coords, {
-                color: ORANGE, weight: 14, opacity: 0,
+                color: NEON, weight: 14, opacity: 0,
                 pane: 'mapMeasurePane'
             }).addTo(_layer);
             mapObjs.hitLines.push(hitLine);
@@ -500,7 +500,7 @@ function sanitizeScreenPos() {
     var vp = getViewportSize();
     var root = document.getElementById('map-topo-ruler');
     var w = root && root.offsetWidth ? root.offsetWidth : PLATE_PX + 20;
-    var h = root && root.offsetHeight ? root.offsetHeight : PLATE_PX + 100;
+    var h = root && root.offsetHeight ? root.offsetHeight : PLATE_PX + 140;
     var x = Number(state.screenX);
     var y = Number(state.screenY);
     if (!isFinite(x) || !isFinite(y)) {
@@ -596,6 +596,7 @@ function updateRulerWidgetPosition() {
 
 function updateRulerPlateVisual() {
     var plate = document.getElementById('topo-ruler-plate');
+    var roamer = document.getElementById('topo-roamer-scales');
     var degEl = document.getElementById('topo-ruler-bearing');
     var scaleEl = document.getElementById('topo-ruler-scale');
     var mgrsEl = document.getElementById('topo-ruler-mgrs');
@@ -603,7 +604,15 @@ function updateRulerPlateVisual() {
 
     var brng = getBearingDeg();
     var scale = plateScaleFactor();
-    plate.style.transform = 'rotate(0deg) scale(' + scale + ')';
+    plate.style.transform = 'rotate(0deg)';
+
+    if (roamer) {
+        if (state.positionLocked && scale !== 1) {
+            roamer.setAttribute('transform', 'translate(130,130) scale(' + scale + ') translate(-130,-130)');
+        } else {
+            roamer.removeAttribute('transform');
+        }
+    }
 
     if (degEl) {
         if (!state.positionLocked) {
@@ -1025,6 +1034,9 @@ function bindMapEvents() {
         if (_bearingDragging) return;
         updateRulerWidgetPosition();
         renderRouteOnMap();
+        if (typeof window !== 'undefined' && typeof window.ensureMapTouchPan === 'function') {
+            window.ensureMapTouchPan();
+        }
         if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
             window.patracUpdateMgrsReadout();
         }
