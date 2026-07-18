@@ -11,8 +11,9 @@ var _bound = false;
 var PLATE_PX = 260;
 /** Strana 1 km čtverce ve SVG/CSS px (při scale=1); po zamknutí = 1 km na mapě. */
 var KM_SQUARE_SVG_PX = 100;
-var GREEN = '#4af626';
-var GREEN_DIM = '#8fd87a';
+var ORANGE = '#ff5500';
+var ORANGE_DIM = '#ff9944';
+var ORANGE_GLOW = 'rgba(255, 85, 0, 0.55)';
 
 var state = {
     expanded: true,
@@ -188,37 +189,77 @@ function renderGridReadouts() {
 
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
-    if (!g || g.getAttribute('data-built') === '1') return;
-    g.setAttribute('data-built', '1');
+    if (!g) return;
+    if (g.getAttribute('data-built') === 'orange-v2') return;
+    g.setAttribute('data-built', 'orange-v2');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var h = '';
-    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(74,246,38,0.07)" stroke="#4af626" stroke-width="1.3"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="#4af626" stroke-width="1.2"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="#4af626" stroke-width="1.2"/>';
+    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(255,85,0,0.06)" stroke="' + ORANGE + '" stroke-width="0.85"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + ORANGE + '" stroke-width="0.75"/>';
+    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + ORANGE + '" stroke-width="0.75"/>';
     var i;
     for (i = 0; i <= 20; i++) {
         var t = i * (L / 20);
         var big = i % 10 === 0;
         var mid = i % 2 === 0;
-        var th = big ? 8 : (mid ? 5 : 3);
-        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="#4af626" stroke-width="' + (big ? 1.1 : 0.75) + '"/>';
-        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="#4af626" stroke-width="' + (big ? 1.1 : 0.75) + '"/>';
+        var th = big ? 6 : (mid ? 4 : 2);
+        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + ORANGE + '" stroke-width="' + (big ? 0.85 : 0.55) + '"/>';
+        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + ORANGE + '" stroke-width="' + (big ? 0.85 : 0.55) + '"/>';
     }
-    h += '<text x="' + O + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    h += '<text x="' + O + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O - i * 10) + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        h += '<text x="' + (O - i * 10) + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
     }
-    h += '<text x="' + (O - L) + '" y="' + (O + 12) + '" text-anchor="middle" fill="#4af626" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
-    h += '<text x="' + (O + 10) + '" y="' + (O + 3) + '" text-anchor="start" fill="#4af626" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
+    h += '<text x="' + (O - L) + '" y="' + (O + 12) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
+    h += '<text x="' + (O + 10) + '" y="' + (O + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="8" font-weight="700" font-family="IBM Plex Mono,monospace">0</text>';
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O + 10) + '" y="' + (O - i * 10 + 3) + '" text-anchor="start" fill="#4af626" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        h += '<text x="' + (O + 10) + '" y="' + (O - i * 10 + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="8" font-family="IBM Plex Mono,monospace">' + i + '</text>';
     }
-    h += '<text x="' + (O + 10) + '" y="' + (O - L + 3) + '" text-anchor="start" fill="#4af626" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
-    h += '<text x="' + (O - L * 0.52) + '" y="' + (O - L + 14) + '" text-anchor="middle" fill="#4af626" font-size="10" font-weight="700" font-family="IBM Plex Mono,monospace">GTA NATO</text>';
-    h += '<circle cx="' + O + '" cy="' + O + '" r="14" fill="none" stroke="#4af626" stroke-width="1" opacity="0.85"/>';
-    h += '<circle cx="' + O + '" cy="' + O + '" r="6" fill="none" stroke="#4af626" stroke-width="1.2"/>';
+    h += '<text x="' + (O + 10) + '" y="' + (O - L + 3) + '" text-anchor="start" fill="' + ORANGE + '" font-size="7" font-family="IBM Plex Mono,monospace">1000</text>';
+    h += '<text x="' + (O - L * 0.52) + '" y="' + (O - L + 14) + '" text-anchor="middle" fill="' + ORANGE + '" font-size="10" font-weight="700" font-family="IBM Plex Mono,monospace">GTA NATO</text>';
+    h += '<circle cx="' + O + '" cy="' + O + '" r="14" fill="none" stroke="' + ORANGE + '" stroke-width="0.75" opacity="0.9"/>';
+    h += '<circle cx="' + O + '" cy="' + O + '" r="6" fill="none" stroke="' + ORANGE + '" stroke-width="0.9"/>';
     g.innerHTML = h;
+}
+
+function syncScreenFromAnchor() {
+    if (!state.positionLocked || !state.anchor) return;
+    var map = getMap();
+    var mapEl = document.getElementById('map');
+    var root = document.getElementById('map-topo-ruler');
+    var centerEl = document.getElementById('topo-ruler-center');
+    if (!map || !mapEl || !root || !centerEl) return;
+
+    root.classList.add('topo-ruler-positioned');
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+
+    if (state.screenX == null || isNaN(state.screenX)) {
+        var def = getDefaultScreenPos();
+        state.screenX = def.x;
+        state.screenY = def.y;
+        root.style.left = Math.round(state.screenX) + 'px';
+        root.style.top = Math.round(state.screenY) + 'px';
+    }
+
+    var pt = map.latLngToContainerPoint([state.anchor.lat, state.anchor.lng]);
+    var mapRect = mapEl.getBoundingClientRect();
+    var targetX = mapRect.left + pt.x;
+    var targetY = mapRect.top + pt.y;
+    var iter;
+    for (iter = 0; iter < 3; iter++) {
+        var rootRect = root.getBoundingClientRect();
+        var centerRect = centerEl.getBoundingClientRect();
+        var cx = centerRect.left + centerRect.width / 2;
+        var cy = centerRect.top + centerRect.height / 2;
+        var left = (parseFloat(root.style.left) || rootRect.left) + (targetX - cx);
+        var top = (parseFloat(root.style.top) || rootRect.top) + (targetY - cy);
+        root.style.left = Math.round(left) + 'px';
+        root.style.top = Math.round(top) + 'px';
+    }
+    state.screenX = parseFloat(root.style.left);
+    state.screenY = parseFloat(root.style.top);
 }
 
 function syncAnchorFromCenter() {
@@ -241,8 +282,6 @@ function setMapInteractionEnabled(on) {
 }
 
 function renderRouteOnMap() {
-    if (state.positionLocked) syncAnchorFromCenter();
-
     clearMapGraphics();
     var map = getMap();
     if (!map || !_layer) return;
@@ -255,7 +294,7 @@ function renderRouteOnMap() {
     if (state.positionLocked || state.target || state.waypoints.length) {
         mapObjs.markers.anchor = window.L.marker([state.anchor.lat, state.anchor.lng], {
             draggable: !state.positionLocked,
-            icon: dotIcon(GREEN_DIM, 12),
+            icon: dotIcon(ORANGE_DIM, 12),
             pane: 'mapMeasurePane'
         }).addTo(_layer);
         mapObjs.markers.anchor.bindTooltip('Střed pravítka', { direction: 'top' });
@@ -274,7 +313,7 @@ function renderRouteOnMap() {
             var wpId = wp.id;
             mapObjs.markers[wpId] = window.L.marker([wp.lat, wp.lng], {
                 draggable: true,
-                icon: dotIcon(GREEN, 12),
+                icon: dotIcon(ORANGE, 12),
                 pane: 'mapMeasurePane',
                 wpId: wpId,
                 riseOnHover: true,
@@ -304,7 +343,7 @@ function renderRouteOnMap() {
     if (state.target) {
         mapObjs.markers.target = window.L.marker([state.target.lat, state.target.lng], {
             draggable: true,
-            icon: dotIcon('#8dff6a', 12),
+            icon: dotIcon('#ffb366', 12),
             pane: 'mapMeasurePane'
         }).addTo(_layer);
         mapObjs.markers.target.bindTooltip('Cíl · táhni', { direction: 'top' });
@@ -324,12 +363,12 @@ function renderRouteOnMap() {
             totalM += segM;
             var coords = [[a.lat, a.lng], [b.lat, b.lng]];
             var line = window.L.polyline(coords, {
-                color: GREEN, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane'
+                color: ORANGE, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane'
             }).addTo(_layer);
             mapObjs.lines.push(line);
 
             var hitLine = window.L.polyline(coords, {
-                color: GREEN, weight: 14, opacity: 0,
+                color: ORANGE, weight: 14, opacity: 0,
                 pane: 'mapMeasurePane'
             }).addTo(_layer);
             mapObjs.hitLines.push(hitLine);
@@ -479,6 +518,7 @@ function sanitizeScreenPos() {
 }
 
 function ensureRulerOnScreen() {
+    if (state.positionLocked) return;
     var root = document.getElementById('map-topo-ruler');
     if (!root || root.style.display === 'none') return;
     var rect = root.getBoundingClientRect();
@@ -519,8 +559,6 @@ function updateRulerWidgetPosition() {
     var body = getBodyEl();
     if (!root || !body) return;
 
-    sanitizeScreenPos();
-
     if (root.classList.contains('topo-ruler-collapsed')) {
         root.classList.remove('topo-ruler-positioned');
         root.classList.add('topo-ruler-docked');
@@ -531,6 +569,17 @@ function updateRulerWidgetPosition() {
         return;
     }
     root.classList.remove('topo-ruler-docked');
+    root.classList.add('topo-ruler-positioned');
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+
+    if (state.positionLocked && state.anchor) {
+        updateRulerPlateVisual();
+        syncScreenFromAnchor();
+        return;
+    }
+
+    sanitizeScreenPos();
 
     if (state.screenX == null || state.screenY == null) {
         var def = getDefaultScreenPos();
@@ -538,9 +587,6 @@ function updateRulerWidgetPosition() {
         state.screenY = def.y;
     }
 
-    root.classList.add('topo-ruler-positioned');
-    root.style.right = 'auto';
-    root.style.bottom = 'auto';
     root.style.left = Math.round(state.screenX) + 'px';
     root.style.top = Math.round(state.screenY) + 'px';
 
@@ -569,7 +615,9 @@ function updateRulerPlateVisual() {
         }
     }
 
-    var centerLl = getRulerOriginLatLng();
+    var centerLl = (state.positionLocked && state.anchor)
+        ? state.anchor
+        : getRulerOriginLatLng();
     if (mgrsEl && centerLl) {
         try {
             mgrsEl.textContent = formatFullMgrs50(centerLl.lat, centerLl.lng);
@@ -579,7 +627,10 @@ function updateRulerPlateVisual() {
     }
 
     if (scaleEl) {
-        var mpp = metersPerPixel();
+        var mpp = metersPerPixelAt(
+            centerLl ? centerLl.lat : (getMap() ? getMap().getCenter().lat : 0),
+            centerLl ? centerLl.lng : (getMap() ? getMap().getCenter().lng : 0)
+        );
         var map = getMap();
         var zoom = map ? map.getZoom() : 0;
         var kmPx = Math.round(1000 / mpp);
@@ -819,7 +870,8 @@ function bindDragOnlyOnHandle(handle, onDrag, onDragEnd) {
 }
 
 function updateBearingPreview() {
-    syncAnchorFromCenter();
+    if (state.positionLocked) syncScreenFromAnchor();
+    else syncAnchorFromCenter();
     renderRouteOnMap();
     updateRulerPlateVisual();
     if (_deps && _deps.onUiUpdate) _deps.onUiUpdate();
@@ -834,7 +886,6 @@ function bindBearingDrag(handle) {
     var dragging = false;
     function onMove(e) {
         if (!state.positionLocked || !dragging) return;
-        syncAnchorFromCenter();
         var ll = pointerEventToLatLng(e);
         if (ll) state.target = { lat: ll.lat, lng: ll.lng };
         updateBearingPreview();
@@ -853,7 +904,6 @@ function bindBearingDrag(handle) {
     function onStart(e) {
         if (!state.positionLocked) return;
         dragging = true;
-        syncAnchorFromCenter();
         _bearingDragging = true;
         setMapInteractionEnabled(false);
         e.preventDefault();
@@ -973,10 +1023,8 @@ function bindMapEvents() {
     _bound = true;
     map.on('move zoom zoomend moveend resize', function() {
         if (_bearingDragging) return;
-        if (state.positionLocked) syncAnchorFromCenter();
         updateRulerWidgetPosition();
         renderRouteOnMap();
-        updateRulerPlateVisual();
         if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
             window.patracUpdateMgrsReadout();
         }
@@ -1030,5 +1078,6 @@ export function formatRulerMgrs50(lat, lng) {
 
 export function getRulerCenterLatLng() {
     if (!state.visible) return null;
+    if (state.positionLocked && state.anchor) return { lat: state.anchor.lat, lng: state.anchor.lng };
     return getRulerOriginLatLng();
 }
