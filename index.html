@@ -1842,7 +1842,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260717c';
+        var PATRAC_BUILD = '20260718a';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6519,6 +6519,25 @@
             return found && found.userId !== exceptUserId;
         }
 
+        /** E-mail je obsazený jen pokud existuje v cloudu — starý localStorage ghost se ignoruje. */
+        function isEmailTakenForRegister(email, exceptUserId) {
+            return import('./src/services/accountService.js').then(function(mod) {
+                var found = findAccountByEmail(email);
+                if (!found || found.userId === exceptUserId) return false;
+                return mod.fetchAccountFromCloud(found.userId).then(function(cloud) {
+                    if (!cloud) {
+                        var accounts = getPatracAccounts();
+                        if (accounts[found.userId]) {
+                            delete accounts[found.userId];
+                            try { savePatracAccounts(accounts); } catch (e) { console.warn(e); }
+                        }
+                        return false;
+                    }
+                    return normalizeEmail(cloud.email) === normalizeEmail(email);
+                });
+            });
+        }
+
         function registerPatracCommunity(comName, founderUserId) {
             var comms = getPatracCommunities();
             var code = generatePatracCode();
@@ -7400,20 +7419,21 @@
             try {
             var accounts = getPatracAccounts();
             if (accounts[userId]) {
-                showGateError('gate-register-error', 'gate.errors.registerIdTaken');
-                var btnTaken = document.getElementById('btn-register-submit');
-                if (btnTaken) { btnTaken.disabled = false; btnTaken.textContent = 'ZALOŽIT A VSTOUPIT'; }
-                return;
-            }
-            if (isEmailTaken(email)) {
-                showGateError('gate-register-error', 'gate.errors.registerEmailTaken');
-                var btnEmail = document.getElementById('btn-register-submit');
-                if (btnEmail) { btnEmail.disabled = false; btnEmail.textContent = 'ZALOŽIT A VSTOUPIT'; }
-                return;
+                delete accounts[userId];
+                try { savePatracAccounts(accounts); } catch (e) { console.warn(e); }
             }
 
             var submitBtn = document.getElementById('btn-register-submit');
-            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'ZPRACOVÁVÁM…'; }
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'OVĚŘUJI EMAIL…'; }
+
+            isEmailTakenForRegister(email, userId).then(function(emailTaken) {
+                if (emailTaken) {
+                    showGateError('gate-register-error', 'gate.errors.registerEmailTaken');
+                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                    return;
+                }
+                if (submitBtn) submitBtn.textContent = 'ZPRACOVÁVÁM…';
+                accounts = getPatracAccounts();
 
             importAuthService().then(function(authMod) {
                 return authMod.registerPatracAuth(userId, pass, email);
@@ -7476,6 +7496,10 @@
                     errMsg = 'ID „' + userId + '“ už existuje. Přihlas se, nebo zvol jiné ID.';
                 }
                 showGateError('gate-register-error', errMsg);
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+            });
+            }).catch(function(err) {
+                console.warn('[register] email check', err);
                 if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
             });
             } catch (err) {
