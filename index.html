@@ -4549,9 +4549,11 @@
                 rot = normalizeDeg(-compassDeviceHeading + compassBezelDeg);
             }
             rose.style.transform = 'rotate(' + rot + 'deg)';
+            updateCompassCenterDeg();
         }
 
         function initCompassBezelDrag() {
+            initCompassWidgetToggle();
             var wrap = document.getElementById('compass-rose-wrap');
             var housing = document.querySelector('#map-compass .compass-housing');
             var readout = document.getElementById('compass-readout');
