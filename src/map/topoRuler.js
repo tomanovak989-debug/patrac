@@ -34,6 +34,8 @@ var _fabLongPressFired = false;
 var _mapZooming = false;
 var _zoomSettleTimer = null;
 var _zoomVisualLl = null;
+var _zoomFrozenScreen = null;
+var _plateCenterOffset = null;
 
 function getMap() {
     return _deps && _deps.getMap ? _deps.getMap() : null;
@@ -190,11 +192,26 @@ function rulerSceneTransformCss(scale, rotDeg) {
     return parts.join(' ');
 }
 
+function cachePlateCenterOffset() {
+    var root = document.getElementById('map-topo-ruler');
+    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
+    if (!root || !plateWrap) return;
+    _plateCenterOffset = {
+        x: plateWrap.offsetLeft + plateWrap.offsetWidth * 0.5,
+        y: plateWrap.offsetTop + plateWrap.offsetHeight * 0.5
+    };
+}
+
 function beginMapZoom() {
     if (_zoomSettleTimer) {
         clearTimeout(_zoomSettleTimer);
         _zoomSettleTimer = null;
     }
+    captureScreenPos();
+    cachePlateCenterOffset();
+    _zoomFrozenScreen = state.screenX != null && state.screenY != null
+        ? { x: state.screenX, y: state.screenY }
+        : null;
     _mapZooming = true;
     if (state.positionLocked && state.anchor) {
         _zoomVisualLl = { lat: state.anchor.lat, lng: state.anchor.lng };
@@ -209,8 +226,16 @@ function endMapZoomSoon() {
     _zoomSettleTimer = setTimeout(function() {
         _mapZooming = false;
         _zoomVisualLl = null;
+        _zoomFrozenScreen = null;
         _zoomSettleTimer = null;
-    }, 300);
+    }, 500);
+}
+
+function restoreFrozenScreenPos() {
+    if (!_mapZooming || !_zoomFrozenScreen) return;
+    state.screenX = _zoomFrozenScreen.x;
+    state.screenY = _zoomFrozenScreen.y;
+    applyRulerScreenPos();
 }
 
 function getVisualCenterLl() {
@@ -220,26 +245,29 @@ function getVisualCenterLl() {
 }
 
 function getPlateCenterScreenPoint() {
-    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
-    if (plateWrap) {
-        var rect = plateWrap.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-            return { x: rect.left + rect.width * 0.5, y: rect.top + rect.height * 0.5 };
-        }
-    }
     var root = document.getElementById('map-topo-ruler');
+    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
     if (!root || !plateWrap) return null;
-    var rootLeft = parseFloat(root.style.left);
-    var rootTop = parseFloat(root.style.top);
-    if (isNaN(rootLeft) || isNaN(rootTop)) {
-        var r = root.getBoundingClientRect();
-        rootLeft = r.left;
-        rootTop = r.top;
+
+    if (_mapZooming && _zoomFrozenScreen && _plateCenterOffset) {
+        return {
+            x: _zoomFrozenScreen.x + _plateCenterOffset.x,
+            y: _zoomFrozenScreen.y + _plateCenterOffset.y
+        };
     }
-    return {
-        x: rootLeft + plateWrap.offsetLeft + plateWrap.offsetWidth * 0.5,
-        y: rootTop + plateWrap.offsetTop + plateWrap.offsetHeight * 0.5
-    };
+
+    if (!_plateCenterOffset) cachePlateCenterOffset();
+    var left = parseFloat(root.style.left);
+    var top = parseFloat(root.style.top);
+    if (_plateCenterOffset && !isNaN(left) && !isNaN(top) && root.classList.contains('topo-ruler-positioned')) {
+        return { x: left + _plateCenterOffset.x, y: top + _plateCenterOffset.y };
+    }
+
+    var rect = plateWrap.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+        return { x: rect.left + rect.width * 0.5, y: rect.top + rect.height * 0.5 };
+    }
+    return null;
 }
 
 function syncRoamerLabels() {
@@ -433,6 +461,7 @@ function captureScreenPos() {
 }
 
 function placeRulerCenterAtLatLng(lat, lng) {
+    if (_mapZooming) return;
     var map = getMap();
     var mapEl = document.getElementById('map');
     var root = document.getElementById('map-topo-ruler');
@@ -661,6 +690,11 @@ function applyRulerScreenPos() {
 }
 
 function updateRulerWidgetPosition() {
+    if (_mapZooming) {
+        restoreFrozenScreenPos();
+        updateRulerPlateVisual();
+        return;
+    }
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
 
@@ -1076,7 +1110,8 @@ function bindMapEvents() {
 
 function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
-    updateRulerVisualOnly();
+    restoreFrozenScreenPos();
+    updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
@@ -1101,6 +1136,7 @@ export function initTopoRuler(deps) {
     initInteractions();
     bindMapEvents();
     syncFabLockUi();
+    cachePlateCenterOffset();
     updateRulerWidgetPosition();
 }
 
@@ -1112,6 +1148,7 @@ function snapTopoRulerToGpsIfAvailable() {
 }
 
 export function snapTopoRulerToLatLng(lat, lng) {
+    if (_mapZooming) return false;
     if (!getMap() || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return false;
     placeRulerCenterAtLatLng(lat, lng);
     syncCoordFieldsFromPosition();
