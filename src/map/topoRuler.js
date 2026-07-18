@@ -122,14 +122,6 @@ function latLngFromCoordInputs(w5, n5) {
     }
 }
 
-function buildRoamerGroupTransform(scale, rotDeg) {
-    var parts = ['translate(130,130)'];
-    parts.push('rotate(' + (rotDeg || 0) + ')');
-    if (scale && scale !== 1) parts.push('scale(' + scale + ')');
-    parts.push('translate(-130,-130)');
-    return parts.join(' ');
-}
-
 function gridConvergenceDegAt(lat, lng) {
     var map = getMap();
     if (!map || lat == null || lng == null) return 0;
@@ -150,11 +142,9 @@ function gridConvergenceDegAt(lat, lng) {
     return Math.atan2(ex, -ey) * 180 / Math.PI - 90;
 }
 
-function syncRoamerLabels(scale) {
+function syncRoamerLabels() {
     var lbl = document.getElementById('topo-roamer-lbl');
     if (!lbl) return;
-    var s = scale || 1;
-    var inv = s > 0.01 ? 1 / s : 1;
     var texts = lbl.querySelectorAll('text[data-ox]');
     for (var i = 0; i < texts.length; i++) {
         var t = texts[i];
@@ -162,14 +152,7 @@ function syncRoamerLabels(scale) {
         var oy = parseFloat(t.getAttribute('data-oy'));
         t.setAttribute('x', String(ox));
         t.setAttribute('y', String(oy));
-        if (Math.abs(inv - 1) > 0.001) {
-            t.setAttribute(
-                'transform',
-                'translate(' + ox + ',' + oy + ') scale(' + inv.toFixed(4) + ') translate(' + (-ox) + ',' + (-oy) + ')'
-            );
-        } else {
-            t.removeAttribute('transform');
-        }
+        t.removeAttribute('transform');
     }
 }
 
@@ -213,7 +196,7 @@ function buildRoamerScales() {
     for (i = 1; i <= 9; i++) lbl += lblText(O + 8, O + i * 10 + 2, roamer2(i), 'start', false);
     lbl += lblText(O + 8, O + L + 2, roamer2(10), 'start', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
-    syncRoamerLabels(1);
+    syncRoamerLabels();
 }
 
 function getRulerOriginLatLng() {
@@ -226,33 +209,6 @@ function getRulerOriginLatLng() {
     var x = rect.left + rect.width / 2 - mapRect.left;
     var y = rect.top + rect.height / 2 - mapRect.top;
     return map.containerPointToLatLng([x, y]);
-}
-
-function metersPerPixelAt(lat, lng) {
-    var map = getMap();
-    if (!map || !window.L) return 1;
-    var p1 = map.latLngToContainerPoint(window.L.latLng(lat, lng));
-    var p2 = map.latLngToContainerPoint(window.L.latLng(lat, lng + 0.001));
-    var px = Math.max(0.5, Math.abs(p2.x - p1.x));
-    return distM(lat, lng, lat, lng + 0.001) / px;
-}
-
-function distM(lat1, lng1, lat2, lng2) {
-    return _deps.distanceMeters(lat1, lng1, lat2, lng2);
-}
-
-function plateScaleFactor() {
-    var ll = getRulerOriginLatLng();
-    if (!ll) {
-        var map = getMap();
-        if (map) {
-            var c = map.getCenter();
-            ll = { lat: c.lat, lng: c.lng };
-        }
-    }
-    if (!ll) return 1;
-    var mpp = metersPerPixelAt(ll.lat, ll.lng);
-    return (1000 / mpp) / KM_SQUARE_SVG_PX;
 }
 
 function getRulerWidgetSize() {
@@ -451,10 +407,10 @@ function syncFabLockUi() {
     var fab = document.getElementById('fab-topo-ruler');
     if (!fab) return;
     fab.classList.toggle('is-locked', state.positionLocked);
-    fab.textContent = state.positionLocked ? '🔒' : '📐';
     fab.title = state.positionLocked
         ? 'Pravítko zamčeno · podrž 2 s = odemknout'
         : 'Pravítko · podrž 2 s = zamknout';
+    fab.setAttribute('aria-label', state.positionLocked ? 'Pravítko zamčeno' : 'Pravítko');
 }
 
 function renderBearingOnMap() {
@@ -486,6 +442,7 @@ function updateRulerPlateVisual() {
     var degEl = document.getElementById('topo-ruler-bearing');
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var centerEl = document.getElementById('topo-ruler-center');
+    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
 
@@ -493,15 +450,20 @@ function updateRulerPlateVisual() {
         ? state.anchor
         : getRulerOriginLatLng();
     var gridRot = centerLl ? gridConvergenceDegAt(centerLl.lat, centerLl.lng) : 0;
-    var roamerScale = plateScaleFactor();
+
+    if (plateWrap) {
+        plateWrap.style.transform = Math.abs(gridRot) > 0.01
+            ? ('rotate(' + gridRot.toFixed(2) + 'deg)')
+            : '';
+    }
 
     var scales = document.getElementById('topo-roamer-scales');
-    if (scales) scales.setAttribute('transform', buildRoamerGroupTransform(roamerScale, gridRot));
-    syncRoamerLabels(roamerScale);
+    if (scales) scales.removeAttribute('transform');
+
+    syncRoamerLabels();
 
     if (centerEl) {
-        centerEl.style.transform = Math.abs(gridRot) > 0.01
-            ? ('rotate(' + gridRot.toFixed(2) + 'deg)') : '';
+        centerEl.style.transform = '';
         centerEl.classList.toggle('is-locked', state.positionLocked);
     }
 

@@ -946,6 +946,26 @@
             pointer-events: auto;
             box-shadow: 0 0 10px rgba(107, 255, 90, 0.45);
             padding: 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .map-tool-fab-icon {
+            font-size: 22px;
+            line-height: 1;
+            pointer-events: none;
+        }
+        .map-tool-fab-lock-badge {
+            display: none;
+            position: absolute;
+            right: 1px;
+            bottom: 0;
+            font-size: 13px;
+            line-height: 1;
+            color: #ffb366;
+            pointer-events: none;
+            filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
         }
         .map-tool-fab.is-active {
             border-color: var(--text-green);
@@ -954,9 +974,11 @@
         }
         .map-tool-fab.is-locked {
             border-color: #ffb366;
-            color: #ffb366;
             box-shadow: 0 0 16px rgba(255, 179, 102, 0.75);
             background: rgba(24, 16, 8, 0.96);
+        }
+        .map-tool-fab.is-locked .map-tool-fab-lock-badge {
+            display: block;
         }
         .map-tool-fab.is-active.is-locked {
             border-color: #ffb366;
@@ -1390,6 +1412,7 @@
             height: 260px;
             flex-shrink: 0;
             overflow: visible;
+            transform-origin: 50% 50%;
         }
         .topo-ruler-footer {
             position: relative;
@@ -1401,9 +1424,7 @@
         .topo-ruler-plate {
             position: absolute;
             inset: 0;
-            transform-origin: 50% 50%;
             pointer-events: none;
-            transform: rotate(0deg);
         }
         .topo-gta-svg {
             width: 100%; height: 100%;
@@ -2197,7 +2218,10 @@
     </div>
 
     <div id="map-tool-fabs" aria-hidden="true">
-        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Pravítko · podrž 2 s = zamknout">📐</button>
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Pravítko · podrž 2 s = zamknout" aria-label="Pravítko">
+            <span class="map-tool-fab-icon" aria-hidden="true">📐</span>
+            <span class="map-tool-fab-lock-badge" aria-hidden="true">🔒</span>
+        </button>
         <button type="button" class="map-tool-fab map-float-hit" id="fab-route-planner" onclick="patracToggleRoutePlanner()" title="Plánovač trasy">🛤</button>
         <button type="button" class="map-tool-fab map-float-hit" id="fab-compass" onclick="patracToggleCompass()" title="Buzola">🧭</button>
     </div>
@@ -2627,7 +2651,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718av';
+        var PATRAC_BUILD = '20260718ax';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
