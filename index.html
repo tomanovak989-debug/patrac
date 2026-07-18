@@ -1327,8 +1327,8 @@
         .topo-ruler-move {
             position: relative;
             left: auto; top: auto; transform: none;
-            width: 28px; height: 44px; border: 1px solid var(--topo-accent-soft);
-            border-radius: 4px; background: rgba(6, 10, 6, 0.82); color: var(--topo-accent-dim);
+            width: 28px; height: 44px; border: 1px solid rgba(120, 255, 102, 0.45);
+            border-radius: 4px; background: rgba(6, 10, 6, 0.28); color: var(--topo-accent-dim);
             font-size: 14px; cursor: grab; line-height: 44px; text-align: center;
             text-shadow: var(--topo-text-glow);
             box-shadow: 0 0 8px var(--topo-accent-glow);
@@ -1352,8 +1352,8 @@
         }
         .topo-ruler-lock {
             width: 28px; height: 36px; padding: 0;
-            border: 1px solid var(--topo-accent-soft);
-            border-radius: 4px; background: rgba(6, 10, 6, 0.82);
+            border: 1px solid rgba(120, 255, 102, 0.45);
+            border-radius: 4px; background: rgba(6, 10, 6, 0.28);
             color: var(--topo-accent); font-size: 15px; line-height: 36px;
             text-align: center; cursor: pointer;
             box-shadow: 0 0 8px var(--topo-accent-glow);
@@ -1372,6 +1372,7 @@
         .topo-gta-svg {
             width: 100%; height: 100%;
             display: block;
+            overflow: visible;
         }
         .topo-gta-svg [stroke="#4af626"],
         .topo-gta-svg [stroke="#8fd87a"] { stroke: var(--topo-accent); stroke-width: 0.75; opacity: 1; }
@@ -1385,10 +1386,12 @@
         .topo-gta-svg rect[stroke] { vector-effect: non-scaling-stroke; }
         .topo-gta-svg g { opacity: 1; }
         .topo-roamer-lbl-text {
-            fill: var(--topo-accent-dim) !important;
-            font-size: 7px !important;
-            font-weight: 500 !important;
+            fill: var(--topo-accent) !important;
+            font-size: 8px !important;
+            font-weight: 600 !important;
             stroke: none !important;
+            paint-order: stroke fill;
+            filter: drop-shadow(0 0 2px rgba(6, 10, 6, 0.9));
         }
         .topo-ruler-bezel-hit { display: none; }
         .topo-ruler-center {
@@ -1403,6 +1406,7 @@
             z-index: 20;
             box-shadow: none;
             pointer-events: auto;
+            transform-origin: 50% 50%;
         }
         .topo-ruler-center::before,
         .topo-ruler-center::after {
@@ -1463,14 +1467,15 @@
         .topo-roamer-readout span {
             display: inline-block;
             transform: translate(-50%, -50%);
-            font-size: 8px;
-            font-weight: 500;
+            font-size: 9px;
+            font-weight: 600;
             font-family: 'IBM Plex Mono', monospace;
-            letter-spacing: 0.04em;
+            letter-spacing: 0.05em;
             color: var(--topo-accent);
-            background: rgba(6,10,6,0.94);
-            border: 1px solid var(--topo-accent);
-            padding: 1px 4px;
+            background: none;
+            border: none;
+            padding: 0;
+            text-shadow: 0 0 4px rgba(6, 10, 6, 0.95), 0 0 8px rgba(120, 255, 102, 0.75);
             pointer-events: none;
             white-space: nowrap;
         }
@@ -1542,12 +1547,13 @@
             transform: translate(-50%, -50%);
             font-size: 9px;
             font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
             color: var(--topo-accent);
             text-align: center;
-            background: rgba(6,10,6,0.82);
-            border: 1px solid var(--topo-accent-soft);
-            padding: 2px 5px;
-            box-shadow: 0 0 6px var(--topo-accent-glow);
+            background: none;
+            border: none;
+            padding: 0;
+            text-shadow: 0 0 4px rgba(6, 10, 6, 0.95), 0 0 8px rgba(120, 255, 102, 0.75);
             white-space: nowrap;
             pointer-events: none;
         }
@@ -1714,7 +1720,7 @@
                     <button type="button" class="topo-ruler-lock map-float-hit" id="topo-ruler-lock" title="Zamknout polohu">🔓</button>
                 </div>
                 <div class="topo-ruler-plate" id="topo-ruler-plate">
-                <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <defs>
                         <g id="topo-deg-tick-sm">
                             <line x1="130" y1="10" x2="130" y2="16" stroke="#78ff66" stroke-width="0.65"/>
@@ -2501,7 +2507,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718am';
+        var PATRAC_BUILD = '20260718an';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
