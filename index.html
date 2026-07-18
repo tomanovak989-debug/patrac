@@ -94,7 +94,16 @@
         #map {
             width: 100%; height: 100%; position: absolute; z-index: 1;
             background-color: #e8e4dc;
+            touch-action: pan-x pan-y pinch-zoom;
         }
+        #map-float-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 1000;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        #map-float-overlay > * { pointer-events: auto; }
         /* Dlaždice mapy — bez papírového filtru (barevný satelit) */
         #map .leaflet-tile-pane {
             filter: none;
@@ -1049,25 +1058,23 @@
         #map-compass {
             display: none;
             position: absolute;
-            left: auto;
-            top: auto;
             right: 12px;
             bottom: 108px;
-            z-index: 1000;
+            z-index: 1002;
             width: 132px;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none;
             font-family: 'IBM Plex Mono', monospace;
-            pointer-events: auto;
         }
         #map-compass.compass-positioned {
             right: auto;
             bottom: auto;
         }
-        #map-compass.compass-anchored .compass-housing {
-            border-color: var(--accent-gold);
-            box-shadow: 0 0 12px rgba(255, 200, 80, 0.55), var(--neon-glow);
+        #map-compass.compass-docked {
+            right: 12px !important;
+            bottom: 108px !important;
+            left: auto !important;
+            top: auto !important;
         }
         .compass-drag-handle {
             position: absolute;
@@ -1089,59 +1096,6 @@
             box-shadow: var(--neon-glow);
         }
         .compass-drag-handle:active { cursor: grabbing; background: rgba(20, 40, 20, 0.95); }
-        .compass-toolbar {
-            display: flex;
-            gap: 4px;
-            justify-content: center;
-            margin-top: 4px;
-        }
-        .compass-tool-btn {
-            flex: 1;
-            min-width: 0;
-            padding: 4px 2px;
-            border: 1px solid rgba(74, 246, 38, 0.55);
-            border-radius: 4px;
-            background: rgba(6, 10, 6, 0.88);
-            color: var(--text-green);
-            font-family: inherit;
-            font-size: 14px;
-            line-height: 1;
-            cursor: pointer;
-            box-shadow: var(--neon-glow);
-        }
-        .compass-tool-btn.active {
-            border-color: var(--accent-gold);
-            color: var(--accent-gold);
-            background: rgba(40, 32, 10, 0.85);
-        }
-        .compass-tool-btn:active { background: rgba(20, 40, 20, 0.95); }
-        .compass-target-arrow {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 3px;
-            height: 38px;
-            margin: -38px 0 0 -1.5px;
-            background: linear-gradient(to top, rgba(0, 180, 220, 0.35), #00ccff);
-            transform-origin: 50% 100%;
-            transform: rotate(0deg);
-            z-index: 4;
-            border-radius: 2px;
-            opacity: 0;
-            pointer-events: none;
-            box-shadow: 0 0 8px rgba(0, 204, 255, 0.75);
-        }
-        .compass-target-arrow.visible { opacity: 0.92; }
-        .compass-target-arrow::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-bottom: 8px solid #00ccff;
-        }
         #map-compass.compass-collapsed {
             width: 48px;
             bottom: 108px;
@@ -1260,6 +1214,168 @@
         }
         .compass-center-deg.is-waiting { color: var(--accent-gold); font-size: 14px; }
 
+        /* Topografické pravítko */
+        #map-topo-ruler {
+            display: none;
+            position: absolute;
+            right: 12px;
+            bottom: 164px;
+            z-index: 1003;
+            user-select: none;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        #map-topo-ruler.topo-ruler-positioned { right: auto; bottom: auto; }
+        #map-topo-ruler.topo-ruler-docked {
+            right: 12px !important;
+            bottom: 164px !important;
+            left: auto !important;
+            top: auto !important;
+        }
+        #map-topo-ruler.topo-ruler-collapsed { width: 48px; }
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-body,
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-mini-bar { display: none; }
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-widget-toggle {
+            position: relative; top: 0; right: 0;
+            width: 48px; height: 48px; border-radius: 50%; font-size: 20px;
+        }
+        .topo-ruler-widget-toggle {
+            position: absolute; top: -6px; right: -6px; z-index: 5;
+            width: 26px; height: 26px; padding: 0;
+            border: 1px solid rgba(0, 204, 255, 0.65); border-radius: 4px;
+            background: rgba(6, 10, 6, 0.92); color: #00ccff;
+            font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 204, 255, 0.45);
+        }
+        .topo-ruler-body {
+            position: relative;
+            width: 140px;
+            min-height: 48px;
+            padding: 8px 6px 6px 22px;
+        }
+        .topo-ruler-move {
+            position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 18px; height: 32px; border: 1px solid rgba(0,204,255,0.5);
+            border-radius: 3px; background: rgba(6,10,6,0.85); color: #6ec;
+            font-size: 12px; cursor: grab; line-height: 32px; text-align: center;
+        }
+        .topo-ruler-arm-wrap {
+            position: relative;
+            height: 28px;
+            transform-origin: 0% 50%;
+        }
+        .topo-ruler-arm {
+            position: absolute;
+            left: 0; top: 50%;
+            height: 4px;
+            width: 120px;
+            margin-top: -2px;
+            background: linear-gradient(90deg, rgba(255,200,80,0.9), rgba(0,204,255,0.85));
+            border-radius: 2px;
+            box-shadow: 0 0 6px rgba(0,204,255,0.5);
+            transform-origin: 0% 50%;
+        }
+        .topo-ruler-center {
+            position: absolute;
+            left: -6px; top: 50%;
+            width: 12px; height: 12px;
+            margin-top: -6px;
+            border-radius: 50%;
+            border: 2px solid #ffc850;
+            background: rgba(255,200,80,0.35);
+            cursor: pointer;
+            z-index: 2;
+        }
+        .topo-ruler-center.anchored { background: #ffc850; }
+        .topo-ruler-tip {
+            position: absolute;
+            right: -8px; top: 50%;
+            width: 14px; height: 14px;
+            margin-top: -7px;
+            border-radius: 50%;
+            border: 2px solid #00ccff;
+            background: rgba(0,204,255,0.45);
+            cursor: grab;
+            z-index: 2;
+        }
+        .topo-ruler-bearing {
+            position: absolute;
+            left: 50%; top: -14px;
+            transform: translateX(-50%);
+            font-size: 10px; font-weight: 700;
+            color: #00ccff;
+            text-shadow: 0 0 4px #000;
+            white-space: nowrap;
+        }
+        .topo-ruler-scale {
+            margin-top: 4px;
+            font-size: 8px;
+            color: var(--text-green-dim);
+            line-height: 1.25;
+            max-width: 200px;
+        }
+        .topo-ruler-glass {
+            background: rgba(6, 10, 6, 0.38);
+            border: 1px solid rgba(0, 204, 255, 0.45);
+            border-radius: 6px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 10px rgba(0, 204, 255, 0.2);
+        }
+        .topo-ruler-mini-bar {
+            display: flex;
+            gap: 3px;
+            margin-top: 4px;
+            align-items: center;
+        }
+        .topo-ruler-mini-bar input,
+        .topo-ruler-mini-bar select {
+            flex: 1;
+            min-width: 0;
+            font-size: 9px;
+            padding: 3px 4px;
+            background: rgba(6,10,6,0.9);
+            border: 1px solid rgba(0,204,255,0.4);
+            color: var(--text-green);
+            font-family: inherit;
+        }
+        .topo-ruler-mini-bar button {
+            font-size: 9px;
+            padding: 3px 5px;
+            border: 1px solid rgba(0,204,255,0.5);
+            background: rgba(6,10,6,0.9);
+            color: #00ccff;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .topo-ruler-total {
+            font-size: 9px;
+            color: var(--accent-gold);
+            margin-top: 3px;
+            text-align: center;
+            font-weight: 700;
+        }
+        .topo-ruler-seg-label {
+            background: none !important;
+            border: none !important;
+        }
+        .topo-ruler-seg-label span {
+            display: block;
+            transform: translate(-50%, -50%);
+            font-size: 9px;
+            font-family: 'IBM Plex Mono', monospace;
+            color: #e8ffe8;
+            text-align: center;
+            text-shadow: 0 0 4px #000, 0 0 8px #000;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .topo-ruler-map-dot { background: none !important; border: none !important; }
+        .topo-ruler-map-dot span {
+            display: block;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            box-shadow: 0 0 4px #000;
+        }
+
         /* Smírčí kříž (Pocta) */
         .pocta-cross-icon { display: inline-block; position: relative; vertical-align: middle; }
         .pocta-cross-sm { width: 10px; height: 14px; }
@@ -1338,12 +1454,10 @@
             .map-tac-value { font-size: 11px; margin-top: 1px; }
             .map-tac-label { font-size: 6px; letter-spacing: 0.06em; }
             .map-tac-sub { font-size: 8px; }
-            #map-compass {
-                width: 118px;
-            }
-            #map-compass.compass-collapsed { bottom: auto; }
+            #map-compass { width: 118px; }
+            #map-compass.compass-docked { bottom: 48px !important; right: 6px !important; }
+            #map-topo-ruler.topo-ruler-docked { bottom: 104px !important; right: 6px !important; }
             .compass-drag-handle { width: 20px; height: 32px; line-height: 32px; font-size: 12px; left: -8px; }
-            .compass-tool-btn { font-size: 12px; padding: 3px 1px; }
             .compass-housing { width: 118px; height: 118px; }
             .compass-center-deg { font-size: 28px; }
             .compass-center-deg.is-waiting { font-size: 11px; max-width: 70px; text-align: center; line-height: 1.1; }
@@ -1375,10 +1489,69 @@
 <body class="theme-standard theme-dark">
 
     <div id="map"></div>
-    
+    <div id="map-float-overlay" aria-hidden="true">
+    <div id="map-topo-ruler" aria-label="Topografické pravítko">
+        <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle" title="Skrýt pravítko">−</button>
+        <div class="topo-ruler-body topo-ruler-glass" id="topo-ruler-body">
+            <button type="button" class="topo-ruler-move" id="topo-ruler-move" title="Přesunout">⠿</button>
+            <div class="topo-ruler-arm-wrap" id="topo-ruler-arm-wrap">
+                <div class="topo-ruler-arm" id="topo-ruler-arm">
+                    <span class="topo-ruler-bearing" id="topo-ruler-bearing">—°</span>
+                    <button type="button" class="topo-ruler-center" id="topo-ruler-center" title="Ukotvit / odpoutat střed"></button>
+                    <button type="button" class="topo-ruler-tip" id="topo-ruler-tip" title="Táhni pro směrník k cíli"></button>
+                </div>
+            </div>
+            <div class="topo-ruler-scale" id="topo-ruler-scale"></div>
+            <div class="topo-ruler-total" id="topo-ruler-total">Σ —</div>
+            <div class="topo-ruler-mini-bar">
+                <input type="text" id="topo-ruler-route-name" placeholder="Název trasy" maxlength="40">
+                <button type="button" id="btn-topo-add-wp" title="Bod uprostřed nejdelší úsečky">+</button>
+                <button type="button" id="btn-topo-save-route" title="Uložit trasu">💾</button>
+            </div>
+            <select id="topo-ruler-route-select" style="width:100%;margin-top:3px;font-size:9px;background:rgba(6,10,6,0.9);border:1px solid rgba(0,204,255,0.4);color:var(--text-green);font-family:inherit;"></select>
+        </div>
+    </div>
+    <div id="map-compass" aria-label="Kompas s azimutem">
+        <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle" title="Skrýt buzolu">−</button>
+        <div class="compass-body">
+        <button type="button" class="compass-drag-handle" id="compass-drag-handle" title="Přesunout buzolu">⠿</button>
+        <div class="compass-housing">
+            <div class="compass-index-line" title="Směrník / lubber line"></div>
+            <div class="compass-north-arrow" id="compass-north-arrow" title="Sever">
+                <span class="compass-north-label">N</span>
+            </div>
+            <div class="compass-center-deg is-waiting" id="compass-center-deg">—°</div>
+            <div class="compass-rose-wrap" id="compass-rose-wrap">
+                <svg class="compass-rose" id="compass-rose" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(74,246,38,0.55)" stroke-width="1.5"/>
+                    <g stroke="rgba(74,246,38,0.45)" stroke-width="1">
+                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(0 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(30 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(60 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(90 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(120 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(150 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(180 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(210 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(240 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(270 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(300 100 100)"/>
+                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(330 100 100)"/>
+                    </g>
+                    <text x="100" y="30" text-anchor="middle" fill="#4af626" font-size="10" font-weight="700" font-family="IBM Plex Mono, monospace">360/0°</text>
+                    <text x="174" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">90°</text>
+                    <text x="100" y="180" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">180°</text>
+                    <text x="26" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">270°</text>
+                </svg>
+            </div>
+        </div>
+        </div>
+    </div>
+    </div>
+
     <!-- NOVÉ OVERLAY PRO ZAMĚŘENÍ -->
     <div id="map-crosshair"><div class="crosshair-ring"></div></div>
-        <div id="map-targeting-bar">
+    <div id="map-targeting-bar">
         <div id="targeting-bar-title" style="font-size:var(--text-md); color:var(--text-green); margin-bottom:8px; font-weight:bold; text-transform:uppercase; text-shadow:var(--text-glow);">Taktický režim: Posuňte cíl do kříže</div>
         <button class="btn-accept" style="width:100%; padding:10px; border-color:var(--text-green); color:var(--text-green);" id="btn-lock-target">📍 POTVRDIT LOKACI (STŘED MAPY)</button>
         <button class="btn-accept" style="width:100%; margin-top:8px; border-color:var(--muted-fg); color:var(--muted-fg); padding:8px;" onclick="cancelTargeting(); switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);">ZRUŠIT ZAMĚŘOVÁNÍ</button>
@@ -1625,6 +1798,7 @@
     </div>
 
     <div class="hud-element" id="map-tools-bar">
+        <button class="tool-btn" style="border-color:#00ccff; color:#00ccff;" onclick="patracToggleTopoRuler()" title="Topografické pravítko"><div>📐</div>PRAVÍTKO</button>
         <button class="tool-btn" style="border-color:var(--xp-blue); color:var(--xp-blue);" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
         <button class="tool-btn" style="border-color:var(--accent-gold); color:var(--accent-gold);" onclick="openMeasurePanel()" title="Měření"><div>📏</div>MĚŘIT</button>
         <button class="tool-btn" style="border-color:var(--text-green); color:var(--text-green);" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
@@ -1681,49 +1855,6 @@
         <button class="btn-accept" style="width:100%; margin-top:4px; border-color:var(--accent-gold); color:var(--accent-gold); padding:6px;" onclick="setMeasurePoint('B')">② BOD B (STŘED)</button>
         <div id="measure-result" style="font-size:var(--text-md); color:var(--text-green); margin-top:6px; text-align:center; min-height:14px; font-weight:600;"></div>
         <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeMeasurePanel()">ZAVŘÍT</button>
-    </div>
-
-    <!-- Plovoucí kompas (mapa HUD) -->
-    <div id="map-compass" aria-label="Kompas s azimutem">
-        <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle" title="Skrýt buzolu">−</button>
-        <div class="compass-body">
-        <button type="button" class="compass-drag-handle" id="compass-drag-handle" title="Přesunout buzolu">⠿</button>
-        <div class="compass-housing">
-            <div class="compass-index-line" title="Směrník / lubber line"></div>
-            <div class="compass-target-arrow" id="compass-target-arrow" title="Směr k cíli"></div>
-            <div class="compass-north-arrow" id="compass-north-arrow" title="Sever">
-                <span class="compass-north-label">N</span>
-            </div>
-            <div class="compass-center-deg is-waiting" id="compass-center-deg">—°</div>
-            <div class="compass-rose-wrap" id="compass-rose-wrap">
-                <svg class="compass-rose" id="compass-rose" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(74,246,38,0.55)" stroke-width="1.5"/>
-                    <g stroke="rgba(74,246,38,0.45)" stroke-width="1">
-                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(0 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(30 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(60 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(90 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(120 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(150 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(180 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(210 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(240 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="18" transform="rotate(270 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(300 100 100)"/>
-                        <line x1="100" y1="8" x2="100" y2="14" transform="rotate(330 100 100)"/>
-                    </g>
-                    <text x="100" y="30" text-anchor="middle" fill="#4af626" font-size="10" font-weight="700" font-family="IBM Plex Mono, monospace">360/0°</text>
-                    <text x="174" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">90°</text>
-                    <text x="100" y="180" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">180°</text>
-                    <text x="26" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">270°</text>
-                </svg>
-            </div>
-        </div>
-        <div class="compass-toolbar">
-            <button type="button" id="btn-compass-pin" class="compass-tool-btn" title="Ukotvit střed buzoly na bod pod ní">📍</button>
-            <button type="button" id="btn-compass-target" class="compass-tool-btn" title="Cíl = střed mapy (zelený kříž)">🎯</button>
-        </div>
-        </div>
     </div>
 
     <!-- STŘEDOVÝ PANEL -->
@@ -2102,7 +2233,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718t';
+        var PATRAC_BUILD = '20260718u';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2116,6 +2247,8 @@
         var mapPointsLayer = null;
         var mapMeasureLayer = null;
         var mapCompassLayer = null;
+        var mapRouteLayer = null;
+        var topoRulerMod = null;
         var mapMarkerRegistry = {};
         var measureState = { pointA: null, pointB: null, line: null, markerA: null, markerB: null };
         var mapV3Module = null;
@@ -2130,10 +2263,6 @@
         var compassNeedsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
             typeof DeviceOrientationEvent.requestPermission === 'function';
         var compassScreenPos = { x: null, y: null };
-        var compassAnchor = null;
-        var compassTarget = null;
-        var compassBearLine = null;
-        var compassAnchorMarker = null;
         var compassFloatListenersBound = false;
         var mapLayerFilterState = null;
         var lastUserPosition = null;
@@ -4358,9 +4487,11 @@
             if (map !== null) {
                 ensureMapPanes();
                 if (!mapCompassLayer) mapCompassLayer = L.layerGroup().addTo(map);
+                if (!mapRouteLayer) mapRouteLayer = L.layerGroup().addTo(map);
                 reloadAllMapPoints();
                 initMapV3Ui();
                 initCompassFloating();
+                initTopoRulerModule();
                 return;
             }
             try {
@@ -4375,6 +4506,7 @@
                 mapPointsLayer = L.layerGroup().addTo(map);
                 mapMeasureLayer = L.layerGroup().addTo(map);
                 mapCompassLayer = L.layerGroup().addTo(map);
+                mapRouteLayer = L.layerGroup().addTo(map);
 
                 var tilePref = localStorage.getItem('map_tile_style') || 'satellite';
                 switchMapTile(tilePref);
@@ -4392,6 +4524,7 @@
                 startGeolocation();
                 initMapV3Ui();
                 initCompassFloating();
+                initTopoRulerModule();
             } catch(e) {
                 console.error('initMap', e);
             }
@@ -4483,8 +4616,8 @@
             return false;
         }
 
-        function getActiveCompassTarget() {
-            return compassTarget || mapNavTarget;
+        function getHudDockBottom() {
+            return window.innerWidth <= 480 ? 48 : 108;
         }
 
         function loadCompassPlacementFromStorage() {
@@ -4493,11 +4626,6 @@
             if (!isNaN(x) && !isNaN(y)) {
                 compassScreenPos.x = x;
                 compassScreenPos.y = y;
-            }
-            var lat = parseFloat(localStorage.getItem('patrac_compass_anchor_lat'));
-            var lng = parseFloat(localStorage.getItem('patrac_compass_anchor_lng'));
-            if (!isNaN(lat) && !isNaN(lng)) {
-                compassAnchor = { lat: lat, lng: lng };
             }
         }
 
@@ -4509,270 +4637,151 @@
             } catch (e) {}
         }
 
-        function saveCompassAnchor() {
-            try {
-                if (compassAnchor) {
-                    localStorage.setItem('patrac_compass_anchor_lat', String(compassAnchor.lat));
-                    localStorage.setItem('patrac_compass_anchor_lng', String(compassAnchor.lng));
-                } else {
-                    localStorage.removeItem('patrac_compass_anchor_lat');
-                    localStorage.removeItem('patrac_compass_anchor_lng');
-                }
-            } catch (e) {}
-        }
-
-        function ensureCompassInMapContainer() {
-            var root = document.getElementById('map-compass');
-            var mapEl = document.getElementById('map');
-            if (root && mapEl && root.parentElement !== mapEl) {
-                mapEl.appendChild(root);
-            }
-        }
-
         function getCompassDefaultScreenPos() {
             if (!map) return { x: 12, y: 12 };
             var root = document.getElementById('map-compass');
             var size = map.getSize();
             var w = (root && root.offsetWidth) ? root.offsetWidth : 132;
-            var h = (root && root.offsetHeight) ? root.offsetHeight : 170;
+            var h = (root && root.offsetHeight) ? root.offsetHeight : 150;
             return {
                 x: Math.max(8, size.x - w - 12),
-                y: Math.max(8, size.y - h - 56)
+                y: Math.max(8, size.y - h - getHudDockBottom() - 8)
             };
         }
 
-        function getCompassCenterContainerPoint() {
+        function applyCompassDockPosition() {
             var root = document.getElementById('map-compass');
-            var mapEl = document.getElementById('map');
-            if (!root || !mapEl || !map) return null;
-            var mapRect = mapEl.getBoundingClientRect();
-            var rect = root.getBoundingClientRect();
-            return {
-                x: rect.left + rect.width / 2 - mapRect.left,
-                y: rect.top + rect.height / 2 - mapRect.top
-            };
-        }
-
-        function getCompassCenterLatLng() {
-            var pt = getCompassCenterContainerPoint();
-            if (!pt || !map) return null;
-            var ll = map.containerPointToLatLng([pt.x, pt.y]);
-            return { lat: ll.lat, lng: ll.lng };
-        }
-
-        function updateCompassPinUi() {
-            var root = document.getElementById('map-compass');
-            var btn = document.getElementById('btn-compass-pin');
-            if (root) root.classList.toggle('compass-anchored', !!compassAnchor);
-            if (btn) {
-                btn.classList.toggle('active', !!compassAnchor);
-                btn.title = compassAnchor ? 'Odpoutat buzolu od mapy' : 'Ukotvit střed buzoly na bod pod ní';
+            if (!root) return;
+            if (root.classList.contains('compass-collapsed')) {
+                root.classList.remove('compass-positioned');
+                root.classList.add('compass-docked');
+                root.style.left = '';
+                root.style.top = '';
+                root.style.right = (window.innerWidth <= 480 ? 6 : 12) + 'px';
+                root.style.bottom = getHudDockBottom() + 'px';
+                return;
             }
+            root.classList.remove('compass-docked');
+            updateCompassScreenPosition();
         }
 
         function updateCompassScreenPosition() {
             var root = document.getElementById('map-compass');
-            if (!root || !map) return;
-            if (compassAnchor) {
-                var pt = map.latLngToContainerPoint([compassAnchor.lat, compassAnchor.lng]);
-                root.classList.add('compass-positioned');
-                root.style.left = Math.round(pt.x - root.offsetWidth / 2) + 'px';
-                root.style.top = Math.round(pt.y - root.offsetHeight / 2) + 'px';
-                return;
-            }
+            if (!root || !map || root.classList.contains('compass-collapsed')) return;
             if (compassScreenPos.x == null || compassScreenPos.y == null) {
                 var def = getCompassDefaultScreenPos();
                 compassScreenPos.x = def.x;
                 compassScreenPos.y = def.y;
             }
             root.classList.add('compass-positioned');
+            root.style.right = 'auto';
+            root.style.bottom = 'auto';
             root.style.left = Math.round(compassScreenPos.x) + 'px';
             root.style.top = Math.round(compassScreenPos.y) + 'px';
         }
 
-        function updateCompassAnchorMarker() {
-            if (!map || !mapCompassLayer) return;
-            if (compassAnchorMarker) {
-                mapCompassLayer.removeLayer(compassAnchorMarker);
-                compassAnchorMarker = null;
-            }
-            if (!compassAnchor) return;
-            compassAnchorMarker = L.circleMarker([compassAnchor.lat, compassAnchor.lng], {
-                radius: 5,
-                color: '#ffc850',
-                weight: 2,
-                fillColor: '#ffc850',
-                fillOpacity: 0.85,
-                pane: 'mapMeasurePane'
-            }).addTo(mapCompassLayer);
-            compassAnchorMarker.bindTooltip('A · buzola', { permanent: false, direction: 'top' });
-        }
-
-        function updateCompassBearLine() {
-            if (!map || !mapCompassLayer) return;
-            if (compassBearLine) {
-                mapCompassLayer.removeLayer(compassBearLine);
-                compassBearLine = null;
-            }
-            var tgt = getActiveCompassTarget();
-            if (!compassAnchor || !tgt) return;
-            compassBearLine = L.polyline(
-                [[compassAnchor.lat, compassAnchor.lng], [tgt.lat, tgt.lng]],
-                { color: '#00ccff', weight: 2, dashArray: '5,7', pane: 'mapMeasurePane' }
-            ).addTo(mapCompassLayer);
-        }
-
-        function updateCompassTargetArrow() {
-            var arrow = document.getElementById('compass-target-arrow');
-            var btn = document.getElementById('btn-compass-target');
-            var tgt = getActiveCompassTarget();
-            if (btn) btn.classList.toggle('active', !!(compassAnchor && tgt));
-            if (!arrow || !compassAnchor || !tgt) {
-                if (arrow) arrow.classList.remove('visible');
-                return;
-            }
-            var brng = bearingDegrees(compassAnchor.lat, compassAnchor.lng, tgt.lat, tgt.lng);
-            arrow.classList.add('visible');
-            arrow.style.transform = 'rotate(' + normalizeDeg(brng) + 'deg)';
-        }
-
-        function toggleCompassAnchor() {
-            if (compassAnchor) {
-                var pt = getCompassCenterContainerPoint();
-                if (pt) {
-                    compassScreenPos.x = Math.round(pt.x - (document.getElementById('map-compass').offsetWidth / 2));
-                    compassScreenPos.y = Math.round(pt.y - (document.getElementById('map-compass').offsetHeight / 2));
-                    saveCompassScreenPos();
-                }
-                compassAnchor = null;
-            } else {
-                var ll = getCompassCenterLatLng();
-                if (!ll) return;
-                compassAnchor = ll;
-            }
-            saveCompassAnchor();
-            updateCompassPinUi();
-            updateCompassScreenPosition();
-            updateCompassAnchorMarker();
-            updateCompassBearLine();
-            updateCompassTargetArrow();
-            updateTacticalHud();
-        }
-
-        function setCompassTargetFromMapCenter() {
-            var center = getMapCenterCoords();
-            compassTarget = { lat: center.lat, lng: center.lng, label: 'Cíl' };
-            updateCompassBearLine();
-            updateCompassTargetArrow();
-            updateTacticalHud();
-        }
-
-        function initCompassFloating() {
-            ensureCompassInMapContainer();
-            loadCompassPlacementFromStorage();
-            updateCompassPinUi();
-            updateCompassScreenPosition();
-            updateCompassAnchorMarker();
-            updateCompassBearLine();
-            updateCompassTargetArrow();
-
-            if (!compassFloatListenersBound && map) {
-                compassFloatListenersBound = true;
-                map.on('move zoom zoomend moveend resize', updateCompassScreenPosition);
-            }
-
+        function bindCompassMoveHandle() {
             var handle = document.getElementById('compass-drag-handle');
-            var pinBtn = document.getElementById('btn-compass-pin');
-            var targetBtn = document.getElementById('btn-compass-target');
-            if (handle && !handle._compassMoveBound) {
-                handle._compassMoveBound = true;
-                var moving = false;
-                var moveStart = null;
-                var originPos = null;
-                function ptr(e) {
-                    return { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
+            if (!handle || handle._compassMoveBound) return;
+            handle._compassMoveBound = true;
+            var moving = false;
+            var moveStart = null;
+            var originPos = null;
+            function ptr(e) {
+                return { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
+            }
+            function onMoveDrag(e) {
+                if (!moveStart) return;
+                var p = ptr(e);
+                var dx = p.x - moveStart.x;
+                var dy = p.y - moveStart.y;
+                if (!moving) {
+                    if (Math.hypot(dx, dy) < 6) return;
+                    moving = true;
                 }
-                function onMoveStart(e) {
-                    if (e.target.closest && e.target.closest('.compass-tool-btn')) return;
-                    moving = false;
-                    moveStart = ptr(e);
-                    originPos = {
-                        x: compassScreenPos.x != null ? compassScreenPos.x : getCompassDefaultScreenPos().x,
-                        y: compassScreenPos.y != null ? compassScreenPos.y : getCompassDefaultScreenPos().y
-                    };
-                    if (compassAnchor) {
-                        var pt = getCompassCenterContainerPoint();
-                        var root = document.getElementById('map-compass');
-                        if (pt && root) {
-                            originPos.x = pt.x - root.offsetWidth / 2;
-                            originPos.y = pt.y - root.offsetHeight / 2;
-                        }
-                        compassAnchor = null;
-                        saveCompassAnchor();
-                        updateCompassPinUi();
-                        updateCompassAnchorMarker();
-                        updateCompassBearLine();
-                    }
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-                function onMoveDrag(e) {
-                    if (!moveStart) return;
-                    var p = ptr(e);
-                    var dx = p.x - moveStart.x;
-                    var dy = p.y - moveStart.y;
-                    if (!moving) {
-                        if (Math.hypot(dx, dy) < 6) return;
-                        moving = true;
-                    }
-                    e.preventDefault();
-                    var root = document.getElementById('map-compass');
-                    var size = map ? map.getSize() : { x: window.innerWidth, y: window.innerHeight };
-                    var w = root ? root.offsetWidth : 132;
-                    var h = root ? root.offsetHeight : 170;
-                    compassScreenPos.x = Math.max(0, Math.min(size.x - w, originPos.x + dx));
-                    compassScreenPos.y = Math.max(0, Math.min(size.y - h, originPos.y + dy));
-                    updateCompassScreenPosition();
-                }
-                function onMoveEnd() {
-                    if (moving) saveCompassScreenPos();
-                    moving = false;
-                    moveStart = null;
-                    originPos = null;
-                }
-                handle.addEventListener('mousedown', onMoveStart);
-                handle.addEventListener('touchstart', onMoveStart, { passive: false });
+                e.preventDefault();
+                e.stopPropagation();
+                var root = document.getElementById('map-compass');
+                var size = map ? map.getSize() : { x: window.innerWidth, y: window.innerHeight };
+                var w = root ? root.offsetWidth : 132;
+                var h = root ? root.offsetHeight : 150;
+                compassScreenPos.x = Math.max(0, Math.min(size.x - w, originPos.x + dx));
+                compassScreenPos.y = Math.max(0, Math.min(size.y - h, originPos.y + dy));
+                updateCompassScreenPosition();
+            }
+            function onMoveEnd() {
+                document.removeEventListener('mousemove', onMoveDrag);
+                document.removeEventListener('touchmove', onMoveDrag);
+                document.removeEventListener('mouseup', onMoveEnd);
+                document.removeEventListener('touchend', onMoveEnd);
+                if (moving) saveCompassScreenPos();
+                moving = false;
+                moveStart = null;
+                originPos = null;
+            }
+            function onMoveStart(e) {
+                var root = document.getElementById('map-compass');
+                if (!root || root.classList.contains('compass-collapsed')) return;
+                moving = false;
+                moveStart = ptr(e);
+                originPos = {
+                    x: compassScreenPos.x != null ? compassScreenPos.x : getCompassDefaultScreenPos().x,
+                    y: compassScreenPos.y != null ? compassScreenPos.y : getCompassDefaultScreenPos().y
+                };
+                e.preventDefault();
+                e.stopPropagation();
                 document.addEventListener('mousemove', onMoveDrag);
                 document.addEventListener('touchmove', onMoveDrag, { passive: false });
                 document.addEventListener('mouseup', onMoveEnd);
                 document.addEventListener('touchend', onMoveEnd);
             }
-            if (pinBtn && !pinBtn._compassPinBound) {
-                pinBtn._compassPinBound = true;
-                pinBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    toggleCompassAnchor();
-                });
-            }
-            if (targetBtn && !targetBtn._compassTargetBound) {
-                targetBtn._compassTargetBound = true;
-                targetBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setCompassTargetFromMapCenter();
-                    updateCompassUi();
+            handle.addEventListener('mousedown', onMoveStart);
+            handle.addEventListener('touchstart', onMoveStart, { passive: false });
+        }
+
+        function initCompassFloating() {
+            loadCompassPlacementFromStorage();
+            applyCompassDockPosition();
+            bindCompassMoveHandle();
+            if (!compassFloatListenersBound && map) {
+                compassFloatListenersBound = true;
+                map.on('move zoom zoomend moveend resize', function() {
+                    if (!document.getElementById('map-compass').classList.contains('compass-collapsed')) {
+                        updateCompassScreenPosition();
+                    }
                 });
             }
         }
 
+        function initTopoRulerModule() {
+            if (topoRulerMod) return;
+            import('./src/map/topoRuler.js?v=' + PATRAC_BUILD).then(function(mod) {
+                topoRulerMod = mod;
+                mod.initTopoRuler({
+                    getMap: function() { return map; },
+                    routeLayer: mapRouteLayer,
+                    bearingDegrees: bearingDegrees,
+                    distanceMeters: distanceMeters,
+                    formatDistance: formatDistance,
+                    onUiUpdate: updateTacticalHud
+                });
+                updateTopoRulerDisplay();
+            }).catch(function(err) { console.warn('[topoRuler]', err); });
+        }
+
+        function updateTopoRulerDisplay() {
+            if (!topoRulerMod) return;
+            var userWants = localStorage.getItem('patrac_topo_ruler_visible') !== 'false';
+            topoRulerMod.updateTopoRulerDisplay(userWants && _mapToolsTabActive && !isMapOverlayOpen());
+        }
+        window.patracToggleTopoRuler = function() {
+            var next = localStorage.getItem('patrac_topo_ruler_visible') === 'false';
+            localStorage.setItem('patrac_topo_ruler_visible', next ? 'true' : 'false');
+            updateTopoRulerDisplay();
+        };
+
         function setMapNavTarget(lat, lng, label) {
             mapNavTarget = { lat: lat, lng: lng, label: label || 'Cíl' };
-            if (compassAnchor) {
-                compassTarget = { lat: lat, lng: lng, label: label || 'Cíl' };
-                updateCompassBearLine();
-                updateCompassTargetArrow();
-            }
             updateCompassUi();
         }
         window.setMapNavTarget = setMapNavTarget;
@@ -4789,22 +4798,17 @@
             var bezEl = document.getElementById('map-tac-bezel');
             var bez = normalizeDeg(compassBezelDeg);
             if (bezEl) bezEl.textContent = bez.toFixed(0) + '°';
-            var origin = compassAnchor;
-            if (!origin && lastUserPosition) {
-                origin = { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
-            }
-            var target = getActiveCompassTarget();
-            if (!origin || !target) {
+            if (!lastUserPosition || !mapNavTarget) {
                 if (azEl) azEl.textContent = '—°';
                 if (distEl) distEl.textContent = '—';
-                if (walkEl) walkEl.textContent = compassAnchor ? 'Dej cíl 🎯' : 'Vyber bod';
+                if (walkEl) walkEl.textContent = 'Vyber bod';
                 return;
             }
-            var brng = bearingDegrees(origin.lat, origin.lng, target.lat, target.lng);
-            var distM = distanceMeters(origin.lat, origin.lng, target.lat, target.lng);
+            var brng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
+            var distM = distanceMeters(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
             if (azEl) azEl.textContent = brng.toFixed(0) + '°';
             if (distEl) distEl.textContent = distM < 1000 ? Math.round(distM) + ' m' : (distM / 1000).toFixed(2) + ' km';
-            if (walkEl) walkEl.textContent = compassAnchor ? 'A→B buzolou' : ('cca ' + Math.max(1, Math.round(distM / 70)) + ' min');
+            if (walkEl) walkEl.textContent = 'cca ' + Math.max(1, Math.round(distM / 70)) + ' min';
         }
 
         function updateCompassCenterDeg() {
@@ -4831,6 +4835,7 @@
                 btn.title = expanded ? 'Skrýt buzolu' : 'Zobrazit buzolu';
             }
             try { localStorage.setItem('patrac_compass_expanded', expanded ? '1' : '0'); } catch (e) {}
+            applyCompassDockPosition();
         }
 
         function initCompassWidgetToggle() {
@@ -4981,10 +4986,6 @@
                     y: e.touches ? e.touches[0].clientY : e.clientY
                 };
             }
-            function onStart(e) {
-                dragStart = pointerFromEvent(e);
-                dragging = false;
-            }
             function onMove(e) {
                 if (!dragStart) return;
                 var p = pointerFromEvent(e);
@@ -4994,6 +4995,7 @@
                     if (Math.hypot(dx, dy) < 10) return;
                     dragging = true;
                     e.preventDefault();
+                    e.stopPropagation();
                 }
                 var dragAngle = angleFromEvent(e);
                 compassBezelDeg = dragAngle;
@@ -5003,11 +5005,23 @@
                 updateCompassUi();
             }
             function onEnd(e) {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('mouseup', onEnd);
+                document.removeEventListener('touchend', onEnd);
                 if (!dragging && dragStart) {
                     enableCompassFromUserGesture();
                 }
                 dragging = false;
                 dragStart = null;
+            }
+            function onStart(e) {
+                dragStart = pointerFromEvent(e);
+                dragging = false;
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('touchmove', onMove, { passive: false });
+                document.addEventListener('mouseup', onEnd);
+                document.addEventListener('touchend', onEnd);
             }
             function bindActivate(el) {
                 if (!el || el._compassActivateBound) return;
@@ -5020,10 +5034,6 @@
             }
             wrap.addEventListener('mousedown', onStart);
             wrap.addEventListener('touchstart', onStart, { passive: true });
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('touchmove', onMove, { passive: false });
-            document.addEventListener('mouseup', onEnd);
-            document.addEventListener('touchend', onEnd);
             bindActivate(housing);
             if (!compassNeedsPermission) {
                 attachCompassOrientationListeners();
@@ -5980,7 +5990,6 @@
         function updateCompassUi() {
             updateCompassCenterDeg();
             applyCompassNorthArrow();
-            updateCompassTargetArrow();
             updateTacticalHud();
         }
 
@@ -6023,12 +6032,13 @@
             var layersDrop = document.getElementById('map-layers-dropdown');
             if (layersDrop && !show) layersDrop.classList.remove('open');
             updateMapCompassDisplay();
-            if (show) updateCompassScreenPosition();
+            updateTopoRulerDisplay();
             updateTacticalHud();
             if (show) {
                 resetMapBearingRotation();
                 updateCompassPermissionUi();
                 updateCompassUi();
+                applyCompassDockPosition();
             } else {
                 resetMapBearingRotation();
             }
