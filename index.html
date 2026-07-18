@@ -1842,7 +1842,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718c';
+        var PATRAC_BUILD = '20260718d';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5400,6 +5400,27 @@
             }
         }
 
+        function resetRegisterForm() {
+            var ids = [
+                'input-gate-user-id', 'input-gate-email', 'input-gate-password', 'input-gate-password2',
+                'input-com-name', 'input-com-code', 'input-player-name', 'input-desc'
+            ];
+            for (var i = 0; i < ids.length; i++) {
+                var el = document.getElementById(ids[i]);
+                if (el) el.value = '';
+            }
+            var comMode = document.getElementById('input-com-mode');
+            if (comMode) comMode.value = 'create';
+            var fileInput = document.getElementById('input-file');
+            if (fileInput) fileInput.value = '';
+            base64Avatar = '';
+            var prev = document.getElementById('avatar-setup-preview');
+            if (prev) prev.innerHTML = 'NO DATA';
+            var btn = document.getElementById('btn-register-submit');
+            if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+            try { onRegComModeChange(); } catch (e) {}
+        }
+
         function switchGatePage(pageId) {
             var panels = document.querySelectorAll('.gate-panel');
             for (var i = 0; i < panels.length; i++) panels[i].classList.remove('active');
@@ -5409,6 +5430,7 @@
             hideGateError('gate-register-error');
             hideGateError('gate-recover-error');
             hideGateError('gate-operator-error');
+            if (pageId === 'gate-register') resetRegisterForm();
             if (pageId === 'gate-operator') populateOperatorCommunitySelect();
         }
 
@@ -7508,6 +7530,8 @@
         }
 
         function completeRegisterAfterAuth(comName, comCode, comMode, userId, email, pass, playerName) {
+            var launched = false;
+            try {
             var accounts = getPatracAccounts();
             var playerCode = generatePatracCode();
             if (comMode === 'create') {
@@ -7515,10 +7539,6 @@
             } else {
                 addMemberToCommunity(comCode, userId);
             }
-
-            var profile = getPlayerProfile();
-            profile.currentClan = comName;
-            savePlayerProfile(profile);
 
             var descText = document.getElementById('input-desc').value.trim();
             accounts[userId] = slimPatracAccount({
@@ -7530,17 +7550,18 @@
                 playerCode: playerCode
             });
             savePatracAccounts(accounts);
-            saveUserDesc(userId, descText);
-            var avatarSaved = true;
-            if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
 
             var defaultProfile = createDefaultUserProfileData(userId);
-            saveUserProfileData(userId, defaultProfile);
             beginSessionForUser(userId, {
                 profileData: defaultProfile,
                 comName: comName,
                 resetChronicle: true
             });
+
+            saveUserDesc(userId, descText);
+            var avatarSaved = true;
+            if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
+            saveUserProfileData(userId, defaultProfile);
 
             try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
 
@@ -7559,12 +7580,24 @@
             operatorEditDraft = null;
             operatorEditDirty = false;
 
-            return import('./src/services/playerService.js').then(function(mod) {
+            resetRegisterForm();
+            launched = true;
+            alert(msg);
+            launchGame();
+
+            import('./src/services/playerService.js').then(function(mod) {
                 return mod.syncPlayerFromLocalStorage(userId);
-            }).then(function() {
-                alert(msg);
-                launchGame();
+            }).catch(function(err) {
+                console.warn('[register] player cloud sync', err);
             });
+            } catch (err) {
+                console.error('[register] completeRegisterAfterAuth', err);
+                if (!launched) {
+                    registerSubmitFail(err.message || 'gate.errors.registerFailed');
+                    return Promise.reject(err);
+                }
+            }
+            return Promise.resolve();
         }
 
         function runRegisterAuthFlow(comName, comCode, comMode, userId, email, pass, playerName, submitBtn) {
