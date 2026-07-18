@@ -71,9 +71,10 @@
         .item-craft-card,
         .lustrace-box,
         .tool-btn,
-        #map-targeting-bar,
         #map-add-poi-bar,
-        #map-measure-bar,
+        #map-story-bar,
+        #poi-edit-bar,
+        #story-pos-edit-bar,
         .chronicle-entry,
         .faction-table {
             box-shadow: var(--neon-glow);
@@ -905,14 +906,47 @@
         #map-tools-bar .tool-btn { width: 52px; height: 38px; font-size: var(--text-micro); }
         #map-tools-bar select { background: var(--hud-bg); border: 1px solid var(--hud-border); color: var(--text-green); font-size: var(--text-xxs); padding: 6px; font-family: inherit; width: 52px; box-shadow: var(--neon-glow); text-shadow: var(--text-glow); }
 
-        #map-add-poi-bar, #map-measure-bar {
+        #map-add-poi-bar, #map-story-bar, #poi-edit-bar, #story-pos-edit-bar {
             display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
             background: var(--overlay-bg); border: 1px solid var(--xp-blue);
             padding: 16px; box-sizing: border-box; border-radius: 2px;
             box-shadow: 0 0 14px rgba(0,136,255,0.4), 0 0 28px rgba(0,136,255,0.12);
             line-height: var(--panel-line-height);
         }
-        #map-measure-bar { border-color: var(--accent-gold); box-shadow: 0 0 14px rgba(255,204,0,0.35), 0 0 28px rgba(255,204,0,0.1); }
+        #map-story-bar { border-color: var(--hud-border); box-shadow: var(--neon-glow); }
+        #poi-edit-bar, #story-pos-edit-bar { border-color: var(--xp-blue); }
+
+        #map-tool-fabs {
+            display: none;
+            position: fixed;
+            right: 8px;
+            bottom: 168px;
+            z-index: 1002;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        #map-tool-fabs.visible { display: flex; }
+        .map-tool-fab {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            border: 2px solid var(--topo-accent, #78ff66);
+            background: rgba(6, 10, 6, 0.92);
+            color: var(--text-green);
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            pointer-events: auto;
+            box-shadow: 0 0 10px rgba(107, 255, 90, 0.45);
+            padding: 0;
+        }
+        .map-tool-fab.is-active {
+            border-color: var(--text-green);
+            box-shadow: 0 0 14px rgba(74, 246, 38, 0.75);
+            background: rgba(12, 24, 12, 0.96);
+        }
+        .topo-ruler-widget-toggle,
+        .compass-widget-toggle { display: none !important; }
 
         .leaflet-tooltip.map-point-label {
             background: var(--overlay-bg) !important;
@@ -1298,7 +1332,10 @@
             font-size: 14px; cursor: grab; line-height: 44px; text-align: center;
             text-shadow: var(--topo-text-glow);
             box-shadow: 0 0 8px var(--topo-accent-glow);
+            pointer-events: auto;
+            touch-action: none;
         }
+        .topo-ruler-move:active { cursor: grabbing; }
         .topo-ruler-move.is-disabled,
         .topo-ruler-move:disabled {
             opacity: 0.35; cursor: not-allowed; pointer-events: none;
@@ -1342,7 +1379,10 @@
         .topo-gta-svg [fill="#8fd87a"] { fill: var(--topo-accent-dim); opacity: 1; }
         .topo-gta-svg text:not(.topo-roamer-lbl-text) { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; opacity: 1 !important; }
         .topo-gta-svg rect[stroke] { stroke-width: 1 !important; opacity: 1; }
-        .topo-gta-svg line { stroke-width: 0.65; opacity: 1; }
+        .topo-gta-svg line { stroke-width: 0.65; opacity: 1; vector-effect: non-scaling-stroke; }
+        .topo-gta-svg polygon,
+        .topo-gta-svg path,
+        .topo-gta-svg rect[stroke] { vector-effect: non-scaling-stroke; }
         .topo-gta-svg g { opacity: 1; }
         .topo-roamer-lbl-text {
             fill: var(--topo-accent-dim) !important;
@@ -1357,11 +1397,11 @@
             width: 32px; height: 32px;
             margin: -16px 0 0 -16px;
             border-radius: 50%;
-            border: 1px solid var(--topo-accent);
-            background: rgba(6, 10, 6, 0.92);
+            border: none;
+            background: transparent;
             cursor: pointer;
             z-index: 20;
-            box-shadow: 0 0 8px var(--topo-accent-glow);
+            box-shadow: none;
             pointer-events: auto;
         }
         .topo-ruler-center::before,
@@ -1384,8 +1424,8 @@
         }
         .topo-ruler-center.anchored,
         .topo-ruler-center.is-locked {
-            background: rgba(6, 10, 6, 0.88);
-            border-color: var(--topo-accent);
+            background: transparent;
+            border: none;
             cursor: grab;
         }
         .topo-ruler-center.is-locked:active { cursor: grabbing; }
@@ -1517,6 +1557,7 @@
             border-radius: 50%;
             border: 2px solid var(--topo-accent-soft);
             box-shadow: 0 0 6px var(--topo-accent-glow);
+            pointer-events: auto;
         }
         .mgrs-grid-label { background: none !important; border: none !important; }
         .mgrs-grid-label span {
@@ -1591,14 +1632,14 @@
         .map-v3-popup-time { font-size: 9px; color: #666; border-top: 1px dotted #333; padding-top: 6px; margin-top: 6px; }
 
         #map-tactical-hud {
-            display: none; position: absolute; top: 44px; left: 60px; right: 68px; z-index: 340;
+            display: none; position: absolute; top: 44px; left: 60px; right: 120px; z-index: 340;
             gap: 6px; flex-wrap: nowrap; pointer-events: none;
         }
         #map-tactical-hud.visible { display: flex; }
         .map-tac-tile {
-            flex: 1; min-width: 0; max-width: none;
-            background: rgba(6, 10, 6, 0.72); border: 1px solid rgba(74,246,38,0.45);
-            padding: 6px 8px; backdrop-filter: blur(6px); box-shadow: var(--neon-glow);
+            flex: 0 1 auto; min-width: 0; max-width: 100%;
+            background: rgba(6, 10, 6, 0.88); border: 1px solid rgba(74,246,38,0.55);
+            padding: 6px 10px; backdrop-filter: blur(6px); box-shadow: var(--neon-glow);
         }
         .map-tac-tile.map-tac-tile-bezel { flex: 0.85; }
         .map-tac-label { display: block; font-size: 8px; color: var(--stat-label-color); letter-spacing: 0.1em; }
@@ -1608,9 +1649,10 @@
         /* Leaflet posouvá mapPane přes transform — nezasahovat. */
         @media (max-width: 480px) {
             #map-tactical-hud {
-                top: 38px; left: 50px; right: 50px; gap: 3px;
+                top: 38px; left: 50px; right: 64px; gap: 3px;
             }
-            #map-tactical-hud .map-tac-tile-bezel { display: none; }
+            #map-tool-fabs { bottom: 104px; right: 6px; }
+            .map-tool-fab { width: 46px; height: 46px; font-size: 20px; }
             .map-tac-tile { padding: 3px 5px; }
             .map-tac-value { font-size: 11px; margin-top: 1px; }
             .map-tac-label { font-size: 6px; letter-spacing: 0.06em; }
@@ -1674,66 +1716,43 @@
                 <div class="topo-ruler-plate" id="topo-ruler-plate">
                 <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <defs>
-                        <g id="topo-deg-tick">
-                            <line x1="130" y1="6" x2="130" y2="14" stroke="#4af626" stroke-width="1.2"/>
+                        <g id="topo-deg-tick-sm">
+                            <line x1="130" y1="10" x2="130" y2="16" stroke="#78ff66" stroke-width="0.65"/>
                         </g>
-                        <g id="topo-mil-tick">
-                            <line x1="130" y1="2" x2="130" y2="8" stroke="#8fd87a" stroke-width="0.8"/>
+                        <g id="topo-deg-tick-lg">
+                            <line x1="130" y1="6" x2="130" y2="18" stroke="#78ff66" stroke-width="0.85"/>
                         </g>
                     </defs>
-                    <rect x="4" y="4" width="252" height="252" rx="10" fill="none" stroke="#4af626" stroke-width="1.2"/>
-                    <g stroke="#4af626" stroke-width="0.8">
-                        <use href="#topo-deg-tick" transform="rotate(0 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(10 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(20 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(30 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(40 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(50 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(60 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(70 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(80 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(90 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(100 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(110 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(120 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(130 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(140 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(150 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(160 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(170 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(180 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(190 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(200 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(210 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(220 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(230 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(240 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(250 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(260 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(270 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(280 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(290 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(300 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(310 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(320 130 130)"/>
-                        <use href="#topo-deg-tick" transform="rotate(330 130 130)"/>
+                    <rect x="4" y="4" width="252" height="252" rx="10" fill="none" stroke="#78ff66" stroke-width="1"/>
+                    <g stroke="#78ff66">
+                        <use href="#topo-deg-tick-lg" transform="rotate(0 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(20 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(40 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(60 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(80 130 130)"/>
+                        <use href="#topo-deg-tick-lg" transform="rotate(90 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(100 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(120 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(140 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(160 130 130)"/>
+                        <use href="#topo-deg-tick-lg" transform="rotate(180 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(200 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(220 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(240 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(260 130 130)"/>
+                        <use href="#topo-deg-tick-lg" transform="rotate(270 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(280 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(300 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(320 130 130)"/>
+                        <use href="#topo-deg-tick-sm" transform="rotate(340 130 130)"/>
                     </g>
-                    <text x="130" y="24" text-anchor="middle" fill="#4af626" font-size="8" font-weight="600" font-family="IBM Plex Mono, monospace">0°</text>
-                    <text x="236" y="134" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">90</text>
-                    <text x="130" y="244" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
-                    <text x="24" y="134" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
-                    <text x="130" y="14" text-anchor="middle" fill="#8fd87a" font-size="5" font-family="IBM Plex Mono, monospace">6400</text>
-                    <text x="246" y="134" text-anchor="middle" fill="#8fd87a" font-size="5" font-family="IBM Plex Mono, monospace">1600</text>
-                    <g fill="none" stroke="#4af626" stroke-width="1">
-                        <path d="M182 242 L242 242 L242 182"/>
-                        <path d="M18 182 L18 242 L78 242"/>
-                    </g>
-                    <text x="212" y="228" fill="#4af626" font-size="7" font-family="IBM Plex Mono, monospace">1:25k</text>
-                    <text x="48" y="228" fill="#4af626" font-size="7" font-family="IBM Plex Mono, monospace">1:100k</text>
-                    <line x1="48" y1="212" x2="212" y2="48" stroke="#4af626" stroke-width="1.2" stroke-dasharray="4,3"/>
+                    <text x="130" y="26" text-anchor="middle" fill="#78ff66" font-size="8" font-weight="600" font-family="IBM Plex Mono, monospace">0°</text>
+                    <text x="234" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">90</text>
+                    <text x="130" y="242" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
+                    <text x="26" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
                     <!-- NATO roamer — generuje buildRoamerScales() -->
                     <g id="topo-roamer-scales"></g>
-                    <polygon points="130,18 126,28 134,28" fill="#4af626"/>
+                    <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
                 </svg>
                 <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Táhni směrník ze středu"></button>
                 <span class="topo-ruler-tip" id="topo-ruler-tip" aria-hidden="true"></span>
@@ -1747,13 +1766,7 @@
                     <span class="topo-ruler-total" id="topo-ruler-total">Σ —</span>
                 </div>
                 <div class="topo-ruler-mini-bar">
-                    <select id="topo-ruler-map-scale" class="map-float-hit" title="Měřítko mapy">
-                        <option value="25000">1:25k</option>
-                        <option value="50000">1:50k</option>
-                        <option value="100000">1:100k</option>
-                    </select>
                     <input type="text" class="map-float-hit" id="topo-ruler-route-name" placeholder="Trasa" maxlength="40">
-                    <button type="button" class="map-float-hit" id="btn-topo-add-wp" title="Bod uprostřed nejdelší úsečky">+</button>
                     <button type="button" class="map-float-hit" id="btn-topo-save-route" title="Uložit trasu">💾</button>
                 </div>
                 <select id="topo-ruler-route-select" class="topo-ruler-route-select map-float-hit"></select>
@@ -2051,16 +2064,20 @@
     </div>
 
     <div id="map-tactical-hud" aria-hidden="true">
-        <div class="map-tac-tile map-tac-tile-mgrs"><span class="map-tac-label">MGRS NATO</span><span class="map-tac-value" id="map-tac-mgrs">—</span><span class="map-tac-sub" id="map-tac-mgrs-sub">střed mapy · 100 m</span></div>
-        <div class="map-tac-tile"><span class="map-tac-label">AZIMUT K CÍLI</span><span class="map-tac-value" id="map-tac-azimuth">—°</span><span class="map-tac-sub" id="map-tac-azimuth-rad"></span></div>
-        <div class="map-tac-tile"><span class="map-tac-label">VZDÁLENOST</span><span class="map-tac-value" id="map-tac-distance">—</span><span class="map-tac-sub" id="map-tac-walk">—</span></div>
-        <div class="map-tac-tile map-tac-tile-bezel"><span class="map-tac-label">LUNETA</span><span class="map-tac-value" id="map-tac-bezel">0°</span><span class="map-tac-sub" id="map-tac-bezel-rad"></span></div>
+        <div class="map-tac-tile map-tac-tile-mgrs">
+            <span class="map-tac-label">MGRS NATO · GPS</span>
+            <span class="map-tac-value" id="map-tac-mgrs">—</span>
+            <span class="map-tac-sub" id="map-tac-mgrs-sub">—</span>
+        </div>
+    </div>
+
+    <div id="map-tool-fabs" aria-hidden="true">
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Topografické pravítko">📐</button>
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-compass" onclick="patracToggleCompass()" title="Buzola">🧭</button>
     </div>
 
     <div class="hud-element" id="map-tools-bar">
-        <button class="tool-btn" style="border-color:var(--text-green); color:var(--text-green);" onclick="patracToggleTopoRuler()" title="Topografické pravítko"><div>📐</div>PRAVÍTKO</button>
         <button class="tool-btn" style="border-color:var(--xp-blue); color:var(--xp-blue);" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
-        <button class="tool-btn" style="border-color:var(--accent-gold); color:var(--accent-gold);" onclick="openMeasurePanel()" title="Měření"><div>📏</div>MĚŘIT</button>
         <button class="tool-btn" style="border-color:var(--text-green); color:var(--text-green);" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
         <select id="map-tile-select" onchange="switchMapTile(this.value)" title="Globální mapa">
             <option value="satellite">🛰️ Sat</option>
@@ -2106,15 +2123,6 @@
         <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 8px 0;">Tyto body jsou trvalé. Lze je znovu zaměřit nebo resetovat, nikdy nezmizí z hry.</p>
         <div id="map-story-positions-list"></div>
         <button class="btn-accept" style="width:100%; margin-top:8px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeStoryPositionsPanel()">ZAVŘÍT</button>
-    </div>
-
-    <div id="map-measure-bar">
-        <div style="font-size:var(--text-base); color:var(--accent-gold); font-weight:bold; margin-bottom:6px;">📏 MĚŘENÍ VZDÁLENOSTI (VZDUCH ČAROU)</div>
-        <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 6px 0;">Posuň mapu — zelený kříž ve středu = bod A / B.</p>
-        <button class="btn-accept" style="width:100%; border-color:var(--accent-gold); color:var(--accent-gold); padding:6px;" onclick="setMeasurePoint('A')">① BOD A (STŘED)</button>
-        <button class="btn-accept" style="width:100%; margin-top:4px; border-color:var(--accent-gold); color:var(--accent-gold); padding:6px;" onclick="setMeasurePoint('B')">② BOD B (STŘED)</button>
-        <div id="measure-result" style="font-size:var(--text-md); color:var(--text-green); margin-top:6px; text-align:center; min-height:14px; font-weight:600;"></div>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeMeasurePanel()">ZAVŘÍT</button>
     </div>
 
     <!-- STŘEDOVÝ PANEL -->
@@ -2493,7 +2501,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718ai';
+        var PATRAC_BUILD = '20260718am';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2511,7 +2519,6 @@
         var topoRulerMod = null;
         var mgrsGridMod = null;
         var mapMarkerRegistry = {};
-        var measureState = { pointA: null, pointB: null, line: null, markerA: null, markerB: null };
         var mapV3Module = null;
         var mapNavTarget = null;
         var compassBezelDeg = parseFloat(localStorage.getItem('patrac_compass_bezel') || '0') || 0;
@@ -5063,24 +5070,18 @@
         };
 
         window.patracUpdateMgrsReadout = function() {
-            if (!mgrsGridMod || !_mapToolsTabActive || isMapOverlayOpen()) return;
+            if (!mgrsGridMod || !_mapToolsTabActive) return;
             var mgrsEl = document.getElementById('map-tac-mgrs');
             var subEl = document.getElementById('map-tac-mgrs-sub');
             if (!mgrsEl) return;
             var lat = null;
             var lng = null;
             var src = 'střed mapy';
-            var tr = null;
-            if (topoRulerMod) {
-                tr = topoRulerMod.getTopoRulerState();
-                if (tr && tr.visible !== false && topoRulerMod.getRulerCenterLatLng) {
-                    var rll = topoRulerMod.getRulerCenterLatLng();
-                    if (rll) {
-                        lat = rll.lat;
-                        lng = rll.lng;
-                        src = tr.positionLocked ? 'střed pravítka 🔒' : 'střed pravítka';
-                    }
-                }
+            if (lastUserPosition && isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
+                lat = lastUserPosition.lat;
+                lng = lastUserPosition.lng;
+                var acc = lastUserPosition.accuracy ? Math.round(lastUserPosition.accuracy) : null;
+                src = acc != null ? ('GPS ±' + acc + ' m') : 'GPS';
             }
             if (lat == null && map) {
                 var c = map.getCenter();
@@ -5089,18 +5090,25 @@
             }
             if (lat == null) {
                 mgrsEl.textContent = '—';
-                if (subEl) subEl.textContent = '';
+                if (subEl) subEl.textContent = 'čekám na GPS…';
                 return;
             }
-            if (topoRulerMod && tr && tr.positionLocked && topoRulerMod.formatRulerMgrs50) {
+            var mgrsAcc = (src.indexOf('GPS') >= 0) ? 5 : (mgrsGridMod.getMgrsAccuracy ? mgrsGridMod.getMgrsAccuracy() : 3);
+            if (topoRulerMod && topoRulerMod.formatRulerMgrs50 && mgrsAcc >= 5) {
                 mgrsEl.textContent = topoRulerMod.formatRulerMgrs50(lat, lng);
-                if (subEl) subEl.textContent = src + ' · 50 m · 5 číslic';
             } else {
-                var acc = mgrsGridMod.getMgrsAccuracy ? mgrsGridMod.getMgrsAccuracy() : 3;
-                mgrsEl.textContent = mgrsGridMod.mgrsAtLatLng(lat, lng, acc);
-                if (subEl) subEl.textContent = src + ' · ' + mgrsGridMod.mgrsPrecisionText(acc);
+                mgrsEl.textContent = mgrsGridMod.mgrsAtLatLng(lat, lng, mgrsAcc);
+            }
+            if (subEl) {
+                subEl.textContent = formatLatLngDegrees(lat, lng) + ' · ' + src + ' · ' + mgrsGridMod.mgrsPrecisionText(mgrsAcc);
             }
         };
+
+        function formatLatLngDegrees(lat, lng) {
+            var ns = lat >= 0 ? 'N' : 'S';
+            var ew = lng >= 0 ? 'E' : 'W';
+            return Math.abs(lat).toFixed(5) + '°' + ns + ' · ' + Math.abs(lng).toFixed(5) + '°' + ew;
+        }
 
         function initTopoRulerModule() {
             if (topoRulerMod) {
@@ -5127,7 +5135,9 @@
         function updateTopoRulerDisplay() {
             var root = document.getElementById('map-topo-ruler');
             var userWants = localStorage.getItem('patrac_topo_ruler_visible') !== 'false';
-            var show = userWants && _mapToolsTabActive && !isMapOverlayOpen();
+            var show = userWants && _mapToolsTabActive;
+            var fab = document.getElementById('fab-topo-ruler');
+            if (fab) fab.classList.toggle('is-active', show);
             if (!topoRulerMod) {
                 if (root) {
                     root.style.display = show ? 'block' : 'none';
@@ -5136,12 +5146,23 @@
                 return;
             }
             topoRulerMod.updateTopoRulerDisplay(show);
+            if (fab) fab.classList.toggle('is-active', show);
         }
         window.patracToggleTopoRuler = function() {
             var next = localStorage.getItem('patrac_topo_ruler_visible') === 'false';
             localStorage.setItem('patrac_topo_ruler_visible', next ? 'true' : 'false');
             updateTopoRulerDisplay();
         };
+        window.patracToggleCompass = function() {
+            var next = localStorage.getItem('patrac_compass_visible') === 'false';
+            localStorage.setItem('patrac_compass_visible', next ? 'true' : 'false');
+            updateMapCompassDisplay();
+        };
+
+        function updateMapToolFabs() {
+            var fabs = document.getElementById('map-tool-fabs');
+            if (fabs) fabs.classList.toggle('visible', !!_mapToolsTabActive);
+        }
 
         function setMapNavTarget(lat, lng, label) {
             mapNavTarget = { lat: lat, lng: lng, label: label || 'Cíl' };
@@ -5153,26 +5174,8 @@
         function updateTacticalHud() {
             var hud = document.getElementById('map-tactical-hud');
             if (!hud) return;
-            var show = _mapToolsTabActive && !isMapOverlayOpen();
-            hud.classList.toggle('visible', show);
-            var azEl = document.getElementById('map-tac-azimuth');
-            var distEl = document.getElementById('map-tac-distance');
-            var walkEl = document.getElementById('map-tac-walk');
-            var bezEl = document.getElementById('map-tac-bezel');
-            var bez = normalizeDeg(compassBezelDeg);
-            if (bezEl) bezEl.textContent = bez.toFixed(0) + '°';
+            hud.classList.toggle('visible', !!_mapToolsTabActive);
             if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
-            if (!lastUserPosition || !mapNavTarget) {
-                if (azEl) azEl.textContent = '—°';
-                if (distEl) distEl.textContent = '—';
-                if (walkEl) walkEl.textContent = 'Vyber bod';
-                return;
-            }
-            var brng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
-            var distM = distanceMeters(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
-            if (azEl) azEl.textContent = brng.toFixed(0) + '°';
-            if (distEl) distEl.textContent = distM < 1000 ? Math.round(distM) + ' m' : (distM / 1000).toFixed(2) + ' km';
-            if (walkEl) walkEl.textContent = 'cca ' + Math.max(1, Math.round(distM / 70)) + ' min';
         }
 
         function updateCompassCenterDeg() {
@@ -5646,7 +5649,6 @@
         function openStoryPositionsPanel() {
             cancelTargeting();
             closeAddPoiPanel();
-            closeMeasurePanel();
             closePoiEditor();
             closeStoryPosEditor();
             renderStoryPositionsList();
@@ -5662,7 +5664,6 @@
 
         function closeAllMapPanels() {
             closeAddPoiPanel();
-            closeMeasurePanel();
             closeStoryPositionsPanel();
             closePoiEditor();
         }
@@ -5723,7 +5724,6 @@
             if (!found) return;
             var poi = found.poi;
             closeStoryPositionsPanel();
-            closeMeasurePanel();
             closeStoryPosEditor();
             document.getElementById('poi-edit-id').value = poiId;
             document.getElementById('poi-edit-name').value = poi.name || '';
@@ -5754,7 +5754,6 @@
         function openStoryPosEditor(questId) {
             if (!gameQuests[questId] || !isStoryQuestPlaced(questId)) return;
             closeStoryPositionsPanel();
-            closeMeasurePanel();
             closeAddPoiPanel();
             closePoiEditor();
             document.getElementById('story-pos-edit-id').value = questId;
@@ -6338,14 +6337,6 @@
             return ((d % 360) + 360) % 360;
         }
 
-        function getMeasureBearing() {
-            if (!measureState.pointA || !measureState.pointB) return null;
-            return bearingDegrees(
-                measureState.pointA.lat, measureState.pointA.lng,
-                measureState.pointB.lat, measureState.pointB.lng
-            );
-        }
-
         function updateCompassUi() {
             updateCompassCenterDeg();
             applyCompassNorthArrow();
@@ -6365,7 +6356,6 @@
 
         function isMapOverlayOpen() {
             return !!activeTargetingQuest
-                || isMeasurePanelOpen()
                 || isPoiPanelOpen()
                 || isOverlayPanelVisible('poi-edit-bar')
                 || isOverlayPanelVisible('story-pos-edit-bar')
@@ -6376,7 +6366,10 @@
             var compass = document.getElementById('map-compass');
             if (!compass) return;
             var userWants = localStorage.getItem('patrac_compass_visible') !== 'false';
-            compass.style.display = (userWants && _mapToolsTabActive && !isMapOverlayOpen()) ? 'block' : 'none';
+            var show = userWants && _mapToolsTabActive;
+            compass.style.display = show ? 'block' : 'none';
+            var fab = document.getElementById('fab-compass');
+            if (fab) fab.classList.toggle('is-active', show);
         }
         window.updateMapCompassDisplay = updateMapCompassDisplay;
 
@@ -6390,6 +6383,7 @@
             if (layersPanel) layersPanel.classList.toggle('visible', show);
             var layersDrop = document.getElementById('map-layers-dropdown');
             if (layersDrop && !show) layersDrop.classList.remove('open');
+            updateMapToolFabs();
             updateMapCompassDisplay();
             updateTopoRulerDisplay();
             updateTacticalHud();
@@ -6405,11 +6399,6 @@
             }
         }
 
-        function isMeasurePanelOpen() {
-            var bar = document.getElementById('map-measure-bar');
-            return bar && bar.style.display === 'block';
-        }
-
         function isPoiPanelOpen() {
             var bar = document.getElementById('map-add-poi-bar');
             return bar && bar.style.display === 'block';
@@ -6418,15 +6407,12 @@
         function updateMapCrosshair() {
             var el = document.getElementById('map-crosshair');
             if (!el) return;
-            var show = isMeasurePanelOpen()
-                || (canUseMapPlacement() && (!!activeTargetingQuest || isPoiPanelOpen()));
+            var show = canUseMapPlacement() && (!!activeTargetingQuest || isPoiPanelOpen());
             el.style.display = show ? 'block' : 'none';
-            updateMapCompassDisplay();
         }
 
         function openAddPoiPanel() {
             cancelTargeting();
-            closeMeasurePanel();
             closeStoryPositionsPanel();
             closePoiEditor();
             closeStoryPosEditor();
@@ -6483,73 +6469,6 @@
             closeAddPoiPanel();
             alert('Bod „' + name + '“ uložen. Poznámku a foto doplníš kdykoli v detailu bodu.');
             syncCommunityPoisToCloud();
-        }
-
-        function openMeasurePanel() {
-            cancelTargeting();
-            closeAddPoiPanel();
-            closeStoryPositionsPanel();
-            closePoiEditor();
-            closeStoryPosEditor();
-            clearMeasureGraphics();
-            document.getElementById('map-measure-bar').style.display = 'block';
-            document.getElementById('measure-result').textContent = '';
-            switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
-            updateMapCrosshair();
-        }
-
-        function closeMeasurePanel() {
-            document.getElementById('map-measure-bar').style.display = 'none';
-            clearMeasureGraphics();
-            updateMapCrosshair();
-        }
-
-        function clearMeasureGraphics() {
-            measureState.pointA = null;
-            measureState.pointB = null;
-            if (mapMeasureLayer) mapMeasureLayer.clearLayers();
-            measureState.line = null;
-            measureState.markerA = null;
-            measureState.markerB = null;
-            updateCompassUi();
-        }
-
-        function setMeasurePoint(which) {
-            if (!map) return;
-            var center = getMapCenterCoords();
-            if (which === 'A') {
-                measureState.pointA = center;
-                if (measureState.markerA) mapMeasureLayer.removeLayer(measureState.markerA);
-                measureState.markerA = L.circleMarker([center.lat, center.lng], {
-                    radius: 7, color: '#ffcc00', weight: 2, fillColor: '#ffcc00', fillOpacity: 0.8,
-                    pane: 'mapMeasurePane'
-                }).addTo(mapMeasureLayer);
-                measureState.markerA.bindTooltip('A', { permanent: true, direction: 'top' });
-            } else {
-                measureState.pointB = center;
-                if (measureState.markerB) mapMeasureLayer.removeLayer(measureState.markerB);
-                measureState.markerB = L.circleMarker([center.lat, center.lng], {
-                    radius: 7, color: '#ff5500', weight: 2, fillColor: '#ff5500', fillOpacity: 0.8,
-                    pane: 'mapMeasurePane'
-                }).addTo(mapMeasureLayer);
-                measureState.markerB.bindTooltip('B', { permanent: true, direction: 'top' });
-            }
-            if (measureState.pointA && measureState.pointB) {
-                if (measureState.line) mapMeasureLayer.removeLayer(measureState.line);
-                var latlngs = [
-                    [measureState.pointA.lat, measureState.pointA.lng],
-                    [measureState.pointB.lat, measureState.pointB.lng]
-                ];
-                measureState.line = L.polyline(latlngs, { color: '#ffcc00', weight: 2, dashArray: '6,6' }).addTo(mapMeasureLayer);
-                var dist = haversineKm(measureState.pointA.lat, measureState.pointA.lng, measureState.pointB.lat, measureState.pointB.lng);
-                var brng = getMeasureBearing();
-                var rad = brng * Math.PI / 180;
-                var txt = '📏 ' + formatDistance(dist) + ' · Azimut ' + brng.toFixed(1) + '° (' + rad.toFixed(3) + ' rad)';
-                document.getElementById('measure-result').textContent = txt;
-                updateCompassUi();
-            } else {
-                updateCompassUi();
-            }
         }
 
         function appendItemHistory(item, entry) {
@@ -6902,7 +6821,6 @@
 
             cancelTargeting();
             closeAddPoiPanel();
-            closeMeasurePanel();
             closeStoryPositionsPanel();
             closePoiEditor();
             closeLoreEditor();
@@ -9256,7 +9174,6 @@
             if (activeTargetingQuest && tab !== 'map-only') cancelTargeting();
             if (tab !== 'map-only') {
                 closeAddPoiPanel();
-                closeMeasurePanel();
                 closeStoryPositionsPanel();
                 closePoiEditor();
             }
@@ -9512,11 +9429,8 @@
         window.previewPoiEditImage = previewPoiEditImage;
         window.onCustomLocModeChange = onCustomLocModeChange;
         window.openAddPoiPanel = openAddPoiPanel;
-        window.openMeasurePanel = openMeasurePanel;
         window.confirmAddMapPoi = confirmAddMapPoi;
         window.closeAddPoiPanel = closeAddPoiPanel;
-        window.closeMeasurePanel = closeMeasurePanel;
-        window.setMeasurePoint = setMeasurePoint;
         window.centerMapToShelter = centerMapToShelter;
         window.switchMapTile = switchMapTile;
 

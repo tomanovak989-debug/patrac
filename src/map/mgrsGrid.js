@@ -16,8 +16,8 @@ var _layer = null;
 var _visible = true;
 var _bound = false;
 var _MGRS_ACCURACY = 3;
-var _GREEN = 'rgba(74,246,38,0.42)';
-var _GREEN_BOLD = 'rgba(74,246,38,0.72)';
+var _GREEN = 'rgba(120,255,102,0.58)';
+var _GREEN_BOLD = 'rgba(120,255,102,0.88)';
 
 var STORAGE_KEY = 'patrac_mgrs_grid_visible';
 var ACC_STORAGE_KEY = 'patrac_mgrs_accuracy';
@@ -95,8 +95,8 @@ function drawGrid() {
         var bold = e % 10000 === 0;
         var line = window.L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
             color: bold ? _GREEN_BOLD : _GREEN,
-            weight: bold ? 1.5 : 1,
-            opacity: bold ? 0.85 : 0.55,
+            weight: bold ? 2 : 1.25,
+            opacity: bold ? 0.95 : 0.72,
             interactive: false,
             pane: 'mapGridPane'
         });
@@ -123,8 +123,8 @@ function drawGrid() {
         var boldN = n % 10000 === 0;
         var lineN = window.L.polyline([[q1.lat, q1.lng], [q2.lat, q2.lng]], {
             color: boldN ? _GREEN_BOLD : _GREEN,
-            weight: boldN ? 1.5 : 1,
-            opacity: boldN ? 0.85 : 0.55,
+            weight: boldN ? 2 : 1.25,
+            opacity: boldN ? 0.95 : 0.72,
             interactive: false,
             pane: 'mapGridPane'
         });

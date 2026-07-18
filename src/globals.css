@@ -289,7 +289,6 @@ body.theme-light .setup-container,
 body.theme-light .chronicle-entry,
 body.theme-light #map-targeting-bar,
 body.theme-light #map-add-poi-bar,
-body.theme-light #map-measure-bar,
 body.theme-light #poi-edit-bar,
 body.theme-light #story-pos-edit-bar {
     box-shadow: var(--neon-glow);
