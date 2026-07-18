@@ -122,6 +122,55 @@ function latLngFromCoordInputs(w5, n5) {
     }
 }
 
+function normalizeDeg(deg) {
+    var d = deg % 360;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return d;
+}
+
+/** Pixely na mapě pro 1 km v místě středu pravítka. */
+function pxPerKmAt(lat, lng) {
+    var map = getMap();
+    if (!map || lat == null || lng == null) return KM_SQUARE_SVG_PX;
+    var utm = latLngToUtm(lat, lng);
+    var zone = utm.zone;
+    var p0 = map.latLngToContainerPoint([lat, lng]);
+    var pE = map.latLngToContainerPoint(utmToLatLng(utm.easting + 1000, utm.northing, zone, lat));
+    var pN = map.latLngToContainerPoint(utmToLatLng(utm.easting, utm.northing + 1000, zone, lat));
+    var pxE = Math.hypot(pE.x - p0.x, pE.y - p0.y);
+    var pxN = Math.hypot(pN.x - p0.x, pN.y - p0.y);
+    return Math.max(1, (pxE + pxN) * 0.5);
+}
+
+/** Měřítko roameru: 100 SVG px = 1 km na mapě (mění se zoomem). */
+function roamerScaleAt(lat, lng) {
+    return pxPerKmAt(lat, lng) / KM_SQUARE_SVG_PX;
+}
+
+/** Natočení roameru podle MGRS mřížky — výchozí osy západ (vlevo) + jih (dolů). */
+function gridRotDegForRoamer(lat, lng) {
+    var map = getMap();
+    if (!map || lat == null || lng == null) return 0;
+    var utm = latLngToUtm(lat, lng);
+    var zone = utm.zone;
+    var p0 = map.latLngToContainerPoint([lat, lng]);
+    var pW = map.latLngToContainerPoint(utmToLatLng(utm.easting - 1000, utm.northing, zone, lat));
+    var wx = pW.x - p0.x;
+    var wy = pW.y - p0.y;
+    if (Math.hypot(wx, wy) < 0.5) return 0;
+    var gridWestDeg = Math.atan2(wy, wx) * 180 / Math.PI;
+    return normalizeDeg(gridWestDeg - 180);
+}
+
+function buildRoamerTransform(scale, rotDeg) {
+    var parts = ['translate(130,130)'];
+    if (rotDeg && Math.abs(rotDeg) > 0.01) parts.push('rotate(' + rotDeg.toFixed(2) + ')');
+    if (scale && Math.abs(scale - 1) > 0.001) parts.push('scale(' + scale.toFixed(4) + ')');
+    parts.push('translate(-130,-130)');
+    return parts.join(' ');
+}
+
 function getPlateCenterScreenPoint() {
     var root = document.getElementById('map-topo-ruler');
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
@@ -457,13 +506,19 @@ function updateRulerPlateVisual() {
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
 
+    var centerLl = (state.positionLocked && state.anchor)
+        ? state.anchor
+        : getRulerOriginLatLng();
+    var gridRot = centerLl ? gridRotDegForRoamer(centerLl.lat, centerLl.lng) : 0;
+    var roamerScale = centerLl ? roamerScaleAt(centerLl.lat, centerLl.lng) : 1;
+
     if (plateWrap) plateWrap.style.transform = '';
     if (plate) plate.style.transform = '';
 
     var scales = document.getElementById('topo-roamer-scales');
-    if (scales) scales.removeAttribute('transform');
+    if (scales) scales.setAttribute('transform', buildRoamerTransform(roamerScale, gridRot));
 
-    syncRoamerLabels(1);
+    syncRoamerLabels(roamerScale);
 
     if (centerEl) {
         centerEl.style.transform = '';
