@@ -1475,7 +1475,7 @@
             background: var(--topo-accent);
             box-shadow: 0 0 3px var(--topo-accent-glow);
         }
-        /* L-kříž: vodorovně N (západ), svisle W (jih) — levý dolní roamer od středu */
+        /* L-kříž: vodorovně západ, svisle jih — roh roameru ve středu */
         .topo-ruler-center::before {
             width: 1px; height: 22px;
             left: 50%; top: 50%;
@@ -2654,7 +2654,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718bb';
+        var PATRAC_BUILD = '20260719be';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
