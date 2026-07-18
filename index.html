@@ -1063,12 +1063,20 @@
             width: 132px;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none;
+            touch-action: manipulation;
             font-family: 'IBM Plex Mono', monospace;
-            pointer-events: none;
+            pointer-events: auto;
+        }
+        #map-compass.compass-needs-permission .compass-housing {
+            border-color: var(--accent-gold);
+            animation: compass-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes compass-pulse {
+            0%, 100% { box-shadow: 0 0 6px rgba(255, 200, 80, 0.35); }
+            50% { box-shadow: 0 0 14px rgba(255, 200, 80, 0.85); }
         }
         #map-compass .compass-housing,
-        #map-compass .compass-readout { pointer-events: auto; }
+        #map-compass .compass-readout { pointer-events: auto; cursor: pointer; }
         .compass-housing {
             position: relative;
             width: 132px; height: 132px;
@@ -1591,7 +1599,7 @@
                 </svg>
             </div>
         </div>
-        <div class="compass-readout" id="compass-readout">Buzola — klepni pro kalibraci<br><span style="font-weight:400;font-size:var(--text-xs);">Zlatá čára = směr telefonu</span></div>
+        <div class="compass-readout" id="compass-readout" role="button" tabindex="0">▶ Klepni pro buzolu<br><span style="font-weight:400;font-size:var(--text-xs);">Zlatá čára = směr telefonu</span></div>
     </div>
 
     <!-- STŘEDOVÝ PANEL -->
@@ -1971,7 +1979,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718l';
+        var PATRAC_BUILD = '20260718m';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -1991,7 +1999,9 @@
         var compassBezelDeg = parseFloat(localStorage.getItem('patrac_compass_bezel') || '0') || 0;
         var compassDeviceHeading = null;
         var compassOrientListening = false;
-        var compassOrientRequested = false;
+        var compassOrientGranted = false;
+        var compassNeedsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function';
         var mapLayerFilterState = null;
         var lastUserPosition = null;
         var _mapToolsTabActive = false;
@@ -4361,9 +4371,9 @@
                 return normalizeDeg(e.webkitCompassHeading);
             }
             if (typeof e.alpha === 'number' && !isNaN(e.alpha)) {
-                var alpha = normalizeDeg(e.alpha);
-                if (e.absolute) return normalizeDeg(360 - alpha);
-                return null;
+                if (e.absolute || e.webkitCompassHeading === undefined) {
+                    return normalizeDeg(360 - e.alpha);
+                }
             }
             return null;
         }
@@ -4372,38 +4382,49 @@
             var heading = getDeviceHeadingFromEvent(e);
             if (heading === null) return;
             compassDeviceHeading = heading;
+            compassOrientGranted = true;
+            updateCompassPermissionUi();
             applyCompassRoseRotation();
             applyMapBearingRotation();
             updateCompassReadout();
         }
 
-        function requestCompassOrientationAccess() {
-            if (compassOrientRequested) return Promise.resolve(compassOrientListening);
-            compassOrientRequested = true;
-            if (typeof DeviceOrientationEvent !== 'undefined' &&
-                typeof DeviceOrientationEvent.requestPermission === 'function') {
+        function attachCompassOrientationListeners() {
+            if (compassOrientListening) return;
+            window.addEventListener('deviceorientation', onDeviceOrientation, true);
+            window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+            compassOrientListening = true;
+        }
+
+        function updateCompassPermissionUi() {
+            var root = document.getElementById('map-compass');
+            if (!root) return;
+            root.classList.toggle('compass-needs-permission', compassNeedsPermission && !compassOrientGranted);
+        }
+
+        function enableCompassFromUserGesture() {
+            if (compassNeedsPermission) {
                 return DeviceOrientationEvent.requestPermission().then(function(state) {
                     if (state === 'granted') {
-                        window.addEventListener('deviceorientation', onDeviceOrientation, true);
-                        compassOrientListening = true;
+                        attachCompassOrientationListeners();
+                        compassOrientGranted = true;
+                        updateCompassPermissionUi();
+                        updateCompassReadout();
+                        return true;
                     }
-                    return compassOrientListening;
+                    updateCompassReadout('Přístup ke kompasu zamítnut. Safari → Nastavení → Pohyb a orientace.');
+                    return false;
                 }).catch(function(err) {
-                    console.warn('[compass] orientation permission', err);
+                    console.warn('[compass] permission', err);
+                    updateCompassReadout('Kompas nelze spustit — zkus znovu klepnout na buzolu.');
                     return false;
                 });
             }
-            window.addEventListener('deviceorientation', onDeviceOrientation, true);
-            compassOrientListening = true;
+            attachCompassOrientationListeners();
+            compassOrientGranted = true;
+            updateCompassPermissionUi();
+            updateCompassReadout();
             return Promise.resolve(true);
-        }
-
-        function startCompassOrientation() {
-            requestCompassOrientationAccess().then(function(ok) {
-                if (!ok) return;
-                applyCompassRoseRotation();
-                applyMapBearingRotation();
-            });
         }
 
         function applyMapBearingRotation() {
@@ -4442,22 +4463,37 @@
         function initCompassBezelDrag() {
             var wrap = document.getElementById('compass-rose-wrap');
             var housing = document.querySelector('#map-compass .compass-housing');
+            var readout = document.getElementById('compass-readout');
             if (!wrap || wrap._bezelBound) return;
             wrap._bezelBound = true;
             var dragging = false;
+            var dragStart = null;
             function angleFromEvent(e) {
                 var rect = wrap.getBoundingClientRect();
                 var cx = (e.touches ? e.touches[0].clientX : e.clientX) - (rect.left + rect.width / 2);
                 var cy = (e.touches ? e.touches[0].clientY : e.clientY) - (rect.top + rect.height / 2);
                 return normalizeDeg(Math.atan2(cx, -cy) * 180 / Math.PI);
             }
+            function pointerFromEvent(e) {
+                return {
+                    x: e.touches ? e.touches[0].clientX : e.clientX,
+                    y: e.touches ? e.touches[0].clientY : e.clientY
+                };
+            }
             function onStart(e) {
-                dragging = true;
-                e.preventDefault();
-                requestCompassOrientationAccess();
+                dragStart = pointerFromEvent(e);
+                dragging = false;
             }
             function onMove(e) {
-                if (!dragging) return;
+                if (!dragStart) return;
+                var p = pointerFromEvent(e);
+                if (!dragging) {
+                    var dx = p.x - dragStart.x;
+                    var dy = p.y - dragStart.y;
+                    if (Math.hypot(dx, dy) < 10) return;
+                    dragging = true;
+                    e.preventDefault();
+                }
                 var dragAngle = angleFromEvent(e);
                 if (compassDeviceHeading !== null) {
                     compassBezelDeg = normalizeDeg(dragAngle + compassDeviceHeading);
@@ -4470,22 +4506,36 @@
                 updateTacticalHud();
                 updateCompassReadout();
             }
-            function onEnd() { dragging = false; }
+            function onEnd(e) {
+                if (!dragging && dragStart) {
+                    enableCompassFromUserGesture();
+                }
+                dragging = false;
+                dragStart = null;
+            }
+            function bindActivate(el) {
+                if (!el || el._compassActivateBound) return;
+                el._compassActivateBound = true;
+                el.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    enableCompassFromUserGesture();
+                });
+            }
             wrap.addEventListener('mousedown', onStart);
-            wrap.addEventListener('touchstart', onStart, { passive: false });
+            wrap.addEventListener('touchstart', onStart, { passive: true });
             document.addEventListener('mousemove', onMove);
             document.addEventListener('touchmove', onMove, { passive: false });
             document.addEventListener('mouseup', onEnd);
             document.addEventListener('touchend', onEnd);
-            if (housing) {
-                housing.addEventListener('click', function() {
-                    requestCompassOrientationAccess().then(function() {
-                        updateCompassReadout();
-                    });
-                });
+            bindActivate(housing);
+            bindActivate(readout);
+            if (!compassNeedsPermission) {
+                attachCompassOrientationListeners();
+                compassOrientGranted = true;
             }
+            updateCompassPermissionUi();
             applyCompassRoseRotation();
-            startCompassOrientation();
         }
 
         function buildMapLabelHtml(meta) {
@@ -5436,10 +5486,15 @@
             );
         }
 
-        function updateCompassReadout() {
+        function updateCompassReadout(statusMsg) {
             var el = document.getElementById('compass-readout');
             var arrow = document.getElementById('compass-bearing-arrow');
             if (!el) return;
+
+            if (statusMsg) {
+                el.innerHTML = '<div style="color:var(--accent-gold);font-size:var(--text-xs);">' + statusMsg + '</div>';
+                return;
+            }
 
             var bez = normalizeDeg(compassBezelDeg);
             var bezRad = bez * Math.PI / 180;
@@ -5448,9 +5503,14 @@
                 targetBrng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
             }
             var measureBrng = getMeasureBearing();
-            var headingLine = compassDeviceHeading !== null
-                ? '<div style="font-size:var(--text-xs);font-weight:400;margin-bottom:3px;">Směr tel.: ' + compassDeviceHeading.toFixed(0) + '° · N na růžici</div>'
-                : '<div style="font-size:var(--text-xs);font-weight:400;margin-bottom:3px;">Klepni buzolu — povol senzor</div>';
+            var headingLine = '';
+            if (compassDeviceHeading !== null) {
+                headingLine = '<div style="font-size:var(--text-xs);font-weight:400;margin-bottom:3px;">Směr tel.: ' + compassDeviceHeading.toFixed(0) + '° · N na růžici</div>';
+            } else if (compassNeedsPermission && !compassOrientGranted) {
+                headingLine = '<div style="font-size:var(--text-xs);font-weight:400;margin-bottom:3px;color:var(--accent-gold);">▶ Klepni buzolu — povol senzor</div>';
+            } else {
+                headingLine = '<div style="font-size:var(--text-xs);font-weight:400;margin-bottom:3px;">Čekám na senzor… otoč telefon</div>';
+            }
 
             function arrowRotation(brng) {
                 if (compassDeviceHeading !== null) {
@@ -5526,7 +5586,8 @@
             updateTacticalHud();
             if (show) {
                 applyMapBearingRotation();
-                startCompassOrientation();
+                updateCompassPermissionUi();
+                updateCompassReadout();
             } else {
                 resetMapBearingRotation();
             }
