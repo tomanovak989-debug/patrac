@@ -290,11 +290,63 @@ function plateScaleFactor() {
     return Math.max(0.35, Math.min(2.5, (1000 / mpp) / REF_1000M_PX));
 }
 
-function getDefaultScreenPos() {
+function getViewportSize() {
     var map = getMap();
-    if (!map) return { x: 40, y: 80 };
-    var size = map.getSize();
-    return { x: Math.max(12, size.x * 0.5 - PLATE_PX / 2), y: Math.max(60, size.y * 0.38) };
+    var mapW = map ? map.getSize().x : window.innerWidth;
+    var mapH = map ? map.getSize().y : window.innerHeight;
+    return {
+        w: Math.max(320, Math.min(window.innerWidth, mapW)),
+        h: Math.max(320, Math.min(window.innerHeight, mapH))
+    };
+}
+
+function getDefaultScreenPos() {
+    var vp = getViewportSize();
+    return {
+        x: Math.max(12, vp.w * 0.5 - PLATE_PX / 2),
+        y: Math.max(60, Math.min(vp.h * 0.38, vp.h - PLATE_PX - 120))
+    };
+}
+
+function sanitizeScreenPos() {
+    var vp = getViewportSize();
+    var root = document.getElementById('map-topo-ruler');
+    var w = root && root.offsetWidth ? root.offsetWidth : PLATE_PX + 20;
+    var h = root && root.offsetHeight ? root.offsetHeight : PLATE_PX + 100;
+    var x = Number(state.screenX);
+    var y = Number(state.screenY);
+    if (!isFinite(x) || !isFinite(y)) {
+        state.screenX = null;
+        state.screenY = null;
+        return;
+    }
+    if (x < -40 || y < -40 || x > vp.w - 40 || y > vp.h - 40) {
+        state.screenX = null;
+        state.screenY = null;
+        return;
+    }
+    state.screenX = Math.max(0, Math.min(vp.w - Math.min(w, 80), x));
+    state.screenY = Math.max(0, Math.min(vp.h - Math.min(h, 80), y));
+}
+
+function ensureRulerOnScreen() {
+    var root = document.getElementById('map-topo-ruler');
+    if (!root || root.style.display === 'none') return;
+    var rect = root.getBoundingClientRect();
+    var vp = getViewportSize();
+    if (rect.width < 8 && rect.height < 8) return;
+    if (rect.right < 24 || rect.bottom < 24 || rect.left > vp.w - 24 || rect.top > vp.h - 24) {
+        var def = getDefaultScreenPos();
+        state.screenX = def.x;
+        state.screenY = def.y;
+        root.classList.remove('topo-ruler-docked');
+        root.classList.add('topo-ruler-positioned');
+        root.style.right = 'auto';
+        root.style.bottom = 'auto';
+        root.style.left = Math.round(state.screenX) + 'px';
+        root.style.top = Math.round(state.screenY) + 'px';
+        persistState();
+    }
 }
 
 function dockBottomPx() {
@@ -317,6 +369,8 @@ function updateRulerWidgetPosition() {
     var root = document.getElementById('map-topo-ruler');
     var body = getBodyEl();
     if (!root || !body) return;
+
+    sanitizeScreenPos();
 
     if (root.classList.contains('topo-ruler-collapsed')) {
         root.classList.remove('topo-ruler-positioned');
@@ -342,6 +396,7 @@ function updateRulerWidgetPosition() {
     root.style.top = Math.round(state.screenY) + 'px';
 
     updateRulerPlateVisual();
+    ensureRulerOnScreen();
 }
 
 function updateRulerPlateVisual() {
@@ -383,13 +438,17 @@ function updateRulerPlateVisual() {
 }
 
 function renderAll() {
-    updateRulerWidgetPosition();
-    renderRouteOnMap();
-    updateLockUi();
-    if (_deps.onUiUpdate) _deps.onUiUpdate();
-    if (_deps.refreshMgrsGrid) _deps.refreshMgrsGrid();
-    if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
-        window.patracUpdateMgrsReadout();
+    try {
+        updateRulerWidgetPosition();
+        renderRouteOnMap();
+        updateLockUi();
+        if (_deps && _deps.onUiUpdate) _deps.onUiUpdate();
+        if (_deps && _deps.refreshMgrsGrid) _deps.refreshMgrsGrid();
+        if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
+            window.patracUpdateMgrsReadout();
+        }
+    } catch (err) {
+        console.error('[topoRuler] renderAll', err);
     }
 }
 
@@ -429,6 +488,7 @@ function loadState() {
         state.activeRouteId = data.activeRouteId || null;
         if (typeof data.expanded === 'boolean') state.expanded = data.expanded;
         if (data.mapScale) state.mapScale = parseInt(data.mapScale, 10) || 25000;
+        sanitizeScreenPos();
     } catch (e) {}
 }
 
@@ -701,10 +761,11 @@ function initInteractions() {
             }
             return { x: state.screenX, y: state.screenY };
         }
-        var map = getMap();
-        var size = map ? map.getSize() : { x: 400, y: 400 };
-        state.screenX = Math.max(0, Math.min(size.x - root.offsetWidth, origin.x + p.dx));
-        state.screenY = Math.max(0, Math.min(size.y - root.offsetHeight, origin.y + p.dy));
+        var vp = getViewportSize();
+        var maxW = Math.max(80, root.offsetWidth || PLATE_PX);
+        var maxH = Math.max(80, root.offsetHeight || PLATE_PX);
+        state.screenX = Math.max(0, Math.min(vp.w - maxW, origin.x + p.dx));
+        state.screenY = Math.max(0, Math.min(vp.h - maxH, origin.y + p.dy));
         updateRulerWidgetPosition();
     }, function() {
         persistState();
@@ -780,7 +841,14 @@ export function updateTopoRulerDisplay(show) {
     if (!root) return;
     state.visible = show !== false;
     root.style.display = state.visible ? 'block' : 'none';
-    if (state.visible) renderAll();
+    root.classList.toggle('is-ready', state.visible);
+    if (state.visible) {
+        renderAll();
+        requestAnimationFrame(function() {
+            ensureRulerOnScreen();
+            updateRulerPlateVisual();
+        });
+    }
 }
 
 export function getTopoRulerState() {

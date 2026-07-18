@@ -1233,6 +1233,9 @@
             user-select: none;
             font-family: 'IBM Plex Mono', monospace;
         }
+        #map-topo-ruler.is-ready {
+            display: block;
+        }
         #map-topo-ruler.topo-ruler-positioned { right: auto; bottom: auto; }
         #map-topo-ruler.topo-ruler-docked {
             right: 12px !important;
@@ -1248,6 +1251,8 @@
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-widget-toggle {
             position: relative; top: 0; right: 0;
             width: 48px; height: 48px; border-radius: 50%; font-size: 20px;
+            border: 2px solid rgba(74,246,38,0.85);
+            box-shadow: 0 0 12px rgba(74,246,38,0.55);
         }
         .topo-ruler-widget-toggle {
             position: absolute; top: -6px; right: -6px; z-index: 20;
@@ -2429,7 +2434,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718y';
+        var PATRAC_BUILD = '20260718z';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5025,7 +5030,10 @@
         };
 
         function initTopoRulerModule() {
-            if (topoRulerMod) return;
+            if (topoRulerMod) {
+                updateTopoRulerDisplay();
+                return;
+            }
             import('./src/map/topoRuler.js?v=' + PATRAC_BUILD).then(function(mod) {
                 topoRulerMod = mod;
                 mod.initTopoRuler({
@@ -5040,13 +5048,21 @@
                     }
                 });
                 updateTopoRulerDisplay();
-            }).catch(function(err) { console.warn('[topoRuler]', err); });
+            }).catch(function(err) { console.error('[topoRuler]', err); });
         }
 
         function updateTopoRulerDisplay() {
-            if (!topoRulerMod) return;
+            var root = document.getElementById('map-topo-ruler');
             var userWants = localStorage.getItem('patrac_topo_ruler_visible') !== 'false';
-            topoRulerMod.updateTopoRulerDisplay(userWants && _mapToolsTabActive && !isMapOverlayOpen());
+            var show = userWants && _mapToolsTabActive && !isMapOverlayOpen();
+            if (!topoRulerMod) {
+                if (root) {
+                    root.style.display = show ? 'block' : 'none';
+                    root.classList.toggle('is-ready', show);
+                }
+                return;
+            }
+            topoRulerMod.updateTopoRulerDisplay(show);
         }
         window.patracToggleTopoRuler = function() {
             var next = localStorage.getItem('patrac_topo_ruler_visible') === 'false';
