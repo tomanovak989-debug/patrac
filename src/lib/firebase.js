@@ -2,7 +2,7 @@
  * Firebase — Auth, Firestore, Storage, App Check.
  */
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
@@ -35,10 +35,66 @@ function initAppCheckIfConfigured() {
 
 initAppCheckIfConfigured();
 
+function hasPatracLocalSession() {
+    try {
+        var session = localStorage.getItem('patrac_session');
+        if (!session) return false;
+        var accounts = JSON.parse(localStorage.getItem('patrac_accounts') || '{}');
+        var acc = accounts[session];
+        return !!(acc && acc.pass);
+    } catch (e) {
+        return false;
+    }
+}
+
+function waitForInitialAuth(auth, maxMs) {
+    maxMs = maxMs || 2500;
+    return new Promise(function(resolve) {
+        if (auth.currentUser) {
+            resolve(auth.currentUser);
+            return;
+        }
+        var done = false;
+        var timer = setTimeout(function() {
+            if (done) return;
+            done = true;
+            unsub();
+            resolve(auth.currentUser || null);
+        }, maxMs);
+        var unsub = onAuthStateChanged(auth, function(user) {
+            if (done) return;
+            if (user) {
+                done = true;
+                clearTimeout(timer);
+                unsub();
+                resolve(user);
+            }
+        });
+    });
+}
+
 export function ensureFirebaseAuth() {
     if (!authReadyPromise) {
         authReadyPromise = (async function() {
             var auth = getAuth(app);
+            await waitForInitialAuth(auth, hasPatracLocalSession() ? 4000 : 2000);
+
+            if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                return auth.currentUser;
+            }
+
+            if (hasPatracLocalSession()) {
+                try {
+                    var mod = await import('../services/authService.js');
+                    var restored = await mod.restorePatracSessionFromLocal(localStorage.getItem('patrac_session'));
+                    if (restored && !restored.isAnonymous) {
+                        return restored;
+                    }
+                } catch (err) {
+                    console.warn('[firebase] patrac session restore', err);
+                }
+            }
+
             if (!auth.currentUser) {
                 await signInAnonymously(auth);
             }
@@ -52,8 +108,12 @@ export function ensureFirebaseAuth() {
     return authReadyPromise;
 }
 
-export function resetAnonymousAuthPromise() {
+export function resetAuthReadyPromise() {
     authReadyPromise = null;
+}
+
+export function resetAnonymousAuthPromise() {
+    resetAuthReadyPromise();
 }
 
 export function getDb() {

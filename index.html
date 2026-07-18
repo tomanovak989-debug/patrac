@@ -1946,7 +1946,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718i';
+        var PATRAC_BUILD = '20260718j';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6876,6 +6876,14 @@
 
             var chain = Promise.resolve();
 
+            if (session) {
+                chain = chain.then(function() {
+                    return importAuthService().then(function(mod) {
+                        return mod.restorePatracSessionFromLocal(session);
+                    });
+                });
+            }
+
             if (session && !skipPlayerHydrate) {
                 chain = chain.then(function() {
                     return import('./src/services/playerService.js').then(function(mod) {
@@ -9071,6 +9079,12 @@
             } catch (e) {}
             var session = localStorage.getItem('patrac_session');
             if (session && getPatracAccounts()[session]) {
+                try {
+                    var authMod = await importAuthService();
+                    await authMod.restorePatracSessionFromLocal(session);
+                } catch (restoreErr) {
+                    console.warn('[auth] session restore on load', restoreErr);
+                }
                 beginSessionForUser(session, { profileData: getUserProfileData(session) });
                 launchGame();
             }

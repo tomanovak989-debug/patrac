@@ -34,7 +34,7 @@ export async function savePlayerToCloud(userId, payload) {
 export async function fetchPlayerFromCloud(userId) {
     userId = normalizeUserId(userId);
     if (!userId) return null;
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var snap = await getDoc(doc(getDb(), COLLECTION, userId));
     if (!snap.exists()) return null;
     return snap.data();
@@ -334,7 +334,7 @@ export async function fetchPlayersPublicProfiles(userIds) {
     }
     if (!ids.length) return {};
 
-    await ensureFirebaseAuth();
+    await ensurePatracAuth();
     var out = {};
     await Promise.all(ids.map(function(uid) {
         return fetchPlayerFromCloud(uid).then(function(data) {

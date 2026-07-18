@@ -143,7 +143,48 @@ export async function ensurePatracAuth() {
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
         return auth.currentUser;
     }
+    var restored = await restorePatracSessionFromLocal('');
+    if (restored && !restored.isAnonymous) {
+        return restored;
+    }
     throw new Error('Nejsi přihlášen — obnov stránku a přihlas se znovu.');
+}
+
+export async function restorePatracSessionFromLocal(userId) {
+    userId = normalizePatracUserId(userId || (typeof localStorage !== 'undefined' ? localStorage.getItem('patrac_session') : '') || '');
+    if (!userId) return null;
+
+    var auth = getAuthInstance();
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+        return auth.currentUser;
+    }
+
+    var pass = '';
+    var localAcc = null;
+    try {
+        var accounts = JSON.parse(localStorage.getItem('patrac_accounts') || '{}');
+        localAcc = accounts[userId] || accounts[userId + '.'] || null;
+        if (!localAcc) {
+            for (var k in accounts) {
+                if (accounts.hasOwnProperty(k) && normalizePatracUserId(k) === userId) {
+                    localAcc = accounts[k];
+                    break;
+                }
+            }
+        }
+        if (localAcc && localAcc.pass) pass = localAcc.pass;
+    } catch (e) {}
+
+    if (!pass) return null;
+
+    try {
+        await signInPatracAuth(userId, pass, localAcc);
+        resetAnonymousAuthPromise();
+        return auth.currentUser;
+    } catch (err) {
+        console.warn('[auth] restorePatracSessionFromLocal', userId, err);
+        return null;
+    }
 }
 
 export async function savePatracIdMapping(userId, firebaseUid, loginEmail, registrationEmail) {
@@ -242,6 +283,7 @@ async function upgradeLegacyAccountToFirebaseAuth(userId, password, acc) {
     delete cleaned.pass;
     await setDoc(doc(getDb(), 'accounts', userId), cleaned, { merge: true });
 
+    resetAnonymousAuthPromise();
     return cred.user;
 }
 
@@ -292,6 +334,7 @@ export async function signInPatracAuth(userId, password, localLegacyAcc) {
     try {
         var cred = await signInWithKnownEmail(loginEmail, password);
         await savePatracIdMapping(userId, cred.user.uid, loginEmail, legacyAcc && legacyAcc.email ? legacyAcc.email : '');
+        resetAnonymousAuthPromise();
         return cred.user;
     } catch (err) {
         if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password')) {
