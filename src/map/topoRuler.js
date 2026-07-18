@@ -167,57 +167,85 @@ function renderGridReadouts() {
     var E0 = utm.easting;
     var N0 = utm.northing;
     var zone = utm.zone;
-    var range = 1000;
+    var r = roundUtm50(E0, N0);
+    var eastLabel = pad5utm(r.e);
+    var northLabel = pad5utm(r.n);
 
     var nLine = Math.ceil(N0 / 1000) * 1000;
     if (Math.abs(nLine - N0) < 0.5) nLine += 1000;
-    for (; nLine <= N0 + range + 0.5; nLine += 1000) {
-        if (nLine - N0 > range + 0.5) break;
-        var pN = utmToLatLng(E0, nLine, zone, ll.lat);
-        addGridReadoutLabel(pN.lat, pN.lng, pad5utm(nLine), 'northing');
-    }
+    var pN = utmToLatLng(E0, nLine, zone, ll.lat);
+    addGridReadoutLabel(pN.lat, pN.lng, northLabel, 'northing');
 
     var eLine = Math.floor(E0 / 1000) * 1000;
     if (Math.abs(eLine - E0) < 0.5) eLine -= 1000;
     else if (eLine >= E0) eLine -= 1000;
-    for (; eLine >= E0 - range - 0.5; eLine -= 1000) {
-        if (E0 - eLine > range + 0.5) break;
-        var pE = utmToLatLng(eLine, N0, zone, ll.lat);
-        addGridReadoutLabel(pE.lat, pE.lng, pad5utm(eLine), 'easting');
+    var pE = utmToLatLng(eLine, N0, zone, ll.lat);
+    addGridReadoutLabel(pE.lat, pE.lng, eastLabel, 'easting');
+}
+
+function roamerScaledPoint(ox, oy, scale) {
+    var O = 130;
+    return {
+        x: O + (ox - O) * scale,
+        y: O + (oy - O) * scale
+    };
+}
+
+function syncRoamerLabels(scale) {
+    var lbl = document.getElementById('topo-roamer-lbl');
+    if (!lbl) return;
+    var s = scale || 1;
+    var texts = lbl.querySelectorAll('text[data-ox]');
+    for (var i = 0; i < texts.length; i++) {
+        var t = texts[i];
+        var p = roamerScaledPoint(
+            parseFloat(t.getAttribute('data-ox')),
+            parseFloat(t.getAttribute('data-oy')),
+            s
+        );
+        t.setAttribute('x', String(p.x));
+        t.setAttribute('y', String(p.y));
     }
 }
 
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'neon-v3') return;
-    g.setAttribute('data-built', 'neon-v3');
+    if (g.getAttribute('data-built') === 'neon-v5') return;
+    g.setAttribute('data-built', 'neon-v5');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
-    var h = '';
-    h += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="rgba(107,255,90,0.05)" stroke="' + NEON + '" stroke-width="0.55"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"/>';
-    h += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"/>';
+    var geo = '';
+    var lbl = '';
+    geo += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"/>';
     var i;
     for (i = 0; i <= 20; i++) {
         var t = i * (L / 20);
         var big = i % 10 === 0;
         var mid = i % 2 === 0;
         var th = big ? 5 : (mid ? 3 : 2);
-        h += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
-        h += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
+        geo += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
+        geo += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O + th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + (big ? 0.55 : 0.35) + '"/>';
     }
-    h += '<text x="' + O + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5.5" font-weight="600" font-family="IBM Plex Mono,monospace">0</text>';
+    function lblText(ox, oy, text, anchor, weight) {
+        var a = anchor || 'middle';
+        var w = weight ? ' font-weight="600"' : '';
+        return '<text class="topo-roamer-lbl-text" data-ox="' + ox + '" data-oy="' + oy + '" x="' + ox + '" y="' + oy + '" text-anchor="' + a + '" fill="' + NEON_DIM + '" font-size="8"' + w + ' font-family="IBM Plex Mono,monospace">' + text + '</text>';
+    }
+    lbl += lblText(O, O + 10, '0', 'middle', true);
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O - i * 10) + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5.5" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        lbl += lblText(O - i * 10, O + 10, String(i));
     }
-    h += '<text x="' + (O - L) + '" y="' + (O + 10) + '" text-anchor="middle" fill="' + NEON_DIM + '" font-size="5" font-family="IBM Plex Mono,monospace">1000</text>';
-    h += '<text x="' + (O + 8) + '" y="' + (O + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5.5" font-weight="600" font-family="IBM Plex Mono,monospace">0</text>';
+    lbl += lblText(O - L, O + 10, '1000', 'middle', false);
+    lbl += lblText(O + 8, O + 2, '0', 'start', true);
     for (i = 1; i <= 9; i++) {
-        h += '<text x="' + (O + 8) + '" y="' + (O - i * 10 + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5.5" font-family="IBM Plex Mono,monospace">' + i + '</text>';
+        lbl += lblText(O + 8, O - i * 10 + 2, String(i), 'start', false);
     }
-    h += '<text x="' + (O + 8) + '" y="' + (O - L + 2) + '" text-anchor="start" fill="' + NEON_DIM + '" font-size="5" font-family="IBM Plex Mono,monospace">1000</text>';
-    g.innerHTML = h;
+    lbl += lblText(O + 8, O - L + 2, '1000', 'start', false);
+    g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
+    syncRoamerLabels(1);
 }
 
 function syncScreenFromAnchor() {
@@ -293,19 +321,11 @@ function renderRouteOnMap() {
 
     if (state.positionLocked || state.target || state.waypoints.length) {
         mapObjs.markers.anchor = window.L.marker([state.anchor.lat, state.anchor.lng], {
-            draggable: !state.positionLocked,
+            draggable: false,
             icon: dotIcon(NEON_DIM, 12),
             pane: 'mapMeasurePane'
         }).addTo(_layer);
         mapObjs.markers.anchor.bindTooltip('Střed pravítka', { direction: 'top' });
-        if (!state.positionLocked) {
-            mapObjs.markers.anchor.on('dragend', function() {
-                var ll = mapObjs.markers.anchor.getLatLng();
-                state.anchor = { lat: ll.lat, lng: ll.lng };
-                persistState();
-                renderAll();
-            });
-        }
     }
 
     for (var w = 0; w < state.waypoints.length; w++) {
@@ -592,11 +612,13 @@ function updateRulerWidgetPosition() {
 
     updateRulerPlateVisual();
     ensureRulerOnScreen();
+    if (!state.positionLocked) {
+        syncAnchorFromCenter();
+    }
 }
 
 function updateRulerPlateVisual() {
     var plate = document.getElementById('topo-ruler-plate');
-    var roamer = document.getElementById('topo-roamer-scales');
     var degEl = document.getElementById('topo-ruler-bearing');
     var scaleEl = document.getElementById('topo-ruler-scale');
     var mgrsEl = document.getElementById('topo-ruler-mgrs');
@@ -606,13 +628,16 @@ function updateRulerPlateVisual() {
     var scale = plateScaleFactor();
     plate.style.transform = 'rotate(0deg)';
 
-    if (roamer) {
+    var geo = document.getElementById('topo-roamer-geo');
+    var roamerScale = state.positionLocked ? scale : 1;
+    if (geo) {
         if (state.positionLocked && scale !== 1) {
-            roamer.setAttribute('transform', 'translate(130,130) scale(' + scale + ') translate(-130,-130)');
+            geo.setAttribute('transform', 'translate(130,130) scale(' + scale + ') translate(-130,-130)');
         } else {
-            roamer.removeAttribute('transform');
+            geo.removeAttribute('transform');
         }
     }
+    syncRoamerLabels(roamerScale);
 
     if (degEl) {
         if (!state.positionLocked) {
@@ -734,6 +759,8 @@ function togglePositionLock() {
         syncAnchorFromCenter();
     } else {
         state.positionLocked = false;
+        captureScreenPos();
+        syncAnchorFromCenter();
     }
     updateLockUi();
     persistState();
@@ -993,6 +1020,8 @@ function initInteractions() {
         state.screenX = Math.max(0, Math.min(vp.w - maxW, origin.x + p.dx));
         state.screenY = Math.max(0, Math.min(vp.h - maxH, origin.y + p.dy));
         updateRulerWidgetPosition();
+        renderRouteOnMap();
+        updateRulerPlateVisual();
     }, function() {
         persistState();
         renderAll();

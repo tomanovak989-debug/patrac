@@ -1234,7 +1234,7 @@
             font-family: 'IBM Plex Mono', monospace;
             --topo-accent: #78ff66;
             --topo-accent-dim: #b8ffb0;
-            --topo-accent-soft: rgba(120, 255, 102, 0.45);
+            --topo-accent-soft: #78ff66;
             --topo-accent-glow: rgba(107, 255, 90, 0.55);
             --topo-text-glow: 0 0 4px rgba(120, 255, 102, 0.75), 0 0 12px rgba(107, 255, 90, 0.35);
         }
@@ -1335,15 +1335,24 @@
         .topo-gta-svg {
             width: 100%; height: 100%;
             display: block;
-            filter: drop-shadow(0 0 3px rgba(107, 255, 90, 0.4));
         }
         .topo-gta-svg [stroke="#4af626"],
-        .topo-gta-svg [stroke="#8fd87a"] { stroke: var(--topo-accent); stroke-width: 0.55; }
-        .topo-gta-svg [fill="#4af626"] { fill: var(--topo-accent); }
-        .topo-gta-svg [fill="#8fd87a"] { fill: var(--topo-accent-dim); }
-        .topo-gta-svg text { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; }
-        .topo-gta-svg rect[stroke] { stroke-width: 0.75 !important; }
-        .topo-gta-svg line { stroke-width: 0.55; }
+        .topo-gta-svg [stroke="#8fd87a"] { stroke: var(--topo-accent); stroke-width: 0.75; opacity: 1; }
+        .topo-gta-svg [fill="#4af626"] { fill: var(--topo-accent); opacity: 1; }
+        .topo-gta-svg [fill="#8fd87a"] { fill: var(--topo-accent-dim); opacity: 1; }
+        .topo-gta-svg text { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; opacity: 1 !important; }
+        .topo-gta-svg rect[stroke] { stroke-width: 1 !important; opacity: 1; }
+        .topo-gta-svg line { stroke-width: 0.65; opacity: 1; }
+        .topo-gta-svg g { opacity: 1; }
+        .topo-roamer-lbl-text {
+            fill: var(--topo-accent-dim) !important;
+            font-size: 8px !important;
+            font-weight: 500 !important;
+            paint-order: stroke fill;
+            stroke: rgba(6, 10, 6, 0.85);
+            stroke-width: 2.5px;
+            stroke-linejoin: round;
+        }
         .topo-ruler-bezel-hit { display: none; }
         .topo-ruler-center {
             position: absolute;
@@ -1352,7 +1361,7 @@
             margin: -16px 0 0 -16px;
             border-radius: 50%;
             border: 1px solid var(--topo-accent);
-            background: rgba(6, 10, 6, 0.55);
+            background: rgba(6, 10, 6, 0.92);
             cursor: pointer;
             z-index: 20;
             box-shadow: 0 0 8px var(--topo-accent-glow);
@@ -1673,11 +1682,11 @@
                             <line x1="130" y1="6" x2="130" y2="14" stroke="#4af626" stroke-width="1.2"/>
                         </g>
                         <g id="topo-mil-tick">
-                            <line x1="130" y1="2" x2="130" y2="8" stroke="#8fd87a" stroke-width="0.8" opacity="0.85"/>
+                            <line x1="130" y1="2" x2="130" y2="8" stroke="#8fd87a" stroke-width="0.8"/>
                         </g>
                     </defs>
-                    <rect x="4" y="4" width="252" height="252" rx="10" fill="none" stroke="#4af626" stroke-width="1.8"/>
-                    <g stroke="#4af626" stroke-width="0.8" opacity="0.55">
+                    <rect x="4" y="4" width="252" height="252" rx="10" fill="rgba(6,10,6,0.88)" stroke="#4af626" stroke-width="1.8"/>
+                    <g stroke="#4af626" stroke-width="0.8">
                         <use href="#topo-deg-tick" transform="rotate(0 130 130)"/>
                         <use href="#topo-deg-tick" transform="rotate(10 130 130)"/>
                         <use href="#topo-deg-tick" transform="rotate(20 130 130)"/>
@@ -1717,15 +1726,15 @@
                     <text x="236" y="134" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">90</text>
                     <text x="130" y="244" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
                     <text x="24" y="134" text-anchor="middle" fill="#8fd87a" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
-                    <text x="130" y="14" text-anchor="middle" fill="#8fd87a" font-size="5" opacity="0.65" font-family="IBM Plex Mono, monospace">6400</text>
-                    <text x="246" y="134" text-anchor="middle" fill="#8fd87a" font-size="5" opacity="0.65" font-family="IBM Plex Mono, monospace">1600</text>
-                    <g fill="none" stroke="#4af626" stroke-width="1" opacity="0.75">
+                    <text x="130" y="14" text-anchor="middle" fill="#8fd87a" font-size="5" font-family="IBM Plex Mono, monospace">6400</text>
+                    <text x="246" y="134" text-anchor="middle" fill="#8fd87a" font-size="5" font-family="IBM Plex Mono, monospace">1600</text>
+                    <g fill="none" stroke="#4af626" stroke-width="1">
                         <path d="M182 242 L242 242 L242 182"/>
                         <path d="M18 182 L18 242 L78 242"/>
                     </g>
                     <text x="212" y="228" fill="#4af626" font-size="7" font-family="IBM Plex Mono, monospace">1:25k</text>
                     <text x="48" y="228" fill="#4af626" font-size="7" font-family="IBM Plex Mono, monospace">1:100k</text>
-                    <line x1="48" y1="212" x2="212" y2="48" stroke="#4af626" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.7"/>
+                    <line x1="48" y1="212" x2="212" y2="48" stroke="#4af626" stroke-width="1.2" stroke-dasharray="4,3"/>
                     <!-- NATO roamer — generuje buildRoamerScales() -->
                     <g id="topo-roamer-scales"></g>
                     <polygon points="130,18 126,28 134,28" fill="#4af626"/>
@@ -2488,7 +2497,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718ae';
+        var PATRAC_BUILD = '20260718ah';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
