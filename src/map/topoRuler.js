@@ -143,9 +143,16 @@ function pxPerKmAt(lat, lng) {
     return Math.max(1, (pxE + pxN) * 0.5);
 }
 
-/** Měřítko roameru: 100 SVG px = 1 km na mapě (mění se zoomem). */
+/** Základní velikost km čtverce na obrazovce při scale(1) — viewBox 260, deska může být 200–260 px. */
+function kmSquareBaseScreenPx() {
+    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
+    var plateW = (plateWrap && plateWrap.offsetWidth) ? plateWrap.offsetWidth : PLATE_PX;
+    return (KM_SQUARE_SVG_PX / 260) * plateW;
+}
+
+/** Měřítko roameru: km čtverec v SVG = 1 km na mapě (mění se zoomem). */
 function roamerScaleAt(lat, lng) {
-    return pxPerKmAt(lat, lng) / KM_SQUARE_SVG_PX;
+    return pxPerKmAt(lat, lng) / kmSquareBaseScreenPx();
 }
 
 /** Natočení roameru podle MGRS mřížky — výchozí osy západ (vlevo) + jih (dolů). */
@@ -163,12 +170,11 @@ function gridRotDegForRoamer(lat, lng) {
     return normalizeDeg(gridWestDeg - 180);
 }
 
-function buildRoamerTransform(scale, rotDeg) {
-    var parts = ['translate(130,130)'];
-    if (rotDeg && Math.abs(rotDeg) > 0.01) parts.push('rotate(' + rotDeg.toFixed(2) + ')');
+function roamerLayerTransformCss(scale, rotDeg) {
+    var parts = [];
+    if (rotDeg && Math.abs(rotDeg) > 0.01) parts.push('rotate(' + rotDeg.toFixed(2) + 'deg)');
     if (scale && Math.abs(scale - 1) > 0.001) parts.push('scale(' + scale.toFixed(4) + ')');
-    parts.push('translate(-130,-130)');
-    return parts.join(' ');
+    return parts.length ? parts.join(' ') : '';
 }
 
 function getPlateCenterScreenPoint() {
@@ -188,11 +194,9 @@ function getPlateCenterScreenPoint() {
     };
 }
 
-function syncRoamerLabels(scale) {
+function syncRoamerLabels() {
     var lbl = document.getElementById('topo-roamer-lbl');
     if (!lbl) return;
-    var s = scale || 1;
-    var inv = s > 0.01 ? 1 / s : 1;
     var texts = lbl.querySelectorAll('text[data-ox]');
     for (var i = 0; i < texts.length; i++) {
         var t = texts[i];
@@ -201,13 +205,11 @@ function syncRoamerLabels(scale) {
         var rot = t.getAttribute('data-rot');
         t.setAttribute('x', String(ox));
         t.setAttribute('y', String(oy));
-        var needsTransform = (Math.abs(inv - 1) > 0.001) || rot;
-        if (needsTransform) {
-            var parts = ['translate(' + ox + ',' + oy + ')'];
-            if (rot) parts.push('rotate(' + rot + ')');
-            if (Math.abs(inv - 1) > 0.001) parts.push('scale(' + inv.toFixed(4) + ')');
-            parts.push('translate(' + (-ox) + ',' + (-oy) + ')');
-            t.setAttribute('transform', parts.join(' '));
+        if (rot) {
+            t.setAttribute(
+                'transform',
+                'translate(' + ox + ',' + oy + ') rotate(' + rot + ') translate(' + (-ox) + ',' + (-oy) + ')'
+            );
         } else {
             t.removeAttribute('transform');
         }
@@ -217,8 +219,8 @@ function syncRoamerLabels(scale) {
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'neon-v16') return;
-    g.setAttribute('data-built', 'neon-v16');
+    if (g.getAttribute('data-built') === 'neon-v17') return;
+    g.setAttribute('data-built', 'neon-v17');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var vns = ' vector-effect="non-scaling-stroke"';
@@ -260,7 +262,7 @@ function buildRoamerScales() {
     for (i = 1; i <= 9; i++) lbl += lblText(O + 8, O + i * 10 + 2, roamer2(i), 'start', false);
     lbl += lblText(O + 8, O + L + 2, roamer2(10), 'start', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
-    syncRoamerLabels(1);
+    syncRoamerLabels();
 }
 
 function getRulerOriginLatLng() {
@@ -501,7 +503,7 @@ function updateRulerPlateVisual() {
     var degEl = document.getElementById('topo-ruler-bearing');
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var centerEl = document.getElementById('topo-ruler-center');
-    var plate = document.getElementById('topo-ruler-plate');
+    var roamerLayer = document.getElementById('topo-roamer-layer');
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
@@ -513,12 +515,14 @@ function updateRulerPlateVisual() {
     var roamerScale = centerLl ? roamerScaleAt(centerLl.lat, centerLl.lng) : 1;
 
     if (plateWrap) plateWrap.style.transform = '';
-    if (plate) plate.style.transform = '';
+    if (roamerLayer) {
+        roamerLayer.style.transform = roamerLayerTransformCss(roamerScale, gridRot);
+    }
 
     var scales = document.getElementById('topo-roamer-scales');
-    if (scales) scales.setAttribute('transform', buildRoamerTransform(roamerScale, gridRot));
+    if (scales) scales.removeAttribute('transform');
 
-    syncRoamerLabels(roamerScale);
+    syncRoamerLabels();
 
     if (centerEl) {
         centerEl.style.transform = '';
@@ -920,6 +924,7 @@ function initInteractions() {
     var toggle = document.getElementById('btn-topo-ruler-toggle');
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var pinCenter = document.getElementById('topo-ruler-center');
+    var roamerLayer = document.getElementById('topo-roamer-layer');
 
     if (toggle && !toggle._bound) {
         toggle._bound = true;
@@ -936,7 +941,7 @@ function initInteractions() {
 
     bindWidgetDrag(dragSurface || root);
     bindMapWheelPassthrough(dragSurface);
-    bindMapWheelPassthrough(root);
+    bindMapWheelPassthrough(roamerLayer);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
         for (var hi = 0; hi < hits.length; hi++) bindMapWheelPassthrough(hits[hi]);
