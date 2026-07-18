@@ -94,22 +94,28 @@
         #map {
             width: 100%; height: 100%; position: absolute; z-index: 1;
             background-color: #e8e4dc;
-            touch-action: pan-x pan-y pinch-zoom;
+        }
+        #map.leaflet-container {
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #map-float-overlay {
-            position: absolute;
-            inset: 0;
+            position: fixed;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            overflow: visible;
             z-index: 1000;
             pointer-events: none;
-            overflow: visible;
         }
         #map-compass,
         #map-topo-ruler {
+            position: fixed;
             pointer-events: none;
             width: fit-content;
             height: fit-content;
         }
-        .map-float-hit { pointer-events: auto; }
+        .map-float-hit { pointer-events: auto; touch-action: none; }
         /* Dlaždice mapy — bez papírového filtru (barevný satelit) */
         #map .leaflet-tile-pane {
             filter: none;
@@ -1063,9 +1069,8 @@
         /* Plovoucí kompas — mapa HUD */
         #map-compass {
             display: none;
-            position: absolute;
-            right: 12px;
-            bottom: 108px;
+            right: auto;
+            bottom: auto;
             z-index: 1002;
             width: 132px;
             user-select: none;
@@ -1222,9 +1227,8 @@
         /* Topografické pravítko — NATO GTA (průhledné, zelené) */
         #map-topo-ruler {
             display: none;
-            position: absolute;
-            right: 12px;
-            bottom: 164px;
+            right: auto;
+            bottom: auto;
             z-index: 1003;
             user-select: none;
             font-family: 'IBM Plex Mono', monospace;
@@ -1249,9 +1253,9 @@
             position: absolute; top: -6px; right: -6px; z-index: 20;
             width: 26px; height: 26px; padding: 0;
             border: 1px solid rgba(74, 246, 38, 0.65); border-radius: 4px;
-            background: rgba(6, 10, 6, 0.92); color: var(--text-green);
+            background: transparent; color: var(--text-green);
             font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-            box-shadow: var(--neon-glow);
+            text-shadow: var(--text-glow);
         }
         .topo-ruler-body {
             position: relative;
@@ -1265,43 +1269,23 @@
             position: absolute; left: -14px; top: 50%; transform: translateY(-50%);
             z-index: 25;
             width: 20px; height: 36px; border: 1px solid rgba(74,246,38,0.55);
-            border-radius: 3px; background: rgba(6,10,6,0.88); color: var(--text-green-dim);
+            border-radius: 3px; background: transparent; color: var(--text-green-dim);
             font-size: 12px; cursor: grab; line-height: 36px; text-align: center;
-            box-shadow: var(--neon-glow);
+            text-shadow: var(--text-glow);
         }
         .topo-ruler-plate {
             position: absolute;
             inset: 0;
             transform-origin: 50% 50%;
             pointer-events: none;
+            transform: rotate(0deg);
         }
         .topo-gta-svg {
             width: 100%; height: 100%;
             display: block;
             filter: drop-shadow(0 0 4px rgba(74,246,38,0.35));
         }
-        .topo-ruler-bezel-hit {
-            position: absolute;
-            left: 0; right: 0;
-            height: 14px;
-            border: none;
-            padding: 0;
-            cursor: grab;
-            background: transparent;
-            touch-action: none;
-            z-index: 8;
-        }
-        .topo-ruler-bezel-hit.top { top: 0; }
-        .topo-ruler-bezel-hit.bottom { bottom: 0; }
-        .topo-ruler-bezel-hit.left {
-            top: 14px; bottom: 14px; left: 0;
-            width: 14px; height: auto; right: auto;
-        }
-        .topo-ruler-bezel-hit.right {
-            top: 14px; bottom: 14px; right: 0;
-            width: 14px; height: auto; left: auto;
-        }
-        .topo-ruler-bezel-hit:active { cursor: grabbing; }
+        .topo-ruler-bezel-hit { display: none; }
         .topo-ruler-center {
             position: absolute;
             left: 50%; top: 50%;
@@ -1372,6 +1356,7 @@
             gap: 3px;
             margin-top: 58px;
             align-items: center;
+            pointer-events: none;
         }
         .topo-ruler-mini-bar input,
         .topo-ruler-mini-bar select,
@@ -1380,23 +1365,26 @@
             min-width: 0;
             font-size: 9px;
             padding: 3px 4px;
-            background: rgba(6,10,6,0.9);
+            background: transparent;
             border: 1px solid rgba(74,246,38,0.45);
             color: var(--text-green);
             font-family: inherit;
+            text-shadow: var(--text-glow);
         }
         .topo-ruler-mini-bar button {
             font-size: 9px;
             padding: 3px 5px;
             border: 1px solid rgba(74,246,38,0.5);
-            background: rgba(6,10,6,0.9);
+            background: transparent;
             color: var(--text-green);
             cursor: pointer;
             font-family: inherit;
+            text-shadow: var(--text-glow);
         }
         .topo-ruler-route-select {
             width: 100%;
             margin-top: 3px;
+            pointer-events: none;
         }
         .topo-ruler-seg-label {
             background: none !important;
@@ -1644,27 +1632,23 @@
                     <circle cx="130" cy="130" r="5" fill="none" stroke="#4af626" stroke-width="1.2"/>
                     <polygon points="130,18 126,28 134,28" fill="#4af626"/>
                 </svg>
-                <button type="button" class="topo-ruler-bezel-hit top map-float-hit" data-edge="top" title="Otáčet pravítko"></button>
-                <button type="button" class="topo-ruler-bezel-hit bottom map-float-hit" data-edge="bottom" title="Otáčet pravítko"></button>
-                <button type="button" class="topo-ruler-bezel-hit left map-float-hit" data-edge="left" title="Otáčet pravítko"></button>
-                <button type="button" class="topo-ruler-bezel-hit right map-float-hit" data-edge="right" title="Otáčet pravítko"></button>
                 <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Ukotvit / odpoutat střed"></button>
-                <button type="button" class="topo-ruler-tip map-float-hit" id="topo-ruler-tip" title="Táhni pro směrník k cíli"></button>
+                <button type="button" class="topo-ruler-tip map-float-hit" id="topo-ruler-tip" title="Táhni pro směr / cíl na mapě"></button>
             </div>
             <div class="topo-ruler-hud">
                 <span class="topo-ruler-bearing" id="topo-ruler-bearing">—°</span>
                 <span class="topo-ruler-scale" id="topo-ruler-scale"></span>
                 <span class="topo-ruler-total" id="topo-ruler-total">Σ —</span>
             </div>
-            <div class="topo-ruler-mini-bar map-float-hit">
-                <select id="topo-ruler-map-scale" title="Měřítko mapy">
+            <div class="topo-ruler-mini-bar">
+                <select id="topo-ruler-map-scale" class="map-float-hit" title="Měřítko mapy">
                     <option value="25000">1:25k</option>
                     <option value="50000">1:50k</option>
                     <option value="100000">1:100k</option>
                 </select>
-                <input type="text" id="topo-ruler-route-name" placeholder="Trasa" maxlength="40">
-                <button type="button" id="btn-topo-add-wp" title="Bod uprostřed nejdelší úsečky">+</button>
-                <button type="button" id="btn-topo-save-route" title="Uložit trasu">💾</button>
+                <input type="text" class="map-float-hit" id="topo-ruler-route-name" placeholder="Trasa" maxlength="40">
+                <button type="button" class="map-float-hit" id="btn-topo-add-wp" title="Bod uprostřed nejdelší úsečky">+</button>
+                <button type="button" class="map-float-hit" id="btn-topo-save-route" title="Uložit trasu">💾</button>
             </div>
             <select id="topo-ruler-route-select" class="topo-ruler-route-select map-float-hit"></select>
         </div>
@@ -1673,7 +1657,7 @@
         <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle map-float-hit" title="Skrýt buzolu">−</button>
         <div class="compass-body">
         <button type="button" class="compass-drag-handle map-float-hit" id="compass-drag-handle" title="Přesunout buzolu">⠿</button>
-        <div class="compass-housing map-float-hit">
+        <div class="compass-housing">
             <div class="compass-index-line" title="Směrník / lubber line"></div>
             <div class="compass-north-arrow" id="compass-north-arrow" title="Sever">
                 <span class="compass-north-label">N</span>
@@ -2402,7 +2386,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718w';
+        var PATRAC_BUILD = '20260718x';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4653,9 +4637,18 @@
             }
         }
 
+        function ensureMapTouchPan() {
+            if (!map) return;
+            if (map.dragging) map.dragging.enable();
+            if (map.touchZoom) map.touchZoom.enable();
+            var el = map.getContainer();
+            if (el) el.style.touchAction = 'none';
+        }
+
         function initMap() {
             if (map !== null) {
                 ensureMapPanes();
+                ensureMapTouchPan();
                 if (!mapCompassLayer) mapCompassLayer = L.layerGroup().addTo(map);
                 if (!mapRouteLayer) mapRouteLayer = L.layerGroup().addTo(map);
                 reloadAllMapPoints();
@@ -4679,6 +4672,7 @@
                     scrollWheelZoom: true,
                     doubleClickZoom: true
                 }).setView([startLat, startLng], startZoom);
+                ensureMapTouchPan();
                 ensureMapPanes();
                 mapPointsLayer = L.layerGroup().addTo(map);
                 mapMeasureLayer = L.layerGroup().addTo(map);
@@ -6270,10 +6264,12 @@
             updateTopoRulerDisplay();
             updateTacticalHud();
             if (show) {
+                ensureMapTouchPan();
                 resetMapBearingRotation();
                 updateCompassPermissionUi();
                 updateCompassUi();
                 applyCompassDockPosition();
+                if (map) setTimeout(function() { map.invalidateSize(); ensureMapTouchPan(); }, 150);
             } else {
                 resetMapBearingRotation();
             }

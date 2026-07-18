@@ -24,7 +24,6 @@ var state = {
     screenY: null,
     activeRouteId: null,
     routeName: 'Trasa 1',
-    rotationDeg: 0,
     mapScale: 25000
 };
 
@@ -42,12 +41,6 @@ function getMap() {
     return _deps && _deps.getMap ? _deps.getMap() : null;
 }
 
-function normalizeDeg(d) {
-    d = d % 360;
-    if (d < 0) d += 360;
-    return d;
-}
-
 function bearing(lat1, lng1, lat2, lng2) {
     return _deps.bearingDegrees(lat1, lng1, lat2, lng2);
 }
@@ -62,20 +55,11 @@ function fmtDist(m) {
     return (m / 1000).toFixed(2) + ' km';
 }
 
-function destinationPoint(lat, lng, brngDeg, dist) {
-    var R = 6378137;
-    var br = brngDeg * Math.PI / 180;
-    var lat1 = lat * Math.PI / 180;
-    var lng1 = lng * Math.PI / 180;
-    var lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(dist / R) +
-        Math.cos(lat1) * Math.sin(dist / R) * Math.cos(br)
-    );
-    var lng2 = lng1 + Math.atan2(
-        Math.sin(br) * Math.sin(dist / R) * Math.cos(lat1),
-        Math.cos(dist / R) - Math.sin(lat1) * Math.sin(lat2)
-    );
-    return { lat: lat2 * 180 / Math.PI, lng: lng2 * 180 / Math.PI };
+function getBearingDeg() {
+    if (state.anchor && state.target) {
+        return bearing(state.anchor.lat, state.anchor.lng, state.target.lat, state.target.lng);
+    }
+    return null;
 }
 
 function chainPoints() {
@@ -155,7 +139,6 @@ function renderRouteOnMap() {
         mapObjs.markers.target.on('dragend', function() {
             var ll = mapObjs.markers.target.getLatLng();
             state.target = { lat: ll.lat, lng: ll.lng };
-            state.rotationDeg = bearing(state.anchor.lat, state.anchor.lng, state.target.lat, state.target.lng);
             sortWaypointsAlongRoute();
             persistState();
             renderAll();
@@ -245,14 +228,7 @@ function getPlateCenterLatLng() {
     return { lat: ll.lat, lng: ll.lng };
 }
 
-function getPlateCenterScreen() {
-    var el = getBodyEl();
-    if (!el) return { x: 0, y: 0 };
-    var rect = el.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-}
-
-function metersPerPixel() {
+function getDefaultScreenPos() {
     var map = getMap();
     if (!map) return 1;
     var c = map.getCenter();
@@ -326,17 +302,14 @@ function updateRulerPlateVisual() {
     var scaleEl = document.getElementById('topo-ruler-scale');
     if (!plate) return;
 
-    if (state.anchor && state.target) {
-        state.rotationDeg = bearing(state.anchor.lat, state.anchor.lng, state.target.lat, state.target.lng);
-    }
-
+    var brng = getBearingDeg();
     var scale = plateScaleFactor();
-    plate.style.transform = 'rotate(' + state.rotationDeg + 'deg) scale(' + scale + ')';
+    plate.style.transform = 'rotate(0deg) scale(' + scale + ')';
 
     if (degEl) {
-        degEl.textContent = state.anchor && state.target
-            ? Math.round(state.rotationDeg) + '° směrník'
-            : Math.round(state.rotationDeg) + '°';
+        degEl.textContent = brng != null
+            ? Math.round(brng) + '° směrník'
+            : '—°';
     }
 
     if (scaleEl) {
@@ -375,7 +348,6 @@ function persistState() {
             routeName: state.routeName,
             activeRouteId: state.activeRouteId,
             expanded: state.expanded,
-            rotationDeg: state.rotationDeg,
             mapScale: state.mapScale
         }));
     } catch (e) {}
@@ -395,7 +367,6 @@ function loadState() {
         state.routeName = data.routeName || state.routeName;
         state.activeRouteId = data.activeRouteId || null;
         if (typeof data.expanded === 'boolean') state.expanded = data.expanded;
-        if (typeof data.rotationDeg === 'number') state.rotationDeg = data.rotationDeg;
         if (data.mapScale) state.mapScale = parseInt(data.mapScale, 10) || 25000;
     } catch (e) {}
 }
@@ -455,7 +426,6 @@ function saveRoute() {
         anchor: state.anchor,
         target: state.target,
         waypoints: state.waypoints.slice(),
-        rotationDeg: state.rotationDeg,
         savedAt: Date.now()
     };
     var found = false;
@@ -494,7 +464,6 @@ function loadRouteById(id) {
             state.target = r.target;
             state.waypoints = r.waypoints || [];
             state.anchored = !!r.anchor;
-            if (typeof r.rotationDeg === 'number') state.rotationDeg = r.rotationDeg;
             persistState();
             renderAll();
             return;
@@ -598,7 +567,6 @@ function initInteractions() {
     var routeSel = document.getElementById('topo-ruler-route-select');
     var nameInput = document.getElementById('topo-ruler-route-name');
     var scaleSel = document.getElementById('topo-ruler-map-scale');
-    var bezelHandles = document.querySelectorAll('.topo-ruler-bezel-hit');
 
     if (scaleSel && !scaleSel._bound) {
         scaleSel._bound = true;
@@ -665,37 +633,10 @@ function initInteractions() {
         var mapRect = mapEl.getBoundingClientRect();
         var ll = map.containerPointToLatLng([p.x - mapRect.left, p.y - mapRect.top]);
         state.target = { lat: ll.lat, lng: ll.lng };
-        state.rotationDeg = bearing(state.anchor.lat, state.anchor.lng, ll.lat, ll.lng);
         renderAll();
     }, function() {
         persistState();
     });
-
-    function onBezelMove(e, p) {
-        var c = getPlateCenterScreen();
-        var dx = p.x - c.x;
-        var dy = p.y - c.y;
-        if (Math.hypot(dx, dy) < 8) return;
-        var newRot = normalizeDeg(Math.atan2(dx, -dy) * 180 / Math.PI);
-        state.rotationDeg = newRot;
-        if (state.anchor && state.target) {
-            var d = distM(state.anchor.lat, state.anchor.lng, state.target.lat, state.target.lng);
-            state.target = destinationPoint(state.anchor.lat, state.anchor.lng, newRot, d);
-        } else if (state.anchor && !state.target) {
-            var ll = getPlateCenterLatLng();
-            if (ll) {
-                var d2 = distM(state.anchor.lat, state.anchor.lng, ll.lat, ll.lng);
-                if (d2 > 5) state.target = destinationPoint(state.anchor.lat, state.anchor.lng, newRot, d2);
-            }
-        }
-        renderAll();
-    }
-
-    for (var bi = 0; bi < bezelHandles.length; bi++) {
-        bindPointerDrag(bezelHandles[bi], onBezelMove, function() {
-            persistState();
-        });
-    }
 
     if (pinCenter && !pinCenter._bound) {
         pinCenter._bound = true;
