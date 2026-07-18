@@ -219,7 +219,7 @@ function gridConvergenceDegAt(lat, lng) {
         if (Math.abs(nx) < 0.01 && Math.abs(ny) < 0.01) return 0;
         return Math.atan2(nx, -ny) * 180 / Math.PI;
     }
-    /* +x roameru = východ (E); grid east = northing úhel + 90° */
+    /* vodorovná osa roameru = N, svislá = W (grid convergence po 🔒) */
     var eastAng = Math.atan2(ex, -ey) * 180 / Math.PI;
     return eastAng - 90;
 }
@@ -252,17 +252,17 @@ function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
     var lblOk = document.getElementById('topo-roamer-lbl');
-    if (g.getAttribute('data-built') === 'neon-v11' && lblOk) return;
-    g.setAttribute('data-built', 'neon-v11');
+    /* −x vodorovně = N, +y svisle = W; levý dolní kvadrant od středu (mapový standard). */
+    if (g.getAttribute('data-built') === 'neon-v12' && lblOk) return;
+    g.setAttribute('data-built', 'neon-v12');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var vns = ' vector-effect="non-scaling-stroke"';
     var geo = '';
     var lbl = '';
-    /* SW průsečík = 0; stupnice E (+x) a N (−y) do km buňky — po 🔒 rotace podle grid convergence. */
-    geo += '<polygon points="' + O + ',' + O + ' ' + (O + L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
-    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O + L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
-    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
+    geo += '<polygon points="' + O + ',' + O + ' ' + (O - L) + ',' + O + ' ' + O + ',' + (O + L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O + L) + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
     var i;
     for (i = 0; i <= 20; i++) {
         var t = i * (L / 20);
@@ -270,24 +270,31 @@ function buildRoamerScales() {
         var mid = i % 2 === 0;
         var th = big ? 5 : (mid ? 3 : 2);
         var sw = big ? 0.55 : 0.35;
-        geo += '<line x1="' + (O + t) + '" y1="' + O + '" x2="' + (O + t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
-        geo += '<line x1="' + O + '" y1="' + (O - t) + '" x2="' + (O - th) + '" y2="' + (O - t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+        geo += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+        geo += '<line x1="' + O + '" y1="' + (O + t) + '" x2="' + (O + th) + '" y2="' + (O + t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+    }
+    function roamer2(v) {
+        var s = String(v);
+        while (s.length < 2) s = '0' + s;
+        return s.slice(-2);
     }
     function lblText(ox, oy, text, anchor, weight) {
         var a = anchor || 'middle';
         var w = weight ? ' font-weight="600"' : '';
         return '<text class="topo-roamer-lbl-text" data-ox="' + ox + '" data-oy="' + oy + '" x="0" y="0" text-anchor="' + a + '" fill="' + NEON + '" font-size="8"' + w + ' font-family="IBM Plex Mono,monospace">' + text + '</text>';
     }
-    lbl += lblText(O, O + 10, '0', 'middle', true);
+    /* vodorovná osa N (2 číslice, bez písmene) */
+    lbl += lblText(O, O + 10, roamer2(0), 'middle', true);
     for (i = 1; i <= 9; i++) {
-        lbl += lblText(O + i * 10, O + 10, String(i));
+        lbl += lblText(O - i * 10, O + 10, roamer2(i));
     }
-    lbl += lblText(O + L, O + 10, '1000', 'middle', false);
-    lbl += lblText(O - 8, O + 2, '0', 'end', true);
+    lbl += lblText(O - L, O + 10, roamer2(10), 'middle', false);
+    /* svislá osa W */
+    lbl += lblText(O + 8, O + 2, roamer2(0), 'start', true);
     for (i = 1; i <= 9; i++) {
-        lbl += lblText(O - 8, O - i * 10 + 2, String(i), 'end', false);
+        lbl += lblText(O + 8, O + i * 10 + 2, roamer2(i), 'start', false);
     }
-    lbl += lblText(O - 8, O - L + 2, '1000', 'end', false);
+    lbl += lblText(O + 8, O + L + 2, roamer2(10), 'start', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
     syncRoamerLabels(1);
 }

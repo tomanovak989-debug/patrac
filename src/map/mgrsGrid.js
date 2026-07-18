@@ -182,26 +182,28 @@ function drawGrid() {
     }
 
     if (cellLabelZoom) {
-        /* E na horizontálních čarách (N konstanta), N na vertikálních — uprostřed km segmentu, každá 2. čára. */
+        /* vodorovné čáry = N (2 cifry), svislé = W (2 cifry) — uprostřed km segmentu, každá 2. čára. */
         for (var nh = nMin; nh <= nMax; nh += step) {
             if (!showKmLineLabel(nh, step)) continue;
+            var n2 = pad2(kmIdx100k(nh));
             for (var eh = eMin; eh < eMax; eh += step) {
-                var ptE = utmToLatLng(eh + step * 0.5, nh, zone, latHint);
+                var ptNline = utmToLatLng(eh + step * 0.5, nh, zone, latHint);
                 addLineSegmentLabel(
-                    ptE.lat, ptE.lng,
-                    '<span><b>E</b>' + pad5utmVal(eh) + '</span>',
-                    'mgrs-grid-line-e'
+                    ptNline.lat, ptNline.lng,
+                    '<span>' + n2 + '</span>',
+                    'mgrs-grid-line-n'
                 );
             }
         }
         for (var ev = eMin; ev <= eMax; ev += step) {
             if (!showKmLineLabel(ev, step)) continue;
+            var w2 = pad2(kmIdx100k(ev));
             for (var nv = nMin; nv < nMax; nv += step) {
-                var ptN = utmToLatLng(ev, nv + step * 0.5, zone, latHint);
+                var ptWline = utmToLatLng(ev, nv + step * 0.5, zone, latHint);
                 addLineSegmentLabel(
-                    ptN.lat, ptN.lng,
-                    '<span><b>N</b>' + pad5utmVal(nv) + '</span>',
-                    'mgrs-grid-line-n'
+                    ptWline.lat, ptWline.lng,
+                    '<span>' + w2 + '</span>',
+                    'mgrs-grid-line-w'
                 );
             }
         }

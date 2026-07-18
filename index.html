@@ -1415,15 +1415,15 @@
             background: var(--topo-accent);
             box-shadow: 0 0 3px var(--topo-accent-glow);
         }
-        /* L-kříž: východ + sever od průsečíku (SW roh km buňky) */
+        /* L-kříž: vodorovně N (západ), svisle W (jih) — levý dolní roamer od středu */
         .topo-ruler-center::before {
             width: 1px; height: 22px;
-            left: 50%; bottom: 50%;
+            left: 50%; top: 50%;
             transform: translateX(-50%);
         }
         .topo-ruler-center::after {
             width: 22px; height: 1px;
-            left: 50%; top: 50%;
+            right: 50%; top: 50%;
             transform: translateY(-50%);
         }
         .topo-ruler-center.anchored,
@@ -1586,8 +1586,8 @@
             color: var(--text-green);
             border-color: rgba(74,246,38,0.55);
         }
-        .mgrs-grid-line-e span,
-        .mgrs-grid-line-n span {
+        .mgrs-grid-line-n span,
+        .mgrs-grid-line-w span {
             display: inline-block;
             font-size: 8px;
             line-height: 1.2;
@@ -1601,14 +1601,8 @@
             pointer-events: none;
             white-space: nowrap;
         }
-        .mgrs-grid-line-e span { transform: translate(-50%, -5px); }
-        .mgrs-grid-line-n span { transform: translate(5px, -50%); }
-        .mgrs-grid-line-e span b,
-        .mgrs-grid-line-n span b {
-            font-weight: 600;
-            color: rgba(184, 255, 176, 0.85);
-            font-size: 7px;
-        }
+        .mgrs-grid-line-n span { transform: translate(-50%, -5px); }
+        .mgrs-grid-line-w span { transform: translate(-50%, -50%); }
 
         /* Smírčí kříž (Pocta) */
         .pocta-cross-icon { display: inline-block; position: relative; vertical-align: middle; }
@@ -2530,7 +2524,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718ar';
+        var PATRAC_BUILD = '20260718at';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
