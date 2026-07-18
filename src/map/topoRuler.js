@@ -17,7 +17,7 @@ var state = {
     visible: true,
     positionLocked: false,
     anchor: null,
-    target: null,
+    bearingDeg: null,
     screenX: null,
     screenY: null,
     gzd: '33U',
@@ -41,11 +41,12 @@ function bearing(lat1, lng1, lat2, lng2) {
     return _deps.bearingDegrees(lat1, lng1, lat2, lng2);
 }
 
+function normalizeDeg360(deg) {
+    return ((deg % 360) + 360) % 360;
+}
+
 function getBearingDeg() {
-    if (state.anchor && state.target) {
-        return bearing(state.anchor.lat, state.anchor.lng, state.target.lat, state.target.lng);
-    }
-    return null;
+    return state.bearingDeg != null ? normalizeDeg360(state.bearingDeg) : null;
 }
 
 function clearMapGraphics() {
@@ -223,6 +224,74 @@ function syncRoamerLabels() {
         } else {
             t.removeAttribute('transform');
         }
+    }
+}
+
+function buildRulerDegTicks() {
+    var g = document.getElementById('topo-ruler-deg-ticks');
+    if (!g) return;
+    if (g.getAttribute('data-built') === 'deg5-v1') return;
+    g.setAttribute('data-built', 'deg5-v1');
+    var html = '';
+    var d;
+    for (d = 0; d < 360; d += 5) {
+        var major = d % 90 === 0;
+        var minor = !major && d % 30 === 0;
+        var len = major ? 9 : (minor ? 6 : 3.5);
+        var sw = major ? 0.85 : (minor ? 0.6 : 0.4);
+        var y2 = 10 + len;
+        html += '<line x1="130" y1="10" x2="130" y2="' + y2 + '" stroke="' + NEON + '" stroke-width="' + sw + '" transform="rotate(' + d + ' 130 130)"/>';
+    }
+    g.innerHTML = html;
+}
+
+function buildBearingHand() {
+    var g = document.getElementById('topo-bearing-hand');
+    if (!g || g.getAttribute('data-built') === '1') return;
+    g.setAttribute('data-built', '1');
+    g.innerHTML =
+        '<line x1="130" y1="130" x2="130" y2="34" stroke="#ffb366" stroke-width="1.2" stroke-linecap="round"/>' +
+        '<polygon points="130,30 126,40 134,40" fill="#ffb366"/>' +
+        '<circle cx="130" cy="130" r="3.5" fill="#ffb366" opacity="0.95"/>';
+}
+
+function bearingDegFromPointer(e) {
+    var svg = document.getElementById('topo-ruler-svg');
+    if (!svg || !svg.createSVGPoint) return null;
+    var clientX = e.clientX;
+    var clientY = e.clientY;
+    if (e.touches && e.touches.length) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+    }
+    var pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    var ctm = svg.getScreenCTM();
+    if (!ctm) return null;
+    var svgPt = pt.matrixTransform(ctm.inverse());
+    var dx = svgPt.x - 130;
+    var dy = svgPt.y - 130;
+    if (Math.hypot(dx, dy) < 2) return null;
+    return normalizeDeg360(Math.atan2(dx, -dy) * 180 / Math.PI);
+}
+
+function syncBearingHand() {
+    var hand = document.getElementById('topo-bearing-hand');
+    var hit = document.getElementById('topo-ruler-bezel-hit');
+    var show = state.positionLocked;
+    if (hand) {
+        if (show && state.bearingDeg != null) {
+            hand.style.display = '';
+            hand.setAttribute('transform', 'rotate(' + normalizeDeg360(state.bearingDeg).toFixed(2) + ' 130 130)');
+        } else {
+            hand.style.display = 'none';
+            hand.removeAttribute('transform');
+        }
+    }
+    if (hit) {
+        hit.style.pointerEvents = show ? 'stroke' : 'none';
+        hit.style.cursor = show ? (_bearingDragging ? 'grabbing' : 'grab') : 'default';
     }
 }
 
@@ -483,27 +552,6 @@ function syncFabLockUi() {
 
 function renderBearingOnMap() {
     clearMapGraphics();
-    var map = getMap();
-    if (!map || !_layer || !state.positionLocked || !state.anchor) return;
-
-    if (state.target) {
-        var coords = [[state.anchor.lat, state.anchor.lng], [state.target.lat, state.target.lng]];
-        var line = window.L.polyline(coords, {
-            color: NEON, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane'
-        }).addTo(_layer);
-        mapObjs.lines.push(line);
-        mapObjs.markers.target = window.L.marker([state.target.lat, state.target.lng], {
-            draggable: false,
-            icon: window.L.divIcon({
-                className: 'topo-ruler-map-dot',
-                html: '<span style="background:#ffb366;width:12px;height:12px"></span>',
-                iconSize: [12, 12],
-                iconAnchor: [6, 6]
-            }),
-            pane: 'mapMeasurePane',
-            zIndexOffset: 1000
-        }).addTo(_layer);
-    }
 }
 
 function updateRulerPlateVisual() {
@@ -526,10 +574,12 @@ function updateRulerPlateVisual() {
     }
 
     syncRoamerLabels();
+    syncBearingHand();
 
     if (centerEl) {
         centerEl.style.transform = '';
         centerEl.classList.toggle('is-locked', state.positionLocked);
+        centerEl.style.pointerEvents = state.positionLocked ? 'none' : 'auto';
     }
 
     var locked = state.positionLocked;
@@ -554,7 +604,7 @@ function updateRulerPlateVisual() {
     var brng = getBearingDeg();
     if (degEl) {
         if (locked && brng != null) degEl.textContent = Math.round(brng) + '° směrník';
-        else if (locked) degEl.textContent = 'Táhni směrník ze středu';
+        else if (locked) degEl.textContent = 'Otoč směrník po rysce';
         else degEl.textContent = '';
     }
     if (dragSurface) dragSurface.classList.toggle('is-locked', locked);
@@ -623,7 +673,7 @@ function persistState() {
         localStorage.setItem('patrac_topo_ruler_state', JSON.stringify({
             positionLocked: state.positionLocked,
             anchor: state.anchor,
-            target: state.target,
+            bearingDeg: state.bearingDeg,
             screenX: state.screenX,
             screenY: state.screenY,
             expanded: state.expanded,
@@ -641,7 +691,11 @@ function loadState() {
         if (!raw) return;
         var data = JSON.parse(raw);
         if (data.anchor) state.anchor = data.anchor;
-        if (data.target) state.target = data.target;
+        if (typeof data.bearingDeg === 'number' && !isNaN(data.bearingDeg)) {
+            state.bearingDeg = data.bearingDeg;
+        } else if (data.target && data.anchor && _deps) {
+            state.bearingDeg = bearing(data.anchor.lat, data.anchor.lng, data.target.lat, data.target.lng);
+        }
         if (typeof data.positionLocked === 'boolean') state.positionLocked = data.positionLocked;
         state.screenX = data.screenX;
         state.screenY = data.screenY;
@@ -658,6 +712,7 @@ function togglePositionLock() {
         captureScreenPos();
         state.positionLocked = true;
         syncAnchorFromCenter();
+        if (state.bearingDeg == null) state.bearingDeg = 0;
     } else {
         state.positionLocked = false;
         releaseInteractionLocks();
@@ -718,7 +773,7 @@ function bindWidgetDrag(surface) {
     var activePointer = null;
 
     function isDragHandle(target) {
-        return target && target.closest && target.closest('input, select, button, .topo-ruler-center, .topo-ruler-zone-bar');
+        return target && target.closest && target.closest('input, select, button, .topo-ruler-center, .topo-ruler-zone-bar, .topo-ruler-bezel-hit');
     }
 
     function ptrXY(e) {
@@ -802,9 +857,9 @@ function bindWidgetDrag(surface) {
     surface.addEventListener('pointerdown', onStart);
 }
 
-function bindBearingDrag(handle) {
-    if (!handle || handle._bearingBound) return;
-    handle._bearingBound = true;
+function bindBearingBezelDrag(bezel) {
+    if (!bezel || bezel._bearingBound) return;
+    bezel._bearingBound = true;
     var dragging = false;
     var activePointer = null;
 
@@ -817,9 +872,9 @@ function bindBearingDrag(handle) {
     function onMove(e) {
         if (!state.positionLocked || !dragging) return;
         if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
-        var ll = pointerEventToLatLng(e);
-        if (ll) state.target = { lat: ll.lat, lng: ll.lng };
-        renderBearingOnMap();
+        var deg = bearingDegFromPointer(e);
+        if (deg != null) state.bearingDeg = deg;
+        syncBearingHand();
         updateRulerPlateVisual();
         e.preventDefault();
     }
@@ -831,6 +886,7 @@ function bindBearingDrag(handle) {
         dragging = false;
         _bearingDragging = false;
         activePointer = null;
+        syncBearingHand();
         persistState();
     }
 
@@ -840,22 +896,20 @@ function bindBearingDrag(handle) {
         dragging = true;
         _bearingDragging = true;
         activePointer = e.pointerId != null ? e.pointerId : null;
-        document.body.style.cursor = 'crosshair';
+        document.body.style.cursor = 'grabbing';
+        syncBearingHand();
         e.preventDefault();
         e.stopPropagation();
         detachDoc();
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
         document.addEventListener('pointercancel', onEnd);
-        var ll = pointerEventToLatLng(e);
-        if (ll) {
-            state.target = { lat: ll.lat, lng: ll.lng };
-            renderBearingOnMap();
-            updateRulerPlateVisual();
-        }
+        var deg = bearingDegFromPointer(e);
+        if (deg != null) state.bearingDeg = deg;
+        updateRulerPlateVisual();
     }
 
-    handle.addEventListener('pointerdown', onStart);
+    bezel.addEventListener('pointerdown', onStart);
 }
 
 function bindCoordInputs() {
@@ -943,6 +997,7 @@ function initInteractions() {
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var pinCenter = document.getElementById('topo-ruler-center');
     var rulerScene = document.getElementById('topo-ruler-scene');
+    var bezelHit = document.getElementById('topo-ruler-bezel-hit');
 
     if (toggle && !toggle._bound) {
         toggle._bound = true;
@@ -964,7 +1019,7 @@ function initInteractions() {
         var hits = root.querySelectorAll('.map-float-hit');
         for (var hi = 0; hi < hits.length; hi++) bindMapWheelPassthrough(hits[hi]);
     }
-    bindBearingDrag(pinCenter);
+    bindBearingBezelDrag(bezelHit);
     bindCoordInputs();
     bindFabLongPress();
     bindInteractionSafetyListeners();
@@ -1005,6 +1060,8 @@ export function initTopoRuler(deps) {
         var toggle = document.getElementById('btn-topo-ruler-toggle');
         if (toggle) toggle.textContent = state.expanded ? '−' : '📐';
     }
+    buildRulerDegTicks();
+    buildBearingHand();
     buildRoamerScales();
     initInteractions();
     bindMapEvents();

@@ -1466,7 +1466,16 @@
             paint-order: stroke fill;
             filter: drop-shadow(0 0 2px rgba(6, 10, 6, 0.9));
         }
-        .topo-ruler-bezel-hit { display: none; }
+        .topo-ruler-bezel-hit {
+            fill: none;
+            stroke: transparent;
+            pointer-events: none;
+        }
+        #topo-bearing-hand line,
+        #topo-bearing-hand polygon,
+        #topo-bearing-hand circle {
+            pointer-events: none;
+        }
         .topo-ruler-center {
             position: absolute;
             left: 50%; top: 50%;
@@ -1864,46 +1873,19 @@
                 <div class="topo-ruler-scene" id="topo-ruler-scene">
                 <svg class="topo-gta-svg topo-ruler-svg" id="topo-ruler-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <g id="topo-ruler-world">
-                    <defs>
-                        <g id="topo-deg-tick-sm">
-                            <line x1="130" y1="10" x2="130" y2="16" stroke="#78ff66" stroke-width="0.65"/>
-                        </g>
-                        <g id="topo-deg-tick-lg">
-                            <line x1="130" y1="6" x2="130" y2="18" stroke="#78ff66" stroke-width="0.85"/>
-                        </g>
-                    </defs>
                     <rect x="4" y="4" width="252" height="252" rx="10" fill="none" stroke="#78ff66" stroke-width="1"/>
-                    <g stroke="#78ff66">
-                        <use href="#topo-deg-tick-lg" transform="rotate(0 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(20 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(40 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(60 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(80 130 130)"/>
-                        <use href="#topo-deg-tick-lg" transform="rotate(90 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(100 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(120 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(140 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(160 130 130)"/>
-                        <use href="#topo-deg-tick-lg" transform="rotate(180 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(200 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(220 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(240 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(260 130 130)"/>
-                        <use href="#topo-deg-tick-lg" transform="rotate(270 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(280 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(300 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(320 130 130)"/>
-                        <use href="#topo-deg-tick-sm" transform="rotate(340 130 130)"/>
-                    </g>
+                    <g id="topo-ruler-deg-ticks"></g>
                     <text x="130" y="26" text-anchor="middle" fill="#78ff66" font-size="8" font-weight="600" font-family="IBM Plex Mono, monospace">0°</text>
                     <text x="234" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">90</text>
                     <text x="130" y="242" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
                     <text x="26" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
                     <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
                     <g id="topo-roamer-scales"></g>
+                    <g id="topo-bearing-hand" style="display:none"></g>
+                    <circle id="topo-ruler-bezel-hit" class="topo-ruler-bezel-hit map-float-hit" cx="130" cy="130" r="115" stroke-width="22"/>
                     </g>
                 </svg>
-                    <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Směrník (po zamknutí)"></button>
+                    <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Střed roameru"></button>
                     <div class="topo-ruler-zone-bar">
                         <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
                         <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
@@ -2669,7 +2651,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bk';
+        var PATRAC_BUILD = '20260719bl';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
