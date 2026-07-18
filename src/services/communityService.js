@@ -7,6 +7,10 @@ import { ensurePatracAuth } from './authService.js';
 
 const COLLECTION = 'communities';
 
+function normalizeComCode(comCode) {
+    return String(comCode || '').trim().toUpperCase();
+}
+
 function mergeUniqueMemberIds() {
     var lists = Array.prototype.slice.call(arguments);
     var out = [];
@@ -83,7 +87,9 @@ export async function fetchCommunityMeta(comCode) {
 export async function hydrateCommunityFromCloud(comCode) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return { ok: false };
-    await ensureFirebaseAuth();
+    await ensurePatracAuth().catch(function() {
+        return ensureFirebaseAuth();
+    });
 
     var snap = await getDoc(doc(getDb(), COLLECTION, comCode));
     if (!snap.exists()) return { ok: false };
@@ -111,10 +117,15 @@ export async function hydrateCommunityFromCloud(comCode) {
     localStorage.setItem('patrac_communities', JSON.stringify(comms));
 
     if (membersChanged(cloudMembers, mergedMembers)) {
-        await setDoc(doc(getDb(), COLLECTION, comCode), {
-            members: mergedMembers,
-            updatedAt: Date.now()
-        }, { merge: true });
+        try {
+            await ensurePatracAuth();
+            await setDoc(doc(getDb(), COLLECTION, comCode), {
+                members: mergedMembers,
+                updatedAt: Date.now()
+            }, { merge: true });
+        } catch (mergeErr) {
+            console.warn('[communityService] member merge sync', comCode, mergeErr);
+        }
     }
 
     if (Array.isArray(data.inventory)) {
