@@ -116,7 +116,14 @@
             width: fit-content;
             height: fit-content;
         }
-        .map-float-hit { pointer-events: auto; touch-action: none; }
+        .map-float-hit { pointer-events: auto; }
+        input.map-float-hit,
+        select.map-float-hit,
+        textarea.map-float-hit {
+            touch-action: manipulation;
+            cursor: text;
+        }
+        button.map-float-hit { touch-action: manipulation; cursor: pointer; }
         /* Dlaždice mapy — bez papírového filtru (barevný satelit) */
         #map .leaflet-tile-pane {
             filter: none;
@@ -945,6 +952,16 @@
             box-shadow: 0 0 14px rgba(74, 246, 38, 0.75);
             background: rgba(12, 24, 12, 0.96);
         }
+        .map-tool-fab.is-locked {
+            border-color: #ffb366;
+            color: #ffb366;
+            box-shadow: 0 0 16px rgba(255, 179, 102, 0.75);
+            background: rgba(24, 16, 8, 0.96);
+        }
+        .map-tool-fab.is-active.is-locked {
+            border-color: #ffb366;
+            box-shadow: 0 0 16px rgba(255, 179, 102, 0.85);
+        }
         .topo-ruler-widget-toggle,
         .compass-widget-toggle { display: none !important; }
 
@@ -1286,8 +1303,7 @@
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-plate-wrap,
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-footer,
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-coord-n,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-zone-bar,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-lock-hint { display: none; }
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-zone-bar { display: none; }
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-widget-toggle {
             position: relative; top: 0; right: 0;
             width: 48px; height: 48px; border-radius: 50%; font-size: 20px;
@@ -1303,7 +1319,6 @@
             text-shadow: var(--topo-text-glow);
             box-shadow: 0 0 8px var(--topo-accent-glow);
         }
-        .topo-ruler-body,
         #topo-ruler-drag-surface {
             position: relative;
             width: 260px;
@@ -1313,10 +1328,10 @@
             border: none;
             box-shadow: none;
             pointer-events: auto;
-            cursor: grab;
-            touch-action: none;
+            cursor: default;
         }
-        #topo-ruler-drag-surface:active { cursor: grabbing; }
+        #topo-ruler-drag-surface.is-dragging { cursor: grabbing; }
+        #topo-ruler-drag-surface.is-locked { cursor: default; }
         .topo-ruler-zone-bar {
             position: absolute;
             top: 0;
@@ -1341,16 +1356,6 @@
             pointer-events: auto;
         }
         .topo-ruler-zone-bar input.is-readonly { opacity: 0.65; }
-        .topo-ruler-lock-hint {
-            position: absolute;
-            top: 2px;
-            left: 4px;
-            z-index: 44;
-            font-size: 9px;
-            color: var(--topo-accent-dim);
-            pointer-events: none;
-        }
-        .topo-ruler-lock-hint.is-locked { color: var(--topo-accent); font-weight: 700; }
         .topo-ruler-coord {
             font-family: 'IBM Plex Mono', monospace;
             font-size: 11px;
@@ -1433,7 +1438,7 @@
             border-radius: 50%;
             border: none;
             background: transparent;
-            cursor: pointer;
+            cursor: crosshair;
             z-index: 20;
             box-shadow: none;
             pointer-events: auto;
@@ -1457,13 +1462,11 @@
             right: 50%; top: 50%;
             transform: translateY(-50%);
         }
-        .topo-ruler-center.anchored,
         .topo-ruler-center.is-locked {
             background: transparent;
             border: none;
-            cursor: grab;
+            cursor: crosshair;
         }
-        .topo-ruler-center.is-locked:active { cursor: grabbing; }
         .topo-ruler-tip {
             pointer-events: none;
             position: absolute;
@@ -1824,7 +1827,6 @@
                 <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
                 <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
             </div>
-            <span class="topo-ruler-lock-hint" id="topo-ruler-lock-hint">🔓 volné</span>
             <div class="topo-ruler-plate-wrap">
                 <div class="topo-ruler-plate" id="topo-ruler-plate">
                 <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1872,7 +1874,7 @@
             </div>
             <input type="text" class="topo-ruler-coord topo-ruler-coord-n map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="North (N)" autocomplete="off">
             <div class="topo-ruler-footer">
-                <span class="topo-ruler-bearing" id="topo-ruler-bearing">Podrž 📐 2 s = zamknout</span>
+                <span class="topo-ruler-bearing" id="topo-ruler-bearing"></span>
             </div>
         </div>
     </div>
@@ -2625,7 +2627,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718au';
+        var PATRAC_BUILD = '20260718av';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }

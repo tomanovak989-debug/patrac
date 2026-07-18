@@ -421,17 +421,40 @@ function setMapInteractionEnabled(on) {
             if (map.dragging) map.dragging.enable();
             if (map.touchZoom) map.touchZoom.enable();
             if (map.scrollWheelZoom) map.scrollWheelZoom.enable();
+            if (map.doubleClickZoom) map.doubleClickZoom.enable();
         }
         return;
     }
-    if (map.dragging) map.dragging.disable();
-    if (map.touchZoom) map.touchZoom.disable();
+    /* Pravítko je overlay — mapu neblokujeme (zabraňuje zaseknutí zoomu / kurzoru). */
 }
 
 function releaseInteractionLocks() {
     _bearingDragging = false;
     _widgetDragging = false;
+    document.body.style.cursor = '';
     setMapInteractionEnabled(true);
+}
+
+var _safetyListenersBound = false;
+
+function bindInteractionSafetyListeners() {
+    if (_safetyListenersBound || typeof window === 'undefined') return;
+    _safetyListenersBound = true;
+    window.addEventListener('blur', releaseInteractionLocks);
+    window.addEventListener('pointercancel', releaseInteractionLocks);
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'hidden') releaseInteractionLocks();
+    });
+}
+
+function syncFabLockUi() {
+    var fab = document.getElementById('fab-topo-ruler');
+    if (!fab) return;
+    fab.classList.toggle('is-locked', state.positionLocked);
+    fab.textContent = state.positionLocked ? '🔒' : '📐';
+    fab.title = state.positionLocked
+        ? 'Pravítko zamčeno · podrž 2 s = odemknout'
+        : 'Pravítko · podrž 2 s = zamknout';
 }
 
 function renderBearingOnMap() {
@@ -461,7 +484,7 @@ function renderBearingOnMap() {
 
 function updateRulerPlateVisual() {
     var degEl = document.getElementById('topo-ruler-bearing');
-    var lockHint = document.getElementById('topo-ruler-lock-hint');
+    var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var centerEl = document.getElementById('topo-ruler-center');
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
@@ -503,14 +526,12 @@ function updateRulerPlateVisual() {
 
     var brng = getBearingDeg();
     if (degEl) {
-        if (!locked) degEl.textContent = 'Podrž 📐 2 s = zamknout';
-        else if (brng != null) degEl.textContent = Math.round(brng) + '° směrník';
-        else degEl.textContent = 'Táhni směrník ze středu';
+        if (locked && brng != null) degEl.textContent = Math.round(brng) + '° směrník';
+        else if (locked) degEl.textContent = 'Táhni směrník ze středu';
+        else degEl.textContent = '';
     }
-    if (lockHint) {
-        lockHint.textContent = locked ? '🔒 zamčeno' : '🔓 volné';
-        lockHint.classList.toggle('is-locked', locked);
-    }
+    if (dragSurface) dragSurface.classList.toggle('is-locked', locked);
+    syncFabLockUi();
 }
 
 function updateRulerWidgetPosition() {
@@ -624,18 +645,34 @@ function bindWidgetDrag(surface) {
     var moving = false;
     var start = null;
     var origin = null;
+    var activePointer = null;
 
-    function ptr(e) {
-        if (e.target.closest('input, select, button, .topo-ruler-center')) return null;
-        return { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
+    function isDragHandle(target) {
+        return target && target.closest && target.closest('input, select, button, .topo-ruler-center, .topo-ruler-zone-bar');
+    }
+
+    function ptrXY(e) {
+        if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        return { x: e.clientX, y: e.clientY };
+    }
+
+    function detachDoc() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('mouseup', onEnd);
+        document.removeEventListener('touchend', onEnd);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onEnd);
+        document.removeEventListener('pointercancel', onEnd);
     }
 
     function onStart(e) {
         if (state.positionLocked) return;
-        var p = ptr(e);
-        if (!p) return;
+        if (isDragHandle(e.target)) return;
+        if (e.button != null && e.button !== 0) return;
         moving = false;
-        start = p;
+        start = ptrXY(e);
+        activePointer = e.pointerId != null ? e.pointerId : null;
         _widgetDragging = true;
         captureScreenPos();
         if (state.screenX == null) {
@@ -650,22 +687,31 @@ function bindWidgetDrag(surface) {
             root.style.right = 'auto';
             root.style.bottom = 'auto';
         }
-        e.preventDefault();
-        e.stopPropagation();
+        if (activePointer != null && surface.setPointerCapture) {
+            try { surface.setPointerCapture(activePointer); } catch (err) {}
+        }
+        detachDoc();
+        document.addEventListener('pointermove', onMove, { passive: false });
+        document.addEventListener('pointerup', onEnd);
+        document.addEventListener('pointercancel', onEnd);
         document.addEventListener('mousemove', onMove);
-        document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('touchend', onEnd);
     }
 
     function onMove(e) {
         if (!start || !origin) return;
-        var p = ptr(e);
-        if (!p) return;
+        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
+        var p = ptrXY(e);
         var dx = p.x - start.x;
         var dy = p.y - start.y;
         if (!moving && Math.hypot(dx, dy) < 4) return;
-        moving = true;
+        if (!moving) {
+            moving = true;
+            surface.classList.add('is-dragging');
+            document.body.style.cursor = 'grabbing';
+        }
         var c = clampRulerScreenPos(origin.x + dx, origin.y + dy);
         state.screenX = c.x;
         state.screenY = c.y;
@@ -679,28 +725,46 @@ function bindWidgetDrag(surface) {
         e.preventDefault();
     }
 
-    function onEnd() {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('mouseup', onEnd);
-        document.removeEventListener('touchend', onEnd);
+    function onEnd(e) {
+        if (activePointer != null && e && e.pointerId != null && e.pointerId !== activePointer) return;
+        detachDoc();
+        if (activePointer != null && surface.releasePointerCapture) {
+            try { surface.releasePointerCapture(activePointer); } catch (err) {}
+        }
+        document.body.style.cursor = '';
+        surface.classList.remove('is-dragging');
         _widgetDragging = false;
         if (moving) persistState();
         moving = false;
         start = null;
+        origin = null;
+        activePointer = null;
     }
 
+    surface.addEventListener('pointerdown', onStart);
     surface.addEventListener('mousedown', onStart);
-    surface.addEventListener('touchstart', onStart, { passive: false });
+    surface.addEventListener('touchstart', onStart, { passive: true });
 }
 
 function bindBearingDrag(handle) {
     if (!handle || handle._bearingBound) return;
     handle._bearingBound = true;
     var dragging = false;
+    var activePointer = null;
+
+    function detachDoc() {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('mouseup', onEnd);
+        document.removeEventListener('touchend', onEnd);
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onEnd);
+        document.removeEventListener('pointercancel', onEnd);
+    }
 
     function onMove(e) {
         if (!state.positionLocked || !dragging) return;
+        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
         var ll = pointerEventToLatLng(e);
         if (ll) state.target = { lat: ll.lat, lng: ll.lng };
         renderBearingOnMap();
@@ -708,27 +772,38 @@ function bindBearingDrag(handle) {
         e.preventDefault();
     }
 
-    function onEnd() {
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('mouseup', onEnd);
-        document.removeEventListener('touchend', onEnd);
+    function onEnd(e) {
+        if (activePointer != null && e && e.pointerId != null && e.pointerId !== activePointer) return;
+        detachDoc();
+        if (activePointer != null && handle.releasePointerCapture) {
+            try { handle.releasePointerCapture(activePointer); } catch (err) {}
+        }
+        document.body.style.cursor = '';
         dragging = false;
         _bearingDragging = false;
-        setMapInteractionEnabled(true);
+        activePointer = null;
         persistState();
     }
 
     function onStart(e) {
         if (!state.positionLocked) return;
+        if (e.button != null && e.button !== 0) return;
         dragging = true;
         _bearingDragging = true;
-        setMapInteractionEnabled(false);
+        activePointer = e.pointerId != null ? e.pointerId : null;
+        document.body.style.cursor = 'crosshair';
         e.preventDefault();
         e.stopPropagation();
+        if (activePointer != null && handle.setPointerCapture) {
+            try { handle.setPointerCapture(activePointer); } catch (err) {}
+        }
+        detachDoc();
+        document.addEventListener('pointermove', onMove, { passive: false });
+        document.addEventListener('pointerup', onEnd);
+        document.addEventListener('pointercancel', onEnd);
         document.addEventListener('mousemove', onMove);
-        document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchmove', onMove, { passive: false });
         document.addEventListener('touchend', onEnd);
         var ll = pointerEventToLatLng(e);
         if (ll) {
@@ -738,6 +813,7 @@ function bindBearingDrag(handle) {
         }
     }
 
+    handle.addEventListener('pointerdown', onStart);
     handle.addEventListener('mousedown', onStart);
     handle.addEventListener('touchstart', onStart, { passive: false });
 }
@@ -844,6 +920,7 @@ function initInteractions() {
     bindBearingDrag(pinCenter);
     bindCoordInputs();
     bindFabLongPress();
+    bindInteractionSafetyListeners();
 }
 
 function bindMapEvents() {
@@ -870,6 +947,7 @@ export function initTopoRuler(deps) {
     buildRoamerScales();
     initInteractions();
     bindMapEvents();
+    syncFabLockUi();
     updateRulerWidgetPosition();
 }
 
