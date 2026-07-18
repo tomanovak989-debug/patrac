@@ -71,7 +71,6 @@
         .item-craft-card,
         .lustrace-box,
         .tool-btn,
-        .map-detail-panel,
         #map-targeting-bar,
         #map-add-poi-bar,
         #map-measure-bar,
@@ -86,7 +85,6 @@
         .form-group label,
         .quest-completed-badge,
         .top-status-bar,
-        .map-detail-panel,
         .inventory-column-title,
         .btn-accept,
         .action-tab.active {
@@ -518,11 +516,6 @@
         }
 
         .bottom-hud-wrapper { position: absolute; bottom: 0; left: 0; width: 100%; z-index: 15; display: none; flex-direction: column; }
-        .map-detail-panel {
-            background-color: var(--hud-bg); border-top: 1px solid var(--hud-border);
-            padding: 10px 14px; font-size: var(--text-base); text-align: center; color: var(--text-green);
-            line-height: var(--panel-line-height);
-        }
         .bottom-action-bar { height: 44px; display: flex; background-color: var(--bar-bg); border-top: 1px solid var(--hud-border); }
         .action-tab {
             flex: 1; display: flex; align-items: center; justify-content: center;
@@ -1105,8 +1098,7 @@
             0%, 100% { box-shadow: 0 0 6px rgba(255, 200, 80, 0.35); }
             50% { box-shadow: 0 0 14px rgba(255, 200, 80, 0.85); }
         }
-        #map-compass .compass-housing,
-        #map-compass .compass-readout { pointer-events: auto; cursor: pointer; }
+        #map-compass .compass-housing { pointer-events: auto; cursor: pointer; }
         .compass-housing {
             position: relative;
             width: 132px; height: 132px;
@@ -1156,29 +1148,16 @@
         .compass-rose-wrap {
             position: absolute; inset: 8px;
             border-radius: 50%;
-            pointer-events: none;
+            pointer-events: auto;
+            cursor: grab;
+            touch-action: none;
         }
+        .compass-rose-wrap:active { cursor: grabbing; }
         .compass-rose {
             width: 100%; height: 100%;
             transform: rotate(0deg);
             transform-origin: 50% 50%;
         }
-        .compass-readout {
-            margin-top: 6px;
-            padding: 6px 8px;
-            background: rgba(6, 10, 6, 0.5);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-            border: 1px solid rgba(74, 246, 38, 0.55);
-            font-size: var(--text-sm);
-            line-height: 1.45;
-            color: var(--text-green-dim);
-            font-weight: 600;
-            text-align: center;
-            box-shadow: var(--neon-glow);
-        }
-        .compass-readout .az-deg { color: var(--text-green); font-size: var(--text-base); text-shadow: var(--text-glow); }
-        .compass-readout .az-rad { color: var(--text-green-dim); font-size: var(--text-sm); }
         .compass-index-line {
             position: absolute; top: 6px; left: 50%; width: 2px; height: 18px;
             margin-left: -1px; background: var(--accent-gold);
@@ -1198,8 +1177,6 @@
             letter-spacing: -0.02em;
         }
         .compass-center-deg.is-waiting { color: var(--accent-gold); font-size: 14px; }
-        .compass-rose-wrap { pointer-events: auto; cursor: grab; touch-action: none; }
-        .compass-rose-wrap:active { cursor: grabbing; }
 
         /* Smírčí kříž (Pocta) */
         .pocta-cross-icon { display: inline-block; position: relative; vertical-align: middle; }
@@ -1288,9 +1265,6 @@
             .compass-center-deg.is-waiting { font-size: 11px; max-width: 70px; text-align: center; line-height: 1.1; }
             .compass-north-arrow { height: 48px; margin-top: -48px; }
             .compass-north-label { font-size: 10px; top: -16px; }
-            .compass-readout {
-                margin-top: 4px; padding: 4px 5px; font-size: 9px; line-height: 1.3;
-            }
             .compass-widget-toggle { width: 30px; height: 30px; font-size: 18px; }
             #map-layers-panel { bottom: 48px; }
         }
@@ -1659,7 +1633,6 @@
                 </svg>
             </div>
         </div>
-        <div class="compass-readout" id="compass-readout" role="button" tabindex="0">▶ Klepni pro buzolu</div>
         </div>
     </div>
 
@@ -2011,7 +1984,6 @@
 
     <!-- SPODNÍ PANEL -->
     <div class="bottom-hud-wrapper crt-surface" id="hud-bottom">
-        <div class="map-detail-panel" id="map-sensor-output">📡 SENSOR: Vyberte taktický bod na mapě...</div>
         <div class="bottom-action-bar">
             <button class="action-tab active" onclick="switchMainTab('shelter', this)">🏠 Útočiště</button>
             <button class="action-tab" onclick="switchMainTab('tasks', this)">🗺️ Úkoly</button>
@@ -2040,7 +2012,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718r';
+        var PATRAC_BUILD = '20260718s';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2062,7 +2034,6 @@
         var compassHeadingSource = null;
         var compassOrientRaf = null;
         var compassOrientLastEvent = null;
-        var compassReadoutThrottle = 0;
         var compassOrientListening = false;
         var compassOrientGranted = false;
         var compassNeedsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
@@ -4413,8 +4384,7 @@
 
         function setMapNavTarget(lat, lng, label) {
             mapNavTarget = { lat: lat, lng: lng, label: label || 'Cíl' };
-            updateTacticalHud();
-            updateCompassReadout();
+            updateCompassUi();
         }
         window.setMapNavTarget = setMapNavTarget;
         window.getMapLayerFilter = getMapLayerFilter;
@@ -4519,11 +4489,6 @@
             compassOrientGranted = true;
             updateCompassPermissionUi();
             applyCompassNorthArrow();
-            var now = Date.now();
-            if (now - compassReadoutThrottle > 900) {
-                compassReadoutThrottle = now;
-                updateCompassReadout();
-            }
         }
 
         function onDeviceOrientation(e) {
@@ -4557,21 +4522,21 @@
                         attachCompassOrientationListeners();
                         compassOrientGranted = true;
                         updateCompassPermissionUi();
-                        updateCompassReadout();
+                        updateCompassUi();
                         return true;
                     }
-                    updateCompassReadout('Přístup ke kompasu zamítnut. Safari → Nastavení → Pohyb a orientace.');
+                    updateCompassPermissionUi();
                     return false;
                 }).catch(function(err) {
                     console.warn('[compass] permission', err);
-                    updateCompassReadout('Kompas nelze spustit — zkus znovu klepnout na buzolu.');
+                    updateCompassPermissionUi();
                     return false;
                 });
             }
             attachCompassOrientationListeners();
             compassOrientGranted = true;
             updateCompassPermissionUi();
-            updateCompassReadout();
+            updateCompassUi();
             return Promise.resolve(true);
         }
 
@@ -4606,7 +4571,6 @@
             initCompassWidgetToggle();
             var wrap = document.getElementById('compass-rose-wrap');
             var housing = document.querySelector('#map-compass .compass-housing');
-            var readout = document.getElementById('compass-readout');
             if (!wrap || wrap._bezelBound) return;
             wrap._bezelBound = true;
             var dragging = false;
@@ -4642,8 +4606,7 @@
                 applyCompassBezelRotation();
                 resetMapBearingRotation();
                 try { localStorage.setItem('patrac_compass_bezel', String(compassBezelDeg)); } catch (err) {}
-                updateTacticalHud();
-                updateCompassReadout();
+                updateCompassUi();
             }
             function onEnd(e) {
                 if (!dragging && dragStart) {
@@ -4668,7 +4631,6 @@
             document.addEventListener('mouseup', onEnd);
             document.addEventListener('touchend', onEnd);
             bindActivate(housing);
-            bindActivate(readout);
             if (!compassNeedsPermission) {
                 attachCompassOrientationListeners();
                 compassOrientGranted = true;
@@ -4840,7 +4802,6 @@
             var lng = parseFloat(localStorage.getItem('point_' + questId + '_lng'));
             map.setView([lat, lng], Math.max(map.getZoom(), 16));
             switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
-            document.getElementById('map-sensor-output').innerHTML = '📡 ' + getQuestMapLabel(questId);
         }
 
         function renderStoryPositionCardHtml(questId) {
@@ -5071,7 +5032,6 @@
             closeStoryPosEditor();
             renderStoryPositionsList();
             renderQuestList();
-            document.getElementById('map-sensor-output').innerHTML = '📢 Popis komunity: ' + getQuestMapLabel(questId);
             syncCommunityPoisToCloud();
         }
 
@@ -5091,7 +5051,6 @@
 
             closePoiEditor();
             closeAddPoiPanel();
-            document.getElementById('map-sensor-output').innerHTML = '🗑️ Smazáno: ' + label;
             syncCommunityPoisToCloud();
         }
 
@@ -5113,7 +5072,6 @@
             localStorage.setItem('map_free_pois', JSON.stringify(found.list));
             renderPointOnMap(poiId, found.poi.lat, found.poi.lng, found.poi.name, found.poi.note || '');
             closePoiEditor();
-            document.getElementById('map-sensor-output').innerHTML = '📝 Upraveno: ' + name;
             syncCommunityPoisToCloud();
         }
 
@@ -5151,7 +5109,6 @@
             rebuildSelectOptions();
             rebuildCustomLocLinkSelect();
             renderStoryPositionsList();
-            document.getElementById('map-sensor-output').innerHTML = '↺ Reset: ' + getQuestMapLabel(questId);
             syncCommunityPoisToCloud();
             syncCommunityQuestsToCloud();
             syncPlayerQuestProgressToCloud();
@@ -5344,7 +5301,6 @@
                 pointMarker.bindPopup(popupHtml, { maxWidth: 280, minWidth: 200, className: 'map-v3-leaflet-popup' });
                 pointMarker.on('click', function(e) {
                     L.DomEvent.stopPropagation(e);
-                    document.getElementById('map-sensor-output').innerHTML = '📡 ' + label;
                     setMapNavTarget(meta.lat, meta.lng, label);
                     pointMarker.openPopup();
                 });
@@ -5626,39 +5582,9 @@
             );
         }
 
-        function updateCompassReadout(statusMsg) {
-            var el = document.getElementById('compass-readout');
-            if (!el) return;
-
+        function updateCompassUi() {
             updateCompassCenterDeg();
             applyCompassNorthArrow();
-
-            if (statusMsg) {
-                el.innerHTML = '<div style="color:var(--accent-gold);font-size:var(--text-xs);">' + statusMsg + '</div>';
-                return;
-            }
-
-            var targetBrng = null;
-            if (lastUserPosition && mapNavTarget) {
-                targetBrng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
-            }
-            var measureBrng = getMeasureBearing();
-            var statusLine = '';
-            if (compassDeviceHeading !== null) {
-                statusLine = 'Mapa severem nahoru · červená šipka = sever';
-            } else if (compassNeedsPermission && !compassOrientGranted) {
-                statusLine = '▶ Klepni buzolu — povol senzor';
-            } else {
-                statusLine = 'Otoč telefon nebo klepni buzolu';
-            }
-
-            if (targetBrng !== null) {
-                el.textContent = statusLine + ' · Cíl ' + targetBrng.toFixed(0) + '°';
-            } else if (measureBrng !== null) {
-                el.textContent = statusLine + ' · A→B ' + measureBrng.toFixed(0) + '°';
-            } else {
-                el.textContent = statusLine;
-            }
             updateTacticalHud();
         }
 
@@ -5705,7 +5631,7 @@
             if (show) {
                 resetMapBearingRotation();
                 updateCompassPermissionUi();
-                updateCompassReadout();
+                updateCompassUi();
             } else {
                 resetMapBearingRotation();
             }
@@ -5787,7 +5713,6 @@
             base64PoiImg = '';
             document.getElementById('poi-create-preview').innerHTML = 'BEZ FOTO';
             closeAddPoiPanel();
-            document.getElementById('map-sensor-output').innerHTML = '📍 Nový bod: ' + name;
             alert('Bod „' + name + '“ uložen. Poznámku a foto doplníš kdykoli v detailu bodu.');
             syncCommunityPoisToCloud();
         }
@@ -5818,7 +5743,7 @@
             measureState.line = null;
             measureState.markerA = null;
             measureState.markerB = null;
-            updateCompassReadout();
+            updateCompassUi();
         }
 
         function setMeasurePoint(which) {
@@ -5853,10 +5778,9 @@
                 var rad = brng * Math.PI / 180;
                 var txt = '📏 ' + formatDistance(dist) + ' · Azimut ' + brng.toFixed(1) + '° (' + rad.toFixed(3) + ' rad)';
                 document.getElementById('measure-result').textContent = txt;
-                document.getElementById('map-sensor-output').innerHTML = txt;
-                updateCompassReadout();
+                updateCompassUi();
             } else {
-                updateCompassReadout();
+                updateCompassUi();
             }
         }
 
@@ -5961,8 +5885,6 @@
                 return;
             }
             map.setView([parseFloat(lat), parseFloat(lng)], Math.max(map.getZoom(), 16));
-            var out = document.getElementById('map-sensor-output');
-            if (out) out.innerHTML = '📡 Útočiště';
         }
 
         function previewImage(input) {
@@ -8441,7 +8363,7 @@
             }
 
             initMap();
-            updateCompassReadout();
+            updateCompassUi();
             updateStatsHud();
             initQuestSections();
             initCraftSection();

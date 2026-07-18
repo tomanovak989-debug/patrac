@@ -167,8 +167,6 @@ export function renderEntityOnMap(entity, userId) {
         });
         marker.on('click', function(e) {
             L.DomEvent.stopPropagation(e);
-            var out = document.getElementById('map-sensor-output');
-            if (out) out.innerHTML = '📡 ' + style.labelPrefix + entity.title + ' · ' + style.sharedTag;
             if (typeof window.setMapNavTarget === 'function') {
                 window.setMapNavTarget(entity.lat, entity.lng, entity.title || entity.code);
             }
@@ -259,8 +257,6 @@ export function panToEntity(code) {
     var bridge = getBridge();
     if (!bridge.map) return false;
     bridge.map.setView([entity.lat, entity.lng], Math.max(bridge.map.getZoom(), 16));
-    var out = document.getElementById('map-sensor-output');
-    if (out) out.innerHTML = '📡 Terminál → ' + (entity.title || entity.code);
     if (typeof bridge.switchMainTab === 'function') {
         var btn = document.querySelectorAll('.bottom-action-bar button')[2];
         bridge.switchMainTab('map-only', btn);
