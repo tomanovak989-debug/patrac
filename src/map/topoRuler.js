@@ -189,8 +189,8 @@ function syncRoamerLabels(scale) {
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'neon-v14') return;
-    g.setAttribute('data-built', 'neon-v14');
+    if (g.getAttribute('data-built') === 'neon-v15') return;
+    g.setAttribute('data-built', 'neon-v15');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var vns = ' vector-effect="non-scaling-stroke"';
@@ -223,9 +223,9 @@ function buildRoamerScales() {
     lbl += lblText(O, O - 10, roamer2(0), 'middle', true, -90);
     for (i = 1; i <= 9; i++) lbl += lblText(O - i * 10, O - 10, roamer2(i), 'middle', false, -90);
     lbl += lblText(O - L, O - 10, roamer2(10), 'middle', false, -90);
-    lbl += lblText(O - 8, O + 2, roamer2(0), 'end', true);
-    for (i = 1; i <= 9; i++) lbl += lblText(O - 8, O + i * 10 + 2, roamer2(i), 'end', false);
-    lbl += lblText(O - 8, O + L + 2, roamer2(10), 'end', false);
+    lbl += lblText(O + 8, O + 2, roamer2(0), 'start', true);
+    for (i = 1; i <= 9; i++) lbl += lblText(O + 8, O + i * 10 + 2, roamer2(i), 'start', false);
+    lbl += lblText(O + 8, O + L + 2, roamer2(10), 'start', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
     syncRoamerLabels(1);
 }
