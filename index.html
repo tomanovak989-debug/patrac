@@ -1117,29 +1117,38 @@
             -webkit-backdrop-filter: blur(6px);
             box-shadow: var(--neon-glow);
         }
-        .compass-north-fixed { display: none; }
-        .compass-bearing-arrow {
+        .compass-north-arrow {
             position: absolute; top: 50%; left: 50%;
-            width: 3px; height: 46px;
-            margin: -46px 0 0 -1.5px;
-            background: linear-gradient(to top, rgba(74,246,38,0.5), var(--text-green));
+            width: 4px; height: 44px;
+            margin: -44px 0 0 -2px;
+            background: linear-gradient(to top, rgba(180, 20, 20, 0.55), #e82020);
             transform-origin: 50% 100%;
             transform: rotate(0deg);
-            z-index: 4;
+            z-index: 5;
             border-radius: 2px;
-            box-shadow: 0 0 10px rgba(74, 246, 38, 0.85);
+            box-shadow: 0 0 8px rgba(232, 32, 32, 0.85);
             opacity: 0;
             transition: opacity 0.2s;
+            pointer-events: none;
         }
-        .compass-bearing-arrow.visible { opacity: 1; }
-        .compass-bearing-arrow::after {
+        .compass-north-arrow.visible { opacity: 1; }
+        .compass-north-arrow::after {
             content: '';
-            position: absolute; top: -2px; left: 50%;
+            position: absolute; top: -3px; left: 50%;
             transform: translateX(-50%);
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            border-bottom: 8px solid var(--text-green);
-            filter: drop-shadow(0 0 4px rgba(74,246,38,0.9));
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 10px solid #e82020;
+            filter: drop-shadow(0 0 4px rgba(232, 32, 32, 0.95));
+        }
+        .compass-north-label {
+            position: absolute; top: -18px; left: 50%;
+            transform: translateX(-50%);
+            font-size: 11px; font-weight: 800;
+            color: #ff4444;
+            text-shadow: 0 0 6px rgba(255, 60, 60, 0.95), 0 0 2px #000;
+            font-family: 'IBM Plex Mono', monospace;
+            line-height: 1;
         }
         .compass-rose-wrap {
             position: absolute; inset: 8px;
@@ -1274,7 +1283,8 @@
             .compass-housing { width: 118px; height: 118px; }
             .compass-center-deg { font-size: 28px; }
             .compass-center-deg.is-waiting { font-size: 11px; max-width: 70px; text-align: center; line-height: 1.1; }
-            .compass-bearing-arrow { height: 48px; margin-top: -48px; }
+            .compass-north-arrow { height: 48px; margin-top: -48px; }
+            .compass-north-label { font-size: 10px; top: -16px; }
             .compass-readout {
                 margin-top: 4px; padding: 4px 5px; font-size: 9px; line-height: 1.3;
             }
@@ -1617,9 +1627,10 @@
         <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle" title="Skrýt buzolu">−</button>
         <div class="compass-body">
         <div class="compass-housing">
-            <div class="compass-north-fixed">N</div>
             <div class="compass-index-line" title="Směrník / lubber line"></div>
-            <div class="compass-bearing-arrow" id="compass-bearing-arrow" title="Azimut k vybranému cíli"></div>
+            <div class="compass-north-arrow" id="compass-north-arrow" title="Sever">
+                <span class="compass-north-label">N</span>
+            </div>
             <div class="compass-center-deg is-waiting" id="compass-center-deg">—°</div>
             <div class="compass-rose-wrap" id="compass-rose-wrap">
                 <svg class="compass-rose" id="compass-rose" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -1638,10 +1649,10 @@
                         <line x1="100" y1="8" x2="100" y2="14" transform="rotate(300 100 100)"/>
                         <line x1="100" y1="8" x2="100" y2="14" transform="rotate(330 100 100)"/>
                     </g>
-                    <text x="100" y="28" text-anchor="middle" fill="#4af626" font-size="11" font-weight="700" font-family="IBM Plex Mono, monospace">N</text>
-                    <text x="172" y="104" text-anchor="middle" fill="#8fd87a" font-size="9" font-family="IBM Plex Mono, monospace">E</text>
-                    <text x="100" y="182" text-anchor="middle" fill="#8fd87a" font-size="9" font-family="IBM Plex Mono, monospace">S</text>
-                    <text x="28" y="104" text-anchor="middle" fill="#8fd87a" font-size="9" font-family="IBM Plex Mono, monospace">W</text>
+                    <text x="100" y="30" text-anchor="middle" fill="#4af626" font-size="10" font-weight="700" font-family="IBM Plex Mono, monospace">360/0°</text>
+                    <text x="174" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">90°</text>
+                    <text x="100" y="180" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">180°</text>
+                    <text x="26" y="104" text-anchor="middle" fill="#8fd87a" font-size="10" font-weight="600" font-family="IBM Plex Mono, monospace">270°</text>
                 </svg>
             </div>
         </div>
@@ -2026,7 +2037,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718p';
+        var PATRAC_BUILD = '20260718q';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4485,7 +4496,8 @@
             compassDeviceHeading = heading;
             compassOrientGranted = true;
             updateCompassPermissionUi();
-            applyCompassRoseRotation();
+            applyCompassBezelRotation();
+            applyCompassNorthArrow();
             resetMapBearingRotation();
             updateCompassReadout();
         }
@@ -4537,15 +4549,23 @@
             }
         }
 
-        function applyCompassRoseRotation() {
+        function applyCompassBezelRotation() {
             var rose = document.getElementById('compass-rose');
             if (!rose) return;
-            var rot = compassBezelDeg;
-            if (compassDeviceHeading !== null) {
-                rot = normalizeDeg(-compassDeviceHeading + compassBezelDeg);
-            }
-            rose.style.transform = 'rotate(' + rot + 'deg)';
+            rose.style.transform = 'rotate(' + compassBezelDeg + 'deg)';
             updateCompassCenterDeg();
+        }
+
+        function applyCompassNorthArrow() {
+            var arrow = document.getElementById('compass-north-arrow');
+            if (!arrow) return;
+            if (compassDeviceHeading === null) {
+                arrow.classList.remove('visible');
+                arrow.style.transform = 'rotate(0deg)';
+                return;
+            }
+            arrow.classList.add('visible');
+            arrow.style.transform = 'rotate(' + normalizeDeg(-compassDeviceHeading) + 'deg)';
         }
 
         function initCompassBezelDrag() {
@@ -4584,12 +4604,8 @@
                     e.preventDefault();
                 }
                 var dragAngle = angleFromEvent(e);
-                if (compassDeviceHeading !== null) {
-                    compassBezelDeg = normalizeDeg(dragAngle + compassDeviceHeading);
-                } else {
-                    compassBezelDeg = dragAngle;
-                }
-                applyCompassRoseRotation();
+                compassBezelDeg = dragAngle;
+                applyCompassBezelRotation();
                 resetMapBearingRotation();
                 try { localStorage.setItem('patrac_compass_bezel', String(compassBezelDeg)); } catch (err) {}
                 updateTacticalHud();
@@ -4624,7 +4640,8 @@
                 compassOrientGranted = true;
             }
             updateCompassPermissionUi();
-            applyCompassRoseRotation();
+            applyCompassBezelRotation();
+            applyCompassNorthArrow();
         }
 
         function buildMapLabelHtml(meta) {
@@ -5577,10 +5594,10 @@
 
         function updateCompassReadout(statusMsg) {
             var el = document.getElementById('compass-readout');
-            var arrow = document.getElementById('compass-bearing-arrow');
             if (!el) return;
 
             updateCompassCenterDeg();
+            applyCompassNorthArrow();
 
             if (statusMsg) {
                 el.innerHTML = '<div style="color:var(--accent-gold);font-size:var(--text-xs);">' + statusMsg + '</div>';
@@ -5594,34 +5611,18 @@
             var measureBrng = getMeasureBearing();
             var statusLine = '';
             if (compassDeviceHeading !== null) {
-                statusLine = 'Mapa severem nahoru · růžice sleduje sever';
+                statusLine = 'Mapa severem nahoru · červená šipka = sever';
             } else if (compassNeedsPermission && !compassOrientGranted) {
                 statusLine = '▶ Klepni buzolu — povol senzor';
             } else {
                 statusLine = 'Otoč telefon nebo klepni buzolu';
             }
 
-            function arrowRotation(brng) {
-                if (compassDeviceHeading !== null) {
-                    return normalizeDeg(brng - compassDeviceHeading + compassBezelDeg);
-                }
-                return brng;
-            }
-
             if (targetBrng !== null) {
                 el.textContent = statusLine + ' · Cíl ' + targetBrng.toFixed(0) + '°';
-                if (arrow) {
-                    arrow.classList.add('visible');
-                    arrow.style.transform = 'rotate(' + arrowRotation(targetBrng) + 'deg)';
-                }
             } else if (measureBrng !== null) {
                 el.textContent = statusLine + ' · A→B ' + measureBrng.toFixed(0) + '°';
-                if (arrow) {
-                    arrow.classList.add('visible');
-                    arrow.style.transform = 'rotate(' + arrowRotation(measureBrng) + 'deg)';
-                }
             } else {
-                if (arrow) arrow.classList.remove('visible');
                 el.textContent = statusLine;
             }
             updateTacticalHud();
