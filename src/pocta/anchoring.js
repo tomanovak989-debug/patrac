@@ -95,7 +95,8 @@ export async function anchorPoctaFromInventory(displayIndex, userId) {
         return { ok: false, error: 'Inventář komunity není připraven.' };
     }
 
-    var item = bridge.resolveCommunityItemAtDisplayIndex(displayIndex);
+    var resolved = bridge.resolveCommunityItemAtDisplayIndex(displayIndex);
+    var item = resolved && resolved.item;
     if (!item || item.itemType !== 'pocta' || !item.poctaId) {
         return { ok: false, error: 'Neplatná položka Pocty.' };
     }
