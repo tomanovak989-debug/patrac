@@ -1284,7 +1284,10 @@
         }
         #map-topo-ruler.topo-ruler-collapsed { width: 48px; }
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-plate-wrap,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-footer { display: none; }
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-footer,
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-coord-n,
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-zone-bar,
+        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-lock-hint { display: none; }
         #map-topo-ruler.topo-ruler-collapsed .topo-ruler-widget-toggle {
             position: relative; top: 0; right: 0;
             width: 48px; height: 48px; border-radius: 50%; font-size: 20px;
@@ -1300,7 +1303,8 @@
             text-shadow: var(--topo-text-glow);
             box-shadow: 0 0 8px var(--topo-accent-glow);
         }
-        .topo-ruler-body {
+        .topo-ruler-body,
+        #topo-ruler-drag-surface {
             position: relative;
             width: 260px;
             display: flex;
@@ -1308,7 +1312,72 @@
             background: transparent;
             border: none;
             box-shadow: none;
+            pointer-events: auto;
+            cursor: grab;
+            touch-action: none;
+        }
+        #topo-ruler-drag-surface:active { cursor: grabbing; }
+        .topo-ruler-zone-bar {
+            position: absolute;
+            top: 0;
+            right: 28px;
+            z-index: 45;
+            display: flex;
+            gap: 4px;
+            pointer-events: auto;
+        }
+        .topo-ruler-zone-bar input {
+            width: 38px;
+            padding: 2px 4px;
+            font-size: 10px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            text-align: center;
+            text-transform: uppercase;
+            color: var(--topo-accent);
+            background: rgba(6, 10, 6, 0.92);
+            border: 1px solid var(--topo-accent);
+            border-radius: 3px;
+            pointer-events: auto;
+        }
+        .topo-ruler-zone-bar input.is-readonly { opacity: 0.65; }
+        .topo-ruler-lock-hint {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            z-index: 44;
+            font-size: 9px;
+            color: var(--topo-accent-dim);
             pointer-events: none;
+        }
+        .topo-ruler-lock-hint.is-locked { color: var(--topo-accent); font-weight: 700; }
+        .topo-ruler-coord {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            color: var(--topo-accent);
+            background: rgba(6, 10, 6, 0.95);
+            border: 1px solid var(--topo-accent);
+            border-radius: 3px;
+            padding: 3px 6px;
+            width: 58px;
+            text-align: center;
+            pointer-events: auto;
+            box-shadow: 0 0 6px rgba(107, 255, 90, 0.25);
+        }
+        .topo-ruler-coord.is-readonly { opacity: 0.7; cursor: default; }
+        .topo-ruler-coord-w {
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translate(calc(-100% - 4px), -50%);
+            z-index: 30;
+        }
+        .topo-ruler-coord-n {
+            align-self: center;
+            margin: 4px 0 0;
+            z-index: 30;
         }
         .topo-ruler-plate-wrap {
             position: relative;
@@ -1320,47 +1389,9 @@
         .topo-ruler-footer {
             position: relative;
             z-index: 35;
-            margin-top: 6px;
+            margin-top: 2px;
             pointer-events: none;
-        }
-        .topo-ruler-footer .map-float-hit { pointer-events: auto; }
-        .topo-ruler-move {
-            position: relative;
-            left: auto; top: auto; transform: none;
-            width: 28px; height: 44px; border: 1px solid rgba(120, 255, 102, 0.45);
-            border-radius: 4px; background: rgba(6, 10, 6, 0.28); color: var(--topo-accent-dim);
-            font-size: 14px; cursor: grab; line-height: 44px; text-align: center;
-            text-shadow: var(--topo-text-glow);
-            box-shadow: 0 0 8px var(--topo-accent-glow);
-            pointer-events: auto;
-            touch-action: none;
-        }
-        .topo-ruler-move:active { cursor: grabbing; }
-        .topo-ruler-move.is-disabled,
-        .topo-ruler-move:disabled {
-            opacity: 0.35; cursor: not-allowed; pointer-events: none;
-        }
-        .topo-ruler-handle-col {
-            position: absolute;
-            left: -34px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 40;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .topo-ruler-lock {
-            width: 28px; height: 36px; padding: 0;
-            border: 1px solid rgba(120, 255, 102, 0.45);
-            border-radius: 4px; background: rgba(6, 10, 6, 0.28);
-            color: var(--topo-accent); font-size: 15px; line-height: 36px;
-            text-align: center; cursor: pointer;
-            box-shadow: 0 0 8px var(--topo-accent-glow);
-        }
-        .topo-ruler-lock.is-locked {
-            border-color: var(--topo-accent);
-            box-shadow: 0 0 8px var(--topo-accent-glow);
+            text-align: center;
         }
         .topo-ruler-plate {
             position: absolute;
@@ -1451,13 +1482,7 @@
             text-align: center;
             pointer-events: none;
         }
-        .topo-ruler-mini-bar {
-            display: flex;
-            gap: 4px;
-            margin-top: 6px;
-            align-items: stretch;
-            pointer-events: none;
-        }
+        .topo-ruler-mini-bar { display: none; }
         .topo-ruler-bearing {
             display: block;
             font-size: 13px; font-weight: 700;
@@ -1669,6 +1694,69 @@
         .map-tac-value { display: block; font-size: 15px; color: var(--text-green); font-weight: 700; text-shadow: var(--text-glow); margin-top: 2px; }
         .map-tac-sub { font-size: 9px; color: var(--dim-fg); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+        .mgrs-grid-line-w span { transform: translate(-50%, -50%); }
+
+        /* Plánovač trasy */
+        #map-route-planner {
+            display: none;
+            position: fixed;
+            left: 12px;
+            bottom: 164px;
+            z-index: 1002;
+            width: 220px;
+            font-family: 'IBM Plex Mono', monospace;
+            --rp-accent: #78ff66;
+        }
+        #map-route-planner.is-ready { display: block; }
+        #map-route-planner.route-planner-collapsed { width: 48px; }
+        #map-route-planner.route-planner-collapsed .route-planner-body { display: none; }
+        .route-planner-widget-toggle {
+            position: absolute; top: -8px; right: -8px; z-index: 40;
+            width: 32px; height: 32px; padding: 0;
+            border: 1px solid rgba(120,255,102,0.45); border-radius: 4px;
+            background: rgba(6,10,6,0.82); color: var(--rp-accent);
+            font-size: 16px; cursor: pointer;
+        }
+        .route-planner-body {
+            background: rgba(6,10,6,0.88);
+            border: 1px solid rgba(120,255,102,0.45);
+            border-radius: 6px;
+            padding: 10px 8px 8px;
+            pointer-events: auto;
+        }
+        .route-planner-title {
+            font-size: 10px; font-weight: 700; color: var(--rp-accent);
+            letter-spacing: 0.08em; margin-bottom: 6px;
+        }
+        .route-planner-row {
+            display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap;
+        }
+        .route-planner-row input,
+        .route-planner-row select,
+        .route-planner-row button {
+            font-family: inherit; font-size: 10px;
+            border: 1px solid rgba(120,255,102,0.4);
+            background: rgba(6,10,6,0.9); color: var(--rp-accent);
+            border-radius: 3px; padding: 4px 6px;
+        }
+        .route-planner-row button { cursor: pointer; flex: 1; min-width: 0; }
+        .route-planner-total {
+            display: block; text-align: center; font-size: 11px;
+            color: var(--rp-accent); margin-top: 4px;
+        }
+        .route-planner-dot span {
+            display: block; border-radius: 50%;
+            border: 1px solid rgba(120,255,102,0.8);
+            box-shadow: 0 0 4px rgba(120,255,102,0.5);
+        }
+        .route-planner-seg-label span {
+            display: inline-block; transform: translate(-50%, -50%);
+            font-size: 9px; font-family: 'IBM Plex Mono', monospace;
+            color: #78ff66; background: rgba(6,10,6,0.85);
+            border: 1px solid rgba(120,255,102,0.35);
+            padding: 2px 4px; text-align: center; white-space: nowrap;
+        }
+
         /* Leaflet posouvá mapPane přes transform — nezasahovat. */
         @media (max-width: 480px) {
             #map-tactical-hud {
@@ -1683,9 +1771,10 @@
             #map-compass { width: 118px; }
             #map-compass.compass-docked { bottom: 48px !important; right: 6px !important; }
             #map-topo-ruler.topo-ruler-docked { bottom: 104px !important; right: 6px !important; }
-            #map-topo-ruler .topo-ruler-body { width: 200px; }
+            #map-topo-ruler .topo-ruler-body,
+            #topo-ruler-drag-surface { width: 200px; }
             #map-topo-ruler .topo-ruler-plate-wrap { width: 200px; height: 200px; }
-            #map-topo-ruler .topo-ruler-handle-col { left: -30px; }
+            #map-route-planner { left: 6px; bottom: 104px; width: 190px; }
             .compass-drag-handle { width: 20px; height: 32px; line-height: 32px; font-size: 12px; left: -8px; }
             .compass-housing { width: 118px; height: 118px; }
             .compass-center-deg { font-size: 28px; }
@@ -1730,12 +1819,13 @@
     <div id="map-float-overlay" aria-hidden="true">
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko">−</button>
-        <div class="topo-ruler-body" id="topo-ruler-body">
+        <div class="topo-ruler-body" id="topo-ruler-drag-surface">
+            <div class="topo-ruler-zone-bar">
+                <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
+                <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
+            </div>
+            <span class="topo-ruler-lock-hint" id="topo-ruler-lock-hint">🔓 volné</span>
             <div class="topo-ruler-plate-wrap">
-                <div class="topo-ruler-handle-col">
-                    <button type="button" class="topo-ruler-move map-float-hit" id="topo-ruler-move" title="Přesunout">⠿</button>
-                    <button type="button" class="topo-ruler-lock map-float-hit" id="topo-ruler-lock" title="Zamknout polohu">🔓</button>
-                </div>
                 <div class="topo-ruler-plate" id="topo-ruler-plate">
                 <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <defs>
@@ -1773,27 +1863,37 @@
                     <text x="234" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">90</text>
                     <text x="130" y="242" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
                     <text x="26" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
-                    <!-- NATO roamer — generuje buildRoamerScales() -->
                     <g id="topo-roamer-scales"></g>
                     <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
                 </svg>
-                <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Táhni směrník ze středu"></button>
-                <span class="topo-ruler-tip" id="topo-ruler-tip" aria-hidden="true"></span>
+                <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Směrník (po zamknutí)"></button>
+                <input type="text" class="topo-ruler-coord topo-ruler-coord-w map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="West (E)" autocomplete="off">
                 </div>
             </div>
+            <input type="text" class="topo-ruler-coord topo-ruler-coord-n map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="North (N)" autocomplete="off">
             <div class="topo-ruler-footer">
-                <div class="topo-ruler-hud">
-                    <span class="topo-ruler-bearing" id="topo-ruler-bearing">—°</span>
-                    <span class="topo-ruler-mgrs" id="topo-ruler-mgrs">—</span>
-                    <span class="topo-ruler-scale" id="topo-ruler-scale"></span>
-                    <span class="topo-ruler-total" id="topo-ruler-total">Σ —</span>
-                </div>
-                <div class="topo-ruler-mini-bar">
-                    <input type="text" class="map-float-hit" id="topo-ruler-route-name" placeholder="Trasa" maxlength="40">
-                    <button type="button" class="map-float-hit" id="btn-topo-save-route" title="Uložit trasu">💾</button>
-                </div>
-                <select id="topo-ruler-route-select" class="topo-ruler-route-select map-float-hit"></select>
+                <span class="topo-ruler-bearing" id="topo-ruler-bearing">Podrž 📐 2 s = zamknout</span>
             </div>
+        </div>
+    </div>
+    <div id="map-route-planner" aria-label="Plánovač trasy">
+        <button type="button" id="btn-route-planner-toggle" class="route-planner-widget-toggle map-float-hit" title="Skrýt plánovač">−</button>
+        <div class="route-planner-body">
+            <div class="route-planner-title">PLÁNOVAČ TRASY</div>
+            <div class="route-planner-row">
+                <input type="text" id="route-planner-route-name" placeholder="Název trasy" maxlength="40" style="flex:1">
+                <button type="button" id="btn-route-save" title="Uložit">💾</button>
+            </div>
+            <select id="route-planner-route-select" style="width:100%;margin-bottom:6px"></select>
+            <div class="route-planner-row">
+                <button type="button" id="btn-route-set-start">Start = střed mapy</button>
+                <button type="button" id="btn-route-set-target">Cíl = střed mapy</button>
+            </div>
+            <div class="route-planner-row">
+                <button type="button" id="btn-route-midpoint">+ bod na nejdelší úsek</button>
+            </div>
+            <span class="route-planner-total" id="route-planner-total">Σ —</span>
+            <div style="font-size:8px;color:rgba(184,255,176,0.7);margin-top:4px;text-align:center">Klik na úsečku = nový bod</div>
         </div>
     </div>
     <div id="map-compass" aria-label="Kompas s azimutem">
@@ -2095,7 +2195,8 @@
     </div>
 
     <div id="map-tool-fabs" aria-hidden="true">
-        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Topografické pravítko">📐</button>
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Pravítko · podrž 2 s = zamknout">📐</button>
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-route-planner" onclick="patracToggleRoutePlanner()" title="Plánovač trasy">🛤</button>
         <button type="button" class="map-tool-fab map-float-hit" id="fab-compass" onclick="patracToggleCompass()" title="Buzola">🧭</button>
     </div>
 
@@ -2524,7 +2625,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718at';
+        var PATRAC_BUILD = '20260718au';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2540,6 +2641,7 @@
         var mapCompassLayer = null;
         var mapRouteLayer = null;
         var topoRulerMod = null;
+        var routePlannerMod = null;
         var mgrsGridMod = null;
         var mapMarkerRegistry = {};
         var mapV3Module = null;
@@ -4800,6 +4902,7 @@
                 initMapV3Ui();
                 initCompassFloating();
                 initTopoRulerModule();
+                initRoutePlannerModule();
                 initMgrsGridModule();
                 return;
             }
@@ -4841,6 +4944,7 @@
                 initMapV3Ui();
                 initCompassFloating();
                 initTopoRulerModule();
+                initRoutePlannerModule();
                 initMgrsGridModule();
             } catch(e) {
                 console.error('initMap', e);
@@ -5175,6 +5279,45 @@
             var next = localStorage.getItem('patrac_topo_ruler_visible') === 'false';
             localStorage.setItem('patrac_topo_ruler_visible', next ? 'true' : 'false');
             updateTopoRulerDisplay();
+        };
+
+        function initRoutePlannerModule() {
+            if (routePlannerMod) {
+                updateRoutePlannerDisplay();
+                return;
+            }
+            import('./src/map/routePlanner.js?v=' + PATRAC_BUILD).then(function(mod) {
+                routePlannerMod = mod;
+                mod.initRoutePlanner({
+                    getMap: function() { return map; },
+                    routeLayer: mapRouteLayer,
+                    bearingDegrees: bearingDegrees,
+                    distanceMeters: distanceMeters,
+                    formatDistance: formatDistance
+                });
+                updateRoutePlannerDisplay();
+            }).catch(function(err) { console.error('[routePlanner]', err); });
+        }
+
+        function updateRoutePlannerDisplay() {
+            var root = document.getElementById('map-route-planner');
+            var userWants = localStorage.getItem('patrac_route_planner_visible') === 'true';
+            var show = userWants && _mapToolsTabActive;
+            var fab = document.getElementById('fab-route-planner');
+            if (fab) fab.classList.toggle('is-active', show);
+            if (!routePlannerMod) {
+                if (root) {
+                    root.style.display = show ? 'block' : 'none';
+                    root.classList.toggle('is-ready', show);
+                }
+                return;
+            }
+            routePlannerMod.updateRoutePlannerDisplay(show);
+        }
+        window.patracToggleRoutePlanner = function() {
+            var next = localStorage.getItem('patrac_route_planner_visible') !== 'true';
+            localStorage.setItem('patrac_route_planner_visible', next ? 'true' : 'false');
+            updateRoutePlannerDisplay();
         };
         window.patracToggleCompass = function() {
             var next = localStorage.getItem('patrac_compass_visible') === 'false';
