@@ -31,6 +31,7 @@ var mapObjs = { lines: [], markers: {} };
 var _bearingDragging = false;
 var _widgetDragging = false;
 var _fabLongPressFired = false;
+var _mapZooming = false;
 
 function getMap() {
     return _deps && _deps.getMap ? _deps.getMap() : null;
@@ -560,6 +561,20 @@ function updateRulerPlateVisual() {
     syncFabLockUi();
 }
 
+function updateRulerVisualOnly() {
+    updateRulerPlateVisual();
+    renderBearingOnMap();
+}
+
+function applyRulerScreenPos() {
+    var root = document.getElementById('map-topo-ruler');
+    if (!root || state.screenX == null || state.screenY == null) return;
+    var left = Math.round(state.screenX);
+    var top = Math.round(state.screenY);
+    if (parseFloat(root.style.left) !== left) root.style.left = left + 'px';
+    if (parseFloat(root.style.top) !== top) root.style.top = top + 'px';
+}
+
 function updateRulerWidgetPosition() {
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
@@ -592,10 +607,11 @@ function updateRulerWidgetPosition() {
         state.screenY = def.y;
     }
     var c = clampRulerScreenPos(state.screenX, state.screenY);
-    state.screenX = c.x;
-    state.screenY = c.y;
-    root.style.left = Math.round(state.screenX) + 'px';
-    root.style.top = Math.round(state.screenY) + 'px';
+    if (c.x !== state.screenX || c.y !== state.screenY) {
+        state.screenX = c.x;
+        state.screenY = c.y;
+    }
+    applyRulerScreenPos();
 
     updateRulerPlateVisual();
     if (!state.positionLocked) syncAnchorFromCenter();
@@ -959,11 +975,22 @@ function bindMapEvents() {
     var map = getMap();
     if (!map) return;
     _bound = true;
-    map.on('move zoom zoomanim zoomend moveend resize', onMapViewChange);
+    map.on('zoomstart', function() { _mapZooming = true; });
+    map.on('zoomend', function() {
+        _mapZooming = false;
+        onMapZoom();
+    });
+    map.on('zoom zoomanim', onMapZoom);
+    map.on('move moveend resize', onMapPanOrResize);
 }
 
-function onMapViewChange() {
+function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
+    updateRulerVisualOnly();
+}
+
+function onMapPanOrResize() {
+    if (_bearingDragging || _widgetDragging || _mapZooming) return;
     releaseInteractionLocks();
     updateRulerWidgetPosition();
 }
