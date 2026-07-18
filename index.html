@@ -1266,12 +1266,37 @@
             box-shadow: none;
         }
         .topo-ruler-move {
-            position: absolute; left: -14px; top: 50%; transform: translateY(-50%);
-            z-index: 25;
+            position: relative;
+            left: auto; top: auto; transform: none;
             width: 20px; height: 36px; border: 1px solid rgba(74,246,38,0.55);
             border-radius: 3px; background: transparent; color: var(--text-green-dim);
             font-size: 12px; cursor: grab; line-height: 36px; text-align: center;
             text-shadow: var(--text-glow);
+        }
+        .topo-ruler-move.is-disabled,
+        .topo-ruler-move:disabled {
+            opacity: 0.35; cursor: not-allowed; pointer-events: none;
+        }
+        .topo-ruler-handle-col {
+            position: absolute;
+            left: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 25;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .topo-ruler-lock {
+            width: 20px; height: 28px; padding: 0;
+            border: 1px solid rgba(74,246,38,0.55);
+            border-radius: 3px; background: transparent;
+            color: var(--text-green); font-size: 13px; line-height: 28px;
+            text-align: center; cursor: pointer;
+        }
+        .topo-ruler-lock.is-locked {
+            border-color: var(--text-green);
+            box-shadow: 0 0 8px rgba(74,246,38,0.55);
         }
         .topo-ruler-plate {
             position: absolute;
@@ -1309,11 +1334,15 @@
         }
         .topo-ruler-center::before { width: 1px; height: 22px; margin-top: -11px; }
         .topo-ruler-center::after { width: 22px; height: 1px; margin-left: -11px; }
-        .topo-ruler-center.anchored {
-            background: rgba(74,246,38,0.25);
+        .topo-ruler-center.anchored,
+        .topo-ruler-center.is-locked {
+            background: rgba(74,246,38,0.2);
             border-color: #8dff6a;
+            cursor: grab;
         }
+        .topo-ruler-center.is-locked:active { cursor: grabbing; }
         .topo-ruler-tip {
+            pointer-events: none;
             position: absolute;
             left: 50%; top: 6px;
             width: 16px; height: 16px;
@@ -1337,6 +1366,16 @@
             font-size: 13px; font-weight: 700;
             color: var(--text-green);
             text-shadow: var(--text-glow);
+        }
+        .topo-ruler-mgrs {
+            display: block;
+            margin-top: 2px;
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-green);
+            text-shadow: var(--text-glow);
+            line-height: 1.25;
+            word-break: break-all;
         }
         .topo-ruler-scale {
             display: block;
@@ -1561,7 +1600,10 @@
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko">−</button>
         <div class="topo-ruler-body" id="topo-ruler-body">
-            <button type="button" class="topo-ruler-move map-float-hit" id="topo-ruler-move" title="Přesunout">⠿</button>
+            <div class="topo-ruler-handle-col">
+                <button type="button" class="topo-ruler-move map-float-hit" id="topo-ruler-move" title="Přesunout">⠿</button>
+                <button type="button" class="topo-ruler-lock map-float-hit" id="topo-ruler-lock" title="Zamknout polohu">🔓</button>
+            </div>
             <div class="topo-ruler-plate" id="topo-ruler-plate">
                 <svg class="topo-gta-svg" id="topo-gta-svg" viewBox="0 0 260 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <defs>
@@ -1632,11 +1674,12 @@
                     <circle cx="130" cy="130" r="5" fill="none" stroke="#4af626" stroke-width="1.2"/>
                     <polygon points="130,18 126,28 134,28" fill="#4af626"/>
                 </svg>
-                <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Ukotvit / odpoutat střed"></button>
-                <button type="button" class="topo-ruler-tip map-float-hit" id="topo-ruler-tip" title="Táhni pro směr / cíl na mapě"></button>
+                <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Zamkni polohu (🔓)"></button>
+                <span class="topo-ruler-tip" id="topo-ruler-tip" aria-hidden="true"></span>
             </div>
             <div class="topo-ruler-hud">
                 <span class="topo-ruler-bearing" id="topo-ruler-bearing">—°</span>
+                <span class="topo-ruler-mgrs" id="topo-ruler-mgrs">—</span>
                 <span class="topo-ruler-scale" id="topo-ruler-scale"></span>
                 <span class="topo-ruler-total" id="topo-ruler-total">Σ —</span>
             </div>
@@ -2386,7 +2429,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718x';
+        var PATRAC_BUILD = '20260718y';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4957,10 +5000,13 @@
             var src = 'střed mapy';
             if (topoRulerMod) {
                 var tr = topoRulerMod.getTopoRulerState();
-                if (tr && tr.anchored && tr.anchor) {
-                    lat = tr.anchor.lat;
-                    lng = tr.anchor.lng;
-                    src = 'ukotvené pravítko';
+                if (tr && tr.visible !== false && topoRulerMod.getRulerCenterLatLng) {
+                    var rll = topoRulerMod.getRulerCenterLatLng();
+                    if (rll) {
+                        lat = rll.lat;
+                        lng = rll.lng;
+                        src = tr.positionLocked ? 'střed pravítka 🔒' : 'střed pravítka';
+                    }
                 }
             }
             if (lat == null && map) {
