@@ -9,7 +9,8 @@ var _layer = null;
 var _bound = false;
 
 var PLATE_PX = 260;
-var REF_1000M_PX = 52;
+/** Strana 1 km čtverce ve SVG/CSS px (při scale=1); po zamknutí = 1 km na mapě. */
+var KM_SQUARE_SVG_PX = 100;
 var GREEN = '#4af626';
 var GREEN_DIM = '#8fd87a';
 
@@ -33,6 +34,8 @@ var mapObjs = {
     labels: [],
     markers: {}
 };
+
+var _bearingDragging = false;
 
 function uid() {
     return 'wp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -110,9 +113,22 @@ function pointerEventToLatLng(e) {
 }
 
 function syncAnchorFromCenter() {
-    var ll = getPlateCenterLatLng();
+    var ll = getRulerOriginLatLng();
     if (ll) state.anchor = ll;
     return ll;
+}
+
+function setMapInteractionEnabled(on) {
+    var map = getMap();
+    if (!map) return;
+    if (map.dragging) {
+        if (on) map.dragging.enable();
+        else map.dragging.disable();
+    }
+    if (map.touchZoom) {
+        if (on) map.touchZoom.enable();
+        else map.touchZoom.disable();
+    }
 }
 
 function renderRouteOnMap() {
@@ -144,23 +160,32 @@ function renderRouteOnMap() {
 
     for (var w = 0; w < state.waypoints.length; w++) {
         (function(wp, idx) {
-            mapObjs.markers[wp.id] = window.L.marker([wp.lat, wp.lng], {
+            var wpId = wp.id;
+            mapObjs.markers[wpId] = window.L.marker([wp.lat, wp.lng], {
                 draggable: true,
-                icon: dotIcon(GREEN, 10),
-                pane: 'mapMeasurePane'
+                icon: dotIcon(GREEN, 12),
+                pane: 'mapMeasurePane',
+                wpId: wpId,
+                riseOnHover: true,
+                riseOffset: 800
             }).addTo(_layer);
-            mapObjs.markers[wp.id].bindTooltip('Bod ' + (idx + 1) + ' · klik = smazat', { direction: 'top' });
-            mapObjs.markers[wp.id].on('dragend', function() {
-                var ll = mapObjs.markers[wp.id].getLatLng();
-                wp.lat = ll.lat;
-                wp.lng = ll.lng;
+            mapObjs.markers[wpId].bindTooltip('Bod ' + (idx + 1) + ' · klik = smazat', { direction: 'top' });
+            mapObjs.markers[wpId].on('dragend', function(ev) {
+                var ll = ev.target.getLatLng();
+                for (var wi = 0; wi < state.waypoints.length; wi++) {
+                    if (state.waypoints[wi].id === wpId) {
+                        state.waypoints[wi].lat = ll.lat;
+                        state.waypoints[wi].lng = ll.lng;
+                        break;
+                    }
+                }
                 sortWaypointsAlongRoute();
                 persistState();
                 renderAll();
             });
-            mapObjs.markers[wp.id].on('click', function(e) {
-                window.L.DomEvent.stopPropagation(e);
-                removeWaypoint(wp.id);
+            mapObjs.markers[wpId].on('click', function(ev) {
+                window.L.DomEvent.stopPropagation(ev);
+                removeWaypoint(wpId);
             });
         })(state.waypoints[w], w);
     }
@@ -262,32 +287,45 @@ function getBodyEl() {
     return document.getElementById('topo-ruler-body');
 }
 
-function getPlateCenterLatLng() {
+function getRulerOriginLatLng() {
     var map = getMap();
-    var centerEl = document.getElementById('topo-ruler-center');
+    var originEl = document.getElementById('topo-ruler-center');
     var mapEl = document.getElementById('map');
-    if (!map || !centerEl || !mapEl) return null;
+    if (!map || !originEl || !mapEl) return null;
     var mapRect = mapEl.getBoundingClientRect();
-    var rect = centerEl.getBoundingClientRect();
+    var rect = originEl.getBoundingClientRect();
     var x = rect.left + rect.width / 2 - mapRect.left;
     var y = rect.top + rect.height / 2 - mapRect.top;
     return map.containerPointToLatLng([x, y]);
 }
 
+function getPlateCenterLatLng() {
+    return getRulerOriginLatLng();
+}
+
+function metersPerPixelAt(lat, lng) {
+    var map = getMap();
+    if (!map || !window.L) return 1;
+    var p1 = map.latLngToContainerPoint(window.L.latLng(lat, lng));
+    var p2 = map.latLngToContainerPoint(window.L.latLng(lat, lng + 0.001));
+    var px = Math.max(0.5, Math.abs(p2.x - p1.x));
+    return distM(lat, lng, lat, lng + 0.001) / px;
+}
+
 function metersPerPixel() {
+    var ll = getRulerOriginLatLng();
+    if (ll) return metersPerPixelAt(ll.lat, ll.lng);
     var map = getMap();
     if (!map) return 1;
     var c = map.getCenter();
-    var p1 = map.latLngToContainerPoint(c);
-    var p2 = map.latLngToContainerPoint(window.L.latLng(c.lat, c.lng + 0.001));
-    var px = Math.max(0.5, Math.abs(p2.x - p1.x));
-    return distM(c.lat, c.lng, c.lat, c.lng + 0.001) / px;
+    return metersPerPixelAt(c.lat, c.lng);
 }
 
 function plateScaleFactor() {
     if (!state.positionLocked) return 1;
     var mpp = metersPerPixel();
-    return Math.max(0.35, Math.min(2.5, (1000 / mpp) / REF_1000M_PX));
+    var kmPxOnMap = 1000 / mpp;
+    return kmPxOnMap / KM_SQUARE_SVG_PX;
 }
 
 function getViewportSize() {
@@ -420,7 +458,7 @@ function updateRulerPlateVisual() {
         }
     }
 
-    var centerLl = getPlateCenterLatLng();
+    var centerLl = getRulerOriginLatLng();
     if (mgrsEl && centerLl) {
         try {
             mgrsEl.textContent = formatMgrs(latLngToMgrs(centerLl.lat, centerLl.lng, 3));
@@ -433,7 +471,12 @@ function updateRulerPlateVisual() {
         var mpp = metersPerPixel();
         var map = getMap();
         var zoom = map ? map.getZoom() : 0;
-        scaleEl.textContent = '1:' + state.mapScale + ' · z' + zoom + ' · 1km≈' + Math.round(1000 / mpp) + 'px';
+        var kmPx = Math.round(1000 / mpp);
+        if (state.positionLocked) {
+            scaleEl.textContent = '1 km □ = ' + kmPx + ' px · z' + zoom + ' · 1 díl = 50 m';
+        } else {
+            scaleEl.textContent = '1:' + state.mapScale + ' · z' + zoom + ' · 1 km ≈ ' + kmPx + ' px';
+        }
     }
 }
 
@@ -664,16 +707,26 @@ function bindDragOnlyOnHandle(handle, onDrag, onDragEnd) {
     handle.addEventListener('touchstart', onStart, { passive: false });
 }
 
+function updateBearingPreview() {
+    syncAnchorFromCenter();
+    renderRouteOnMap();
+    updateRulerPlateVisual();
+    if (_deps && _deps.onUiUpdate) _deps.onUiUpdate();
+    if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
+        window.patracUpdateMgrsReadout();
+    }
+}
+
 function bindBearingDrag(handle) {
     if (!handle || handle._bearingBound) return;
     handle._bearingBound = true;
     var dragging = false;
     function onMove(e) {
-        if (!state.positionLocked) return;
+        if (!state.positionLocked || !dragging) return;
         syncAnchorFromCenter();
         var ll = pointerEventToLatLng(e);
         if (ll) state.target = { lat: ll.lat, lng: ll.lng };
-        renderAll();
+        updateBearingPreview();
         e.preventDefault();
     }
     function onEnd() {
@@ -681,13 +734,17 @@ function bindBearingDrag(handle) {
         document.removeEventListener('touchmove', onMove);
         document.removeEventListener('mouseup', onEnd);
         document.removeEventListener('touchend', onEnd);
+        _bearingDragging = false;
+        setMapInteractionEnabled(true);
         if (dragging) persistState();
         dragging = false;
     }
     function onStart(e) {
         if (!state.positionLocked) return;
-        dragging = false;
+        dragging = true;
         syncAnchorFromCenter();
+        _bearingDragging = true;
+        setMapInteractionEnabled(false);
         e.preventDefault();
         e.stopPropagation();
         document.addEventListener('mousemove', onMove);
@@ -696,9 +753,8 @@ function bindBearingDrag(handle) {
         document.addEventListener('touchend', onEnd);
         var ll = pointerEventToLatLng(e);
         if (ll) {
-            dragging = true;
             state.target = { lat: ll.lat, lng: ll.lng };
-            renderAll();
+            updateBearingPreview();
         }
     }
     handle.addEventListener('mousedown', onStart);
@@ -805,6 +861,7 @@ function bindMapEvents() {
     if (!map) return;
     _bound = true;
     map.on('move zoom zoomend moveend resize', function() {
+        if (_bearingDragging) return;
         if (state.positionLocked) syncAnchorFromCenter();
         updateRulerWidgetPosition();
         renderRouteOnMap();
@@ -857,5 +914,5 @@ export function getTopoRulerState() {
 
 export function getRulerCenterLatLng() {
     if (!state.visible) return null;
-    return getPlateCenterLatLng();
+    return getRulerOriginLatLng();
 }
