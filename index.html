@@ -1946,7 +1946,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718h';
+        var PATRAC_BUILD = '20260718i';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -3621,6 +3621,8 @@
             setCommunityLaunchedQuests(launched);
             try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
         }
+
+        function recordStoryRunCompletion(questId, lat, lng) {
             var launched = getCommunityLaunchedQuests();
             var entry = launched[questId];
             if (!entry) return;
