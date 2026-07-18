@@ -1415,7 +1415,7 @@
             background: var(--topo-accent);
             box-shadow: 0 0 3px var(--topo-accent-glow);
         }
-        /* L-kříž: východ + sever od průsečíku (0 km — SW roh čtverce) */
+        /* L-kříž: východ + sever od průsečíku (SW roh km buňky) */
         .topo-ruler-center::before {
             width: 1px; height: 22px;
             left: 50%; bottom: 50%;
@@ -1586,23 +1586,25 @@
             color: var(--text-green);
             border-color: rgba(74,246,38,0.55);
         }
-        .mgrs-grid-cell span {
+        .mgrs-grid-line-e span,
+        .mgrs-grid-line-n span {
             display: inline-block;
-            transform: translate(-50%, -50%);
             font-size: 8px;
-            line-height: 1.35;
+            line-height: 1.2;
             font-family: 'IBM Plex Mono', monospace;
             font-weight: 500;
             color: rgba(120, 255, 102, 0.92);
             background: none;
             border: none;
             padding: 0;
-            text-align: center;
             text-shadow: 0 0 4px rgba(6, 10, 6, 0.95), 0 0 6px rgba(120, 255, 102, 0.55);
             pointer-events: none;
             white-space: nowrap;
         }
-        .mgrs-grid-cell span b {
+        .mgrs-grid-line-e span { transform: translate(-50%, -5px); }
+        .mgrs-grid-line-n span { transform: translate(5px, -50%); }
+        .mgrs-grid-line-e span b,
+        .mgrs-grid-line-n span b {
             font-weight: 600;
             color: rgba(184, 255, 176, 0.85);
             font-size: 7px;
@@ -2528,7 +2530,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718ao';
+        var PATRAC_BUILD = '20260718ar';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }

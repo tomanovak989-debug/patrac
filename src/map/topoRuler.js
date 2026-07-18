@@ -193,61 +193,58 @@ function renderGridReadouts() {
     addGridReadoutLabel(pE.lat, pE.lng, digits.easting, 'easting');
 }
 
-function roamerTransformPoint(ox, oy, scale, rotDeg) {
-    var O = 130;
-    var s = scale || 1;
-    var rad = (rotDeg || 0) * Math.PI / 180;
-    var lx = ox - O;
-    var ly = oy - O;
-    var cos = Math.cos(rad);
-    var sin = Math.sin(rad);
-    var rx = lx * cos - ly * sin;
-    var ry = lx * sin + ly * cos;
-    return { x: O + rx * s, y: O + ry * s };
-}
-
 function buildRoamerGroupTransform(scale, rotDeg) {
     var parts = ['translate(130,130)'];
-    if (rotDeg) parts.push('rotate(' + rotDeg + ')');
+    parts.push('rotate(' + (rotDeg || 0) + ')');
     if (scale && scale !== 1) parts.push('scale(' + scale + ')');
     parts.push('translate(-130,-130)');
     return parts.join(' ');
 }
 
-/** Úhel grid north vůči severu obrazovky (° po směru hodin) — pro srovnání roameru s km mřížkou. */
+/** Úhel grid north vůči severu obrazovky (° po směru hodin) — roamer rovnoběžně s km mřížkou. */
 function gridConvergenceDegAt(lat, lng) {
     var map = getMap();
     if (!map || lat == null || lng == null) return 0;
     var utm = latLngToUtm(lat, lng);
     var zone = utm.zone;
     var d = 400;
-    var ll0 = { lat: lat, lng: lng };
-    var llN = utmToLatLng(utm.easting, utm.northing + d, zone, lat);
-    var p0 = map.latLngToContainerPoint([ll0.lat, ll0.lng]);
-    var pN = map.latLngToContainerPoint([llN.lat, llN.lng]);
+    var p0 = map.latLngToContainerPoint([lat, lng]);
+    var pE = map.latLngToContainerPoint(utmToLatLng(utm.easting + d, utm.northing, zone, lat));
+    var pN = map.latLngToContainerPoint(utmToLatLng(utm.easting, utm.northing + d, zone, lat));
+    var ex = pE.x - p0.x;
+    var ey = pE.y - p0.y;
     var nx = pN.x - p0.x;
     var ny = pN.y - p0.y;
-    if (Math.abs(nx) < 0.01 && Math.abs(ny) < 0.01) return 0;
-    return Math.atan2(nx, -ny) * 180 / Math.PI;
+    if (Math.abs(ex) < 0.01 && Math.abs(ey) < 0.01) {
+        if (Math.abs(nx) < 0.01 && Math.abs(ny) < 0.01) return 0;
+        return Math.atan2(nx, -ny) * 180 / Math.PI;
+    }
+    /* +x roameru = východ (E); grid east = northing úhel + 90° */
+    var eastAng = Math.atan2(ex, -ey) * 180 / Math.PI;
+    return eastAng - 90;
 }
 
-function syncRoamerLabels(scale, rotDeg) {
+function syncRoamerLabels(scale) {
     var lbl = document.getElementById('topo-roamer-lbl');
     if (!lbl) return;
     var s = scale || 1;
     var inv = s > 0.01 ? 1 / s : 1;
-    var rot = rotDeg || 0;
     var texts = lbl.querySelectorAll('text[data-ox]');
     for (var i = 0; i < texts.length; i++) {
         var t = texts[i];
         var ox = parseFloat(t.getAttribute('data-ox'));
         var oy = parseFloat(t.getAttribute('data-oy'));
-        var p = roamerTransformPoint(ox, oy, s, rot);
         t.style.display = '';
-        t.setAttribute(
-            'transform',
-            'translate(' + p.x.toFixed(2) + ',' + p.y.toFixed(2) + ') scale(' + inv.toFixed(4) + ')'
-        );
+        t.setAttribute('x', String(ox));
+        t.setAttribute('y', String(oy));
+        if (Math.abs(inv - 1) > 0.001) {
+            t.setAttribute(
+                'transform',
+                'translate(' + ox + ',' + oy + ') scale(' + inv.toFixed(4) + ') translate(' + (-ox) + ',' + (-oy) + ')'
+            );
+        } else {
+            t.removeAttribute('transform');
+        }
     }
 }
 
@@ -255,14 +252,14 @@ function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
     var lblOk = document.getElementById('topo-roamer-lbl');
-    if (g.getAttribute('data-built') === 'neon-v9' && lblOk) return;
-    g.setAttribute('data-built', 'neon-v9');
+    if (g.getAttribute('data-built') === 'neon-v11' && lblOk) return;
+    g.setAttribute('data-built', 'neon-v11');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var vns = ' vector-effect="non-scaling-stroke"';
     var geo = '';
     var lbl = '';
-    /* SW roh (průsečík) = 0; stupnice do východu a severu — jako papírový roamer v km čtverci. */
+    /* SW průsečík = 0; stupnice E (+x) a N (−y) do km buňky — po 🔒 rotace podle grid convergence. */
     geo += '<polygon points="' + O + ',' + O + ' ' + (O + L) + ',' + O + ' ' + O + ',' + (O - L) + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
     geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O + L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
     geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O - L) + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
@@ -292,7 +289,7 @@ function buildRoamerScales() {
     }
     lbl += lblText(O - 8, O - L + 2, '1000', 'end', false);
     g.innerHTML = '<g id="topo-roamer-geo">' + geo + '</g><g id="topo-roamer-lbl">' + lbl + '</g>';
-    syncRoamerLabels(1, 0);
+    syncRoamerLabels(1);
 }
 
 function syncScreenFromAnchor() {
@@ -728,18 +725,28 @@ function updateRulerPlateVisual() {
     var centerLl = (state.positionLocked && state.anchor)
         ? state.anchor
         : getRulerOriginLatLng();
-    var gridRot = centerLl ? gridConvergenceDegAt(centerLl.lat, centerLl.lng) : 0;
+    var gridRot = (state.positionLocked && centerLl)
+        ? gridConvergenceDegAt(centerLl.lat, centerLl.lng)
+        : 0;
     var roamerScale = state.positionLocked ? scale : 1;
 
-    var geo = document.getElementById('topo-roamer-geo');
-    if (geo) {
-        geo.setAttribute('transform', buildRoamerGroupTransform(roamerScale, gridRot));
+    var scales = document.getElementById('topo-roamer-scales');
+    var tf = buildRoamerGroupTransform(roamerScale, gridRot);
+    if (scales) {
+        scales.setAttribute('transform', tf);
     }
-    syncRoamerLabels(roamerScale, gridRot);
+    var geo = document.getElementById('topo-roamer-geo');
+    if (geo) geo.removeAttribute('transform');
+    var lblG = document.getElementById('topo-roamer-lbl');
+    if (lblG) lblG.removeAttribute('transform');
+    syncRoamerLabels(roamerScale);
 
     if (centerEl) {
-        var rotStr = Math.abs(gridRot) > 0.02 ? (' rotate(' + gridRot.toFixed(2) + 'deg)') : '';
-        centerEl.style.transform = rotStr ? rotStr.trim() : '';
+        if (state.positionLocked && Math.abs(gridRot) > 0.01) {
+            centerEl.style.transform = 'rotate(' + gridRot.toFixed(2) + 'deg)';
+        } else {
+            centerEl.style.transform = '';
+        }
     }
 
     if (degEl) {

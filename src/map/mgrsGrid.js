@@ -55,18 +55,45 @@ function clearLayer() {
 }
 
 function mgrsKmDigits(easting, northing) {
-    return {
-        e: pad2((easting % 100000) / 1000),
-        n: pad2((northing % 100000) / 1000)
-    };
+    var e = kmIdx100k(easting);
+    var n = kmIdx100k(northing);
+    return { e: pad2(e), n: pad2(n) };
+}
+
+/** Metry v rámci 100 km bloku (SW roh buňky = hodnota grid čáry). */
+function utmWithin100k(v) {
+    var n = Math.floor(v + 1e-3) % 100000;
+    if (n < 0) n += 100000;
+    return n;
+}
+
+function kmIdx100k(v) {
+    return Math.floor(utmWithin100k(v) / 1000);
 }
 
 function pad5utmVal(v) {
-    var n = Math.round(v) % 100000;
-    if (n < 0) n += 100000;
+    var n = utmWithin100k(v);
     var s = String(n);
     while (s.length < 5) s = '0' + s;
     return s;
+}
+
+/** Popisky jen na každé druhé km čáře (při kroku 1 km). */
+function showKmLineLabel(coord, step) {
+    if (step >= 2000) return true;
+    return (kmIdx100k(coord) % 2) === 0;
+}
+
+function addLineSegmentLabel(lat, lng, html, className) {
+    _layer.addLayer(window.L.marker([lat, lng], {
+        icon: window.L.divIcon({
+            className: 'mgrs-grid-label ' + className,
+            html: html,
+            iconSize: [0, 0]
+        }),
+        interactive: false,
+        pane: 'mapGridPane'
+    }));
 }
 
 function drawGrid() {
@@ -155,20 +182,27 @@ function drawGrid() {
     }
 
     if (cellLabelZoom) {
-        for (var ec = eMin; ec < eMax; ec += step) {
-            for (var nc = nMin; nc < nMax; nc += step) {
-                var e5 = pad5utmVal(ec);
-                var n5 = pad5utmVal(nc);
-                var ptCell = utmToLatLng(ec + step * 0.5, nc + step * 0.5, zone, latHint);
-                _layer.addLayer(window.L.marker([ptCell.lat, ptCell.lng], {
-                    icon: window.L.divIcon({
-                        className: 'mgrs-grid-label mgrs-grid-cell',
-                        html: '<span><b>E</b>' + e5 + '<br><b>N</b>' + n5 + '</span>',
-                        iconSize: [0, 0]
-                    }),
-                    interactive: false,
-                    pane: 'mapGridPane'
-                }));
+        /* E na horizontálních čarách (N konstanta), N na vertikálních — uprostřed km segmentu, každá 2. čára. */
+        for (var nh = nMin; nh <= nMax; nh += step) {
+            if (!showKmLineLabel(nh, step)) continue;
+            for (var eh = eMin; eh < eMax; eh += step) {
+                var ptE = utmToLatLng(eh + step * 0.5, nh, zone, latHint);
+                addLineSegmentLabel(
+                    ptE.lat, ptE.lng,
+                    '<span><b>E</b>' + pad5utmVal(eh) + '</span>',
+                    'mgrs-grid-line-e'
+                );
+            }
+        }
+        for (var ev = eMin; ev <= eMax; ev += step) {
+            if (!showKmLineLabel(ev, step)) continue;
+            for (var nv = nMin; nv < nMax; nv += step) {
+                var ptN = utmToLatLng(ev, nv + step * 0.5, zone, latHint);
+                addLineSegmentLabel(
+                    ptN.lat, ptN.lng,
+                    '<span><b>N</b>' + pad5utmVal(nv) + '</span>',
+                    'mgrs-grid-line-n'
+                );
             }
         }
     }
