@@ -1255,7 +1255,7 @@
         .map-tac-sub { font-size: 9px; color: var(--dim-fg); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
         #map .leaflet-map-pane {
-            transition: transform 0.12s linear;
+            transform: none !important;
         }
 
         @media (max-width: 480px) {
@@ -2026,7 +2026,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718n';
+        var PATRAC_BUILD = '20260718p';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -3696,15 +3696,30 @@
             var now = Date.now();
             launched[questId] = {
                 startedAt: now,
-                expiresAt: now + parseQuestTimeToMs(q.time),
+                expiresAt: isStoryQuestId(questId) ? (now + 365 * 24 * 60 * 60 * 1000) : (now + parseQuestTimeToMs(q.time)),
                 startedBy: localStorage.getItem('patrac_session') || '',
                 startedByName: localStorage.getItem('player_name') || 'Operativec',
                 closed: false,
                 completions: {},
-                pendingPosition: null
+                pendingPosition: null,
+                noPlacementCountdown: !!gameQuests[questId]
             };
             setCommunityLaunchedQuests(launched);
             try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
+        }
+
+        function applyStoryPendingPositionNow(questId, entry) {
+            if (!entry || !entry.pendingPosition || entry.positionApplied) return false;
+            if (!applyStoryPositionFromLaunch(questId, entry.pendingPosition)) return false;
+            var launched = getCommunityLaunchedQuests();
+            if (!launched[questId]) launched[questId] = entry;
+            launched[questId].positionApplied = true;
+            setCommunityLaunchedQuests(launched);
+            syncCommunityQuestsToCloud();
+            try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
+            rebuildCustomLocLinkSelect();
+            renderStoryPositionsList();
+            return true;
         }
 
         function recordStoryRunCompletion(questId, lat, lng) {
@@ -3725,6 +3740,7 @@
                 };
             }
             setCommunityLaunchedQuests(launched);
+            applyStoryPendingPositionNow(questId, entry);
         }
 
         function applyStoryPositionFromLaunch(questId, pendingPosition) {
@@ -3820,7 +3836,7 @@
         function renderCommunityQuestStatusHtml(questId, q) {
             if (!usesCommunityLaunchQuest(questId)) return '';
             if (isStoryQuestId(questId) && isPlayerCompletedCurrentRun(questId)) {
-                return '<div style="font-size:var(--text-sm);color:var(--text-green);margin:4px 0;">✅ Výkon potvrzen — rank zapsán. Trvalý bod se aktualizuje po vypršení lhůty.</div>';
+                return '<div style="font-size:var(--text-sm);color:var(--text-green);margin:4px 0;">✅ Výkon potvrzen — rank zapsán. Trvalý bod je na mapě.</div>';
             }
             if (!isStoryQuestId(questId) && isQuestCompleted(q)) return '';
             if (isQuestMissedByPlayer(questId)) {
@@ -3829,11 +3845,13 @@
             var entry = getLaunchedQuestEntry(questId);
             if (!entry) return '';
             var starter = entry.startedByName || entry.startedBy || 'komunita';
-            var cd = formatQuestCountdown(questId);
-            var html = '<div style="font-size:var(--text-sm);color:var(--accent-gold);margin:4px 0;">📡 Spuštěno: ' + starter + ' · zbývá ~' + cd + '</div>';
+            var html = '<div style="font-size:var(--text-sm);color:var(--accent-gold);margin:4px 0;">📡 Spuštěno: ' + starter + '</div>';
             html += '<div style="font-size:var(--text-xs);color:var(--muted-fg);margin-bottom:4px;">Každý pátrač musí potvrdit výkon na místě sám — jinak rank nezíská.</div>';
             if (isStoryQuestId(questId)) {
-                html += '<div style="font-size:var(--text-xs);color:var(--muted-fg);margin-bottom:4px;">Trvalý bod na mapě se po lhůtě aktualizuje, pokud alespoň jeden hráč potvrdí polohu.</div>';
+                html += '<div style="font-size:var(--text-xs);color:var(--muted-fg);margin-bottom:4px;">Trvalý bod se na mapě aktualizuje hned po potvrzení GPS.</div>';
+            } else {
+                var cd = formatQuestCountdown(questId);
+                html += '<div style="font-size:var(--text-xs);color:var(--muted-fg);margin-bottom:4px;">Zbývá ~' + cd + '</div>';
             }
             return html;
         }
@@ -4417,16 +4435,8 @@
                 return;
             }
             el.classList.remove('is-waiting');
-            var deg = null;
-            if (lastUserPosition && mapNavTarget) {
-                deg = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
-            } else if (compassDeviceHeading !== null) {
-                deg = compassDeviceHeading;
-            } else {
-                deg = compassBezelDeg;
-            }
-            el.textContent = Math.round(normalizeDeg(deg)) + '°';
-            el.title = '';
+            el.textContent = Math.round(normalizeDeg(compassBezelDeg)) + '°';
+            el.title = 'Natáčení lunety';
         }
 
         function setCompassWidgetExpanded(expanded) {
@@ -4476,7 +4486,7 @@
             compassOrientGranted = true;
             updateCompassPermissionUi();
             applyCompassRoseRotation();
-            applyMapBearingRotation();
+            resetMapBearingRotation();
             updateCompassReadout();
         }
 
@@ -4516,20 +4526,6 @@
             updateCompassPermissionUi();
             updateCompassReadout();
             return Promise.resolve(true);
-        }
-
-        function applyMapBearingRotation() {
-            if (!map) return;
-            var pane = map.getPane('mapPane');
-            if (!pane) return;
-            if (!_mapToolsTabActive || compassDeviceHeading === null) {
-                pane.style.transform = '';
-                pane.style.transformOrigin = '';
-                return;
-            }
-            var rot = normalizeDeg(-compassDeviceHeading + compassBezelDeg);
-            pane.style.transformOrigin = '50% 50%';
-            pane.style.transform = 'rotate(' + rot + 'deg)';
         }
 
         function resetMapBearingRotation() {
@@ -4594,7 +4590,7 @@
                     compassBezelDeg = dragAngle;
                 }
                 applyCompassRoseRotation();
-                applyMapBearingRotation();
+                resetMapBearingRotation();
                 try { localStorage.setItem('patrac_compass_bezel', String(compassBezelDeg)); } catch (err) {}
                 updateTacticalHud();
                 updateCompassReadout();
@@ -5534,7 +5530,7 @@
                 syncCommunityQuestsToCloud();
                 poctaReward = finalizeQuestComplete(q);
                 var msg = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Rank zapsán tobě.';
-                msg += '\n\n📍 Poloha zaznamenána. Trvalý bod na mapě se aktualizuje po vypršení lhůty (pokud alespoň jeden hráč potvrdí).';
+                msg += '\n\n📍 Trvalý bod na mapě byl právě aktualizován.';
                 if (poctaReward) {
                     msg += '\n\n✝ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
                 }
@@ -5598,7 +5594,7 @@
             var measureBrng = getMeasureBearing();
             var statusLine = '';
             if (compassDeviceHeading !== null) {
-                statusLine = 'Sever na růžici · zlatá = směr tel.';
+                statusLine = 'Mapa severem nahoru · růžice sleduje sever';
             } else if (compassNeedsPermission && !compassOrientGranted) {
                 statusLine = '▶ Klepni buzolu — povol senzor';
             } else {
@@ -5672,7 +5668,7 @@
             updateMapCompassDisplay();
             updateTacticalHud();
             if (show) {
-                applyMapBearingRotation();
+                resetMapBearingRotation();
                 updateCompassPermissionUi();
                 updateCompassReadout();
             } else {
@@ -8657,7 +8653,7 @@
                 launchCommunityQuest(questId, q);
                 syncCommunityQuestsToCloud();
                 if (isStoryQuestId(questId)) {
-                    alert('📡 Prvotní pozice spuštěna pro celou komunitu!\nKaždý musí na místě potvrdit GPS sám. Trvalý bod na mapě se po lhůtě aktualizuje, pokud alespoň jeden hráč potvrdí.');
+                    alert('📡 Prvotní pozice spuštěna pro celou komunitu!\nKaždý musí na místě potvrdit GPS sám. Trvalý bod se na mapě objeví hned po prvním potvrzení.');
                 } else {
                     alert('📡 Rozkaz spuštěn pro celou komunitu!\nVšichni ho vidí — každý musí na místě potvrdit výkon sám, jinak rank nezíská.');
                 }
