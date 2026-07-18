@@ -3,7 +3,7 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
-import { ensurePatracAuth, getCurrentFirebaseUid } from './authService.js';
+import { ensurePatracAuth, getCurrentFirebaseUid, normalizePatracUserId } from './authService.js';
 
 const COLLECTION = 'accounts';
 
@@ -24,7 +24,7 @@ export function sanitizeAccountForCloud(userId, account) {
 }
 
 export async function saveAccountToCloud(userId, account) {
-    userId = String(userId || '').trim();
+    userId = normalizePatracUserId(userId);
     if (!userId || !account) return;
     await ensurePatracAuth();
     var payload = sanitizeAccountForCloud(userId, account);
@@ -33,7 +33,7 @@ export async function saveAccountToCloud(userId, account) {
 }
 
 export async function fetchAccountFromCloud(userId) {
-    userId = String(userId || '').trim();
+    userId = normalizePatracUserId(userId);
     if (!userId) return null;
     var mod = await import('./authService.js');
     await mod.ensureAnonymousAuth();

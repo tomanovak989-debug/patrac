@@ -3,12 +3,12 @@
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
-import { ensurePatracAuth, getCurrentFirebaseUid } from './authService.js';
+import { ensurePatracAuth, getCurrentFirebaseUid, normalizePatracUserId } from './authService.js';
 
 const COLLECTION = 'players';
 
 function normalizeUserId(userId) {
-    return String(userId || '').trim();
+    return normalizePatracUserId(userId);
 }
 
 export async function savePlayerToCloud(userId, payload) {
@@ -128,9 +128,26 @@ export function applyPlayerProgressFromCloud(userId, data) {
             stored.localIssuerStats = missions.localIssuerStats || stored.localIssuerStats || {};
             stored.globalIssuerStats = missions.globalIssuerStats || stored.globalIssuerStats || {};
             if (Array.isArray(missions.missionLog)) stored.missionLog = missions.missionLog.slice();
+            if (Array.isArray(missions.missionLog)) stored.missionLog = missions.missionLog.slice();
             localStorage.setItem(getPatracProfileKey(userId), JSON.stringify(stored));
         } catch (e) {
             console.warn('[playerService] patrac_profile missions', e);
+        }
+    }
+
+    if (Array.isArray(data.chronicle)) {
+        try {
+            var chronicle = data.chronicle.slice();
+            var profileChronicleRaw = localStorage.getItem('player_profile');
+            var profileChronicle = profileChronicleRaw ? JSON.parse(profileChronicleRaw) : {};
+            profileChronicle.chronicle = chronicle;
+            localStorage.setItem('player_profile', JSON.stringify(profileChronicle));
+            var storedChronicleRaw = localStorage.getItem(getPatracProfileKey(userId));
+            var storedChronicle = storedChronicleRaw ? JSON.parse(storedChronicleRaw) : {};
+            storedChronicle.chronicle = chronicle;
+            localStorage.setItem(getPatracProfileKey(userId), JSON.stringify(storedChronicle));
+        } catch (e) {
+            console.warn('[playerService] chronicle', e);
         }
     }
 
@@ -238,6 +255,17 @@ export async function syncPlayerFromLocalStorage(userId) {
             };
             if (profile.questDone) {
                 payload.quests = { done: profile.questDone, unlocked: {} };
+            }
+            if (Array.isArray(profile.chronicle)) {
+                payload.chronicle = profile.chronicle.slice();
+            } else {
+                try {
+                    var globalProfileRaw = localStorage.getItem('player_profile');
+                    var globalProfile = globalProfileRaw ? JSON.parse(globalProfileRaw) : null;
+                    if (globalProfile && Array.isArray(globalProfile.chronicle) && localStorage.getItem('patrac_session') === userId) {
+                        payload.chronicle = globalProfile.chronicle.slice();
+                    }
+                } catch (e) {}
             }
         }
     } catch (e) {}

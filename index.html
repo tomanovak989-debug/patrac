@@ -1842,7 +1842,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718b';
+        var PATRAC_BUILD = '20260718c';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5518,6 +5518,8 @@
                 console.warn('[auth] logout', err);
             });
             try { localStorage.removeItem('patrac_session'); } catch (e) {}
+            clearGlobalSessionGameCache();
+            localStorage.setItem('items_community', '[]');
             localStorage.setItem('items_personal', '[]');
 
             isOperatorMode = false;
@@ -5644,6 +5646,73 @@
             return 'patrac_profile_' + userId;
         }
 
+        /** Smaže globální herní cache — před přepnutím účtu/komunity. */
+        function clearGlobalSessionGameCache() {
+            var keysToRemove = [];
+            for (var i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (!key) continue;
+                if (key.indexOf('quest_done_') === 0 ||
+                    key.indexOf('unlocked_story_') === 0 ||
+                    key.indexOf('point_') === 0 ||
+                    key.indexOf('story_pos_note_') === 0 ||
+                    key.indexOf('story_pos_img_') === 0) {
+                    keysToRemove.push(key);
+                }
+            }
+            for (var r = 0; r < keysToRemove.length; r++) {
+                try { localStorage.removeItem(keysToRemove[r]); } catch (e) {}
+            }
+            safeLocalStorageSet('items_community', '[]');
+            safeLocalStorageSet('map_free_pois', '[]');
+            safeLocalStorageSet('custom_quests_list', '[]');
+            safeLocalStorageSet('random_quests_list', '[]');
+            safeLocalStorageSet('dismissed_quests', '[]');
+            safeLocalStorageSet('quest_req_overrides', '{}');
+            safeLocalStorageSet('quest_sections_state', '{}');
+        }
+
+        function loadCommunityInventoryFromComCode(comCode) {
+            comCode = String(comCode || '').trim().toUpperCase();
+            if (!comCode) {
+                localStorage.setItem('items_community', '[]');
+                return;
+            }
+            var raw = localStorage.getItem(getPatracItemsCommunityKey(comCode));
+            if (raw !== null) {
+                localStorage.setItem('items_community', raw);
+            } else {
+                localStorage.setItem('items_community', '[]');
+            }
+        }
+
+        function emptyCommunityQuestsForCloud() {
+            return {
+                version: 1,
+                story: {},
+                custom: [],
+                random: [],
+                dismissed: [],
+                reqOverrides: {},
+                launched: {},
+                updatedAt: Date.now()
+            };
+        }
+
+        function beginSessionForUser(userId, options) {
+            options = options || {};
+            clearGlobalSessionGameCache();
+            applyAccountToLocalStorage(userId);
+            var comCode = localStorage.getItem('com_code') || '';
+            loadCommunityInventoryFromComCode(comCode);
+            var profileData = options.profileData || getUserProfileData(userId);
+            applyUserProfileDataToSession(userId, profileData);
+            var profile = getPlayerProfile();
+            if (options.comName) profile.currentClan = options.comName;
+            if (options.resetChronicle) profile.chronicle = [];
+            savePlayerProfile(profile);
+        }
+
         function getPatracItemsCommunityKey(comCode) {
             return 'patrac_items_community_' + (comCode || '').toUpperCase();
         }
@@ -5679,14 +5748,9 @@
                         if (Array.isArray(keyed)) return keyed;
                     } catch (e) {}
                 }
-                var legacy = getSafeItems('items_community');
-                if (legacy.length > 0) {
-                    saveCommunityItemsRaw(legacy, comCode);
-                    return legacy.slice();
-                }
                 return [];
             }
-            return getSafeItems('items_community');
+            return [];
         }
 
         function saveCommunityItemsRaw(items, comCode) {
@@ -5828,6 +5892,7 @@
                 localIssuerStats: profile.localIssuerStats ? JSON.parse(JSON.stringify(profile.localIssuerStats)) : emptyIssuerStats(),
                 globalIssuerStats: profile.globalIssuerStats ? JSON.parse(JSON.stringify(profile.globalIssuerStats)) : emptyIssuerStats(),
                 missionLog: profile.missionLog ? JSON.parse(JSON.stringify(profile.missionLog)) : [],
+                chronicle: profile.chronicle ? JSON.parse(JSON.stringify(profile.chronicle)) : [],
                 questDone: snapshotQuestDoneFromLocalStorage(),
                 itemsPersonal: JSON.parse(JSON.stringify(getCurrentPersonalItems()))
             };
@@ -5841,6 +5906,7 @@
                 localIssuerStats: emptyIssuerStats(),
                 globalIssuerStats: emptyIssuerStats(),
                 missionLog: [],
+                chronicle: [],
                 questDone: {},
                 itemsPersonal: []
             };
@@ -5960,6 +6026,7 @@
                 localIssuerStats: data.localIssuerStats || emptyIssuerStats(),
                 globalIssuerStats: data.globalIssuerStats || emptyIssuerStats(),
                 missionLog: data.missionLog || [],
+                chronicle: data.chronicle || [],
                 questDone: data.questDone || {}
             };
             var ok = safeLocalStorageSet(getPatracProfileKey(userId), JSON.stringify(store));
@@ -5985,6 +6052,7 @@
             profile.localIssuerStats = data.localIssuerStats ? JSON.parse(JSON.stringify(data.localIssuerStats)) : emptyIssuerStats();
             profile.globalIssuerStats = data.globalIssuerStats ? JSON.parse(JSON.stringify(data.globalIssuerStats)) : emptyIssuerStats();
             if (data.missionLog) profile.missionLog = JSON.parse(JSON.stringify(data.missionLog));
+            profile.chronicle = data.chronicle ? JSON.parse(JSON.stringify(data.chronicle)) : [];
             savePlayerProfile(profile);
 
             var quests = getAllQuestDefinitionsForOperator();
@@ -6438,8 +6506,10 @@
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             var session = localStorage.getItem('patrac_session') || '';
             var skipPlayerHydrate = false;
+            var skipCommunityLocalMerge = false;
             try {
                 skipPlayerHydrate = sessionStorage.getItem('patrac_fresh_register') === '1';
+                skipCommunityLocalMerge = skipPlayerHydrate;
                 if (skipPlayerHydrate) sessionStorage.removeItem('patrac_fresh_register');
             } catch (e) {}
 
@@ -6463,6 +6533,7 @@
                     return import('./src/services/poiService.js').then(function(mod) {
                         return mod.hydrateCommunityPoisFromCloud(comCode).then(function(result) {
                             if (result.ok) return result;
+                            if (skipCommunityLocalMerge) return result;
                             var localPois = collectCommunityPoisForCloud();
                             if (!localPois.length) return result;
                             return mod.saveCommunityPoisToCloud(comCode, localPois, getPreviousPoiImgById());
@@ -6471,7 +6542,10 @@
                 });
                 chain = chain.then(function() {
                     return import('./src/services/questService.js').then(function(mod) {
-                        return mod.hydrateCommunityQuestsFromCloud(comCode, collectCommunityQuestsForCloud());
+                        return mod.hydrateCommunityQuestsFromCloud(
+                            comCode,
+                            skipCommunityLocalMerge ? emptyCommunityQuestsForCloud() : collectCommunityQuestsForCloud()
+                        );
                     });
                 });
             }
@@ -7273,10 +7347,7 @@
             }
 
             function finishLogin() {
-                applyAccountToLocalStorage(userId);
-                var storedProfile = getUserProfileData(userId);
-                applyUserProfileDataToSession(userId, storedProfile);
-                reconcileCommunityInventory(localStorage.getItem('com_code') || '');
+                beginSessionForUser(userId, { profileData: getUserProfileData(userId) });
                 isOperatorMode = false;
                 operatorComCode = '';
                 currentlyEditingPlayerId = null;
@@ -7462,9 +7533,14 @@
             saveUserDesc(userId, descText);
             var avatarSaved = true;
             if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
-            applyAccountToLocalStorage(userId);
-            setUserPersonalItemsLocal(userId, []);
-            saveUserProfileData(userId, createDefaultUserProfileData(userId));
+
+            var defaultProfile = createDefaultUserProfileData(userId);
+            saveUserProfileData(userId, defaultProfile);
+            beginSessionForUser(userId, {
+                profileData: defaultProfile,
+                comName: comName,
+                resetChronicle: true
+            });
 
             try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
 
@@ -8523,7 +8599,7 @@
             } catch (e) {}
             var session = localStorage.getItem('patrac_session');
             if (session && getPatracAccounts()[session]) {
-                applyAccountToLocalStorage(session);
+                beginSessionForUser(session, { profileData: getUserProfileData(session) });
                 launchGame();
             }
         };
