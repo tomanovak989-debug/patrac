@@ -74,7 +74,7 @@ function markerStyle(entity, userId) {
             weight: own ? 3 : 2,
             dashArray: own ? null : '4,4',
             radius: 10,
-            labelPrefix: own ? '🕯️ ' : '🕯️ ',
+            labelPrefix: own ? '✝ ' : '✝ ',
             sharedTag: own ? 'Moje pocta' : 'Sdílená pocta'
         };
     }
@@ -156,35 +156,72 @@ export function renderEntityOnMap(entity, userId) {
     }
 
     var near = checkProximityForEntity(entity);
-    var marker = L.circleMarker([entity.lat, entity.lng], {
-        radius: style.radius,
-        color: style.color,
-        weight: style.weight,
-        fillColor: style.fillColor,
-        fillOpacity: style.fillOpacity,
-        dashArray: style.dashArray || null,
-        pane: 'mapPointsPane'
-    }).addTo(bridge.mapPointsLayer);
+    var label = entity.title || entity.code;
+    if (label.length > 18) label = label.slice(0, 17) + '…';
+    var popupHtml = buildPopupHtml(entity, userId, near);
 
-    marker.bindTooltip(buildLabelHtml(entity, style), {
-        permanent: true,
-        direction: 'top',
-        className: 'map-point-label' + (style.dashArray ? ' map-point-inactive' : ''),
-        offset: [0, -10]
-    });
-    marker.bindPopup(buildPopupHtml(entity, userId, near), { maxWidth: 300, minWidth: 200 });
-    marker.on('popupopen', function() {
-        initPoctaChroniclePopup(entity, userId, checkProximityForEntity(entity));
-    });
-    marker.on('click', function(e) {
-        L.DomEvent.stopPropagation(e);
-        var out = document.getElementById('map-sensor-output');
-        if (out) out.innerHTML = '📡 ' + style.labelPrefix + entity.title + ' · ' + style.sharedTag;
-        marker.openPopup();
-    });
+    function placeMarker(marker) {
+        marker.bindPopup(popupHtml, { maxWidth: 300, minWidth: 200, className: 'map-v3-leaflet-popup' });
+        marker.on('popupopen', function() {
+            initPoctaChroniclePopup(entity, userId, checkProximityForEntity(entity));
+        });
+        marker.on('click', function(e) {
+            L.DomEvent.stopPropagation(e);
+            var out = document.getElementById('map-sensor-output');
+            if (out) out.innerHTML = '📡 ' + style.labelPrefix + entity.title + ' · ' + style.sharedTag;
+            if (typeof window.setMapNavTarget === 'function') {
+                window.setMapNavTarget(entity.lat, entity.lng, entity.title || entity.code);
+            }
+            marker.openPopup();
+        });
+        registry[mapId] = marker;
+        bridge.mapMarkerRegistry = registry;
+    }
 
-    registry[mapId] = marker;
-    bridge.mapMarkerRegistry = registry;
+    var filterFn = typeof window.getMapLayerFilter === 'function' ? window.getMapLayerFilter : null;
+    var filter = filterFn ? filterFn() : { pocta: true };
+    var dimmed = filter.pocta === false;
+
+    import('../map/mapV3.js').then(function(v3) {
+        var activeQuest = false;
+        if (isCodedQuestEntity(entity)) {
+            activeQuest = entity.phase === CODED_QUEST_PHASE.MYSTERY || entity.phase === CODED_QUEST_PHASE.ACTIVE;
+        }
+        var html = v3.buildMapMarkerHtml({
+            id: mapId,
+            mapLabel: label.replace(/^[^\s]+\s/, ''),
+            category: 'pocta',
+            activeQuest: activeQuest || (isCoded && entity.phase === CODED_QUEST_PHASE.ACTIVE),
+            color: style.color,
+            dimmed: dimmed
+        });
+        var icon = L.divIcon({
+            className: 'map-v3-divicon',
+            html: html,
+            iconSize: [88, 52],
+            iconAnchor: [44, 26],
+            popupAnchor: [0, -22]
+        });
+        placeMarker(L.marker([entity.lat, entity.lng], { icon: icon, pane: 'mapPointsPane' }).addTo(bridge.mapPointsLayer));
+    }).catch(function() {
+        var marker = L.circleMarker([entity.lat, entity.lng], {
+            radius: style.radius,
+            color: style.color,
+            weight: style.weight,
+            fillColor: style.fillColor,
+            fillOpacity: dimmed ? 0.08 : style.fillOpacity,
+            dashArray: style.dashArray || null,
+            pane: 'mapPointsPane',
+            opacity: dimmed ? 0.4 : 1
+        }).addTo(bridge.mapPointsLayer);
+        marker.bindTooltip(style.labelPrefix + label, {
+            permanent: true,
+            direction: 'top',
+            className: 'map-point-label' + (style.dashArray ? ' map-point-inactive' : ''),
+            offset: [0, -10]
+        });
+        placeMarker(marker);
+    });
 }
 
 export function reloadPoctaMapMarkers(userId) {

@@ -57,7 +57,7 @@ export function initPoctaModule(bridge) {
                 if (typeof b.loadCustomCraftedItems === 'function') {
                     b.loadCustomCraftedItems();
                 }
-                alert('🕯️ Pocta ukotvena na mapě.\n\n→ záložka 🗺️ Mapa');
+                alert('✝ Pocta ukotvena na mapě.\n\n→ záložka 🗺️ Mapa');
             } else {
                 alert(result.error || 'Ukotvení selhalo.');
             }

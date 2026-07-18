@@ -1129,6 +1129,94 @@
         }
         .compass-readout .az-deg { color: var(--text-green); font-size: var(--text-base); text-shadow: var(--text-glow); }
         .compass-readout .az-rad { color: var(--text-green-dim); font-size: var(--text-sm); }
+        .compass-index-line {
+            position: absolute; top: 6px; left: 50%; width: 2px; height: 18px;
+            margin-left: -1px; background: var(--accent-gold);
+            box-shadow: 0 0 8px rgba(255, 200, 80, 0.9); z-index: 6; pointer-events: none;
+        }
+        .compass-rose-wrap { pointer-events: auto; cursor: grab; touch-action: none; }
+        .compass-rose-wrap:active { cursor: grabbing; }
+
+        /* Smírčí kříž (Pocta) */
+        .pocta-cross-icon { display: inline-block; position: relative; vertical-align: middle; }
+        .pocta-cross-sm { width: 10px; height: 14px; }
+        .pocta-cross-md { width: 14px; height: 18px; }
+        .pocta-cross-map { width: 22px; height: 28px; }
+        .pocta-cross-icon::before {
+            content: ''; position: absolute; left: 50%; top: 15%; width: 3px; height: 70%;
+            margin-left: -1.5px; background: #8a7344; border-radius: 1px;
+        }
+        .pocta-cross-icon::after {
+            content: ''; position: absolute; left: 15%; top: 32%; width: 70%; height: 3px;
+            background: #c9a227; border-radius: 1px;
+        }
+        .pocta-cross-map::before { width: 4px; margin-left: -2px; background: #6a5a40; }
+        .pocta-cross-map::after { height: 4px; top: 30%; background: #e8c547; box-shadow: 0 0 6px rgba(232,197,71,0.6); }
+
+        /* Mapa V3 — markery, filtr, popup, HUD */
+        .map-v3-divicon { background: none !important; border: none !important; }
+        .map-v3-marker {
+            display: flex; flex-direction: column; align-items: center;
+            pointer-events: auto; transition: opacity 0.25s, filter 0.25s;
+        }
+        .map-v3-marker.map-v3-dimmed { opacity: 0.4; filter: grayscale(1); }
+        .map-v3-marker-halo {
+            position: absolute; width: 36px; height: 36px; border-radius: 50%;
+            background: radial-gradient(circle, var(--marker-color, #4af626) 0%, transparent 70%);
+            opacity: 0.35; margin-top: 2px;
+        }
+        .map-v3-marker-pin {
+            position: relative; z-index: 2; width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            filter: drop-shadow(0 0 4px rgba(0,0,0,0.8));
+        }
+        .map-v3-glyph { width: 28px; height: 28px; display: block; }
+        .map-v3-marker-label {
+            margin-top: 2px; font-size: 9px; font-family: 'IBM Plex Mono', monospace;
+            color: #e8e8e8; text-shadow: 0 0 4px #000, 0 0 8px #000;
+            font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
+            max-width: 88px; text-align: center; line-height: 1.15;
+        }
+        .map-v3-popup { font-family: 'IBM Plex Mono', monospace; text-transform: none; letter-spacing: 0.02em; }
+        .map-v3-popup-header {
+            padding: 8px 10px; border-left: 3px solid; background: rgba(0,0,0,0.55);
+            margin: -10px -12px 8px -12px;
+        }
+        .map-v3-popup-cat { display: block; font-size: 9px; opacity: 0.85; letter-spacing: 0.12em; }
+        .map-v3-popup-title { display: block; font-size: 13px; margin-top: 2px; color: #eee; }
+        .map-v3-popup-desc { font-size: 11px; color: #bbb; line-height: 1.45; margin: 0 0 6px; white-space: pre-wrap; }
+        .map-v3-popup-time { font-size: 9px; color: #666; border-top: 1px dotted #333; padding-top: 6px; margin-top: 6px; }
+
+        #map-tactical-hud {
+            display: none; position: absolute; top: 44px; left: 60px; right: 8px; z-index: 340;
+            gap: 6px; flex-wrap: wrap; pointer-events: none;
+        }
+        #map-tactical-hud.visible { display: flex; }
+        .map-tac-tile {
+            flex: 1; min-width: 90px; max-width: 140px;
+            background: rgba(6, 10, 6, 0.72); border: 1px solid rgba(74,246,38,0.45);
+            padding: 6px 8px; backdrop-filter: blur(6px); box-shadow: var(--neon-glow);
+        }
+        .map-tac-label { display: block; font-size: 8px; color: var(--stat-label-color); letter-spacing: 0.1em; }
+        .map-tac-value { display: block; font-size: 15px; color: var(--text-green); font-weight: 700; text-shadow: var(--text-glow); margin-top: 2px; }
+        .map-tac-sub { font-size: 9px; color: var(--dim-fg); font-weight: 400; }
+
+        #map-layers-panel {
+            display: none; position: absolute; left: 5px; bottom: 108px; z-index: 360;
+            flex-direction: column; gap: 4px;
+        }
+        #map-layers-panel.visible { display: flex; }
+        #map-layers-dropdown {
+            display: none; background: rgba(6,10,6,0.92); border: 1px solid var(--hud-border);
+            padding: 8px 10px; min-width: 160px; box-shadow: var(--neon-glow);
+            font-family: 'IBM Plex Mono', monospace; font-size: var(--text-xs);
+        }
+        #map-layers-dropdown.open { display: block; }
+        #map-layers-dropdown label {
+            display: flex; align-items: center; gap: 8px; padding: 5px 0;
+            color: var(--text-green-dim); cursor: pointer;
+        }
+        #map-layers-dropdown input { accent-color: var(--text-green); }
         .bottom-hud-wrapper.crt-surface { position: absolute; }
     </style>
 </head>
@@ -1366,7 +1454,22 @@
     <div class="hud-element left-toolbar" id="hud-left">
         <button class="tool-btn" id="btn-center-shelter" style="border-color:#0088ff; color:#0088ff;" onclick="centerMapToShelter()" title="Vycentrovat na útočiště"><div>🏠</div>ÚTULIŠTĚ</button>
         <button class="tool-btn" onclick="centerMapToUser()"><div>▲</div>CENTR.</button>
+        <button class="tool-btn" style="border-color:#e8c547;color:#e8c547;" onclick="toggleMapLayersPanel()" title="Filtr vrstev mapy"><div>◫</div>VRSTVY</button>
         <button class="tool-btn" style="border-color:var(--danger-orange); color:var(--danger-orange);" onclick="hardResetData()"><div>☠</div>RESET</button>
+    </div>
+
+    <div id="map-layers-panel">
+        <div id="map-layers-dropdown">
+            <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
+            <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
+            <label><input type="checkbox" id="map-filter-pocta" checked onchange="setMapLayerFilter('pocta', this.checked)"> Pocty</label>
+        </div>
+    </div>
+
+    <div id="map-tactical-hud" aria-hidden="true">
+        <div class="map-tac-tile"><span class="map-tac-label">AZIMUT K CÍLI</span><span class="map-tac-value" id="map-tac-azimuth">—°</span><span class="map-tac-sub" id="map-tac-azimuth-rad">— rad</span></div>
+        <div class="map-tac-tile"><span class="map-tac-label">VZDÁLENOST</span><span class="map-tac-value" id="map-tac-distance">—</span><span class="map-tac-sub" id="map-tac-walk">—</span></div>
+        <div class="map-tac-tile"><span class="map-tac-label">LUNETA</span><span class="map-tac-value" id="map-tac-bezel">0°</span><span class="map-tac-sub" id="map-tac-bezel-rad">0 rad</span></div>
     </div>
 
     <div class="hud-element" id="map-tools-bar">
@@ -1432,7 +1535,8 @@
     <div id="map-compass" aria-label="Kompas s azimutem">
         <div class="compass-housing">
             <div class="compass-north-fixed">N</div>
-            <div class="compass-bearing-arrow" id="compass-bearing-arrow" title="Směr A → B"></div>
+            <div class="compass-index-line" title="Směrník / lubber line"></div>
+            <div class="compass-bearing-arrow" id="compass-bearing-arrow" title="Azimut k vybranému cíli"></div>
             <div class="compass-rose-wrap" id="compass-rose-wrap">
                 <svg class="compass-rose" id="compass-rose" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="100" cy="100" r="96" fill="none" stroke="rgba(74,246,38,0.55)" stroke-width="1.5"/>
@@ -1705,7 +1809,7 @@
                     <p style="font-size:var(--text-xs);color:var(--dim-fg);margin:0 0 8px 0;">Pro lokální test modulu POCTA (data zůstávají v tomto prohlížeči).</p>
                     <div class="story-pos-actions">
                         <button type="button" class="btn-accept" id="terminal-sim-quest-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">✅ Simulovat odměnu z mise</button>
-                        <button type="button" class="btn-accept" id="terminal-demo-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">🕯️ Nová Pocta</button>
+                        <button type="button" class="btn-accept" id="terminal-demo-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">✝ Nová Pocta</button>
                         <button type="button" class="btn-accept" id="terminal-demo-quest" style="border-color:var(--muted-fg);color:var(--muted-fg);font-size:var(--text-xs);">❓ Nový fázovaný úkol</button>
                     </div>
                 </div>
@@ -1842,7 +1946,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718f';
+        var PATRAC_BUILD = '20260718g';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -1857,6 +1961,10 @@
         var mapMeasureLayer = null;
         var mapMarkerRegistry = {};
         var measureState = { pointA: null, pointB: null, line: null, markerA: null, markerB: null };
+        var mapV3Module = null;
+        var mapNavTarget = null;
+        var compassBezelDeg = parseFloat(localStorage.getItem('patrac_compass_bezel') || '0') || 0;
+        var mapLayerFilterState = null;
         var lastUserPosition = null;
         var _mapToolsTabActive = false;
         var QUEST_GPS_RADIUS_M = 80;
@@ -3511,9 +3619,8 @@
                 pendingPosition: null
             };
             setCommunityLaunchedQuests(launched);
+            try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
         }
-
-        function recordStoryRunCompletion(questId, lat, lng) {
             var launched = getCommunityLaunchedQuests();
             var entry = launched[questId];
             if (!entry) return;
@@ -3969,6 +4076,7 @@
             lastUserPosition = { lat: lat, lng: lng, accuracy: acc, ts: Date.now() };
             if (window.patracPoctaBridge) window.patracPoctaBridge.lastUserPosition = lastUserPosition;
             if (typeof window.patracPoctaOnGps === 'function') window.patracPoctaOnGps();
+            updateTacticalHud();
 
             setGpsStatus('● GPS LOCK <span style="color:#0077ff;">[' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ']</span>');
 
@@ -4059,6 +4167,7 @@
             if (map !== null) {
                 ensureMapPanes();
                 reloadAllMapPoints();
+                initMapV3Ui();
                 return;
             }
             try {
@@ -4087,6 +4196,7 @@
 
                 reloadAllMapPoints();
                 startGeolocation();
+                initMapV3Ui();
             } catch(e) {
                 console.error('initMap', e);
             }
@@ -4110,6 +4220,144 @@
                 });
             }
             baseTileLayer.addTo(map);
+        }
+
+        function poctaCrossIcon(size) {
+            return '<span class="pocta-cross-icon pocta-cross-' + (size || 'md') + '" aria-hidden="true"></span>';
+        }
+
+        function initMapV3Ui() {
+            import('./src/map/mapV3.js').then(function(m) {
+                mapV3Module = m;
+                mapLayerFilterState = m.loadMapLayerFilter();
+                syncMapLayerFilterCheckboxes();
+            }).catch(function(e) { console.warn('mapV3', e); });
+            initCompassBezelDrag();
+        }
+
+        function getMapLayerFilter() {
+            if (mapLayerFilterState) return mapLayerFilterState;
+            if (mapV3Module) return mapV3Module.loadMapLayerFilter();
+            return { permanent: true, custom: true, pocta: true };
+        }
+
+        function setMapLayerFilter(key, on) {
+            var f = getMapLayerFilter();
+            f[key] = !!on;
+            mapLayerFilterState = f;
+            if (mapV3Module) mapV3Module.saveMapLayerFilter(f);
+            else import('./src/map/mapV3.js').then(function(m) { m.saveMapLayerFilter(f); });
+            reloadAllMapPoints();
+        }
+
+        function syncMapLayerFilterCheckboxes() {
+            var f = getMapLayerFilter();
+            var p = document.getElementById('map-filter-permanent');
+            var c = document.getElementById('map-filter-custom');
+            var o = document.getElementById('map-filter-pocta');
+            if (p) p.checked = f.permanent;
+            if (c) c.checked = f.custom;
+            if (o) o.checked = f.pocta;
+        }
+
+        function toggleMapLayersPanel() {
+            var drop = document.getElementById('map-layers-dropdown');
+            if (drop) drop.classList.toggle('open');
+        }
+
+        function getMapPointCategory(meta) {
+            var id = meta.id || '';
+            if (gameQuests[id]) return 'permanent';
+            if (meta.isPoi || id.indexOf('poi_') === 0) return 'custom';
+            if (id.indexOf('pocta_ent_') === 0 || id.indexOf('cquest_ent_') === 0) return 'pocta';
+            if (id.indexOf('custom_') === 0 || id.indexOf('random_') === 0) return 'permanent';
+            return 'custom';
+        }
+
+        function isActiveQuestAtPoint(id) {
+            if (gameQuests[id]) {
+                var q = getQuestWithReq(gameQuests[id]);
+                if (!q || isQuestCompleted(q) || isQuestDismissed(id)) return false;
+                if (isPlayerCompletedCurrentRun(id)) return false;
+                return localStorage.getItem('unlocked_story_' + id) === 'true' || isQuestLaunchedCommunityWide(id);
+            }
+            var q2 = getQuestById(id);
+            if (q2 && (id.indexOf('custom_') === 0 || isRandomQuestId(id))) {
+                return isQuestActive(q2);
+            }
+            return false;
+        }
+
+        function setMapNavTarget(lat, lng, label) {
+            mapNavTarget = { lat: lat, lng: lng, label: label || 'Cíl' };
+            updateTacticalHud();
+            updateCompassReadout();
+        }
+        window.setMapNavTarget = setMapNavTarget;
+        window.getMapLayerFilter = getMapLayerFilter;
+
+        function updateTacticalHud() {
+            var hud = document.getElementById('map-tactical-hud');
+            if (!hud) return;
+            var show = _mapToolsTabActive && !isMapOverlayOpen();
+            hud.classList.toggle('visible', show);
+            var azEl = document.getElementById('map-tac-azimuth');
+            var azRad = document.getElementById('map-tac-azimuth-rad');
+            var distEl = document.getElementById('map-tac-distance');
+            var walkEl = document.getElementById('map-tac-walk');
+            var bezEl = document.getElementById('map-tac-bezel');
+            var bezRad = document.getElementById('map-tac-bezel-rad');
+            var bez = normalizeDeg(compassBezelDeg);
+            if (bezEl) bezEl.textContent = bez.toFixed(0) + '°';
+            if (bezRad) bezRad.textContent = (bez * Math.PI / 180).toFixed(3) + ' rad';
+            if (!lastUserPosition || !mapNavTarget) {
+                if (azEl) azEl.textContent = '—°';
+                if (azRad) azRad.textContent = '— rad';
+                if (distEl) distEl.textContent = '—';
+                if (walkEl) walkEl.textContent = 'Vyber bod na mapě';
+                return;
+            }
+            var brng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
+            var distM = distanceMeters(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
+            if (azEl) azEl.textContent = brng.toFixed(0) + '°';
+            if (azRad) azRad.textContent = (brng * Math.PI / 180).toFixed(3) + ' rad';
+            if (distEl) distEl.textContent = distM < 1000 ? Math.round(distM) + ' m' : (distM / 1000).toFixed(2) + ' km';
+            if (walkEl) walkEl.textContent = 'cca ' + Math.max(1, Math.round(distM / 70)) + ' min chůze';
+        }
+
+        function applyCompassBezelRotation() {
+            var rose = document.getElementById('compass-rose');
+            if (rose) rose.style.transform = 'rotate(' + compassBezelDeg + 'deg)';
+        }
+
+        function initCompassBezelDrag() {
+            var wrap = document.getElementById('compass-rose-wrap');
+            if (!wrap || wrap._bezelBound) return;
+            wrap._bezelBound = true;
+            var dragging = false;
+            function angleFromEvent(e) {
+                var rect = wrap.getBoundingClientRect();
+                var cx = (e.touches ? e.touches[0].clientX : e.clientX) - (rect.left + rect.width / 2);
+                var cy = (e.touches ? e.touches[0].clientY : e.clientY) - (rect.top + rect.height / 2);
+                return normalizeDeg(Math.atan2(cx, -cy) * 180 / Math.PI);
+            }
+            function onStart(e) { dragging = true; e.preventDefault(); }
+            function onMove(e) {
+                if (!dragging) return;
+                compassBezelDeg = angleFromEvent(e);
+                applyCompassBezelRotation();
+                try { localStorage.setItem('patrac_compass_bezel', String(compassBezelDeg)); } catch (err) {}
+                updateTacticalHud();
+                updateCompassReadout();
+            }
+            function onEnd() { dragging = false; }
+            wrap.addEventListener('mousedown', onStart);
+            wrap.addEventListener('touchstart', onStart, { passive: false });
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('touchmove', onMove, { passive: false });
+            document.addEventListener('mouseup', onEnd);
+            document.addEventListener('touchend', onEnd);
+            applyCompassBezelRotation();
         }
 
         function buildMapLabelHtml(meta) {
@@ -4154,6 +4402,33 @@
 
         function buildMapPopupHtml(meta) {
             var faded = meta.isCompleted && !meta.isStoryQuest;
+            var category = getMapPointCategory(meta);
+            var title = meta.mapLabel || 'Bod';
+            var desc = meta.isPoi ? (meta.poiNote || '') : (meta.popupDesc || '');
+            if (mapV3Module) {
+                var extra = '';
+                if (meta.isPoi) {
+                    if (meta.poiImg) extra += '<img class="poi-popup-img" src="' + meta.poiImg + '" alt="">';
+                    extra += '<button type="button" class="map-popup-edit" onclick="openPoiEditor(\'' + meta.id + '\')">📝 UPRAVIT</button>';
+                    extra += '<button type="button" class="map-popup-reset" onclick="deleteMapPoi(\'' + meta.id + '\')">🗑️ SMAZAT</button>';
+                } else {
+                    if (faded) extra += '<p class="popup-meta popup-inactive-tag">⏸ Neaktivní · mise splněna</p>';
+                    if (meta.isStoryQuest) {
+                        if (meta.communityImg) extra += '<img class="poi-popup-img" src="' + meta.communityImg + '" alt="">';
+                        if (meta.communityNote) extra += '<p class="popup-desc popup-community-note"><strong>📢 Komunita:</strong> ' + meta.communityNote + '</p>';
+                        extra += '<button type="button" class="map-popup-edit" onclick="openStoryPosEditor(\'' + meta.id + '\')">📝 POPIS KOMUNITY</button>';
+                        if (meta.canReset) extra += '<button type="button" class="map-popup-reset" onclick="resetStoryQuestPosition(\'' + meta.id + '\')">↺ RESET</button>';
+                    }
+                    if (meta.reqLine) extra += '<div class="popup-meta">🎒 Potřeba: ' + meta.reqLine + '</div>';
+                }
+                return mapV3Module.buildTacticalPopupHtml({
+                    category: category,
+                    storyId: gameQuests[meta.id] ? meta.id : null,
+                    title: title,
+                    desc: desc,
+                    extraHtml: extra
+                });
+            }
             var html = '<div class="map-popup-body' + (faded ? ' map-popup-inactive' : '') + '">';
             if (meta.isPoi) {
                 if (meta.poiImg) {
@@ -4738,30 +5013,68 @@
                 mapPointsLayer.removeLayer(mapMarkerRegistry[id]);
             }
             var faded = meta.isCompleted && !meta.isStoryQuest;
-            var neonColor = faded ? '#5a6858' : getMapPointColor(id);
-            var shortLabel = buildMapLabelHtml(meta);
+            var category = getMapPointCategory(meta);
+            var storyId = gameQuests[id] ? id : null;
+            var activeQuest = !faded && isActiveQuestAtPoint(id);
+            var filter = getMapLayerFilter();
+            var dimmed = !filter[category];
+            var color = getMapPointColor(id);
             var popupHtml = buildMapPopupHtml(meta);
-            var tooltipClass = 'map-point-label' + (faded ? ' map-point-inactive' : '');
+            var label = meta.mapLabel || 'Bod';
 
-            var pointMarker = L.circleMarker([meta.lat, meta.lng], {
-                radius: faded ? 7 : 9,
-                color: neonColor,
-                weight: faded ? 2 : 3,
-                fillColor: neonColor,
-                fillOpacity: faded ? 0.12 : 0.35,
-                pane: 'mapPointsPane'
-            }).addTo(mapPointsLayer);
+            function attachMarker(pointMarker) {
+                pointMarker.bindPopup(popupHtml, { maxWidth: 280, minWidth: 200, className: 'map-v3-leaflet-popup' });
+                pointMarker.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    document.getElementById('map-sensor-output').innerHTML = '📡 ' + label;
+                    setMapNavTarget(meta.lat, meta.lng, label);
+                    pointMarker.openPopup();
+                });
+                mapMarkerRegistry[id] = pointMarker;
+            }
 
-            pointMarker.bindTooltip(shortLabel, {
-                permanent: true, direction: 'top', className: tooltipClass, offset: [0, -10], opacity: faded ? 0.65 : 0.95
+            if (mapV3Module && window.L) {
+                var html = mapV3Module.buildMapMarkerHtml({
+                    id: id,
+                    mapLabel: label,
+                    category: category,
+                    storyId: storyId,
+                    activeQuest: activeQuest,
+                    color: color,
+                    dimmed: dimmed
+                });
+                var icon = L.divIcon({
+                    className: 'map-v3-divicon',
+                    html: html,
+                    iconSize: [88, 52],
+                    iconAnchor: [44, 26],
+                    popupAnchor: [0, -22]
+                });
+                attachMarker(L.marker([meta.lat, meta.lng], { icon: icon, pane: 'mapPointsPane' }).addTo(mapPointsLayer));
+                return;
+            }
+
+            import('./src/map/mapV3.js').then(function(m) {
+                mapV3Module = m;
+                renderMapPointFromMeta(meta);
+            }).catch(function() {
+                var neonColor = faded ? '#5a6858' : color;
+                var shortLabel = buildMapLabelHtml(meta);
+                var tooltipClass = 'map-point-label' + (faded ? ' map-point-inactive' : '');
+                var pointMarker = L.circleMarker([meta.lat, meta.lng], {
+                    radius: faded ? 7 : 9,
+                    color: neonColor,
+                    weight: faded ? 2 : 3,
+                    fillColor: neonColor,
+                    fillOpacity: dimmed ? 0.08 : (faded ? 0.12 : 0.35),
+                    pane: 'mapPointsPane',
+                    opacity: dimmed ? 0.4 : 1
+                }).addTo(mapPointsLayer);
+                pointMarker.bindTooltip(shortLabel, {
+                    permanent: true, direction: 'top', className: tooltipClass, offset: [0, -10], opacity: dimmed ? 0.4 : 0.95
+                });
+                attachMarker(pointMarker);
             });
-            pointMarker.bindPopup(popupHtml, { maxWidth: 220, minWidth: 160 });
-            pointMarker.on('click', function(e) {
-                L.DomEvent.stopPropagation(e);
-                document.getElementById('map-sensor-output').innerHTML = '📡 ' + meta.mapLabel;
-                pointMarker.openPopup();
-            });
-            mapMarkerRegistry[id] = pointMarker;
         }
 
         function getMapPointColor(type) {
@@ -4952,7 +5265,7 @@
                 var msg = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Rank zapsán tobě.';
                 msg += '\n\n📍 Poloha zaznamenána. Trvalý bod na mapě se aktualizuje po vypršení lhůty (pokud alespoň jeden hráč potvrdí).';
                 if (poctaReward) {
-                    msg += '\n\n🕯️ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
+                    msg += '\n\n✝ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
                 }
                 alert(msg);
                 return;
@@ -4962,7 +5275,7 @@
             poctaReward = finalizeQuestComplete(q);
             var msg2 = '✅ Mise „' + (q.title || getQuestMapLabel(q)) + '“ splněna. Rank a odměna jsou zapsány tobě.';
             if (poctaReward) {
-                msg2 += '\n\n🕯️ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
+                msg2 += '\n\n✝ Komunita získala Poctu: „' + poctaReward.title + '“\nKód: ' + poctaReward.code + '\n→ Inventář komunity (neaktivovaná).';
             }
             alert(msg2);
         }
@@ -5000,21 +5313,40 @@
             var arrow = document.getElementById('compass-bearing-arrow');
             if (!el) return;
 
-            var brng = getMeasureBearing();
-            if (brng !== null) {
-                var rad = brng * Math.PI / 180;
+            var bez = normalizeDeg(compassBezelDeg);
+            var bezRad = bez * Math.PI / 180;
+            var targetBrng = null;
+            if (lastUserPosition && mapNavTarget) {
+                targetBrng = bearingDegrees(lastUserPosition.lat, lastUserPosition.lng, mapNavTarget.lat, mapNavTarget.lng);
+            }
+            var measureBrng = getMeasureBearing();
+
+            if (targetBrng !== null) {
                 el.innerHTML =
-                    '<div class="az-deg">Azimut A→B: ' + brng.toFixed(1) + '°</div>' +
-                    '<div class="az-rad">' + rad.toFixed(3) + ' rad</div>' +
-                    '<div style="margin-top:4px;font-size:var(--text-xs);font-weight:400;">Sever mapy nahoře · směr trasy zelenou šipkou</div>';
+                    '<div class="az-deg">Cíl: ' + targetBrng.toFixed(1) + '°</div>' +
+                    '<div class="az-rad">' + (targetBrng * Math.PI / 180).toFixed(3) + ' rad</div>' +
+                    '<div style="margin-top:4px;font-size:var(--text-xs);font-weight:400;">Luneta: ' + bez.toFixed(1) + '° · otáčej lunetou</div>';
                 if (arrow) {
                     arrow.classList.add('visible');
-                    arrow.style.transform = 'rotate(' + brng + 'deg)';
+                    arrow.style.transform = 'rotate(' + targetBrng + 'deg)';
+                }
+            } else if (measureBrng !== null) {
+                el.innerHTML =
+                    '<div class="az-deg">Azimut A→B: ' + measureBrng.toFixed(1) + '°</div>' +
+                    '<div class="az-rad">' + (measureBrng * Math.PI / 180).toFixed(3) + ' rad</div>' +
+                    '<div style="margin-top:4px;font-size:var(--text-xs);font-weight:400;">Luneta: ' + bez.toFixed(1) + '°</div>';
+                if (arrow) {
+                    arrow.classList.add('visible');
+                    arrow.style.transform = 'rotate(' + measureBrng + 'deg)';
                 }
             } else {
                 if (arrow) arrow.classList.remove('visible');
-                el.innerHTML = 'Nahoře = sever mapy<br><span style="font-weight:400;font-size:var(--text-xs);">Nastav body A a B pro azimut</span>';
+                el.innerHTML =
+                    '<div class="az-deg">Luneta: ' + bez.toFixed(1) + '°</div>' +
+                    '<div class="az-rad">' + bezRad.toFixed(3) + ' rad</div>' +
+                    '<span style="font-weight:400;font-size:var(--text-xs);">N = sever · otáčej lunetou</span>';
             }
+            updateTacticalHud();
         }
 
         function getMapCenterCoords() {
@@ -5051,7 +5383,12 @@
             if (bar) bar.style.display = show ? 'flex' : 'none';
             var shelterBtn = document.getElementById('btn-center-shelter');
             if (shelterBtn) shelterBtn.style.display = show ? 'flex' : 'none';
+            var layersPanel = document.getElementById('map-layers-panel');
+            if (layersPanel) layersPanel.classList.toggle('visible', show);
+            var layersDrop = document.getElementById('map-layers-dropdown');
+            if (layersDrop && !show) layersDrop.classList.remove('open');
             updateMapCompassDisplay();
+            updateTacticalHud();
         }
 
         function isMeasurePanelOpen() {
@@ -7933,6 +8270,7 @@
 
             localStorage.setItem('unlocked_story_' + q.id, 'true');
             renderQuestList();
+            reloadAllMapPoints();
             syncPlayerQuestProgressToCloud();
         }
 
@@ -7973,7 +8311,7 @@
             switchMainTab('tasks', document.querySelectorAll('.bottom-action-bar button')[1]);
             var msg = "📍 Cíl zaměřen (admin)! Mise zapsána do profilu. Odměna v inventáři.";
             if (poctaReward) {
-                msg += '\n\n🕯️ Pocta: „' + poctaReward.title + '“ → inventář komunity.';
+                msg += '\n\n✝ Pocta: „' + poctaReward.title + '“ → inventář komunity.';
             }
             alert(msg);
         }
@@ -8188,7 +8526,7 @@
             }
             if (item.itemType === 'pocta') {
                 var phaseLabel = item.poctaPhase === 'anchored' ? 'Ukotvená' : 'Neaktivovaná';
-                return '<div class="item-rank-summary" style="color:#e8c547;">🕯️ Pocta · ' + phaseLabel + '</div>';
+                return '<div class="item-rank-summary" style="color:#e8c547;">' + poctaCrossIcon('sm') + ' Pocta · ' + phaseLabel + '</div>';
             }
             var rank = getTalismanStatusDisplay(item);
             if (!rank) return '';
@@ -8198,7 +8536,7 @@
         function getItemDetailHtml(item) {
             var html = '';
             if (item.itemType === 'pocta') {
-                html += '<div class="item-type-badge" style="margin-top:0;border-color:#e8c547;color:#e8c547;">🕯️ POCTA — příběhový artefakt komunity</div>';
+                html += '<div class="item-type-badge" style="margin-top:0;border-color:#e8c547;color:#e8c547;">' + poctaCrossIcon('sm') + ' POCTA — příběhový artefakt komunity</div>';
                 html += '<div class="item-meta-info" style="color:#e8c547;">Terminálový kód: <strong style="letter-spacing:0.12em;">' + (item.poctaCode || '—') + '</strong></div>';
                 html += '<div class="item-meta-info">Fáze: ' + (item.poctaPhase === 'anchored' ? 'Ukotvená na mapě' : 'Neaktivovaná — čeká na ukotvení v terénu (GPS)') + '</div>';
                 if (item.lore) {
@@ -8279,7 +8617,7 @@
                     var imgHtml = item.img ? '<img src="' + item.img + '">' : '📦';
                     var blueprintWatermark = (item.locked && item.itemType !== 'tool') ? '<div class="blueprint-alert">PROTOTYP<br>PLÁN</div>' : '';
                     if (item.itemType === 'pocta') {
-                        imgHtml = '<span style="font-size:var(--text-icon-lg);line-height:42px;display:block;text-align:center;">🕯️</span>';
+                        imgHtml = poctaCrossIcon('md');
                         blueprintWatermark = '<div class="blueprint-alert" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xxs);">POCTA<br>NEAKT.</div>';
                     }
                     var rankSummary = getItemRankSummaryHtml(item);

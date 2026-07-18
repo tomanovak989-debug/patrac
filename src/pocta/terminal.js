@@ -165,7 +165,7 @@ export function bindTerminalUi(ctx) {
                     msgEl.dataset.sticky = '1';
                 }
                 alert(entity
-                    ? '🕯️ Pocta „' + entity.title + '“ je ve skladu komunity.\nKód: ' + entity.code + '\n\n→ 🎒 Inventář → UKOTVIT NA GPS'
+                    ? '✝ Pocta „' + entity.title + '“ je ve skladu komunity.\nKód: ' + entity.code + '\n\n→ 🎒 Inventář → UKOTVIT NA GPS'
                     : 'Nepodařilo se vytvořit Poctu.');
             });
         });
@@ -186,7 +186,7 @@ export function bindTerminalUi(ctx) {
                 msgEl.textContent = 'Simulace mise → Pocta v inventáři komunity. Kód: ' + entity.code;
                 msgEl.dataset.sticky = '1';
             }
-            alert('✅ Simulace splnění mise.\n\n🕯️ Komunita získala: „' + entity.title + '“\nKód: ' + entity.code + '\n\n→ 🎒 Inventář komunity');
+            alert('✅ Simulace splnění mise.\n\n✝ Komunita získala: „' + entity.title + '“\nKód: ' + entity.code + '\n\n→ 🎒 Inventář komunity');
         });
     }
 
