@@ -1437,11 +1437,12 @@
         }
         .mgrs-grid-e span { transform: translate(-50%, -4px); }
         .mgrs-grid-n span { transform: translate(4px, -50%); }
-        .mgrs-grid-zone span {
+        .mgrs-grid-square span {
             font-size: 9px;
             font-weight: 700;
-            transform: translate(-50%, -50%);
+            transform: translate(4px, 4px);
             color: var(--text-green);
+            border-color: rgba(74,246,38,0.55);
         }
 
         /* Smírčí kříž (Pocta) */
@@ -1553,6 +1554,15 @@
             color: var(--text-green-dim); cursor: pointer;
         }
         #map-layers-dropdown input { accent-color: var(--text-green); }
+        #map-layers-dropdown .mgrs-acc-row {
+            flex-direction: column; align-items: flex-start; gap: 4px;
+            padding-top: 8px; border-top: 1px dotted rgba(74,246,38,0.25);
+        }
+        #map-layers-dropdown .mgrs-acc-row select {
+            width: 100%; background: rgba(6,10,6,0.92); border: 1px solid var(--hud-border);
+            color: var(--text-green); font-family: inherit; font-size: var(--text-xs); padding: 4px;
+        }
+        .map-tac-tile-mgrs .map-tac-value { font-size: 11px; letter-spacing: 0.04em; line-height: 1.25; }
         .bottom-hud-wrapper.crt-surface { position: absolute; }
     </style>
 </head>
@@ -1937,10 +1947,20 @@
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
             <label><input type="checkbox" id="map-filter-pocta" checked onchange="setMapLayerFilter('pocta', this.checked)"> Pocty</label>
             <label><input type="checkbox" id="map-filter-mgrs" checked onchange="patracToggleMgrsGrid(this.checked)"> MGRS mřížka 1 km</label>
+            <label class="mgrs-acc-row">Přesnost MGRS:
+                <select id="map-mgrs-accuracy" onchange="patracSetMgrsAccuracy(this.value)">
+                    <option value="5">1 m (10 číslic)</option>
+                    <option value="4">10 m (8 číslic)</option>
+                    <option value="3" selected>100 m (6 číslic)</option>
+                    <option value="2">1 km (4 číslice)</option>
+                    <option value="1">10 km (2 číslice)</option>
+                </select>
+            </label>
         </div>
     </div>
 
     <div id="map-tactical-hud" aria-hidden="true">
+        <div class="map-tac-tile map-tac-tile-mgrs"><span class="map-tac-label">MGRS NATO</span><span class="map-tac-value" id="map-tac-mgrs">—</span><span class="map-tac-sub" id="map-tac-mgrs-sub">střed mapy · 100 m</span></div>
         <div class="map-tac-tile"><span class="map-tac-label">AZIMUT K CÍLI</span><span class="map-tac-value" id="map-tac-azimuth">—°</span><span class="map-tac-sub" id="map-tac-azimuth-rad"></span></div>
         <div class="map-tac-tile"><span class="map-tac-label">VZDÁLENOST</span><span class="map-tac-value" id="map-tac-distance">—</span><span class="map-tac-sub" id="map-tac-walk">—</span></div>
         <div class="map-tac-tile map-tac-tile-bezel"><span class="map-tac-label">LUNETA</span><span class="map-tac-value" id="map-tac-bezel">0°</span><span class="map-tac-sub" id="map-tac-bezel-rad"></span></div>
@@ -2382,7 +2402,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718v';
+        var PATRAC_BUILD = '20260718w';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4916,6 +4936,7 @@
             import('./src/map/mgrsGrid.js?v=' + PATRAC_BUILD).then(function(mod) {
                 mgrsGridMod = mod;
                 mod.initMgrsGrid(map);
+                if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
             }).catch(function(err) { console.warn('[mgrsGrid]', err); });
         }
 
@@ -4925,6 +4946,42 @@
                 return;
             }
             try { localStorage.setItem('patrac_mgrs_grid_visible', on ? 'true' : 'false'); } catch (e) {}
+        };
+
+        window.patracSetMgrsAccuracy = function(val) {
+            if (mgrsGridMod) mgrsGridMod.setMgrsAccuracy(val);
+            patracUpdateMgrsReadout();
+        };
+
+        window.patracUpdateMgrsReadout = function() {
+            if (!mgrsGridMod || !_mapToolsTabActive || isMapOverlayOpen()) return;
+            var mgrsEl = document.getElementById('map-tac-mgrs');
+            var subEl = document.getElementById('map-tac-mgrs-sub');
+            if (!mgrsEl) return;
+            var lat = null;
+            var lng = null;
+            var src = 'střed mapy';
+            if (topoRulerMod) {
+                var tr = topoRulerMod.getTopoRulerState();
+                if (tr && tr.anchored && tr.anchor) {
+                    lat = tr.anchor.lat;
+                    lng = tr.anchor.lng;
+                    src = 'ukotvené pravítko';
+                }
+            }
+            if (lat == null && map) {
+                var c = map.getCenter();
+                lat = c.lat;
+                lng = c.lng;
+            }
+            if (lat == null) {
+                mgrsEl.textContent = '—';
+                if (subEl) subEl.textContent = '';
+                return;
+            }
+            var acc = mgrsGridMod.getMgrsAccuracy ? mgrsGridMod.getMgrsAccuracy() : 3;
+            mgrsEl.textContent = mgrsGridMod.mgrsAtLatLng(lat, lng, acc);
+            if (subEl) subEl.textContent = src + ' · ' + mgrsGridMod.mgrsPrecisionText(acc);
         };
 
         function initTopoRulerModule() {
@@ -4975,6 +5032,7 @@
             var bezEl = document.getElementById('map-tac-bezel');
             var bez = normalizeDeg(compassBezelDeg);
             if (bezEl) bezEl.textContent = bez.toFixed(0) + '°';
+            if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
             if (!lastUserPosition || !mapNavTarget) {
                 if (azEl) azEl.textContent = '—°';
                 if (distEl) distEl.textContent = '—';

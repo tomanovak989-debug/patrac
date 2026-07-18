@@ -2,6 +2,8 @@
  * Topografické pravítko — NATO GTA, průhledné, zelené; trasa, body, ukládání.
  */
 
+import { formatMgrs, latLngToMgrs } from './mgrsCoords.js';
+
 var _deps = null;
 var _layer = null;
 var _bound = false;
@@ -341,9 +343,13 @@ function updateRulerPlateVisual() {
         var mpp = metersPerPixel();
         var map = getMap();
         var zoom = map ? map.getZoom() : 0;
-        scaleEl.textContent = '1:' + state.mapScale + ' · zoom ' + zoom +
-            ' · 1 km ≈ ' + Math.round(1000 / mpp) + ' px' +
-            (state.anchored ? ' · měřítko synchroniz.' : '');
+        var lines = ['1:' + state.mapScale + ' · zoom ' + zoom + ' · 1 km ≈ ' + Math.round(1000 / mpp) + ' px'];
+        if (state.anchored && state.anchor) {
+            try {
+                lines.push(formatMgrs(latLngToMgrs(state.anchor.lat, state.anchor.lng, 3)));
+            } catch (e) {}
+        }
+        scaleEl.textContent = lines.join(' · ');
     }
 }
 
@@ -352,6 +358,9 @@ function renderAll() {
     renderRouteOnMap();
     if (_deps.onUiUpdate) _deps.onUiUpdate();
     if (_deps.refreshMgrsGrid) _deps.refreshMgrsGrid();
+    if (typeof window !== 'undefined' && typeof window.patracUpdateMgrsReadout === 'function') {
+        window.patracUpdateMgrsReadout();
+    }
 }
 
 function persistState() {
