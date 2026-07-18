@@ -1246,6 +1246,7 @@
 
             <div id="gate-register" class="gate-panel">
                 <p class="gate-register-title" data-i18n="gate.register.title">Nový pátrač — registrace</p>
+                <div id="gate-register-error" class="gate-error"></div>
                 <div class="gate-form-group">
                     <label for="input-gate-user-id" data-i18n="gate.register.userIdLabel">Uživatelské ID</label>
                     <input type="text" id="input-gate-user-id" data-i18n-placeholder="gate.register.userIdPlaceholder" placeholder="identifikátor pro přihlášení" autocomplete="username">
@@ -1300,7 +1301,6 @@
                 <div style="display:flex; justify-content:center; margin: 8px 0 12px;">
                     <div class="avatar-box" id="avatar-setup-preview" style="border-color:#333; color:var(--panel-subtle); box-shadow:none;">NO DATA</div>
                 </div>
-                <div id="gate-register-error" class="gate-error"></div>
                 <button type="button" class="gate-btn-primary" id="btn-register-submit" onclick="saveProfileAndLaunch()" data-i18n="gate.register.submit">ZALOŽIT A VSTOUPIT</button>
                 <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-login')" data-i18n="gate.register.back">← ZPĚT NA PŘIHLÁŠENÍ</button>
             </div>
@@ -1842,7 +1842,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718a';
+        var PATRAC_BUILD = '20260718b';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6535,6 +6535,9 @@
                     }
                     return normalizeEmail(cloud.email) === normalizeEmail(email);
                 });
+            }).catch(function(err) {
+                console.warn('[register] email cloud verify', err);
+                return false;
             });
         }
 
@@ -7329,6 +7332,7 @@
             try {
             try { migratePatracAccountsStorage(); } catch (migrateErr) { console.warn(migrateErr); }
             hideGateError('gate-register-error');
+            var submitBtnStart = document.getElementById('btn-register-submit');
             var userId = normalizePatracId(document.getElementById('input-gate-user-id').value);
             var email = normalizeEmail(document.getElementById('input-gate-email').value);
             var pass = document.getElementById('input-gate-password').value;
@@ -7341,16 +7345,23 @@
                 showGateError('gate-register-error', 'gate.errors.registerMissingId');
                 return;
             }
+            var regIdErr = validatePatracUserIdInput(userId, 'gate-register-error');
+            if (regIdErr) {
+                showGateError('gate-register-error', regIdErr);
+                return;
+            }
             if (!isValidEmail(email)) {
                 showGateError('gate-register-error', 'gate.errors.registerBadEmail');
                 return;
             }
             if (pass.length < 6) {
                 showGateError('gate-register-error', 'gate.errors.registerShortPass');
+                if (submitBtnStart) { submitBtnStart.disabled = false; submitBtnStart.textContent = 'ZALOŽIT A VSTOUPIT'; }
                 return;
             }
             if (pass !== pass2) {
                 showGateError('gate-register-error', 'gate.errors.registerPassMismatch');
+                if (submitBtnStart) { submitBtnStart.disabled = false; submitBtnStart.textContent = 'ZALOŽIT A VSTOUPIT'; }
                 return;
             }
             if (!playerName) {
@@ -7358,12 +7369,15 @@
                 return;
             }
 
+            if (submitBtnStart) { submitBtnStart.disabled = true; submitBtnStart.textContent = 'ZPRACOVÁVÁM…'; }
+
             var comName = '';
             var comCode = '';
             if (comMode === 'create') {
                 comName = document.getElementById('input-com-name').value.trim();
                 if (!comName) {
                     showGateError('gate-register-error', 'gate.errors.registerMissingComName');
+                    if (submitBtnStart) { submitBtnStart.disabled = false; submitBtnStart.textContent = 'ZALOŽIT A VSTOUPIT'; }
                     return;
                 }
                 continueRegisterAfterCommunityCheck(comName, comCode, comMode, userId, email, pass, playerName);
@@ -7371,9 +7385,10 @@
                 comCode = (document.getElementById('input-com-code').value || '').trim().toUpperCase();
                 if (comCode.length !== 5) {
                     showGateError('gate-register-error', 'gate.errors.registerBadComCode');
+                    if (submitBtnStart) { submitBtnStart.disabled = false; submitBtnStart.textContent = 'ZALOŽIT A VSTOUPIT'; }
                     return;
                 }
-                var submitBtnEarly = document.getElementById('btn-register-submit');
+                var submitBtnEarly = submitBtnStart;
                 if (submitBtnEarly) { submitBtnEarly.disabled = true; submitBtnEarly.textContent = 'OVĚŘUJI KOMUNITU…'; }
                 findCommunityByCodeWithCloud(comCode).then(function(existingComm) {
                     if (!existingComm) {
@@ -7393,6 +7408,12 @@
                 var btn = document.getElementById('btn-register-submit');
                 if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
             }
+        }
+
+        function registerSubmitFail(msgOrKey, opts) {
+            showGateError('gate-register-error', msgOrKey, opts);
+            var btn = document.getElementById('btn-register-submit');
+            if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
         }
 
         function continueRegisterAfterCommunityCheck(comName, comCode, comMode, userId, email, pass, playerName) {
@@ -7415,6 +7436,77 @@
             });
         }
 
+        function completeRegisterAfterAuth(comName, comCode, comMode, userId, email, pass, playerName) {
+            var accounts = getPatracAccounts();
+            var playerCode = generatePatracCode();
+            if (comMode === 'create') {
+                comCode = registerPatracCommunity(comName, userId);
+            } else {
+                addMemberToCommunity(comCode, userId);
+            }
+
+            var profile = getPlayerProfile();
+            profile.currentClan = comName;
+            savePlayerProfile(profile);
+
+            var descText = document.getElementById('input-desc').value.trim();
+            accounts[userId] = slimPatracAccount({
+                pass: pass,
+                email: email,
+                comName: comName,
+                comCode: comCode,
+                playerName: playerName,
+                playerCode: playerCode
+            });
+            savePatracAccounts(accounts);
+            saveUserDesc(userId, descText);
+            var avatarSaved = true;
+            if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
+            applyAccountToLocalStorage(userId);
+            setUserPersonalItemsLocal(userId, []);
+            saveUserProfileData(userId, createDefaultUserProfileData(userId));
+
+            try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
+
+            var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
+            if (comMode === 'create') {
+                msg += '\nKód komunity: ' + comCode + '\n(Sdílej ho s dalšími pátrači pro připojení.)';
+            } else {
+                msg += '\nPřipojeno ke komunitě: ' + comName + ' [' + comCode + ']';
+            }
+            if (base64Avatar && !avatarSaved) {
+                msg += '\n\n(Poznámka: avatar se nevešel do úložiště — účet funguje bez fotky.)';
+            }
+            isOperatorMode = false;
+            operatorComCode = '';
+            currentlyEditingPlayerId = null;
+            operatorEditDraft = null;
+            operatorEditDirty = false;
+
+            return import('./src/services/playerService.js').then(function(mod) {
+                return mod.syncPlayerFromLocalStorage(userId);
+            }).then(function() {
+                alert(msg);
+                launchGame();
+            });
+        }
+
+        function runRegisterAuthFlow(comName, comCode, comMode, userId, email, pass, playerName, submitBtn) {
+            if (submitBtn) submitBtn.textContent = 'ZPRACOVÁVÁM…';
+            return importAuthService().then(function(authMod) {
+                return authMod.registerPatracAuth(userId, pass, email);
+            }).then(function() {
+                return completeRegisterAfterAuth(comName, comCode, comMode, userId, email, pass, playerName);
+            }).catch(function(err) {
+                console.warn('[auth] register', err);
+                var errMsg = err.message || 'Registrace selhala.';
+                if (err && err.code === 'auth/email-already-in-use') {
+                    errMsg = 'E-mail je ve Firebase obsazený — smaž ho v Authentication, nebo použij jiný.';
+                }
+                registerSubmitFail(errMsg);
+            });
+        }
+
         function finishRegisterAfterCloudCheck(comName, comCode, comMode, userId, email, pass, playerName) {
             try {
             var accounts = getPatracAccounts();
@@ -7428,85 +7520,17 @@
 
             isEmailTakenForRegister(email, userId).then(function(emailTaken) {
                 if (emailTaken) {
-                    showGateError('gate-register-error', 'gate.errors.registerEmailTaken');
-                    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                    registerSubmitFail('gate.errors.registerEmailTaken');
                     return;
                 }
-                if (submitBtn) submitBtn.textContent = 'ZPRACOVÁVÁM…';
-                accounts = getPatracAccounts();
-
-            importAuthService().then(function(authMod) {
-                return authMod.registerPatracAuth(userId, pass, email);
-            }).then(function() {
-                var playerCode = generatePatracCode();
-                if (comMode === 'create') {
-                    comCode = registerPatracCommunity(comName, userId);
-                } else {
-                    addMemberToCommunity(comCode, userId);
-                }
-
-                var profile = getPlayerProfile();
-                profile.currentClan = comName;
-                savePlayerProfile(profile);
-
-                var descText = document.getElementById('input-desc').value.trim();
-                accounts[userId] = slimPatracAccount({
-                    pass: pass,
-                    email: email,
-                    comName: comName,
-                    comCode: comCode,
-                    playerName: playerName,
-                    playerCode: playerCode
-                });
-                savePatracAccounts(accounts);
-                saveUserDesc(userId, descText);
-                var avatarSaved = true;
-                if (base64Avatar) avatarSaved = saveUserAvatar(userId, base64Avatar);
-                applyAccountToLocalStorage(userId);
-                setUserPersonalItemsLocal(userId, []);
-                saveUserProfileData(userId, createDefaultUserProfileData(userId));
-
-                try { sessionStorage.setItem('patrac_fresh_register', '1'); } catch (e) {}
-
-                var msg = 'Registrace dokončena.\n\nKód operativce: ' + playerCode;
-                if (comMode === 'create') {
-                    msg += '\nKód komunity: ' + comCode + '\n(Sdílej ho s dalšími pátrači pro připojení.)';
-                } else {
-                    msg += '\nPřipojeno ke komunitě: ' + comName + ' [' + comCode + ']';
-                }
-                if (base64Avatar && !avatarSaved) {
-                    msg += '\n\n(Poznámka: avatar se nevešel do úložiště — účet funguje bez fotky.)';
-                }
-                isOperatorMode = false;
-                operatorComCode = '';
-                currentlyEditingPlayerId = null;
-                operatorEditDraft = null;
-                operatorEditDirty = false;
-
-                return import('./src/services/playerService.js').then(function(mod) {
-                    return mod.syncPlayerFromLocalStorage(userId);
-                }).then(function() {
-                    alert(msg);
-                    launchGame();
-                });
-            }).catch(function(err) {
-                console.warn('[auth] register', err);
-                var errMsg = err.message || 'Registrace selhala.';
-                if (err.code === 'auth/email-already-in-use') {
-                    errMsg = 'ID „' + userId + '“ už existuje. Přihlas se, nebo zvol jiné ID.';
-                }
-                showGateError('gate-register-error', errMsg);
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
-            });
+                runRegisterAuthFlow(comName, comCode, comMode, userId, email, pass, playerName, submitBtn);
             }).catch(function(err) {
                 console.warn('[register] email check', err);
-                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                runRegisterAuthFlow(comName, comCode, comMode, userId, email, pass, playerName, submitBtn);
             });
             } catch (err) {
                 console.error('finishRegisterAfterCloudCheck', err);
-                showGateError('gate-register-error', 'gate.errors.registerFailed', { msg: err.message || err });
-                var btn = document.getElementById('btn-register-submit');
-                if (btn) { btn.disabled = false; btn.textContent = 'ZALOŽIT A VSTOUPIT'; }
+                registerSubmitFail('gate.errors.registerFailed', { msg: err.message || err });
             }
         }
 
