@@ -143,14 +143,23 @@ function pxPerKmAt(lat, lng) {
     return Math.max(1, (pxE + pxN) * 0.5);
 }
 
-/** Základní velikost km čtverce na obrazovce při scale(1) — viewBox 260, deska může být 200–260 px. */
-function kmSquareBaseScreenPx() {
+/** Šířka desky v CSS px (260 desktop, 200 mobil). */
+function plateWidthPx() {
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
-    var plateW = (plateWrap && plateWrap.offsetWidth) ? plateWrap.offsetWidth : PLATE_PX;
-    return (KM_SQUARE_SVG_PX / 260) * plateW;
+    if (plateWrap) {
+        var w = plateWrap.getBoundingClientRect().width;
+        if (w > 0) return w;
+        if (plateWrap.offsetWidth > 0) return plateWrap.offsetWidth;
+    }
+    return PLATE_PX;
 }
 
-/** Měřítko roameru: km čtverec v SVG = 1 km na mapě (mění se zoomem). */
+/** Velikost km čtverce na obrazovce při scale(1). */
+function kmSquareBaseScreenPx() {
+    return (KM_SQUARE_SVG_PX / 260) * plateWidthPx();
+}
+
+/** Měřítko: km čtverec = 1 km na mapě. */
 function roamerScaleAt(lat, lng) {
     return pxPerKmAt(lat, lng) / kmSquareBaseScreenPx();
 }
@@ -170,11 +179,11 @@ function gridRotDegForRoamer(lat, lng) {
     return normalizeDeg(gridWestDeg - 180);
 }
 
-function roamerLayerTransformCss(scale, rotDeg) {
+function rulerSceneTransformCss(scale, rotDeg) {
     var parts = [];
     if (rotDeg && Math.abs(rotDeg) > 0.01) parts.push('rotate(' + rotDeg.toFixed(2) + 'deg)');
-    if (scale && Math.abs(scale - 1) > 0.001) parts.push('scale(' + scale.toFixed(4) + ')');
-    return parts.length ? parts.join(' ') : '';
+    parts.push('scale(' + (scale || 1).toFixed(4) + ')');
+    return parts.join(' ');
 }
 
 function getPlateCenterScreenPoint() {
@@ -219,17 +228,16 @@ function syncRoamerLabels() {
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'neon-v17') return;
-    g.setAttribute('data-built', 'neon-v17');
+    if (g.getAttribute('data-built') === 'neon-v18') return;
+    g.setAttribute('data-built', 'neon-v18');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
-    var vns = ' vector-effect="non-scaling-stroke"';
     var geo = '';
     var lbl = '';
     /* 1 km čtverec — SW roh ve středu, osy západ (vlevo) + jih (dolů) */
-    geo += '<rect x="' + (O - L) + '" y="' + O + '" width="' + L + '" height="' + L + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"' + vns + '/>';
-    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
-    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O + L) + '" stroke="' + NEON + '" stroke-width="0.5"' + vns + '/>';
+    geo += '<rect x="' + (O - L) + '" y="' + O + '" width="' + L + '" height="' + L + '" fill="none" stroke="' + NEON + '" stroke-width="0.65"/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + (O - L) + '" y2="' + O + '" stroke="' + NEON + '" stroke-width="0.5"/>';
+    geo += '<line x1="' + O + '" y1="' + O + '" x2="' + O + '" y2="' + (O + L) + '" stroke="' + NEON + '" stroke-width="0.5"/>';
     var i;
     for (i = 0; i <= 20; i++) {
         var t = i * (L / 20);
@@ -237,10 +245,8 @@ function buildRoamerScales() {
         var mid = i % 2 === 0;
         var th = big ? 5 : (mid ? 3 : 2);
         var sw = big ? 0.55 : 0.35;
-        /* Západní osa: dílky dovnitř úhlu (dolů) */
-        geo += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
-        /* Jižní osa: dílky dovnitř úhlu (doleva) */
-        geo += '<line x1="' + O + '" y1="' + (O + t) + '" x2="' + (O - th) + '" y2="' + (O + t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"' + vns + '/>';
+        geo += '<line x1="' + (O - t) + '" y1="' + O + '" x2="' + (O - t) + '" y2="' + (O + th) + '" stroke="' + NEON + '" stroke-width="' + sw + '"/>';
+        geo += '<line x1="' + O + '" y1="' + (O + t) + '" x2="' + (O - th) + '" y2="' + (O + t) + '" stroke="' + NEON + '" stroke-width="' + sw + '"/>';
     }
     function roamer2(v) {
         var s = String(v);
@@ -503,8 +509,7 @@ function updateRulerPlateVisual() {
     var degEl = document.getElementById('topo-ruler-bearing');
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var centerEl = document.getElementById('topo-ruler-center');
-    var roamerLayer = document.getElementById('topo-roamer-layer');
-    var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
+    var rulerScene = document.getElementById('topo-ruler-scene');
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
 
@@ -512,15 +517,12 @@ function updateRulerPlateVisual() {
         ? state.anchor
         : getRulerOriginLatLng();
     var gridRot = centerLl ? gridRotDegForRoamer(centerLl.lat, centerLl.lng) : 0;
-    var roamerScale = centerLl ? roamerScaleAt(centerLl.lat, centerLl.lng) : 1;
+    var kmScale = centerLl ? roamerScaleAt(centerLl.lat, centerLl.lng) : 1;
 
-    if (plateWrap) plateWrap.style.transform = '';
-    if (roamerLayer) {
-        roamerLayer.style.transform = roamerLayerTransformCss(roamerScale, gridRot);
+    if (rulerScene) {
+        rulerScene.style.transformOrigin = '50% 50%';
+        rulerScene.style.transform = rulerSceneTransformCss(kmScale, gridRot);
     }
-
-    var scales = document.getElementById('topo-roamer-scales');
-    if (scales) scales.removeAttribute('transform');
 
     syncRoamerLabels();
 
@@ -924,7 +926,7 @@ function initInteractions() {
     var toggle = document.getElementById('btn-topo-ruler-toggle');
     var dragSurface = document.getElementById('topo-ruler-drag-surface');
     var pinCenter = document.getElementById('topo-ruler-center');
-    var roamerLayer = document.getElementById('topo-roamer-layer');
+    var rulerScene = document.getElementById('topo-ruler-scene');
 
     if (toggle && !toggle._bound) {
         toggle._bound = true;
@@ -941,7 +943,7 @@ function initInteractions() {
 
     bindWidgetDrag(dragSurface || root);
     bindMapWheelPassthrough(dragSurface);
-    bindMapWheelPassthrough(roamerLayer);
+    bindMapWheelPassthrough(rulerScene);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
         for (var hi = 0; hi < hits.length; hi++) bindMapWheelPassthrough(hits[hi]);
@@ -957,11 +959,13 @@ function bindMapEvents() {
     var map = getMap();
     if (!map) return;
     _bound = true;
-    map.on('move zoom zoomend moveend resize', function() {
-        if (_bearingDragging || _widgetDragging) return;
-        releaseInteractionLocks();
-        updateRulerWidgetPosition();
-    });
+    map.on('move zoom zoomanim zoomend moveend resize', onMapViewChange);
+}
+
+function onMapViewChange() {
+    if (_bearingDragging || _widgetDragging) return;
+    releaseInteractionLocks();
+    updateRulerWidgetPosition();
 }
 
 export function initTopoRuler(deps) {

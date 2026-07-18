@@ -1416,19 +1416,14 @@
             flex-shrink: 0;
             overflow: visible;
         }
-        .topo-compass-svg {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-        .topo-roamer-layer {
+        .topo-ruler-scene {
             position: absolute;
             inset: 0;
             transform-origin: 50% 50%;
             pointer-events: none;
             overflow: visible;
         }
-        .topo-roamer-svg {
+        .topo-ruler-svg {
             width: 100%;
             height: 100%;
             display: block;
@@ -1453,7 +1448,7 @@
         .topo-gta-svg [fill="#8fd87a"] { fill: var(--topo-accent-dim); opacity: 1; }
         .topo-gta-svg text:not(.topo-roamer-lbl-text) { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; opacity: 1 !important; }
         .topo-gta-svg rect[stroke] { stroke-width: 1 !important; opacity: 1; }
-        .topo-gta-svg line { stroke-width: 0.65; opacity: 1; vector-effect: non-scaling-stroke; }
+        .topo-gta-svg line { stroke-width: 0.65; opacity: 1; }
         .topo-gta-svg polygon,
         .topo-gta-svg path,
         .topo-gta-svg rect[stroke] { vector-effect: non-scaling-stroke; }
@@ -1865,7 +1860,9 @@
                 <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
             </div>
             <div class="topo-ruler-plate-wrap">
-                <svg class="topo-gta-svg topo-compass-svg" id="topo-compass-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <div class="topo-ruler-scene" id="topo-ruler-scene">
+                <svg class="topo-gta-svg topo-ruler-svg" id="topo-ruler-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <g id="topo-ruler-world">
                     <defs>
                         <g id="topo-deg-tick-sm">
                             <line x1="130" y1="10" x2="130" y2="16" stroke="#78ff66" stroke-width="0.65"/>
@@ -1902,11 +1899,9 @@
                     <text x="130" y="242" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">180</text>
                     <text x="26" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
                     <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
+                    <g id="topo-roamer-scales"></g>
+                    </g>
                 </svg>
-                <div class="topo-roamer-layer" id="topo-roamer-layer">
-                    <svg class="topo-gta-svg topo-roamer-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                        <g id="topo-roamer-scales"></g>
-                    </svg>
                     <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Směrník (po zamknutí)"></button>
                     <input type="text" class="topo-ruler-coord topo-ruler-coord-w map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="West (E)" autocomplete="off">
                 </div>
@@ -2669,7 +2664,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bh';
+        var PATRAC_BUILD = '20260719bi';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
