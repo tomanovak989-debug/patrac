@@ -2651,7 +2651,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bl';
+        var PATRAC_BUILD = '20260719bm';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5277,6 +5277,12 @@
                     distanceMeters: distanceMeters,
                     formatDistance: formatDistance,
                     onUiUpdate: updateTacticalHud,
+                    getGpsLatLng: function() {
+                        if (lastUserPosition && isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
+                            return { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
+                        }
+                        return null;
+                    },
                     refreshMgrsGrid: function() {
                         if (mgrsGridMod) mgrsGridMod.refreshMgrsGrid();
                     }

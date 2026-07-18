@@ -1069,10 +1069,27 @@ export function initTopoRuler(deps) {
     updateRulerWidgetPosition();
 }
 
+function snapTopoRulerToGpsIfAvailable() {
+    if (!_deps || typeof _deps.getGpsLatLng !== 'function') return false;
+    var gps = _deps.getGpsLatLng();
+    if (!gps || !isFinite(gps.lat) || !isFinite(gps.lng)) return false;
+    return snapTopoRulerToLatLng(gps.lat, gps.lng);
+}
+
+export function snapTopoRulerToLatLng(lat, lng) {
+    if (!getMap() || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return false;
+    placeRulerCenterAtLatLng(lat, lng);
+    syncCoordFieldsFromPosition();
+    persistState();
+    if (state.visible) updateRulerPlateVisual();
+    return true;
+}
+
 export function updateTopoRulerDisplay(show) {
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
     state.visible = show !== false;
+    snapTopoRulerToGpsIfAvailable();
     root.style.display = state.visible ? 'block' : 'none';
     root.classList.toggle('is-ready', state.visible);
     if (state.visible) {
