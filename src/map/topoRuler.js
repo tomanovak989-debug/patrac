@@ -33,8 +33,7 @@ var _widgetDragging = false;
 var _fabLongPressFired = false;
 var _mapZooming = false;
 var _zoomSettleTimer = null;
-var _zoomVisualLl = null;
-var _zoomFrozenScreen = null;
+var _zoomAnchorLl = null;
 var _plateCenterOffset = null;
 
 function getMap() {
@@ -207,17 +206,13 @@ function beginMapZoom() {
         clearTimeout(_zoomSettleTimer);
         _zoomSettleTimer = null;
     }
-    captureScreenPos();
     cachePlateCenterOffset();
-    _zoomFrozenScreen = state.screenX != null && state.screenY != null
-        ? { x: state.screenX, y: state.screenY }
-        : null;
     _mapZooming = true;
     if (state.positionLocked && state.anchor) {
-        _zoomVisualLl = { lat: state.anchor.lat, lng: state.anchor.lng };
+        _zoomAnchorLl = { lat: state.anchor.lat, lng: state.anchor.lng };
     } else {
         var ll = getRulerOriginLatLng();
-        _zoomVisualLl = ll ? { lat: ll.lat, lng: ll.lng } : null;
+        _zoomAnchorLl = ll ? { lat: ll.lat, lng: ll.lng } : null;
     }
 }
 
@@ -225,23 +220,24 @@ function endMapZoomSoon() {
     if (_zoomSettleTimer) clearTimeout(_zoomSettleTimer);
     _zoomSettleTimer = setTimeout(function() {
         _mapZooming = false;
-        _zoomVisualLl = null;
-        _zoomFrozenScreen = null;
+        _zoomAnchorLl = null;
         _zoomSettleTimer = null;
+        if (!_bearingDragging && !_widgetDragging) {
+            updateRulerWidgetPosition();
+        }
     }, 500);
 }
 
-function restoreFrozenScreenPos() {
-    if (!_mapZooming || !_zoomFrozenScreen) return;
-    state.screenX = _zoomFrozenScreen.x;
-    state.screenY = _zoomFrozenScreen.y;
-    applyRulerScreenPos();
-}
-
 function getVisualCenterLl() {
-    if (_mapZooming && _zoomVisualLl) return _zoomVisualLl;
+    if (_mapZooming && _zoomAnchorLl) return _zoomAnchorLl;
     if (state.positionLocked && state.anchor) return state.anchor;
     return getRulerOriginLatLng();
+}
+
+function repositionRulerForZoom() {
+    var ll = getVisualCenterLl();
+    if (!ll) return;
+    placeRulerCenterAtLatLng(ll.lat, ll.lng, true);
 }
 
 function getPlateCenterScreenPoint() {
@@ -249,14 +245,8 @@ function getPlateCenterScreenPoint() {
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
     if (!root || !plateWrap) return null;
 
-    if (_mapZooming && _zoomFrozenScreen && _plateCenterOffset) {
-        return {
-            x: _zoomFrozenScreen.x + _plateCenterOffset.x,
-            y: _zoomFrozenScreen.y + _plateCenterOffset.y
-        };
-    }
-
     if (!_plateCenterOffset) cachePlateCenterOffset();
+
     var left = parseFloat(root.style.left);
     var top = parseFloat(root.style.top);
     if (_plateCenterOffset && !isNaN(left) && !isNaN(top) && root.classList.contains('topo-ruler-positioned')) {
@@ -460,14 +450,18 @@ function captureScreenPos() {
     state.screenY = rect.top;
 }
 
-function placeRulerCenterAtLatLng(lat, lng) {
-    if (_mapZooming) return;
+function placeRulerCenterAtLatLng(lat, lng, zoomPass) {
     var map = getMap();
     var mapEl = document.getElementById('map');
     var root = document.getElementById('map-topo-ruler');
     if (!map || !mapEl || !root) return;
 
-    state.anchor = { lat: lat, lng: lng };
+    if (!zoomPass) {
+        state.anchor = { lat: lat, lng: lng };
+    } else if (state.positionLocked) {
+        state.anchor = { lat: lat, lng: lng };
+    }
+
     root.classList.remove('topo-ruler-docked');
     root.classList.add('topo-ruler-positioned');
     root.style.right = 'auto';
@@ -478,26 +472,16 @@ function placeRulerCenterAtLatLng(lat, lng) {
     var targetX = mapRect.left + pt.x;
     var targetY = mapRect.top + pt.y;
 
-    if (state.screenX == null || isNaN(state.screenX)) {
-        var def = getDefaultScreenPos();
-        state.screenX = def.x;
-        state.screenY = def.y;
-    }
-    root.style.left = Math.round(state.screenX) + 'px';
-    root.style.top = Math.round(state.screenY) + 'px';
+    if (!_plateCenterOffset) cachePlateCenterOffset();
+    if (!_plateCenterOffset) return;
 
-    var iter;
-    for (iter = 0; iter < 4; iter++) {
-        var centerPt = getPlateCenterScreenPoint();
-        if (!centerPt) break;
-        var left = (parseFloat(root.style.left) || 0) + (targetX - centerPt.x);
-        var top = (parseFloat(root.style.top) || 0) + (targetY - centerPt.y);
-        var c = clampRulerScreenPos(left, top);
-        root.style.left = Math.round(c.x) + 'px';
-        root.style.top = Math.round(c.y) + 'px';
-        state.screenX = c.x;
-        state.screenY = c.y;
-    }
+    var left = targetX - _plateCenterOffset.x;
+    var top = targetY - _plateCenterOffset.y;
+    var c = clampRulerScreenPos(left, top);
+    root.style.left = Math.round(c.x) + 'px';
+    root.style.top = Math.round(c.y) + 'px';
+    state.screenX = c.x;
+    state.screenY = c.y;
 }
 
 function syncScreenFromAnchor() {
@@ -691,7 +675,7 @@ function applyRulerScreenPos() {
 
 function updateRulerWidgetPosition() {
     if (_mapZooming) {
-        restoreFrozenScreenPos();
+        repositionRulerForZoom();
         updateRulerPlateVisual();
         return;
     }
@@ -1110,12 +1094,17 @@ function bindMapEvents() {
 
 function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
-    restoreFrozenScreenPos();
+    if (_mapZooming) repositionRulerForZoom();
     updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
-    if (_bearingDragging || _widgetDragging || _mapZooming) return;
+    if (_bearingDragging || _widgetDragging) return;
+    if (_mapZooming) {
+        repositionRulerForZoom();
+        updateRulerPlateVisual();
+        return;
+    }
     releaseInteractionLocks();
     updateRulerWidgetPosition();
 }
