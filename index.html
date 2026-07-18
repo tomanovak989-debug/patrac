@@ -1340,18 +1340,15 @@
         .topo-gta-svg [stroke="#8fd87a"] { stroke: var(--topo-accent); stroke-width: 0.75; opacity: 1; }
         .topo-gta-svg [fill="#4af626"] { fill: var(--topo-accent); opacity: 1; }
         .topo-gta-svg [fill="#8fd87a"] { fill: var(--topo-accent-dim); opacity: 1; }
-        .topo-gta-svg text { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; opacity: 1 !important; }
+        .topo-gta-svg text:not(.topo-roamer-lbl-text) { fill: var(--topo-accent-dim) !important; font-size: 7px !important; font-weight: 500 !important; opacity: 1 !important; }
         .topo-gta-svg rect[stroke] { stroke-width: 1 !important; opacity: 1; }
         .topo-gta-svg line { stroke-width: 0.65; opacity: 1; }
         .topo-gta-svg g { opacity: 1; }
         .topo-roamer-lbl-text {
             fill: var(--topo-accent-dim) !important;
-            font-size: 8px !important;
+            font-size: 7px !important;
             font-weight: 500 !important;
-            paint-order: stroke fill;
-            stroke: rgba(6, 10, 6, 0.85);
-            stroke-width: 2.5px;
-            stroke-linejoin: round;
+            stroke: none !important;
         }
         .topo-ruler-bezel-hit { display: none; }
         .topo-ruler-center {
@@ -1387,8 +1384,8 @@
         }
         .topo-ruler-center.anchored,
         .topo-ruler-center.is-locked {
-            background: rgba(107, 255, 90, 0.12);
-            border-color: var(--topo-accent-dim);
+            background: rgba(6, 10, 6, 0.88);
+            border-color: var(--topo-accent);
             cursor: grab;
         }
         .topo-ruler-center.is-locked:active { cursor: grabbing; }
@@ -1426,15 +1423,14 @@
         .topo-roamer-readout span {
             display: inline-block;
             transform: translate(-50%, -50%);
-            font-size: 10px;
-            font-weight: 700;
+            font-size: 8px;
+            font-weight: 500;
             font-family: 'IBM Plex Mono', monospace;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.04em;
             color: var(--topo-accent);
-            background: rgba(6,10,6,0.92);
-            border: 1px solid var(--topo-accent-soft);
-            padding: 2px 6px;
-            box-shadow: 0 0 8px var(--topo-accent-glow);
+            background: rgba(6,10,6,0.94);
+            border: 1px solid var(--topo-accent);
+            padding: 1px 4px;
             pointer-events: none;
             white-space: nowrap;
         }
@@ -1685,7 +1681,7 @@
                             <line x1="130" y1="2" x2="130" y2="8" stroke="#8fd87a" stroke-width="0.8"/>
                         </g>
                     </defs>
-                    <rect x="4" y="4" width="252" height="252" rx="10" fill="rgba(6,10,6,0.88)" stroke="#4af626" stroke-width="1.8"/>
+                    <rect x="4" y="4" width="252" height="252" rx="10" fill="none" stroke="#4af626" stroke-width="1.2"/>
                     <g stroke="#4af626" stroke-width="0.8">
                         <use href="#topo-deg-tick" transform="rotate(0 130 130)"/>
                         <use href="#topo-deg-tick" transform="rotate(10 130 130)"/>
@@ -2497,7 +2493,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718ah';
+        var PATRAC_BUILD = '20260718ai';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }

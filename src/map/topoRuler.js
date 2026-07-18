@@ -116,6 +116,17 @@ function pointerEventToLatLng(e) {
     return map.containerPointToLatLng(pt);
 }
 
+function parseMgrs5Digits(lat, lng) {
+    var formatted = formatFullMgrs50(lat, lng);
+    var parts = formatted.split(/\s+/);
+    if (parts.length >= 3) {
+        return {
+            easting: parts[parts.length - 2],
+            northing: parts[parts.length - 1]
+        };
+    }
+    return { easting: '00000', northing: '00000' };
+}
 function pad5utm(v) {
     var n = Math.round(v) % 100000;
     if (n < 0) n += 100000;
@@ -167,20 +178,18 @@ function renderGridReadouts() {
     var E0 = utm.easting;
     var N0 = utm.northing;
     var zone = utm.zone;
-    var r = roundUtm50(E0, N0);
-    var eastLabel = pad5utm(r.e);
-    var northLabel = pad5utm(r.n);
+    var digits = parseMgrs5Digits(ll.lat, ll.lng);
 
     var nLine = Math.ceil(N0 / 1000) * 1000;
     if (Math.abs(nLine - N0) < 0.5) nLine += 1000;
     var pN = utmToLatLng(E0, nLine, zone, ll.lat);
-    addGridReadoutLabel(pN.lat, pN.lng, northLabel, 'northing');
+    addGridReadoutLabel(pN.lat, pN.lng, digits.northing, 'northing');
 
     var eLine = Math.floor(E0 / 1000) * 1000;
     if (Math.abs(eLine - E0) < 0.5) eLine -= 1000;
     else if (eLine >= E0) eLine -= 1000;
     var pE = utmToLatLng(eLine, N0, zone, ll.lat);
-    addGridReadoutLabel(pE.lat, pE.lng, eastLabel, 'easting');
+    addGridReadoutLabel(pE.lat, pE.lng, digits.easting, 'easting');
 }
 
 function roamerScaledPoint(ox, oy, scale) {
@@ -195,24 +204,34 @@ function syncRoamerLabels(scale) {
     var lbl = document.getElementById('topo-roamer-lbl');
     if (!lbl) return;
     var s = scale || 1;
+    var inv = s > 0.01 ? 1 / s : 1;
     var texts = lbl.querySelectorAll('text[data-ox]');
     for (var i = 0; i < texts.length; i++) {
         var t = texts[i];
-        var p = roamerScaledPoint(
-            parseFloat(t.getAttribute('data-ox')),
-            parseFloat(t.getAttribute('data-oy')),
-            s
+        var ox = parseFloat(t.getAttribute('data-ox'));
+        var oy = parseFloat(t.getAttribute('data-oy'));
+        var p = roamerScaledPoint(ox, oy, s);
+        var offPlate = p.x < 2 || p.x > 258 || p.y < 2 || p.y > 258;
+        t.style.display = offPlate ? 'none' : '';
+        if (offPlate) {
+            t.removeAttribute('transform');
+            continue;
+        }
+        t.setAttribute('x', String(ox));
+        t.setAttribute('y', String(oy));
+        t.setAttribute(
+            'transform',
+            'translate(' + p.x + ',' + p.y + ') scale(' + inv + ') translate(' + (-ox) + ',' + (-oy) + ')'
         );
-        t.setAttribute('x', String(p.x));
-        t.setAttribute('y', String(p.y));
     }
 }
 
 function buildRoamerScales() {
     var g = document.getElementById('topo-roamer-scales');
     if (!g) return;
-    if (g.getAttribute('data-built') === 'neon-v5') return;
-    g.setAttribute('data-built', 'neon-v5');
+    var lblOk = document.getElementById('topo-roamer-lbl');
+    if (g.getAttribute('data-built') === 'neon-v6' && lblOk) return;
+    g.setAttribute('data-built', 'neon-v6');
     var O = 130;
     var L = KM_SQUARE_SVG_PX;
     var geo = '';
@@ -232,7 +251,7 @@ function buildRoamerScales() {
     function lblText(ox, oy, text, anchor, weight) {
         var a = anchor || 'middle';
         var w = weight ? ' font-weight="600"' : '';
-        return '<text class="topo-roamer-lbl-text" data-ox="' + ox + '" data-oy="' + oy + '" x="' + ox + '" y="' + oy + '" text-anchor="' + a + '" fill="' + NEON_DIM + '" font-size="8"' + w + ' font-family="IBM Plex Mono,monospace">' + text + '</text>';
+        return '<text class="topo-roamer-lbl-text" data-ox="' + ox + '" data-oy="' + oy + '" x="' + ox + '" y="' + oy + '" text-anchor="' + a + '" fill="' + NEON_DIM + '" font-size="7"' + w + ' font-family="IBM Plex Mono,monospace">' + text + '</text>';
     }
     lbl += lblText(O, O + 10, '0', 'middle', true);
     for (i = 1; i <= 9; i++) {
