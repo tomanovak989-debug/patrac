@@ -1360,8 +1360,9 @@
         .topo-ruler-zone-bar {
             position: absolute;
             top: 0;
-            right: 28px;
-            z-index: 45;
+            left: 50%;
+            transform: translate(-50%, calc(-100% - 4px));
+            z-index: 30;
             display: flex;
             gap: 4px;
             pointer-events: auto;
@@ -1379,6 +1380,7 @@
             border: 1px solid var(--topo-accent);
             border-radius: 3px;
             pointer-events: auto;
+            box-shadow: 0 0 6px rgba(107, 255, 90, 0.25);
         }
         .topo-ruler-zone-bar input.is-readonly { opacity: 0.65; }
         .topo-ruler-coord {
@@ -1405,8 +1407,11 @@
             z-index: 30;
         }
         .topo-ruler-coord-n {
-            align-self: center;
-            margin: 4px 0 0;
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 4px);
+            margin: 0;
             z-index: 30;
         }
         .topo-ruler-plate-wrap {
@@ -1855,10 +1860,6 @@
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko">−</button>
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
-            <div class="topo-ruler-zone-bar">
-                <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
-                <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
-            </div>
             <div class="topo-ruler-plate-wrap">
                 <div class="topo-ruler-scene" id="topo-ruler-scene">
                 <svg class="topo-gta-svg topo-ruler-svg" id="topo-ruler-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1903,10 +1904,14 @@
                     </g>
                 </svg>
                     <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Směrník (po zamknutí)"></button>
+                    <div class="topo-ruler-zone-bar">
+                        <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
+                        <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
+                    </div>
                     <input type="text" class="topo-ruler-coord topo-ruler-coord-w map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="West (E)" autocomplete="off">
+                    <input type="text" class="topo-ruler-coord topo-ruler-coord-n map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="North (N)" autocomplete="off">
                 </div>
             </div>
-            <input type="text" class="topo-ruler-coord topo-ruler-coord-n map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="North (N)" autocomplete="off">
             <div class="topo-ruler-footer">
                 <span class="topo-ruler-bearing" id="topo-ruler-bearing"></span>
             </div>
@@ -2664,7 +2669,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bi';
+        var PATRAC_BUILD = '20260719bj';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
