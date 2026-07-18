@@ -2,8 +2,8 @@
  * Účty ve Firestore — veřejná metadata bez hesla (heslo řeší Firebase Auth).
  */
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getDb } from '../lib/firebase.js';
-import { ensurePatracAuth, getCurrentFirebaseUid, normalizePatracUserId } from './authService.js';
+import { getDb, getFirebaseAuth } from '../lib/firebase.js';
+import { ensurePatracAuth, ensureAnonymousAuth, getCurrentFirebaseUid, normalizePatracUserId } from './authService.js';
 
 const COLLECTION = 'accounts';
 
@@ -32,18 +32,34 @@ export async function saveAccountToCloud(userId, account) {
     await setDoc(doc(getDb(), COLLECTION, userId), payload, { merge: true });
 }
 
+function stripAccountPayload(data) {
+    if (!data) return null;
+    var payload = Object.assign({}, data);
+    delete payload.updatedAt;
+    delete payload.pass;
+    delete payload.password;
+    return payload;
+}
+
 export async function fetchAccountFromCloud(userId) {
     userId = normalizePatracUserId(userId);
     if (!userId) return null;
-    var mod = await import('./authService.js');
-    await mod.ensureAnonymousAuth();
-    var snap = await getDoc(doc(getDb(), COLLECTION, userId));
-    if (!snap.exists()) return null;
-    var data = snap.data();
-    delete data.updatedAt;
-    delete data.pass;
-    delete data.password;
-    return data;
+
+    var authUser = getFirebaseAuth().currentUser;
+    if (authUser && !authUser.isAnonymous) {
+        await ensurePatracAuth();
+    } else {
+        await ensureAnonymousAuth();
+    }
+
+    var docIds = [userId];
+    if (docIds.indexOf(userId + '.') === -1) docIds.push(userId + '.');
+
+    for (var i = 0; i < docIds.length; i++) {
+        var snap = await getDoc(doc(getDb(), COLLECTION, docIds[i]));
+        if (snap.exists()) return stripAccountPayload(snap.data());
+    }
+    return null;
 }
 
 export async function fetchAccountByEmail(email) {

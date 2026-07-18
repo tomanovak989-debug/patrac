@@ -1271,16 +1271,16 @@
             </header>
 
             <div id="gate-login" class="gate-panel active">
-                <div id="gate-login-error" class="gate-error"></div>
                 <div class="gate-form-group">
                     <label for="input-login-id" data-i18n="gate.login.userIdLabel">Uživatelské ID</label>
                     <input type="text" id="input-login-id" data-i18n-placeholder="gate.login.userIdPlaceholder" placeholder="identifikátor pátrače" autocomplete="username">
                 </div>
                 <div class="gate-form-group">
                     <label for="input-login-pass" data-i18n="gate.login.passwordLabel">Heslo</label>
-                    <input type="password" id="input-login-pass" placeholder="••••••••" autocomplete="current-password">
+                    <input type="password" id="input-login-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();patracLogin();}">
                 </div>
-                <button type="button" class="gate-btn-primary" onclick="patracLogin()" data-i18n="gate.login.submit">DEŠIFROVAT A VSTOUPIT</button>
+                <div id="gate-login-error" class="gate-error"></div>
+                <button type="button" id="btn-login-submit" class="gate-btn-primary" onclick="patracLogin()" data-i18n="gate.login.submit">DEŠIFROVAT A VSTOUPIT</button>
                 <button type="button" class="gate-btn-secondary" onclick="switchGatePage('gate-register')" data-i18n="gate.login.register">REGISTRACE NOVÉHO PÁTRAČE</button>
                 <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:14px;" onclick="switchGatePage('gate-recover')" data-i18n="gate.login.recover">[ OBNOVA HESLA PŘES EMAIL ]</button>
                 <button type="button" class="gate-link" style="border:none;background:none;width:100%;cursor:pointer;margin-top:8px;color:var(--danger-orange);" onclick="hardResetData()">☠ RESET — SMAZAT DATA V PROHLÍŽEČI</button>
@@ -1946,7 +1946,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718g';
+        var PATRAC_BUILD = '20260718h';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -7584,12 +7584,23 @@
             return key;
         }
 
+        function gateErrorFallback(key) {
+            var map = {
+                'gate.errors.loginMissingId': 'CHYBA: Zadej uživatelské ID.',
+                'gate.errors.loginUnknownId': 'CHYBA: ID není v síti, nebo heslo nesedí. Zkus znovu, nebo obnovu hesla.',
+                'gate.errors.loginBadPass': 'CHYBA: Heslo nesouhlasí. Signál zamítnut.',
+                'gate.errors.loginFailed': 'CHYBA: Přihlášení selhalo — zkontroluj připojení a zkus znovu.'
+            };
+            return map[key] || key;
+        }
+
         function showGateError(elId, msgOrKey, opts) {
             var el = document.getElementById(elId);
             if (!el) return;
             var msg = msgOrKey;
-            if (window.patracT && typeof msgOrKey === 'string' && msgOrKey.indexOf('gate.errors.') === 0) {
-                msg = window.patracT(msgOrKey, opts || {});
+            if (typeof msgOrKey === 'string' && msgOrKey.indexOf('gate.errors.') === 0) {
+                if (window.patracT) msg = window.patracT(msgOrKey, opts || {});
+                if (!msg || msg === msgOrKey) msg = gateErrorFallback(msgOrKey);
             }
             el.textContent = msg;
             el.classList.add('visible');
@@ -7691,6 +7702,38 @@
             localStorage.setItem('patrac_legacy_migrated', '1');
         }
 
+        function resolveLocalPatracAccount(userId) {
+            var accounts = getPatracAccounts();
+            if (accounts[userId]) return accounts[userId];
+            if (accounts[userId + '.']) return accounts[userId + '.'];
+            for (var k in accounts) {
+                if (accounts.hasOwnProperty(k) && normalizePatracId(k) === userId) return accounts[k];
+            }
+            return null;
+        }
+
+        function withPatracTimeout(promise, ms, message) {
+            return new Promise(function(resolve, reject) {
+                var done = false;
+                var timer = setTimeout(function() {
+                    if (done) return;
+                    done = true;
+                    reject(new Error(message || 'Vypršel časový limit — obnov stránku (Ctrl+F5) a zkus znovu.'));
+                }, ms || 45000);
+                Promise.resolve(promise).then(function(v) {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    resolve(v);
+                }, function(e) {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(timer);
+                    reject(e);
+                });
+            });
+        }
+
         function patracLogin() {
             hideGateError('gate-login-error');
             var userId = normalizePatracId(document.getElementById('input-login-id').value);
@@ -7706,51 +7749,106 @@
             }
 
             function finishLogin() {
-                beginSessionForUser(userId, { profileData: getUserProfileData(userId) });
-                isOperatorMode = false;
-                operatorComCode = '';
-                currentlyEditingPlayerId = null;
-                operatorEditDraft = null;
-                operatorEditDirty = false;
-                launchGame();
+                try {
+                    beginSessionForUser(userId, { profileData: getUserProfileData(userId) });
+                    isOperatorMode = false;
+                    operatorComCode = '';
+                    currentlyEditingPlayerId = null;
+                    operatorEditDraft = null;
+                    operatorEditDirty = false;
+                    launchGame();
+                } catch (launchErr) {
+                    console.error('[auth] finishLogin', launchErr);
+                    showGateError('gate-login-error', launchErr.message || 'gate.errors.loginFailed');
+                }
             }
 
-            var loginBtn = document.querySelector('#gate-login button.gate-btn-primary');
-            if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'PŘIPOJOVÁNÍ…'; }
-
-            var localAcc = getPatracAccounts()[userId] || null;
-
-            importAuthService().then(function(authMod) {
-                return authMod.signInPatracAuth(userId, pass, localAcc);
-            }).then(function() {
-                return import('./src/services/accountService.js').then(function(accMod) {
-                    return accMod.fetchAccountFromCloud(userId);
-                });
-            }).then(function(cloudAcc) {
+            function mergeAndFinishLogin(cloudAcc, localAcc) {
                 var accounts = getPatracAccounts();
-                if (cloudAcc) {
-                    accounts[userId] = slimPatracAccount(Object.assign({}, cloudAcc, { pass: pass }));
-                } else if (!accounts[userId]) {
+                var merged = cloudAcc
+                    ? slimPatracAccount(Object.assign({}, localAcc || {}, cloudAcc, { pass: pass }))
+                    : slimPatracAccount(Object.assign({}, localAcc || {}, { pass: pass }));
+                if (!merged) {
                     showGateError('gate-login-error', 'gate.errors.loginUnknownId');
                     return;
                 }
-                if (accounts[userId]) {
-                    savePatracAccounts(accounts);
-                }
+                accounts[userId] = merged;
+                ensureLegacyPatracCodes(userId, accounts[userId]);
+                savePatracAccounts(accounts);
                 finishLogin();
-            }).catch(function(err) {
+            }
+
+            function bootstrapAfterAuth(localAcc) {
+                return import('./src/services/accountService.js?v=' + PATRAC_BUILD).then(function(accMod) {
+                    return accMod.fetchAccountFromCloud(userId).catch(function(e) {
+                        console.warn('[login] cloud account fetch', e);
+                        return null;
+                    });
+                }).then(function(cloudAcc) {
+                    if (cloudAcc || localAcc) {
+                        mergeAndFinishLogin(cloudAcc, localAcc);
+                        return;
+                    }
+                    return importAuthService().then(function(authMod) {
+                        return authMod.fetchPatracIdMapping(userId);
+                    }).then(function(mapping) {
+                        if (!mapping || !mapping.firebaseUid) {
+                            showGateError('gate-login-error',
+                                'Firebase přihlášení OK, ale profil v síti chybí. Zkus obnovu hesla, nebo se registruj znovu.');
+                            return;
+                        }
+                        var accounts = getPatracAccounts();
+                        accounts[userId] = slimPatracAccount({
+                            pass: pass,
+                            email: mapping.registrationEmail || mapping.loginEmail || '',
+                            comName: '',
+                            comCode: '',
+                            playerName: userId,
+                            playerCode: generatePatracCode(),
+                            localMissions: 0
+                        });
+                        ensureLegacyPatracCodes(userId, accounts[userId]);
+                        savePatracAccounts(accounts);
+                        finishLogin();
+                    });
+                });
+            }
+
+            var loginBtn = document.getElementById('btn-login-submit');
+            var loginBtnLabel = loginBtn ? loginBtn.textContent : 'DEŠIFROVAT A VSTOUPIT';
+            if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'PŘIPOJOVÁNÍ…'; }
+
+            var localAcc = resolveLocalPatracAccount(userId);
+
+            withPatracTimeout(
+                importAuthService().then(function(authMod) {
+                    return authMod.signInPatracAuth(userId, pass, localAcc);
+                }).then(function() {
+                    return bootstrapAfterAuth(localAcc);
+                }),
+                45000,
+                'Připojení trvá příliš dlouho — zkontroluj internet, vypni VPN/adblock, nebo obnov stránku (Ctrl+F5).'
+            ).catch(function(err) {
                 console.warn('[auth] login', err);
-                if ((err && err.code === 'auth/wrong-password') || (err && err.message && err.message.indexOf('Špatné heslo') !== -1)) {
+                var msg = (err && err.message) || '';
+                if ((err && err.code === 'auth/wrong-password') || msg.indexOf('Špatné heslo') !== -1) {
                     showGateError('gate-login-error', 'gate.errors.loginBadPass');
                 } else if (err && err.code === 'auth/weak-password') {
-                    showGateError('gate-login-error', err.message);
-                } else if (err && err.code === 'auth/user-not-found') {
-                    showGateError('gate-login-error', 'gate.errors.loginUnknownId');
+                    showGateError('gate-login-error', msg);
+                } else if (err && (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential')) {
+                    showGateError('gate-login-error', 'gate.errors.loginBadPass');
+                } else if (err && err.code === 'auth/network-request-failed') {
+                    showGateError('gate-login-error', 'CHYBA: Síť neodpovídá — zkontroluj připojení.');
+                } else if (msg) {
+                    showGateError('gate-login-error', msg);
                 } else {
-                    showGateError('gate-login-error', err.message || 'gate.errors.loginUnknownId');
+                    showGateError('gate-login-error', 'gate.errors.loginUnknownId');
                 }
             }).finally(function() {
-                if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'DEŠIFROVAT A VSTOUPIT'; }
+                if (loginBtn) {
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = loginBtnLabel;
+                }
             });
         }
 

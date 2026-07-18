@@ -184,9 +184,13 @@ export async function fetchPatracIdMapping(userId) {
 async function fetchLegacyAccountFromCloud(userId) {
     userId = normalizePatracUserId(userId);
     await ensureAnonymousAuth();
-    var snap = await getDoc(doc(getDb(), 'accounts', userId));
-    if (!snap.exists()) return null;
-    return snap.data();
+    var docIds = [userId];
+    if (docIds.indexOf(userId + '.') === -1) docIds.push(userId + '.');
+    for (var i = 0; i < docIds.length; i++) {
+        var snap = await getDoc(doc(getDb(), 'accounts', docIds[i]));
+        if (snap.exists()) return snap.data();
+    }
+    return null;
 }
 
 function isLegacyAccount(acc) {
