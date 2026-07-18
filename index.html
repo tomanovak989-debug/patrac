@@ -1128,10 +1128,13 @@
             border-radius: 2px;
             box-shadow: 0 0 8px rgba(232, 32, 32, 0.85);
             opacity: 0;
-            transition: opacity 0.2s;
             pointer-events: none;
+            will-change: transform;
         }
-        .compass-north-arrow.visible { opacity: 1; }
+        .compass-north-arrow.visible {
+            opacity: 1;
+            transition: opacity 0.35s ease;
+        }
         .compass-north-arrow::after {
             content: '';
             position: absolute; top: -3px; left: 50%;
@@ -2037,7 +2040,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260718q';
+        var PATRAC_BUILD = '20260718r';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2056,6 +2059,10 @@
         var mapNavTarget = null;
         var compassBezelDeg = parseFloat(localStorage.getItem('patrac_compass_bezel') || '0') || 0;
         var compassDeviceHeading = null;
+        var compassHeadingSource = null;
+        var compassOrientRaf = null;
+        var compassOrientLastEvent = null;
+        var compassReadoutThrottle = 0;
         var compassOrientListening = false;
         var compassOrientGranted = false;
         var compassNeedsPermission = typeof DeviceOrientationEvent !== 'undefined' &&
@@ -4477,35 +4484,63 @@
             });
         }
 
+        function shortestDegDelta(from, to) {
+            return ((to - from + 540) % 360) - 180;
+        }
+
+        function smoothCompassHeading(raw) {
+            if (compassDeviceHeading === null) return raw;
+            var delta = shortestDegDelta(compassDeviceHeading, raw);
+            if (Math.abs(delta) > 45) {
+                return normalizeDeg(compassDeviceHeading + delta * 0.08);
+            }
+            return normalizeDeg(compassDeviceHeading + delta * 0.18);
+        }
+
         function getDeviceHeadingFromEvent(e) {
             if (!e) return null;
             if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
+                compassHeadingSource = 'webkit';
                 return normalizeDeg(e.webkitCompassHeading);
             }
+            if (compassHeadingSource === 'webkit') return null;
             if (typeof e.alpha === 'number' && !isNaN(e.alpha)) {
-                if (e.absolute || e.webkitCompassHeading === undefined) {
-                    return normalizeDeg(360 - e.alpha);
-                }
+                compassHeadingSource = 'alpha';
+                return normalizeDeg(360 - e.alpha);
             }
             return null;
         }
 
-        function onDeviceOrientation(e) {
-            var heading = getDeviceHeadingFromEvent(e);
+        function flushCompassOrientation() {
+            compassOrientRaf = null;
+            var heading = getDeviceHeadingFromEvent(compassOrientLastEvent);
             if (heading === null) return;
-            compassDeviceHeading = heading;
+            compassDeviceHeading = smoothCompassHeading(heading);
             compassOrientGranted = true;
             updateCompassPermissionUi();
-            applyCompassBezelRotation();
             applyCompassNorthArrow();
-            resetMapBearingRotation();
-            updateCompassReadout();
+            var now = Date.now();
+            if (now - compassReadoutThrottle > 900) {
+                compassReadoutThrottle = now;
+                updateCompassReadout();
+            }
+        }
+
+        function onDeviceOrientation(e) {
+            compassOrientLastEvent = e;
+            if (compassOrientRaf) return;
+            compassOrientRaf = requestAnimationFrame(flushCompassOrientation);
         }
 
         function attachCompassOrientationListeners() {
             if (compassOrientListening) return;
-            window.addEventListener('deviceorientation', onDeviceOrientation, true);
-            window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+            if (compassNeedsPermission) {
+                window.addEventListener('deviceorientation', onDeviceOrientation, true);
+            } else if ('ondeviceorientationabsolute' in window) {
+                window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+            } else {
+                window.addEventListener('deviceorientation', onDeviceOrientation, true);
+            }
             compassOrientListening = true;
         }
 
@@ -4560,8 +4595,7 @@
             var arrow = document.getElementById('compass-north-arrow');
             if (!arrow) return;
             if (compassDeviceHeading === null) {
-                arrow.classList.remove('visible');
-                arrow.style.transform = 'rotate(0deg)';
+                if (!compassOrientGranted) arrow.classList.remove('visible');
                 return;
             }
             arrow.classList.add('visible');
