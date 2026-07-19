@@ -128,6 +128,13 @@
         #map .leaflet-tile-pane {
             filter: none;
         }
+        #map .map-fog-overlay {
+            position: absolute;
+            left: 0;
+            top: 0;
+            pointer-events: none;
+            z-index: 650;
+        }
         #map-fog-admin-controls {
             display: none;
             margin-top: 6px;
@@ -2670,7 +2677,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719br';
+        var PATRAC_BUILD = '20260719bs';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6700,7 +6707,11 @@
                 updateCompassPermissionUi();
                 updateCompassUi();
                 applyCompassDockPosition();
-                if (map) setTimeout(function() { map.invalidateSize(); ensureMapTouchPan(); }, 150);
+                if (map) setTimeout(function() {
+                    map.invalidateSize();
+                    ensureMapTouchPan();
+                    patracRefreshFogOfWar();
+                }, 150);
             } else {
                 resetMapBearingRotation();
             }
@@ -9498,6 +9509,7 @@
                         ensureMapPanes();
                         reloadAllMapPoints();
                         map.invalidateSize();
+                        patracRefreshFogOfWar();
                         if (!userMarker) startGeolocation();
                     }
                 }, 150);

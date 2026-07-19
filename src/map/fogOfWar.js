@@ -9,7 +9,6 @@ export var FOG_ADMIN_UI_ENABLED = true;
 export var FOG_REVEAL_RADIUS_M = 300;
 
 var _deps = null;
-var _map = null;
 var _canvas = null;
 var _ctx = null;
 var _bound = false;
@@ -52,34 +51,19 @@ function saveRevealAllPref(on) {
     try { localStorage.setItem(STORAGE_REVEAL_ALL, on ? 'true' : 'false'); } catch (e) {}
 }
 
-function ensureFogPane() {
-    var map = getMap();
-    if (!map) return;
-    if (!map.getPane('mapFogPane')) {
-        map.createPane('mapFogPane');
-        map.getPane('mapFogPane').style.zIndex = '650';
-        map.getPane('mapFogPane').style.pointerEvents = 'none';
-    }
-}
-
+/** Overlay přímo v #map kontejneru — ne v Leaflet pane (pane se transformuje a mlha zmizí). */
 function ensureCanvas() {
     var map = getMap();
     if (!map) return;
-    ensureFogPane();
-    var pane = map.getPane('mapFogPane');
-    if (!pane) return;
+    var container = map.getContainer();
+    if (!container) return;
 
     if (!_canvas) {
         _canvas = document.createElement('canvas');
         _canvas.id = 'map-fog-canvas';
+        _canvas.className = 'map-fog-overlay';
         _canvas.setAttribute('aria-hidden', 'true');
-        _canvas.style.position = 'absolute';
-        _canvas.style.left = '0';
-        _canvas.style.top = '0';
-        _canvas.style.width = '100%';
-        _canvas.style.height = '100%';
-        _canvas.style.pointerEvents = 'none';
-        pane.appendChild(_canvas);
+        container.appendChild(_canvas);
         _ctx = _canvas.getContext('2d');
     }
 }
@@ -91,7 +75,7 @@ function metersToPixelRadius(lat, lng, meters) {
     var cosLat = Math.cos(lat * Math.PI / 180);
     var dLng = meters / (111320 * Math.max(0.2, cosLat));
     var edge = map.latLngToContainerPoint([lat, lng + dLng]);
-    return Math.max(4, Math.hypot(edge.x - center.x, edge.y - center.y));
+    return Math.max(6, Math.hypot(edge.x - center.x, edge.y - center.y));
 }
 
 function drawRevealCircle(ctx, lat, lng, radiusM) {
@@ -101,7 +85,7 @@ function drawRevealCircle(ctx, lat, lng, radiusM) {
     var radiusPx = metersToPixelRadius(lat, lng, radiusM);
     var grad = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radiusPx);
     grad.addColorStop(0, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.72, 'rgba(0,0,0,0.85)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.92)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -111,7 +95,9 @@ function drawRevealCircle(ctx, lat, lng, radiusM) {
 
 export function refreshFogOfWar() {
     var map = getMap();
-    if (!map || !_canvas || !_ctx) return;
+    if (!map) return;
+    ensureCanvas();
+    if (!_canvas || !_ctx) return;
 
     if (!_enabled || (_revealAll && isOperator())) {
         _canvas.style.display = 'none';
@@ -124,12 +110,14 @@ export function refreshFogOfWar() {
     var dpr = window.devicePixelRatio || 1;
     _canvas.width = Math.round(size.x * dpr);
     _canvas.height = Math.round(size.y * dpr);
+    _canvas.style.width = size.x + 'px';
+    _canvas.style.height = size.y + 'px';
     _canvas.style.display = 'block';
 
     var ctx = _ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.x, size.y);
-    ctx.fillStyle = 'rgba(4, 6, 4, 0.92)';
+    ctx.fillStyle = 'rgba(2, 4, 2, 0.94)';
     ctx.fillRect(0, 0, size.x, size.y);
 
     ctx.globalCompositeOperation = 'destination-out';
@@ -156,7 +144,7 @@ function bindMapEvents() {
     var map = getMap();
     if (!map) return;
     _bound = true;
-    map.on('move zoom zoomend moveend resize viewreset', refreshFogOfWar);
+    map.on('move zoom zoomend moveend resize viewreset load', refreshFogOfWar);
 }
 
 export function setFogEnabled(on) {
@@ -200,11 +188,13 @@ export function syncFogAdminControls() {
 
 export function initFogOfWar(deps) {
     _deps = deps;
-    _map = getMap();
     _enabled = loadEnabledPref();
     _revealAll = loadRevealAllPref();
     ensureCanvas();
     bindMapEvents();
     syncFogAdminUi();
-    refreshFogOfWar();
+    requestAnimationFrame(function() {
+        refreshFogOfWar();
+        setTimeout(refreshFogOfWar, 200);
+    });
 }
