@@ -1,12 +1,14 @@
 /**
  * Mlha války — mapa zahalená, odkrývá se kruhy 300 m kolem trvalých bodů / poct / POI.
- * Ovládání jen pro operátora (admin); hráčům běží automaticky.
+ * Vrstva uvnitř Leaflet (pod body a MGRS mřížkou).
  */
 
 /** Před ostrým startem nechat true; pro launch nastavit false (zůstane jen logika bez UI). */
 export var FOG_ADMIN_UI_ENABLED = true;
 
 export var FOG_REVEAL_RADIUS_M = 300;
+
+var FOG_PANE_Z = 450;
 
 var _deps = null;
 var _canvas = null;
@@ -51,37 +53,76 @@ function saveRevealAllPref(on) {
     try { localStorage.setItem(STORAGE_REVEAL_ALL, on ? 'true' : 'false'); } catch (e) {}
 }
 
-/** Overlay přímo v #map kontejneru — ne v Leaflet pane (pane se transformuje a mlha zmizí). */
+function ensureFogPane() {
+    var map = getMap();
+    if (!map) return;
+    if (!map.getPane('mapFogPane')) {
+        map.createPane('mapFogPane');
+    }
+    var pane = map.getPane('mapFogPane');
+    if (pane) {
+        pane.style.zIndex = String(FOG_PANE_Z);
+        pane.style.pointerEvents = 'none';
+    }
+}
+
 function ensureCanvas() {
     var map = getMap();
     if (!map) return;
-    var container = map.getContainer();
-    if (!container) return;
+    ensureFogPane();
+    var pane = map.getPane('mapFogPane');
+    if (!pane) return;
 
     if (!_canvas) {
         _canvas = document.createElement('canvas');
         _canvas.id = 'map-fog-canvas';
-        _canvas.className = 'map-fog-overlay';
+        _canvas.className = 'map-fog-canvas';
         _canvas.setAttribute('aria-hidden', 'true');
-        container.appendChild(_canvas);
+        _canvas.style.position = 'absolute';
+        _canvas.style.left = '0';
+        _canvas.style.top = '0';
+        _canvas.style.pointerEvents = 'none';
+        pane.appendChild(_canvas);
         _ctx = _canvas.getContext('2d');
     }
 }
 
-function metersToPixelRadius(lat, lng, meters) {
+function latLngToCanvasPoint(lat, lng) {
     var map = getMap();
-    if (!map) return 0;
-    var center = map.latLngToContainerPoint([lat, lng]);
+    if (!map || !window.L) return null;
+    var layerPt = map.latLngToLayerPoint(window.L.latLng(lat, lng));
+    var origin = map.containerPointToLayerPoint(window.L.point(0, 0));
+    return { x: layerPt.x - origin.x, y: layerPt.y - origin.y };
+}
+
+function positionFogCanvas() {
+    var map = getMap();
+    if (!map || !_canvas || !window.L) return null;
+    var size = map.getSize();
+    if (!size || size.x < 1 || size.y < 1) return null;
+    var dpr = window.devicePixelRatio || 1;
+    _canvas.width = Math.round(size.x * dpr);
+    _canvas.height = Math.round(size.y * dpr);
+    _canvas.style.width = size.x + 'px';
+    _canvas.style.height = size.y + 'px';
+    var topLeft = map.containerPointToLayerPoint(window.L.point(0, 0));
+    window.L.DomUtil.setPosition(_canvas, topLeft);
+    return size;
+}
+
+function metersToPixelRadius(lat, lng, meters) {
+    var p0 = latLngToCanvasPoint(lat, lng);
+    if (!p0) return 0;
     var cosLat = Math.cos(lat * Math.PI / 180);
     var dLng = meters / (111320 * Math.max(0.2, cosLat));
-    var edge = map.latLngToContainerPoint([lat, lng + dLng]);
-    return Math.max(6, Math.hypot(edge.x - center.x, edge.y - center.y));
+    var p1 = latLngToCanvasPoint(lat, lng + dLng);
+    if (!p1) return 0;
+    return Math.max(6, Math.hypot(p1.x - p0.x, p1.y - p0.y));
 }
 
 function drawRevealCircle(ctx, lat, lng, radiusM) {
-    var map = getMap();
-    if (!map) return;
-    var center = map.latLngToContainerPoint([lat, lng]);
+    var center = latLngToCanvasPoint(lat, lng);
+    if (!center) return;
     var radiusPx = metersToPixelRadius(lat, lng, radiusM);
     var grad = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radiusPx);
     grad.addColorStop(0, 'rgba(0,0,0,1)');
@@ -104,14 +145,10 @@ export function refreshFogOfWar() {
         return;
     }
 
-    var size = map.getSize();
-    if (!size || size.x < 1 || size.y < 1) return;
+    var size = positionFogCanvas();
+    if (!size) return;
 
     var dpr = window.devicePixelRatio || 1;
-    _canvas.width = Math.round(size.x * dpr);
-    _canvas.height = Math.round(size.y * dpr);
-    _canvas.style.width = size.x + 'px';
-    _canvas.style.height = size.y + 'px';
     _canvas.style.display = 'block';
 
     var ctx = _ctx;

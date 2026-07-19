@@ -128,12 +128,8 @@
         #map .leaflet-tile-pane {
             filter: none;
         }
-        #map .map-fog-overlay {
-            position: absolute;
-            left: 0;
-            top: 0;
+        #map .map-fog-canvas {
             pointer-events: none;
-            z-index: 650;
         }
         #map-fog-admin-controls {
             display: none;
@@ -2677,7 +2673,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bs';
+        var PATRAC_BUILD = '20260719bt';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2765,6 +2761,7 @@
                     isOperator: function() { return isOperatorMode === true; },
                     revealRadiusM: 300
                 });
+                if (typeof refreshMapLayerStack === 'function') refreshMapLayerStack();
             }).catch(function(err) { console.warn('[fogOfWar]', err); });
         }
 
@@ -5002,13 +4999,21 @@
 
         function ensureMapPanes() {
             if (!map) return;
+            if (!map.getPane('mapFogPane')) {
+                map.createPane('mapFogPane');
+                map.getPane('mapFogPane').style.zIndex = 450;
+            }
+            if (!map.getPane('mapGridPane')) {
+                map.createPane('mapGridPane');
+                map.getPane('mapGridPane').style.zIndex = 665;
+            }
             if (!map.getPane('mapPointsPane')) {
                 map.createPane('mapPointsPane');
                 map.getPane('mapPointsPane').style.zIndex = 640;
             }
             if (!map.getPane('mapMeasurePane')) {
                 map.createPane('mapMeasurePane');
-                map.getPane('mapMeasurePane').style.zIndex = 645;
+                map.getPane('mapMeasurePane').style.zIndex = 670;
             }
         }
 
@@ -6477,6 +6482,17 @@
             }
             if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
             patracRefreshFogOfWar();
+        }
+
+        /** Obnoví vrstvy mapy po init (pořadí: mlha < body < MGRS). */
+        function refreshMapLayerStack() {
+            ensureMapPanes();
+            if (map && map.getPane('mapFogPane')) map.getPane('mapFogPane').style.zIndex = 450;
+            if (map && map.getPane('mapPointsPane')) map.getPane('mapPointsPane').style.zIndex = 640;
+            if (map && map.getPane('mapGridPane')) map.getPane('mapGridPane').style.zIndex = 665;
+            if (map && map.getPane('mapMeasurePane')) map.getPane('mapMeasurePane').style.zIndex = 670;
+            patracRefreshFogOfWar();
+            if (mgrsGridMod && mgrsGridMod.refreshMgrsGrid) mgrsGridMod.refreshMgrsGrid();
         }
 
         function haversineKm(lat1, lng1, lat2, lng2) {
@@ -9507,9 +9523,9 @@
                 setTimeout(function() {
                     if (map) {
                         ensureMapPanes();
-                        reloadAllMapPoints();
                         map.invalidateSize();
-                        patracRefreshFogOfWar();
+                        refreshMapLayerStack();
+                        reloadAllMapPoints();
                         if (!userMarker) startGeolocation();
                     }
                 }, 150);

@@ -253,7 +253,7 @@ export function initMgrsGrid(map) {
     if (!_layer) _layer = window.L.layerGroup();
     if (!map.getPane('mapGridPane')) {
         map.createPane('mapGridPane');
-        map.getPane('mapGridPane').style.zIndex = 420;
+        map.getPane('mapGridPane').style.zIndex = 665;
     }
     if (_visible) _layer.addTo(map);
     bindMap();
