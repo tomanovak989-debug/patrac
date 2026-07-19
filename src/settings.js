@@ -79,6 +79,9 @@ export function initPatracSettings() {
     applyDisplayMode(getDisplayMode());
     applyTextSize(getTextSize());
     applyCompassVisible(getCompassVisible());
+    bindFullscreenListeners();
+    syncFullscreenSettingVisibility();
+    updateFullscreenButtons();
 }
 
 export function setPatracTextSize(size) {
@@ -91,4 +94,75 @@ export function setPatracDisplayMode(mode) {
 
 export function setPatracCompassVisible(visible) {
     applyCompassVisible(visible);
+}
+
+function getFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+export function isBrowserFullscreen() {
+    return !!getFullscreenElement();
+}
+
+export function isFullscreenSupported() {
+    var el = document.documentElement;
+    return !!(el.requestFullscreen || el.webkitRequestFullscreen);
+}
+
+export function updateFullscreenButtons() {
+    var active = isBrowserFullscreen();
+    var ids = [
+        ['btn-fullscreen-on', !active],
+        ['btn-fullscreen-off', active]
+    ];
+    for (var i = 0; i < ids.length; i++) {
+        var el = document.getElementById(ids[i][0]);
+        if (el) el.classList.toggle('is-active', ids[i][1]);
+    }
+}
+
+export function syncFullscreenSettingVisibility() {
+    var row = document.getElementById('hud-menu-fullscreen-row');
+    if (row) row.style.display = isFullscreenSupported() ? '' : 'none';
+}
+
+function bindFullscreenListeners() {
+    if (bindFullscreenListeners._bound) return;
+    bindFullscreenListeners._bound = true;
+    document.addEventListener('fullscreenchange', updateFullscreenButtons);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButtons);
+}
+
+export function setBrowserFullscreen(on) {
+    if (!isFullscreenSupported()) {
+        alert('Prohlížeč nepodporuje režim celé obrazovky.');
+        return Promise.resolve(false);
+    }
+    if (on) {
+        if (isBrowserFullscreen()) {
+            updateFullscreenButtons();
+            return Promise.resolve(true);
+        }
+        var el = document.documentElement;
+        var req = el.requestFullscreen || el.webkitRequestFullscreen;
+        return Promise.resolve(req.call(el)).then(function() {
+            updateFullscreenButtons();
+            return true;
+        }).catch(function() {
+            alert('Celou obrazovku nelze zapnout — zkus to znovu po klepnutí na tlačítko.');
+            return false;
+        });
+    }
+    if (!isBrowserFullscreen()) {
+        updateFullscreenButtons();
+        return Promise.resolve(true);
+    }
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    return Promise.resolve(exit.call(document)).then(function() {
+        updateFullscreenButtons();
+        return true;
+    }).catch(function() {
+        updateFullscreenButtons();
+        return false;
+    });
 }

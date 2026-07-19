@@ -126,7 +126,7 @@ function drawRevealCircle(ctx, lat, lng, radiusM) {
     var radiusPx = metersToPixelRadius(lat, lng, radiusM);
     var grad = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radiusPx);
     grad.addColorStop(0, 'rgba(0,0,0,1)');
-    grad.addColorStop(0.7, 'rgba(0,0,0,0.92)');
+    grad.addColorStop(0.82, 'rgba(0,0,0,0.98)');
     grad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
@@ -154,7 +154,9 @@ export function refreshFogOfWar() {
     var ctx = _ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.x, size.y);
-    ctx.fillStyle = 'rgba(2, 4, 2, 0.94)';
+    ctx.fillStyle = 'rgb(0, 0, 0)';
+    ctx.fillRect(0, 0, size.x, size.y);
+    ctx.fillStyle = 'rgb(1, 3, 1)';
     ctx.fillRect(0, 0, size.x, size.y);
 
     ctx.globalCompositeOperation = 'destination-out';

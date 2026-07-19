@@ -105,6 +105,9 @@
                      "displayMode":  "Display mode",
                      "displayDay":  "Day",
                      "displayNight":  "Night",
+                     "fullscreen":  "Full screen",
+                     "fullscreenOn":  "On",
+                     "fullscreenOff":  "Off",
                      "logout":  "⏻ LOG OUT"
                  },
     "quests":  {

@@ -105,6 +105,9 @@
                      "displayMode":  "Režim zobrazení",
                      "displayDay":  "Den",
                      "displayNight":  "Noc",
+                     "fullscreen":  "Celá obrazovka",
+                     "fullscreenOn":  "Zapnout",
+                     "fullscreenOff":  "Vypnout",
                      "logout":  "⏻ OHLÁSIT SE"
                  },
     "quests":  {

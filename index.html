@@ -130,6 +130,7 @@
         }
         #map .map-fog-canvas {
             pointer-events: none;
+            opacity: 1;
         }
         #map-fog-admin-controls {
             display: none;
@@ -2152,6 +2153,13 @@
                             <button type="button" class="hud-menu-toggle-btn" id="btn-theme-dark" onclick="patracSetDisplayMode('dark')" data-i18n="settings.displayNight">Noc</button>
                         </div>
                     </div>
+                    <div class="hud-menu-setting-row" id="hud-menu-fullscreen-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.fullscreen">Celá obrazovka</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-fullscreen-on" onclick="patracSetBrowserFullscreen(true)" data-i18n="settings.fullscreenOn">Zapnout</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-fullscreen-off" onclick="patracSetBrowserFullscreen(false)" data-i18n="settings.fullscreenOff">Vypnout</button>
+                        </div>
+                    </div>
                 </div>
                 <button type="button" class="hud-menu-item" onclick="patracLogout()" data-i18n="settings.logout">⏻ OHLÁSIT SE</button>
             </div>
@@ -2640,7 +2648,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bw';
+        var PATRAC_BUILD = '20260719by';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4462,7 +4470,30 @@
             return true;
         }
 
+        function applyStoryPendingPositions() {
+            var launched = getCommunityLaunchedQuests();
+            var changed = false;
+            var mapChanged = false;
+            for (var questId in launched) {
+                if (!Object.prototype.hasOwnProperty.call(launched, questId)) continue;
+                var entry = launched[questId];
+                if (!gameQuests[questId] || !entry || !entry.pendingPosition || entry.positionApplied) continue;
+                if (applyStoryPositionFromLaunch(questId, entry.pendingPosition)) {
+                    entry.positionApplied = true;
+                    changed = true;
+                    mapChanged = true;
+                }
+            }
+            if (changed) setCommunityLaunchedQuests(launched);
+            if (changed) syncCommunityQuestsToCloud();
+            if (mapChanged) {
+                try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
+            }
+            return changed;
+        }
+
         function ensureClosedStoryPositionsApplied() {
+            applyStoryPendingPositions();
             var launched = getCommunityLaunchedQuests();
             var changed = false;
             var mapChanged = false;
@@ -4544,7 +4575,10 @@
         function renderCommunityQuestStatusHtml(questId, q) {
             if (!usesCommunityLaunchQuest(questId)) return '';
             if (isStoryQuestId(questId) && isPlayerCompletedCurrentRun(questId)) {
-                return '<div style="font-size:var(--text-sm);color:var(--text-green);margin:4px 0;">✅ Výkon potvrzen — rank zapsán. Trvalý bod je na mapě.</div>';
+                if (isStoryQuestPlaced(questId)) {
+                    return '<div style="font-size:var(--text-sm);color:var(--text-green);margin:4px 0;">✅ Výkon potvrzen — rank zapsán. Trvalý bod je na mapě.</div>';
+                }
+                return '<div style="font-size:var(--text-sm);color:var(--danger-orange);margin:4px 0;">✅ Výkon potvrzen — rank zapsán, ale bod na mapě chybí. Použij ↺ RESET a zaměř znovu.</div>';
             }
             if (!isStoryQuestId(questId) && isQuestCompleted(q)) return '';
             if (isQuestMissedByPlayer(questId)) {
@@ -5806,13 +5840,89 @@
             return gameQuests[questId] && hasStoredQuestCoords(questId);
         }
 
+        function canResetStoryQuest(questId) {
+            if (!gameQuests[questId]) return false;
+            if (isStoryQuestPlaced(questId)) return true;
+            if (isPlayerCompletedCurrentRun(questId)) return true;
+            if (isQuestCompleted(gameQuests[questId])) return true;
+            return false;
+        }
+
+        function recalculateProfileMissionsFromQuestDone(data) {
+            var stats = emptyIssuerStats();
+            var count = 0;
+            var quests = getAllQuestDefinitionsForOperator();
+            for (var i = 0; i < quests.length; i++) {
+                if (data.questDone && data.questDone[quests[i].id]) {
+                    count++;
+                    var fullQ = getQuestById(quests[i].id);
+                    if (fullQ) {
+                        var key = getIssuerKey(fullQ);
+                        stats[key] = (stats[key] || 0) + 1;
+                    }
+                }
+            }
+            data.localMissions = count;
+            data.localIssuerStats = stats;
+        }
+
+        function clearStoryQuestUserProgress(questId) {
+            if (!gameQuests[questId]) return;
+            var q = gameQuests[questId];
+            var doneKey = q.doneKey || ('quest_done_' + questId);
+            try { localStorage.removeItem(doneKey); } catch (e) {}
+
+            var session = localStorage.getItem('patrac_session') || '';
+            if (session) {
+                var missed = getPlayerQuestMissedMap(session);
+                if (missed[questId]) {
+                    delete missed[questId];
+                    localStorage.setItem('patrac_quest_missed_' + session, JSON.stringify(missed));
+                }
+                var data = loadUserProfileDataFromStorage(session);
+                var profileChanged = false;
+                if (data.questDone && data.questDone[questId]) {
+                    delete data.questDone[questId];
+                    profileChanged = true;
+                }
+                if (data.missionLog && data.missionLog.length) {
+                    var filtered = [];
+                    for (var m = 0; m < data.missionLog.length; m++) {
+                        if (data.missionLog[m].questId !== questId) filtered.push(data.missionLog[m]);
+                    }
+                    if (filtered.length !== data.missionLog.length) {
+                        data.missionLog = filtered;
+                        profileChanged = true;
+                    }
+                }
+                if (profileChanged) {
+                    recalculateProfileMissionsFromQuestDone(data);
+                    saveUserProfileData(session, data);
+                    if (!isOperatorMode || session !== currentlyEditingPlayerId) {
+                        applyUserProfileDataToSession(session, data);
+                    }
+                }
+            }
+
+            if (isOperatorMode && operatorEditDraft) {
+                if (!operatorEditDraft.questDone) operatorEditDraft.questDone = {};
+                if (operatorEditDraft.questDone[questId]) {
+                    delete operatorEditDraft.questDone[questId];
+                    recalculateOperatorDraftFromQuests();
+                }
+            }
+        }
+
         function getStoryQuestStatusText(questId) {
             if (!gameQuests[questId]) return '—';
             if (isQuestMissedByPlayer(questId)) {
                 return '⏱ Lhůta vypršela — rank nezapsán';
             }
             if (isPlayerCompletedCurrentRun(questId)) {
-                return '✅ Výkon potvrzen · rank zapsán · bod se aktualizuje po lhůtě';
+                if (isStoryQuestPlaced(questId)) {
+                    return '✅ Výkon potvrzen · rank zapsán · trvalý bod na mapě';
+                }
+                return '✅ Výkon potvrzen · rank zapsán · ⚠️ bod na mapě chybí (↺ RESET)';
             }
             if (isQuestLaunchedCommunityWide(questId) && !isQuestRunExpired(questId)) {
                 return '📡 Komunitní mise běží · potvrď polohu na místě';
@@ -5884,7 +5994,7 @@
             if (canUseMapPlacement()) {
                 html += '<button class="btn-accept" style="border-color:var(--muted-fg);color:var(--muted-fg);" onclick="activatePlacementMode(\'' + questId + '\')">🗺️ ADMIN: MAPA</button>';
             }
-            if (placed) {
+            if (canResetStoryQuest(questId)) {
                 html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="resetStoryQuestPosition(\'' + questId + '\')">↺ RESET</button>';
             }
             html += '</div></div>';
@@ -5921,7 +6031,7 @@
                 if (canUseMapPlacement()) {
                     html += '<button class="btn-accept" style="border-color:var(--muted-fg);color:var(--muted-fg);" onclick="activatePlacementMode(\'' + id + '\')">🗺️ Admin</button>';
                 }
-                if (isStoryQuestPlaced(id)) {
+                if (canResetStoryQuest(id)) {
                     html += '<button class="btn-accept" style="border-color:var(--danger-orange);color:var(--danger-orange);" onclick="resetStoryQuestPosition(\'' + id + '\')">↺ Reset</button>';
                 }
                 html += '</div></div>';
@@ -6124,11 +6234,12 @@
         function resetStoryQuestPosition(questId) {
             if (!gameQuests[questId]) return;
             var q = gameQuests[questId];
-            if (!confirm('Resetovat polohu prvotní mise?\nSouřadnice se smažou, úkol se vrátí do rozkazů a budeš ho moci znovu zaměřit.')) return;
+            if (!canResetStoryQuest(questId)) return;
+            if (!confirm('Resetovat prvotní misi „' + (q.mapLabel || q.title) + '“?\nSmaže se poloha na mapě, stav splnění i komunitní průběh — misi půjde znovu spustit a zaměřit.')) return;
 
             localStorage.removeItem(q.latKey || ('point_' + questId + '_lat'));
             localStorage.removeItem(q.lngKey || ('point_' + questId + '_lng'));
-            localStorage.setItem(q.doneKey || ('quest_done_' + questId), 'false');
+            clearStoryQuestUserProgress(questId);
             localStorage.setItem('unlocked_story_' + questId, 'true');
             clearStoryPosCommunityData(questId);
             closeStoryPosEditor();
@@ -6155,6 +6266,8 @@
             rebuildSelectOptions();
             rebuildCustomLocLinkSelect();
             renderStoryPositionsList();
+            reloadAllMapPoints();
+            updateStatsHud();
             syncCommunityPoisToCloud();
             syncCommunityQuestsToCloud();
             syncPlayerQuestProgressToCloud();
@@ -7906,6 +8019,12 @@
         function toggleOperatorMission(questId, isDone) {
             if (!operatorEditDraft) return;
             if (!operatorEditDraft.questDone) operatorEditDraft.questDone = {};
+            if (isDone && gameQuests[questId] && !hasStoredQuestCoords(questId)) {
+                if (!confirm('Mise „' + (gameQuests[questId].mapLabel || gameQuests[questId].title) + '“ nemá uloženou polohu na mapě.\nOznačit jako splněnou i bez bodu? (Doporučeno: nejdřív umístit na mapě.)')) {
+                    renderOperatorEditPanel();
+                    return;
+                }
+            }
             if (isDone) operatorEditDraft.questDone[questId] = true;
             else delete operatorEditDraft.questDone[questId];
             recalculateOperatorDraftFromQuests();
@@ -7919,6 +8038,7 @@
             markOperatorEditDirty();
             updateOperatorEditPanelSummary();
             updateStatsHud({ skipMembersList: true });
+            renderQuestList();
         }
 
         function adjustOperatorSpec(key, delta) {
@@ -9641,6 +9761,12 @@
             if (!q) return;
 
             var center = getMapCenterCoords();
+            if (isStoryQuestId(char)) {
+                if (!isQuestLaunchedCommunityWide(char)) {
+                    launchCommunityQuest(char, q);
+                }
+                recordStoryRunCompletion(char, center.lat, center.lng);
+            }
             saveQuestCoords(char, center.lat, center.lng);
             var poctaReward = finalizeQuestComplete(q);
             renderPointOnMap(char, center.lat, center.lng, q.mapLabel || q.title, q.desc);
@@ -10212,6 +10338,12 @@
         window.patracSetDisplayMode = function(mode) {
             import('./src/settings.js').then(function(mod) {
                 mod.setPatracDisplayMode(mode);
+            });
+        };
+
+        window.patracSetBrowserFullscreen = function(on) {
+            import('./src/settings.js').then(function(mod) {
+                mod.setBrowserFullscreen(on);
             });
         };
 
