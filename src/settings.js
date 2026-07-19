@@ -19,9 +19,7 @@ export function applyTextSize(size) {
 export function updateTextSizeButtons(size) {
     var ids = [
         ['btn-text-default', size === 'default'],
-        ['btn-text-large', size === 'large'],
-        ['btn-gate-text-default', size === 'default'],
-        ['btn-gate-text-large', size === 'large']
+        ['btn-text-large', size === 'large']
     ];
     for (var i = 0; i < ids.length; i++) {
         var el = document.getElementById(ids[i][0]);
@@ -45,9 +43,7 @@ export function applyDisplayMode(mode) {
 export function updateDisplayModeButtons(mode) {
     var ids = [
         ['btn-theme-dark', mode === 'dark'],
-        ['btn-theme-light', mode === 'light'],
-        ['btn-gate-theme-dark', mode === 'dark'],
-        ['btn-gate-theme-light', mode === 'light']
+        ['btn-theme-light', mode === 'light']
     ];
     for (var i = 0; i < ids.length; i++) {
         var el = document.getElementById(ids[i][0]);
@@ -70,9 +66,7 @@ export function applyCompassVisible(visible) {
 export function updateCompassButtons(visible) {
     var ids = [
         ['btn-compass-show', visible],
-        ['btn-compass-hide', !visible],
-        ['btn-gate-compass-show', visible],
-        ['btn-gate-compass-hide', !visible]
+        ['btn-compass-hide', !visible]
     ];
     for (var i = 0; i < ids.length; i++) {
         var el = document.getElementById(ids[i][0]);

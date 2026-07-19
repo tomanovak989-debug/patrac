@@ -12,8 +12,6 @@ export async function switchGateLanguage(code) {
 export function applyGateHeaderI18n() {
     var header = document.querySelector('.gate-header');
     if (header) applyI18nToDom(header);
-    var settings = document.getElementById('gate-settings-block');
-    if (settings) applyI18nToDom(settings);
 }
 
 export function applyGatePanelsI18n() {

@@ -500,25 +500,6 @@
             border-color: var(--text-green); color: var(--text-green);
             box-shadow: var(--neon-glow);
         }
-        .gate-settings-block {
-            margin-top: 12px; padding-top: 10px;
-            border-top: 1px dotted rgba(106, 106, 106, 0.35);
-        }
-        .gate-settings-row {
-            display: flex; align-items: center; justify-content: center;
-            gap: 8px; flex-wrap: wrap; margin-top: 6px;
-        }
-        .gate-settings-row button {
-            display: inline-block; margin: 0; padding: 6px 12px; min-height: 36px;
-            border: 1px solid var(--gate-border); background: var(--gate-input-bg);
-            color: var(--gate-text); font-family: inherit; font-size: var(--text-sm);
-            letter-spacing: 0.1em; cursor: pointer; text-transform: uppercase;
-        }
-        .gate-settings-row button.is-active {
-            border-color: var(--gate-accent); color: var(--gate-accent-hover);
-            box-shadow: 0 0 8px rgba(138, 148, 136, 0.25);
-        }
-        .gate-settings-label { font-size: var(--text-sm); color: var(--gate-text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
         .left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; }
         .tool-btn {
             background-color: var(--hud-bg); border: 1px solid var(--hud-border);
@@ -1371,6 +1352,9 @@
             pointer-events: auto;
             cursor: default;
             overflow: visible;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         #topo-ruler-drag-surface.is-dragging { cursor: grabbing; }
         #topo-ruler-drag-surface.is-locked { cursor: default; }
@@ -2000,23 +1984,6 @@
                     <span class="gate-lang-switch-label" data-i18n="gate.lang.label">Jazyk</span>
                     <button type="button" id="btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
                     <button type="button" id="btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
-                </div>
-                <div class="gate-settings-block" id="gate-settings-block">
-                    <div class="gate-settings-row">
-                        <span class="gate-settings-label" data-i18n="settings.textSize">Velikost textu</span>
-                        <button type="button" id="btn-gate-text-default" onclick="patracSetTextSize('default')" data-i18n="settings.textDefault">Standard</button>
-                        <button type="button" id="btn-gate-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
-                    </div>
-                    <div class="gate-settings-row">
-                        <span class="gate-settings-label" data-i18n="settings.compass">Kompas na mapě</span>
-                        <button type="button" id="btn-gate-compass-show" onclick="patracSetCompassVisible(true)" data-i18n="settings.compassShow">Zobrazit</button>
-                        <button type="button" id="btn-gate-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
-                    </div>
-                    <div class="gate-settings-row">
-                        <span class="gate-settings-label" data-i18n="settings.displayMode">Režim zobrazení</span>
-                        <button type="button" id="btn-gate-theme-light" onclick="patracSetDisplayMode('light')" data-i18n="settings.displayDay">Den</button>
-                        <button type="button" id="btn-gate-theme-dark" onclick="patracSetDisplayMode('dark')" data-i18n="settings.displayNight">Noc</button>
-                    </div>
                 </div>
             </header>
 
@@ -2673,7 +2640,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bt';
+        var PATRAC_BUILD = '20260719bw';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4924,7 +4891,7 @@
             if (typeof window.patracPoctaOnGps === 'function') window.patracPoctaOnGps();
             updateTacticalHud();
 
-            setGpsStatus('● GPS LOCK <span style="color:#0077ff;">[' + lat.toFixed(5) + ', ' + lng.toFixed(5) + ']</span>');
+            setGpsStatus('<span style="color:#0077ff;">● GPS LOCK</span>');
 
             if (!userMarker) {
                 userMarker = L.circleMarker([lat, lng], {

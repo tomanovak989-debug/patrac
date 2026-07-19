@@ -30,6 +30,7 @@ var state = {
 var mapObjs = { lines: [], markers: {} };
 var _bearingDragging = false;
 var _widgetDragging = false;
+var _widgetDragCleanup = null;
 var _fabLongPressFired = false;
 var _mapZooming = false;
 var _zoomSettleTimer = null;
@@ -548,10 +549,15 @@ function setMapInteractionEnabled(on) {
         }
         return;
     }
-    /* Pravítko je overlay — mapu neblokujeme (zabraňuje zaseknutí zoomu / kurzoru). */
+    if (map.dragging) map.dragging.disable();
+    if (map.touchZoom) map.touchZoom.disable();
 }
 
 function releaseInteractionLocks() {
+    if (_widgetDragCleanup) {
+        _widgetDragCleanup();
+        _widgetDragCleanup = null;
+    }
     _bearingDragging = false;
     _widgetDragging = false;
     document.body.style.cursor = '';
@@ -808,6 +814,60 @@ function bindWidgetDrag(surface) {
         document.removeEventListener('pointercancel', onEnd);
     }
 
+    function releasePointerCapture(e) {
+        if (!surface || !surface.releasePointerCapture || activePointer == null) return;
+        try {
+            if (!e || e.pointerId == null || e.pointerId === activePointer) {
+                surface.releasePointerCapture(activePointer);
+            }
+        } catch (err) {}
+    }
+
+    function onEnd(e) {
+        if (activePointer != null && e && e.pointerId != null && e.pointerId !== activePointer) return;
+        detachDoc();
+        releasePointerCapture(e);
+        document.body.style.cursor = '';
+        surface.classList.remove('is-dragging');
+        surface.style.touchAction = '';
+        _widgetDragging = false;
+        _widgetDragCleanup = null;
+        setMapInteractionEnabled(true);
+        if (moving) persistState();
+        moving = false;
+        start = null;
+        origin = null;
+        activePointer = null;
+    }
+
+    function onMove(e) {
+        if (!start || !origin) return;
+        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
+        var p = ptrXY(e);
+        var dx = p.x - start.x;
+        var dy = p.y - start.y;
+        if (!moving && Math.hypot(dx, dy) < 4) return;
+        if (!moving) {
+            moving = true;
+            _widgetDragging = true;
+            surface.classList.add('is-dragging');
+            document.body.style.cursor = 'grabbing';
+        }
+        var nextX = origin.x + dx;
+        var nextY = origin.y + dy;
+        state.screenX = nextX;
+        state.screenY = nextY;
+        if (root) {
+            root.style.left = Math.round(nextX) + 'px';
+            root.style.top = Math.round(nextY) + 'px';
+        }
+        syncAnchorFromCenter();
+        syncCoordFieldsFromPosition();
+        updateRulerPlateVisual();
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
     function onStart(e) {
         if (state.positionLocked) return;
         if (isDragHandle(e.target)) return;
@@ -828,52 +888,19 @@ function bindWidgetDrag(surface) {
             root.style.right = 'auto';
             root.style.bottom = 'auto';
         }
+        surface.style.touchAction = 'none';
+        setMapInteractionEnabled(false);
+        _widgetDragging = true;
+        _widgetDragCleanup = function() { onEnd(null); };
+        if (surface.setPointerCapture && activePointer != null) {
+            try { surface.setPointerCapture(activePointer); } catch (err) {}
+        }
+        e.preventDefault();
+        e.stopPropagation();
         detachDoc();
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
         document.addEventListener('pointercancel', onEnd);
-    }
-
-    function onMove(e) {
-        if (!start || !origin) return;
-        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
-        var p = ptrXY(e);
-        var dx = p.x - start.x;
-        var dy = p.y - start.y;
-        if (!moving && Math.hypot(dx, dy) < 4) return;
-        if (!moving) {
-            moving = true;
-            _widgetDragging = true;
-            surface.classList.add('is-dragging');
-            surface.style.touchAction = 'none';
-            document.body.style.cursor = 'grabbing';
-        }
-        var nextX = origin.x + dx;
-        var nextY = origin.y + dy;
-        state.screenX = nextX;
-        state.screenY = nextY;
-        if (root) {
-            root.style.left = Math.round(nextX) + 'px';
-            root.style.top = Math.round(nextY) + 'px';
-        }
-        syncAnchorFromCenter();
-        syncCoordFieldsFromPosition();
-        updateRulerPlateVisual();
-        e.preventDefault();
-    }
-
-    function onEnd(e) {
-        if (activePointer != null && e && e.pointerId != null && e.pointerId !== activePointer) return;
-        detachDoc();
-        document.body.style.cursor = '';
-        surface.classList.remove('is-dragging');
-        surface.style.touchAction = '';
-        _widgetDragging = false;
-        if (moving) persistState();
-        moving = false;
-        start = null;
-        origin = null;
-        activePointer = null;
     }
 
     surface.addEventListener('pointerdown', onStart);

@@ -5,11 +5,6 @@ import { updateTextSizeButtons, getTextSize, updateCompassButtons, getCompassVis
 export function applySettingsMenuI18n() {
     var menu = document.getElementById('hud-menu-dropdown');
     if (menu) applyI18nToDom(menu);
-    var gate = document.getElementById('gate-box');
-    if (gate) {
-        var settingsBlock = document.getElementById('gate-settings-block');
-        if (settingsBlock) applyI18nToDom(settingsBlock);
-    }
     updateLanguageButtons(getPatracLanguage());
     updateTextSizeButtons(getTextSize());
     updateCompassButtons(getCompassVisible());
