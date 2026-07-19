@@ -128,6 +128,20 @@
         #map .leaflet-tile-pane {
             filter: none;
         }
+        #map-fog-admin-controls {
+            display: none;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dotted rgba(74, 246, 38, 0.25);
+        }
+        body.admin-mode #map-fog-admin-controls { display: block; }
+        #map-fog-admin-controls .fog-admin-heading {
+            font-size: var(--text-xxs);
+            color: #e8c547;
+            letter-spacing: 0.06em;
+            margin: 0 0 4px 0;
+            font-weight: 600;
+        }
         #map.blur-mode .leaflet-tile-pane {
             filter: brightness(0.55);
         }
@@ -2206,6 +2220,11 @@
                     <option value="1">10 km (2 číslice)</option>
                 </select>
             </label>
+            <div id="map-fog-admin-controls">
+                <p class="fog-admin-heading">Mlha války — operátor</p>
+                <label><input type="checkbox" id="map-fog-enabled" checked onchange="patracToggleFogEnabled(this.checked)"> Mlha zapnutá</label>
+                <label><input type="checkbox" id="map-fog-reveal-all" onchange="patracToggleFogRevealAll(this.checked)"> Zobrazit celou mapu (test)</label>
+            </div>
         </div>
     </div>
 
@@ -2651,7 +2670,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719bq';
+        var PATRAC_BUILD = '20260719br';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2666,7 +2685,91 @@
         var mapMeasureLayer = null;
         var mapCompassLayer = null;
         var mapRouteLayer = null;
+        var fogOfWarMod = null;
+
         var topoRulerMod = null;
+
+        function patracRefreshFogOfWar() {
+            if (fogOfWarMod && fogOfWarMod.refreshFogOfWar) fogOfWarMod.refreshFogOfWar();
+        }
+
+        function collectFogRevealAnchors() {
+            var anchors = [];
+            function push(lat, lng) {
+                if (lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return;
+                anchors.push({ lat: lat, lng: lng });
+            }
+
+            var storyIds = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
+            var i;
+            for (i = 0; i < storyIds.length; i++) {
+                var sid = storyIds[i];
+                var latS = parseFloat(localStorage.getItem('point_' + sid + '_lat'));
+                var lngS = parseFloat(localStorage.getItem('point_' + sid + '_lng'));
+                if (!isNaN(latS) && !isNaN(lngS)) push(latS, lngS);
+            }
+
+            var customQuests = getSafeJSON('custom_quests_list');
+            for (i = 0; i < customQuests.length; i++) {
+                var cq = customQuests[i];
+                var latC = parseFloat(localStorage.getItem('point_' + cq.id + '_lat'));
+                var lngC = parseFloat(localStorage.getItem('point_' + cq.id + '_lng'));
+                if (!isNaN(latC) && !isNaN(lngC)) push(latC, lngC);
+            }
+
+            var randomQuests = getRandomQuestsList();
+            for (i = 0; i < randomQuests.length; i++) {
+                var rnd = randomQuests[i];
+                var latR = parseFloat(localStorage.getItem('point_' + rnd.id + '_lat'));
+                var lngR = parseFloat(localStorage.getItem('point_' + rnd.id + '_lng'));
+                if (!isNaN(latR) && !isNaN(lngR)) push(latR, lngR);
+            }
+
+            var pois = getSafeJSON('map_free_pois');
+            for (i = 0; i < pois.length; i++) {
+                if (pois[i]) push(parseFloat(pois[i].lat), parseFloat(pois[i].lng));
+            }
+
+            try {
+                var reg = JSON.parse(localStorage.getItem('patrac_pocta_registry') || '{}');
+                if (reg && reg.entities) {
+                    for (var code in reg.entities) {
+                        if (!reg.entities.hasOwnProperty(code)) continue;
+                        var ent = reg.entities[code];
+                        if (ent && isFinite(ent.lat) && isFinite(ent.lng)) push(ent.lat, ent.lng);
+                    }
+                }
+            } catch (eFog) {}
+
+            return anchors;
+        }
+
+        function initFogOfWarModule() {
+            if (fogOfWarMod) {
+                patracRefreshFogOfWar();
+                if (fogOfWarMod.syncFogAdminControls) fogOfWarMod.syncFogAdminControls();
+                return;
+            }
+            import('./src/map/fogOfWar.js?v=' + PATRAC_BUILD).then(function(mod) {
+                fogOfWarMod = mod;
+                mod.initFogOfWar({
+                    getMap: function() { return map; },
+                    getRevealAnchors: collectFogRevealAnchors,
+                    isOperator: function() { return isOperatorMode === true; },
+                    revealRadiusM: 300
+                });
+            }).catch(function(err) { console.warn('[fogOfWar]', err); });
+        }
+
+        window.patracToggleFogEnabled = function(on) {
+            if (!isOperatorMode || !fogOfWarMod) return;
+            fogOfWarMod.setFogEnabled(on);
+        };
+        window.patracToggleFogRevealAll = function(on) {
+            if (!isOperatorMode || !fogOfWarMod) return;
+            fogOfWarMod.setFogRevealAll(on);
+        };
+
         var routePlannerMod = null;
         var mgrsGridMod = null;
         var mapMarkerRegistry = {};
@@ -4930,6 +5033,7 @@
                 initTopoRulerModule();
                 initRoutePlannerModule();
                 initMgrsGridModule();
+                initFogOfWarModule();
                 return;
             }
             try {
@@ -4972,6 +5076,7 @@
                 initTopoRulerModule();
                 initRoutePlannerModule();
                 initMgrsGridModule();
+                initFogOfWarModule();
             } catch(e) {
                 console.error('initMap', e);
             }
@@ -6159,6 +6264,7 @@
             localStorage.setItem('point_' + questId + '_lat', lat);
             localStorage.setItem('point_' + questId + '_lng', lng);
             syncCommunityQuestsToCloud();
+            patracRefreshFogOfWar();
         }
 
         function getMapPointMeta(id, lat, lng) {
@@ -6363,6 +6469,7 @@
                 renderPointOnMap(poi.id, poi.lat, poi.lng, poi.name, poi.note || poi.desc || '');
             }
             if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
+            patracRefreshFogOfWar();
         }
 
         function haversineKm(lat1, lng1, lat2, lng2) {
@@ -6669,6 +6776,7 @@
             closeAddPoiPanel();
             alert('Bod „' + name + '“ uložen. Poznámku a foto doplníš kdykoli v detailu bodu.');
             syncCommunityPoisToCloud();
+            patracRefreshFogOfWar();
         }
 
         function appendItemHistory(item, entry) {
@@ -7662,6 +7770,8 @@
                 document.body.classList.remove('admin-editing-player');
                 if (exitAdminBtn) exitAdminBtn.style.display = 'none';
             }
+            if (fogOfWarMod && fogOfWarMod.syncFogAdminControls) fogOfWarMod.syncFogAdminControls();
+            patracRefreshFogOfWar();
         }
 
         function renderOperatorMemberList() {
