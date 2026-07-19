@@ -2647,7 +2647,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719cc';
+        var PATRAC_BUILD = '20260719cd';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4254,9 +4254,10 @@
                 var questId = storyIds[s];
                 var note = getStoryPosCommunityNote(questId);
                 var imgS = getStoryPosCommunityImg(questId);
-                if (!note && !imgS) continue;
                 var lat = parseFloat(localStorage.getItem('point_' + questId + '_lat'));
                 var lng = parseFloat(localStorage.getItem('point_' + questId + '_lng'));
+                var hasCoords = !isNaN(lat) && !isNaN(lng);
+                if (!note && !imgS && !hasCoords) continue;
                 pois.push({
                     id: 'story_' + questId,
                     type: 'story',
@@ -4329,11 +4330,31 @@
             return meta;
         }
 
-        function snapshotCommunityMapCache(comCode) {
+        function stripMapCachePayloadForStorage(payload) {
+            if (!payload || typeof payload !== 'object') return payload;
+            var copy = JSON.parse(JSON.stringify(payload));
+            if (Array.isArray(copy.freePois)) {
+                for (var i = 0; i < copy.freePois.length; i++) {
+                    var img = copy.freePois[i] && copy.freePois[i].img;
+                    if (typeof img === 'string' && img.indexOf('data:') === 0) copy.freePois[i].img = '';
+                }
+            }
+            if (copy.storyPosMeta && typeof copy.storyPosMeta === 'object') {
+                for (var qid in copy.storyPosMeta) {
+                    if (!Object.prototype.hasOwnProperty.call(copy.storyPosMeta, qid)) continue;
+                    var sImg = copy.storyPosMeta[qid] && copy.storyPosMeta[qid].img;
+                    if (typeof sImg === 'string' && sImg.indexOf('data:') === 0) copy.storyPosMeta[qid].img = '';
+                }
+            }
+            return copy;
+        }
+
+        function captureCommunityMapCachePayload(comCode) {
             comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
-            if (!comCode) return;
-            var payload = {
+            if (!comCode) return null;
+            return {
                 version: 1,
+                comCode: comCode,
                 points: collectCommunityMapPointKeys(),
                 storyPosMeta: collectStoryPosMetaKeys(),
                 freePois: getSafeJSON('map_free_pois'),
@@ -4344,7 +4365,131 @@
                 launched: getCommunityLaunchedQuests(),
                 savedAt: Date.now()
             };
-            safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(payload));
+        }
+
+        function snapshotCommunityMapCache(comCode, payload) {
+            payload = payload || captureCommunityMapCachePayload(comCode);
+            if (!payload) return null;
+            comCode = String(payload.comCode || comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
+            if (!comCode) return payload;
+            var stored = stripMapCachePayloadForStorage(payload);
+            if (!safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(stored))) {
+                var minimal = {
+                    version: 1,
+                    comCode: comCode,
+                    points: stored.points || {},
+                    storyPosMeta: {},
+                    freePois: (stored.freePois || []).map(function(p) {
+                        return {
+                            id: p.id,
+                            name: p.name || '',
+                            note: p.note || p.desc || '',
+                            lat: p.lat,
+                            lng: p.lng,
+                            creator: p.creator || '',
+                            creatorUserId: p.creatorUserId || '',
+                            createdAt: p.createdAt || Date.now(),
+                            updatedAt: p.updatedAt || Date.now()
+                        };
+                    }),
+                    customQuests: stored.customQuests || [],
+                    randomQuests: stored.randomQuests || [],
+                    dismissed: stored.dismissed || [],
+                    reqOverrides: stored.reqOverrides || {},
+                    launched: stored.launched || {},
+                    savedAt: Date.now()
+                };
+                safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(minimal));
+            }
+            return payload;
+        }
+
+        function collectCommunityPoisFromMapPayload(payload) {
+            payload = payload || captureCommunityMapCachePayload();
+            if (!payload) return [];
+            var session = localStorage.getItem('patrac_session') || '';
+            var playerName = localStorage.getItem('player_name') || 'Operativec';
+            var pois = [];
+            var free = Array.isArray(payload.freePois) ? payload.freePois : [];
+            for (var i = 0; i < free.length; i++) {
+                var p = free[i];
+                if (!p || !p.id) continue;
+                var img = p.img || '';
+                pois.push({
+                    id: p.id,
+                    type: 'free',
+                    name: p.name || '',
+                    note: p.note || p.desc || '',
+                    img: img,
+                    imgUrl: /^https?:\/\//.test(img) ? img : '',
+                    lat: p.lat,
+                    lng: p.lng,
+                    creatorUserId: p.creatorUserId || session,
+                    creatorName: p.creator || playerName,
+                    createdAt: p.createdAt || Date.now(),
+                    updatedAt: Date.now()
+                });
+            }
+            var storyIds = getStoryQuestIds();
+            var points = payload.points || {};
+            var meta = payload.storyPosMeta || {};
+            for (var s = 0; s < storyIds.length; s++) {
+                var questId = storyIds[s];
+                var note = (meta[questId] && meta[questId].note) || getStoryPosCommunityNote(questId);
+                var imgS = (meta[questId] && meta[questId].img) || getStoryPosCommunityImg(questId);
+                var pt = points[questId] || {};
+                var lat = pt.lat != null ? parseFloat(pt.lat) : NaN;
+                var lng = pt.lng != null ? parseFloat(pt.lng) : NaN;
+                var hasCoords = !isNaN(lat) && !isNaN(lng);
+                if (!note && !imgS && !hasCoords) continue;
+                pois.push({
+                    id: 'story_' + questId,
+                    type: 'story',
+                    questId: questId,
+                    name: getQuestMapLabel(questId),
+                    note: note,
+                    img: imgS,
+                    imgUrl: /^https?:\/\//.test(imgS) ? imgS : '',
+                    lat: hasCoords ? lat : null,
+                    lng: hasCoords ? lng : null,
+                    creatorUserId: session,
+                    creatorName: playerName,
+                    updatedAt: Date.now()
+                });
+            }
+            return pois;
+        }
+
+        function collectCommunityQuestsFromMapPayload(payload) {
+            payload = payload || captureCommunityMapCachePayload();
+            if (!payload) return collectCommunityQuestsForCloud();
+            var story = {};
+            var storyIds = getStoryQuestIds();
+            var points = payload.points || {};
+            for (var i = 0; i < storyIds.length; i++) {
+                var id = storyIds[i];
+                var pt = points[id] || {};
+                story[id] = {
+                    lat: pt.lat != null && pt.lat !== '' ? parseFloat(pt.lat) : null,
+                    lng: pt.lng != null && pt.lng !== '' ? parseFloat(pt.lng) : null
+                };
+            }
+            var custom = (Array.isArray(payload.customQuests) ? payload.customQuests : []).map(function(q) {
+                return enrichQuestWithCoordsFromPoints(q, points);
+            });
+            var random = (Array.isArray(payload.randomQuests) ? payload.randomQuests : []).map(function(q) {
+                return enrichQuestWithCoordsFromPoints(q, points);
+            });
+            return {
+                version: 1,
+                story: story,
+                custom: custom,
+                random: random,
+                dismissed: Array.isArray(payload.dismissed) ? payload.dismissed.slice() : [],
+                reqOverrides: payload.reqOverrides && typeof payload.reqOverrides === 'object' ? payload.reqOverrides : {},
+                launched: payload.launched && typeof payload.launched === 'object' ? payload.launched : {},
+                updatedAt: Date.now()
+            };
         }
 
         function restoreCommunityMapCache(comCode) {
@@ -4385,19 +4530,23 @@
             }
         }
 
-        function flushCommunityMapCacheToCloud(comCode) {
-            comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
+        function flushCommunityMapCacheToCloud(comCode, payload) {
+            comCode = String(comCode || (payload && payload.comCode) || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
             if (!comCode) return Promise.resolve();
-            snapshotCommunityMapCache(comCode);
+            payload = payload || snapshotCommunityMapCache(comCode);
+            if (!payload) return Promise.resolve();
+            var pois = collectCommunityPoisFromMapPayload(payload);
+            var quests = collectCommunityQuestsFromMapPayload(payload);
+            var previousImgById = getPreviousPoiImgById();
             var chain = Promise.resolve();
             chain = chain.then(function() {
-                return import('./src/services/poiService.js').then(function(mod) {
-                    return mod.saveCommunityPoisToCloud(comCode, collectCommunityPoisForCloud(), getPreviousPoiImgById());
+                return import('./src/services/poiService.js?v=' + PATRAC_BUILD).then(function(mod) {
+                    return mod.saveCommunityPoisToCloud(comCode, pois, previousImgById);
                 });
             }).catch(function(err) { console.warn('[cloud] pois flush', err); });
             chain = chain.then(function() {
-                return import('./src/services/questService.js').then(function(mod) {
-                    return mod.saveCommunityQuestsToCloud(comCode, collectCommunityQuestsForCloud());
+                return import('./src/services/questService.js?v=' + PATRAC_BUILD).then(function(mod) {
+                    return mod.saveCommunityQuestsToCloud(comCode, quests);
                 });
             }).catch(function(err) { console.warn('[cloud] quests flush', err); });
             return chain;
@@ -4709,13 +4858,24 @@
             return html;
         }
 
+        function enrichQuestWithCoordsFromPoints(quest, points) {
+            if (!quest || !quest.id) return quest;
+            var copy = JSON.parse(JSON.stringify(quest));
+            var pt = points && points[quest.id];
+            var lat = pt && pt.lat != null && pt.lat !== '' ? parseFloat(pt.lat) : (copy.lat != null ? parseFloat(copy.lat) : null);
+            var lng = pt && pt.lng != null && pt.lng !== '' ? parseFloat(pt.lng) : (copy.lng != null ? parseFloat(copy.lng) : null);
+            copy.lat = typeof lat === 'number' && !isNaN(lat) ? lat : null;
+            copy.lng = typeof lng === 'number' && !isNaN(lng) ? lng : null;
+            return copy;
+        }
+
         function enrichQuestWithCoords(quest) {
             if (!quest || !quest.id) return quest;
             var copy = JSON.parse(JSON.stringify(quest));
             var lat = localStorage.getItem('point_' + quest.id + '_lat');
             var lng = localStorage.getItem('point_' + quest.id + '_lng');
-            copy.lat = lat ? parseFloat(lat) : null;
-            copy.lng = lng ? parseFloat(lng) : null;
+            copy.lat = lat ? parseFloat(lat) : (copy.lat != null ? parseFloat(copy.lat) : null);
+            copy.lng = lng ? parseFloat(lng) : (copy.lng != null ? parseFloat(copy.lng) : null);
             return copy;
         }
 
@@ -6467,7 +6627,9 @@
         function saveQuestCoords(questId, lat, lng) {
             localStorage.setItem('point_' + questId + '_lat', lat);
             localStorage.setItem('point_' + questId + '_lng', lng);
+            snapshotCommunityMapCache();
             syncCommunityQuestsToCloud();
+            syncCommunityPoisToCloud();
             patracRefreshFogOfWar();
         }
 
@@ -7395,8 +7557,8 @@
             syncCurrentAccountMissionStats();
             syncCurrentAccountWearLoadout();
             var logoutComCode = localStorage.getItem('com_code') || operatorComCode || '';
-            snapshotCommunityMapCache(logoutComCode);
-            flushCommunityMapCacheToCloud(logoutComCode).catch(function(err) {
+            var logoutMapPayload = snapshotCommunityMapCache(logoutComCode);
+            flushCommunityMapCacheToCloud(logoutComCode, logoutMapPayload).catch(function(err) {
                 console.warn('[logout] cloud flush', err);
             });
             importAuthService().then(function(mod) {
@@ -7593,7 +7755,9 @@
             applyAccountToLocalStorage(userId);
             var comCode = localStorage.getItem('com_code') || '';
             loadCommunityInventoryFromComCode(comCode);
-            restoreCommunityMapCache(comCode);
+            if (!restoreCommunityMapCache(comCode) && previousCom && previousCom !== comCode) {
+                restoreCommunityMapCache(previousCom);
+            }
             var profileData = options.profileData || getUserProfileData(userId);
             applyUserProfileDataToSession(userId, profileData);
             var profile = getPlayerProfile();

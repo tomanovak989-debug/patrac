@@ -9,6 +9,14 @@ import { ensurePatracAuth } from './authService.js';
 const COLLECTION = 'communities';
 const STORY_QUEST_IDS = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
 
+async function ensureCommunityCloudAuth() {
+    try {
+        return await ensurePatracAuth();
+    } catch (err) {
+        return ensureFirebaseAuth();
+    }
+}
+
 function normalizeComCode(comCode) {
     return String(comCode || '').trim().toUpperCase();
 }
@@ -279,6 +287,12 @@ function applyQuestCoords(questId, lat, lng) {
     }
 }
 
+function applyQuestCoordsIfPresent(questId, lat, lng) {
+    if (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) {
+        applyQuestCoords(questId, lat, lng);
+    }
+}
+
 /**
  * Zapíše cloud quest data do localStorage cache.
  */
@@ -287,8 +301,8 @@ export function applyCommunityQuestsToLocalStorage(quests) {
 
     for (var s = 0; s < STORY_QUEST_IDS.length; s++) {
         var storyId = STORY_QUEST_IDS[s];
-        var entry = data.story[storyId] || { lat: null, lng: null };
-        applyQuestCoords(storyId, entry.lat, entry.lng);
+        var entry = data.story[storyId];
+        if (entry) applyQuestCoordsIfPresent(storyId, entry.lat, entry.lng);
     }
 
     localStorage.setItem('custom_quests_list', JSON.stringify(data.custom));
@@ -303,17 +317,17 @@ export function applyCommunityQuestsToLocalStorage(quests) {
     }
 
     for (var c = 0; c < data.custom.length; c++) {
-        applyQuestCoords(data.custom[c].id, data.custom[c].lat, data.custom[c].lng);
+        applyQuestCoordsIfPresent(data.custom[c].id, data.custom[c].lat, data.custom[c].lng);
     }
     for (var r = 0; r < data.random.length; r++) {
-        applyQuestCoords(data.random[r].id, data.random[r].lat, data.random[r].lng);
+        applyQuestCoordsIfPresent(data.random[r].id, data.random[r].lat, data.random[r].lng);
     }
 }
 
 export async function saveCommunityQuestsToCloud(comCode, quests) {
     comCode = normalizeComCode(comCode);
     if (!comCode || !quests) return;
-    await ensurePatracAuth();
+    await ensureCommunityCloudAuth();
     var payload = normalizeCommunityQuests(Object.assign({}, quests, { updatedAt: Date.now() }));
     await setDoc(doc(getDb(), COLLECTION, comCode), {
         quests: payload,

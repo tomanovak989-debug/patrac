@@ -10,6 +10,14 @@ import { uploadPhotoFromDataUrl, deleteStorageFileByUrl } from './dataService.js
 const COLLECTION = 'communities';
 const STORY_QUEST_IDS = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
 
+async function ensureCommunityCloudAuth() {
+    try {
+        return await ensurePatracAuth();
+    } catch (err) {
+        return ensureFirebaseAuth();
+    }
+}
+
 function normalizeComCode(comCode) {
     return String(comCode || '').trim().toUpperCase();
 }
@@ -69,6 +77,10 @@ export function applyCloudPoisToLocalStorage(pois) {
         if (!poi) continue;
 
         if (poi.type === 'story' && poi.questId) {
+            if (typeof poi.lat === 'number' && typeof poi.lng === 'number' && !isNaN(poi.lat) && !isNaN(poi.lng)) {
+                localStorage.setItem('point_' + poi.questId + '_lat', String(poi.lat));
+                localStorage.setItem('point_' + poi.questId + '_lng', String(poi.lng));
+            }
             if (poi.note) {
                 localStorage.setItem('story_pos_note_' + poi.questId, poi.note);
             } else {
@@ -176,7 +188,7 @@ export async function preparePoisForCloud(pois, previousImgById) {
 export async function saveCommunityPoisToCloud(comCode, pois, previousImgById) {
     comCode = normalizeComCode(comCode);
     if (!comCode) return;
-    await ensurePatracAuth();
+    await ensureCommunityCloudAuth();
 
     var existing = await fetchCommunityPoisFromCloud(comCode);
     var prepared = await preparePoisForCloud(pois, previousImgById);
@@ -214,10 +226,42 @@ export async function hydrateCommunityPoisFromCloud(comCode) {
     if (!comCode) return { ok: false };
 
     var pois = await fetchCommunityPoisFromCloud(comCode);
-    if (!pois.length) return { ok: false };
+    var localFree = [];
+    try {
+        localFree = JSON.parse(localStorage.getItem('map_free_pois') || '[]');
+        if (!Array.isArray(localFree)) localFree = [];
+    } catch (e) {
+        localFree = [];
+    }
 
-    applyCloudPoisToLocalStorage(pois);
-    return { ok: true, pois: pois };
+    if (!pois.length && !localFree.length) return { ok: false };
+
+    var merged = pois.slice();
+    var seen = {};
+    for (var i = 0; i < pois.length; i++) {
+        var cp = normalizeCloudPoi(pois[i]);
+        if (cp && cp.type !== 'story') seen[cp.id] = true;
+    }
+    for (var j = 0; j < localFree.length; j++) {
+        var lf = localFree[j];
+        if (!lf || !lf.id || seen[lf.id]) continue;
+        merged.push({
+            id: lf.id,
+            type: 'free',
+            name: lf.name || '',
+            note: lf.note || lf.desc || '',
+            imgUrl: /^https?:\/\//.test(lf.img || '') ? lf.img : '',
+            lat: lf.lat,
+            lng: lf.lng,
+            creatorUserId: lf.creatorUserId || '',
+            creatorName: lf.creator || 'Operativec',
+            createdAt: lf.createdAt || Date.now(),
+            updatedAt: lf.updatedAt || Date.now()
+        });
+    }
+
+    applyCloudPoisToLocalStorage(merged);
+    return { ok: true, pois: merged };
 }
 
 export function buildStoryPoisFromLocalStorage(readNote, readImg, readCoords, readLabel) {
