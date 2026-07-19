@@ -62,6 +62,7 @@
                                   "comCodeLabel":  "Community code",
                                   "comCodePlaceholder":  "e.g. K7X2M",
                                   "comSelectLabel":  "Or select community from list",
+                                  "comSelectPlaceholder":  "— select community (name + code) —",
                                   "loadingComs":  "— loading communities… —",
                                   "adminKeyLabel":  "Operator key",
                                   "adminKeyPlaceholder":  "operator key",
@@ -90,6 +91,7 @@
                                 "registerFailed":  "ERROR: Registration failed — {{msg}}",
                                 "operatorMissingFields":  "ERROR: Enter community code and operator key.",
                                 "operatorUnknownCom":  "ERROR: No community with this code.",
+                                "operatorCloudError":  "ERROR: Could not verify community — check connection and try again.",
                                 "operatorBadKey":  "ERROR: Operator key does not match."
                             }
              },

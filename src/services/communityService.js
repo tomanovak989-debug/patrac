@@ -1,7 +1,7 @@
 /**
  * Komunity a společný inventář ve Firestore — první krok k více uživatelům.
  */
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
 import { ensurePatracAuth } from './authService.js';
 
@@ -78,6 +78,51 @@ export async function fetchCommunityMeta(comCode) {
         members: Array.isArray(data.members) ? data.members.slice() : [],
         createdAt: data.createdAt || null
     };
+}
+
+/** Všechny komunity z Firestore (pro operátorský výběr na novém zařízení). */
+export async function fetchAllCommunitiesFromCloud() {
+    await ensureFirebaseAuth();
+    var snap = await getDocs(collection(getDb(), COLLECTION));
+    var out = {};
+    snap.forEach(function(docSnap) {
+        var comCode = normalizeComCode(docSnap.id);
+        if (!comCode) return;
+        var data = docSnap.data() || {};
+        out[comCode] = {
+            name: data.name || '',
+            code: comCode,
+            founder: data.founder || '',
+            members: Array.isArray(data.members) ? data.members.slice() : [],
+            createdAt: data.createdAt || null
+        };
+    });
+    return out;
+}
+
+/** Sloučí cloud seznam komunit s lokální cache. */
+export async function hydrateAllCommunitiesFromCloud() {
+    var cloud = await fetchAllCommunitiesFromCloud();
+    var comms = {};
+    try {
+        comms = JSON.parse(localStorage.getItem('patrac_communities') || '{}');
+    } catch (e) {
+        comms = {};
+    }
+    for (var code in cloud) {
+        if (!Object.prototype.hasOwnProperty.call(cloud, code)) continue;
+        var existing = comms[code] || {};
+        var cloudEntry = cloud[code];
+        comms[code] = {
+            name: cloudEntry.name || existing.name || '',
+            code: code,
+            founder: cloudEntry.founder || existing.founder || '',
+            members: mergeUniqueMemberIds(cloudEntry.members, existing.members),
+            createdAt: cloudEntry.createdAt || existing.createdAt || new Date().toISOString()
+        };
+    }
+    localStorage.setItem('patrac_communities', JSON.stringify(comms));
+    return comms;
 }
 
 /**

@@ -46,6 +46,7 @@ function syncGateSelectOptions() {
     }
     var opSel = document.getElementById('select-operator-com');
     if (opSel && opSel.options.length && opSel.options[0].value === '' && window.patracT) {
-        opSel.options[0].textContent = window.patracT('gate.operator.loadingComs');
+        var opKey = opSel.disabled ? 'gate.operator.loadingComs' : 'gate.operator.comSelectPlaceholder';
+        opSel.options[0].textContent = window.patracT(opKey);
     }
 }

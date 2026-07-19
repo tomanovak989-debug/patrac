@@ -130,7 +130,6 @@
         }
         #map .map-fog-canvas {
             pointer-events: none;
-            opacity: 1;
         }
         #map-fog-admin-controls {
             display: none;
@@ -2648,7 +2647,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719by';
+        var PATRAC_BUILD = '20260719cc';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4293,9 +4292,121 @@
             return map;
         }
 
+        function getCommunityMapCacheKey(comCode) {
+            return 'patrac_map_cache_' + String(comCode || '').trim().toUpperCase();
+        }
+
+        function collectCommunityMapPointKeys() {
+            var points = {};
+            var i;
+            for (i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (!key || key.indexOf('point_') !== 0 || key.slice(-4) !== '_lat') continue;
+                var questId = key.slice(6, -4);
+                var lat = localStorage.getItem(key);
+                var lng = localStorage.getItem('point_' + questId + '_lng');
+                if (lat && lng) points[questId] = { lat: lat, lng: lng };
+            }
+            return points;
+        }
+
+        function collectStoryPosMetaKeys() {
+            var meta = {};
+            var i;
+            for (i = 0; i < localStorage.length; i++) {
+                var key = localStorage.key(i);
+                if (!key) continue;
+                var noteMatch = key.match(/^story_pos_note_(.+)$/);
+                var imgMatch = key.match(/^story_pos_img_(.+)$/);
+                if (noteMatch) {
+                    if (!meta[noteMatch[1]]) meta[noteMatch[1]] = {};
+                    meta[noteMatch[1]].note = localStorage.getItem(key) || '';
+                } else if (imgMatch) {
+                    if (!meta[imgMatch[1]]) meta[imgMatch[1]] = {};
+                    meta[imgMatch[1]].img = localStorage.getItem(key) || '';
+                }
+            }
+            return meta;
+        }
+
+        function snapshotCommunityMapCache(comCode) {
+            comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
+            if (!comCode) return;
+            var payload = {
+                version: 1,
+                points: collectCommunityMapPointKeys(),
+                storyPosMeta: collectStoryPosMetaKeys(),
+                freePois: getSafeJSON('map_free_pois'),
+                customQuests: getSafeJSON('custom_quests_list'),
+                randomQuests: getRandomQuestsList(),
+                dismissed: getDismissedQuests(),
+                reqOverrides: getQuestReqOverrides(),
+                launched: getCommunityLaunchedQuests(),
+                savedAt: Date.now()
+            };
+            safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(payload));
+        }
+
+        function restoreCommunityMapCache(comCode) {
+            comCode = String(comCode || '').trim().toUpperCase();
+            if (!comCode) return false;
+            var raw = localStorage.getItem(getCommunityMapCacheKey(comCode));
+            if (!raw) return false;
+            try {
+                var data = JSON.parse(raw);
+                if (!data || typeof data !== 'object') return false;
+
+                var points = data.points || {};
+                var qid;
+                for (qid in points) {
+                    if (!Object.prototype.hasOwnProperty.call(points, qid)) continue;
+                    if (points[qid].lat) localStorage.setItem('point_' + qid + '_lat', points[qid].lat);
+                    if (points[qid].lng) localStorage.setItem('point_' + qid + '_lng', points[qid].lng);
+                }
+
+                var meta = data.storyPosMeta || {};
+                for (qid in meta) {
+                    if (!Object.prototype.hasOwnProperty.call(meta, qid)) continue;
+                    if (meta[qid].note) localStorage.setItem('story_pos_note_' + qid, meta[qid].note);
+                    else try { localStorage.removeItem('story_pos_note_' + qid); } catch (e) {}
+                    if (meta[qid].img) localStorage.setItem('story_pos_img_' + qid, meta[qid].img);
+                    else try { localStorage.removeItem('story_pos_img_' + qid); } catch (e) {}
+                }
+
+                if (Array.isArray(data.freePois)) safeLocalStorageSet('map_free_pois', JSON.stringify(data.freePois));
+                if (Array.isArray(data.customQuests)) safeLocalStorageSet('custom_quests_list', JSON.stringify(data.customQuests));
+                if (Array.isArray(data.randomQuests)) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
+                if (Array.isArray(data.dismissed)) safeLocalStorageSet('dismissed_quests', JSON.stringify(data.dismissed));
+                if (data.reqOverrides) safeLocalStorageSet('quest_req_overrides', JSON.stringify(data.reqOverrides));
+                if (data.launched) setCommunityLaunchedQuests(data.launched);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function flushCommunityMapCacheToCloud(comCode) {
+            comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
+            if (!comCode) return Promise.resolve();
+            snapshotCommunityMapCache(comCode);
+            var chain = Promise.resolve();
+            chain = chain.then(function() {
+                return import('./src/services/poiService.js').then(function(mod) {
+                    return mod.saveCommunityPoisToCloud(comCode, collectCommunityPoisForCloud(), getPreviousPoiImgById());
+                });
+            }).catch(function(err) { console.warn('[cloud] pois flush', err); });
+            chain = chain.then(function() {
+                return import('./src/services/questService.js').then(function(mod) {
+                    return mod.saveCommunityQuestsToCloud(comCode, collectCommunityQuestsForCloud());
+                });
+            }).catch(function(err) { console.warn('[cloud] quests flush', err); });
+            return chain;
+        }
+
         function syncCommunityPoisToCloud() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
+            snapshotCommunityMapCache(comCode);
             var pois = collectCommunityPoisForCloud();
             var previousImgById = getPreviousPoiImgById();
             import('./src/services/poiService.js').then(function(mod) {
@@ -4637,6 +4748,7 @@
         function syncCommunityQuestsToCloud() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
+            snapshotCommunityMapCache(comCode);
             var quests = collectCommunityQuestsForCloud();
             import('./src/services/questService.js').then(function(mod) {
                 return mod.saveCommunityQuestsToCloud(comCode, quests);
@@ -7115,11 +7227,10 @@
             if (pageId === 'gate-operator') populateOperatorCommunitySelect();
         }
 
-        function populateOperatorCommunitySelect() {
+        function renderOperatorCommunityOptions(comms) {
             var sel = document.getElementById('select-operator-com');
             var input = document.getElementById('input-operator-com-code');
             if (!sel) return;
-            var comms = getPatracCommunities();
             var list = [];
             for (var code in comms) {
                 if (!Object.prototype.hasOwnProperty.call(comms, code)) continue;
@@ -7132,7 +7243,10 @@
             list.sort(function(a, b) {
                 return a.name.localeCompare(b.name, 'cs');
             });
-            var html = '<option value="">— vyber komunitu (název + kód) —</option>';
+            var placeholder = window.patracT
+                ? window.patracT('gate.operator.comSelectPlaceholder')
+                : '— vyber komunitu (název + kód) —';
+            var html = '<option value="">' + placeholder + '</option>';
             if (list.length === 0) {
                 html += '<option value="" disabled>(Zatím žádná komunita — zadej kód ručně)</option>';
             } else {
@@ -7142,7 +7256,72 @@
                 }
             }
             sel.innerHTML = html;
+            sel.disabled = false;
             if (input && input.value) onOperatorCommunityCodeInput();
+        }
+
+        function setOperatorCommunitySelectLoading(loading) {
+            var sel = document.getElementById('select-operator-com');
+            if (!sel) return;
+            if (loading) {
+                var loadingLabel = window.patracT
+                    ? window.patracT('gate.operator.loadingComs')
+                    : '— načítám komunity… —';
+                sel.innerHTML = '<option value="">' + loadingLabel + '</option>';
+                sel.disabled = true;
+            }
+        }
+
+        function mergeCommunitiesFromAccounts(comms) {
+            comms = comms || {};
+            var accounts = getPatracAccounts();
+            for (var id in accounts) {
+                if (!Object.prototype.hasOwnProperty.call(accounts, id)) continue;
+                var acc = accounts[id];
+                var code = String(acc.comCode || '').trim().toUpperCase();
+                if (!code) continue;
+                if (!comms[code]) {
+                    comms[code] = {
+                        name: String(acc.comName || code).trim() || code,
+                        code: code,
+                        founder: '',
+                        members: [id]
+                    };
+                } else if (comms[code].members && comms[code].members.indexOf(id) === -1) {
+                    comms[code].members.push(id);
+                }
+            }
+            return comms;
+        }
+
+        function getPatracCommunitiesForOperator() {
+            return mergeCommunitiesFromAccounts(getPatracCommunities());
+        }
+
+        function populateOperatorCommunitySelect() {
+            var sel = document.getElementById('select-operator-com');
+            if (!sel) return;
+            var localComms = getPatracCommunitiesForOperator();
+            var hasLocal = Object.keys(localComms).length > 0;
+            if (hasLocal) {
+                renderOperatorCommunityOptions(localComms);
+            } else {
+                setOperatorCommunitySelectLoading(true);
+            }
+            withPatracTimeout(
+                import('./src/services/communityService.js?v=' + PATRAC_BUILD).then(function(mod) {
+                    return mod.hydrateAllCommunitiesFromCloud();
+                }).then(function(comms) {
+                    return mergeCommunitiesFromAccounts(comms || getPatracCommunities());
+                }),
+                20000,
+                'operator communities timeout'
+            ).then(function(comms) {
+                renderOperatorCommunityOptions(comms || getPatracCommunitiesForOperator());
+            }).catch(function(err) {
+                console.warn('[operator] communities cloud', err);
+                renderOperatorCommunityOptions(getPatracCommunitiesForOperator());
+            });
         }
 
         function onOperatorCommunitySelectChange() {
@@ -7215,6 +7394,11 @@
             syncSessionUserToStorage();
             syncCurrentAccountMissionStats();
             syncCurrentAccountWearLoadout();
+            var logoutComCode = localStorage.getItem('com_code') || operatorComCode || '';
+            snapshotCommunityMapCache(logoutComCode);
+            flushCommunityMapCacheToCloud(logoutComCode).catch(function(err) {
+                console.warn('[logout] cloud flush', err);
+            });
             importAuthService().then(function(mod) {
                 return mod.signOutPatracAuth();
             }).catch(function(err) {
@@ -7403,10 +7587,13 @@
 
         function beginSessionForUser(userId, options) {
             options = options || {};
+            var previousCom = localStorage.getItem('com_code') || '';
+            if (previousCom) snapshotCommunityMapCache(previousCom);
             clearGlobalSessionGameCache();
             applyAccountToLocalStorage(userId);
             var comCode = localStorage.getItem('com_code') || '';
             loadCommunityInventoryFromComCode(comCode);
+            restoreCommunityMapCache(comCode);
             var profileData = options.profileData || getUserProfileData(userId);
             applyUserProfileDataToSession(userId, profileData);
             var profile = getPlayerProfile();
@@ -7818,6 +8005,29 @@
             corner.addEventListener('touchcancel', cancelHold);
         }
 
+        function findCommunityForOperatorLogin(code) {
+            code = String(code || '').trim().toUpperCase();
+            if (!code) return Promise.resolve(null);
+            var local = findCommunityByCode(code);
+            if (local) return Promise.resolve(local);
+            return withPatracTimeout(
+                import('./src/services/communityService.js?v=' + PATRAC_BUILD).then(function(mod) {
+                    return mod.fetchCommunityMeta(code);
+                }),
+                15000,
+                'operator community lookup timeout'
+            ).then(function(cloud) {
+                if (!cloud) return null;
+                var comms = getPatracCommunities();
+                comms[code] = cloud;
+                localStorage.setItem('patrac_communities', JSON.stringify(comms));
+                return cloud;
+            }).catch(function(err) {
+                console.warn('[operator] community lookup', err);
+                return null;
+            });
+        }
+
         function patracOperatorLogin() {
             hideGateError('gate-operator-error');
             var comCode = (document.getElementById('input-operator-com-code').value || '').trim().toUpperCase();
@@ -7826,25 +8036,44 @@
                 showGateError('gate-operator-error', 'gate.errors.operatorMissingFields');
                 return;
             }
-            var comm = findCommunityByCode(comCode);
-            if (!comm) {
-                showGateError('gate-operator-error', 'gate.errors.operatorUnknownCom');
+            if (comCode.length !== 5) {
+                showGateError('gate-operator-error', 'gate.errors.registerBadComCode');
                 return;
             }
             if (!verifyOperatorAdminKey(adminKey)) {
                 showGateError('gate-operator-error', 'gate.errors.operatorBadKey');
                 return;
             }
-            isOperatorMode = true;
-            operatorComCode = comCode;
-            currentlyEditingPlayerId = null;
-            operatorEditDraft = null;
-            operatorEditDirty = false;
-            localStorage.setItem('com_code', comCode);
-            localStorage.setItem('com_name', comm.name || '');
-            try { localStorage.removeItem('patrac_session'); } catch (e) {}
-            localStorage.setItem('items_personal', '[]');
-            launchGame();
+            var submitBtn = document.querySelector('#gate-operator .gate-btn-primary');
+            if (submitBtn) submitBtn.disabled = true;
+            findCommunityForOperatorLogin(comCode).then(function(comm) {
+                if (submitBtn) submitBtn.disabled = false;
+                if (!comm) {
+                    comm = findCommunityByCode(comCode);
+                }
+                if (!comm) {
+                    comm = {
+                        name: comCode,
+                        code: comCode,
+                        founder: '',
+                        members: []
+                    };
+                }
+                isOperatorMode = true;
+                operatorComCode = comCode;
+                currentlyEditingPlayerId = null;
+                operatorEditDraft = null;
+                operatorEditDirty = false;
+                localStorage.setItem('com_code', comCode);
+                localStorage.setItem('com_name', comm.name || comCode);
+                try { localStorage.removeItem('patrac_session'); } catch (e) {}
+                localStorage.setItem('items_personal', '[]');
+                launchGame();
+            }).catch(function(err) {
+                if (submitBtn) submitBtn.disabled = false;
+                console.warn('[operator] login', err);
+                showGateError('gate-operator-error', 'gate.errors.operatorCloudError');
+            });
         }
 
         function markOperatorEditDirty() {
@@ -8193,22 +8422,42 @@
 
         function findCommunityByCode(code) {
             if (!code) return null;
+            code = String(code).trim().toUpperCase();
             var comms = getPatracCommunities();
-            return comms[code.toUpperCase()] || null;
+            if (comms[code]) return comms[code];
+            var accounts = getPatracAccounts();
+            for (var id in accounts) {
+                if (!Object.prototype.hasOwnProperty.call(accounts, id)) continue;
+                var acc = accounts[id];
+                if (String(acc.comCode || '').trim().toUpperCase() === code) {
+                    return {
+                        name: String(acc.comName || code).trim() || code,
+                        code: code,
+                        founder: (comms[code] && comms[code].founder) || '',
+                        members: [id]
+                    };
+                }
+            }
+            return null;
         }
 
         function findCommunityByCodeWithCloud(code) {
             var local = findCommunityByCode(code);
             if (local) return Promise.resolve(local);
-            return import('./src/services/communityService.js').then(function(mod) {
-                return mod.fetchCommunityMeta(code).then(function(cloud) {
-                    if (!cloud) return null;
-                    var comms = getPatracCommunities();
-                    comms[code.toUpperCase()] = cloud;
-                    localStorage.setItem('patrac_communities', JSON.stringify(comms));
-                    return cloud;
-                });
-            }).catch(function() {
+            return withPatracTimeout(
+                import('./src/services/communityService.js?v=' + PATRAC_BUILD).then(function(mod) {
+                    return mod.fetchCommunityMeta(code);
+                }),
+                15000,
+                'community lookup timeout'
+            ).then(function(cloud) {
+                if (!cloud) return null;
+                var comms = getPatracCommunities();
+                comms[String(code).trim().toUpperCase()] = cloud;
+                localStorage.setItem('patrac_communities', JSON.stringify(comms));
+                return cloud;
+            }).catch(function(err) {
+                console.warn('[community] cloud lookup', code, err);
                 return null;
             });
         }
@@ -9442,6 +9691,10 @@
             try { migrateLegacyData(); } catch (e) { console.error('migrateLegacyData', e); }
             try { checkClanOnLaunch(); } catch (e) { console.error('checkClanOnLaunch', e); }
             try { migratePoiNotes(); repairStoryQuestDismissed(); ensureRandomQuests(); } catch (e) { console.error('migratePoi', e); }
+            var launchComCode = localStorage.getItem('com_code') || operatorComCode || '';
+            if (launchComCode) {
+                try { restoreCommunityMapCache(launchComCode); } catch (e) { console.warn('restoreCommunityMapCache', e); }
+            }
             try { reconcileCommunityInventory(localStorage.getItem('com_code') || operatorComCode || ''); } catch (e) { console.error('reconcileCommunityInventory', e); }
 
             document.getElementById('gate-box').style.display = 'none';

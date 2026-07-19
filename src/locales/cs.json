@@ -62,6 +62,7 @@
                                   "comCodeLabel":  "Kód komunity",
                                   "comCodePlaceholder":  "např. K7X2M",
                                   "comSelectLabel":  "Nebo vyber komunitu ze seznamu",
+                                  "comSelectPlaceholder":  "— vyber komunitu (název + kód) —",
                                   "loadingComs":  "— načítám komunity… —",
                                   "adminKeyLabel":  "Operátorský klíč",
                                   "adminKeyPlaceholder":  "operátorský klíč",
@@ -90,6 +91,7 @@
                                 "registerFailed":  "CHYBA: Registrace selhala — {{msg}}",
                                 "operatorMissingFields":  "CHYBA: Vyplň kód komunity i operátorský klíč.",
                                 "operatorUnknownCom":  "CHYBA: Komunita s tímto kódem neexistuje.",
+                                "operatorCloudError":  "CHYBA: Nepodařilo se ověřit komunitu — zkontroluj připojení a zkus znovu.",
                                 "operatorBadKey":  "CHYBA: Operátorský klíč nesouhlasí."
                             }
              },
