@@ -85,6 +85,21 @@ body.theme-dark {
     --accent-hover-bg: rgba(0, 255, 0, 0.08);
     --accent-muted-bg: rgba(0, 255, 0, 0.05);
     --completed-opacity: 0.58;
+
+    --map-float-bg: rgba(8, 12, 8, 0.92);
+    --map-float-bg-solid: rgba(6, 10, 6, 0.95);
+    --map-float-bg-alt: rgba(6, 10, 6, 0.82);
+    --map-float-bg-glass: rgba(6, 10, 6, 0.42);
+    --map-float-bg-active: rgba(20, 40, 20, 0.95);
+    --map-float-border: rgba(74, 246, 38, 0.55);
+    --map-float-border-strong: rgba(74, 246, 38, 0.65);
+    --map-float-border-stronger: rgba(74, 246, 38, 0.75);
+    --topo-accent: #78ff66;
+    --topo-accent-dim: #b8ffb0;
+    --topo-accent-soft: rgba(120, 255, 102, 0.45);
+    --topo-accent-glow: rgba(107, 255, 90, 0.55);
+    --topo-text-glow: 0 0 4px rgba(120, 255, 102, 0.75), 0 0 12px rgba(107, 255, 90, 0.35);
+    --rp-accent: #78ff66;
 }
 
 /* Denní režim — „Polní manuál“: světlé pozadí, tmavý text, vysoký kontrast */
@@ -201,6 +216,21 @@ body.theme-light {
     --accent-hover-bg: #E2F0E6;
     --accent-muted-bg: #F0F3EE;
     --completed-opacity: 0.85;
+
+    --map-float-bg: rgba(255, 255, 255, 0.94);
+    --map-float-bg-solid: rgba(255, 255, 255, 0.98);
+    --map-float-bg-alt: rgba(240, 243, 238, 0.96);
+    --map-float-bg-glass: rgba(255, 255, 255, 0.72);
+    --map-float-bg-active: rgba(226, 240, 230, 0.98);
+    --map-float-border: rgba(10, 92, 46, 0.42);
+    --map-float-border-strong: rgba(10, 92, 46, 0.52);
+    --map-float-border-stronger: rgba(10, 92, 46, 0.62);
+    --topo-accent: #0A5C2E;
+    --topo-accent-dim: #1F3328;
+    --topo-accent-soft: rgba(10, 92, 46, 0.38);
+    --topo-accent-glow: rgba(10, 92, 46, 0.28);
+    --topo-text-glow: none;
+    --rp-accent: #0A5C2E;
 }
 
 body.contrast-enhanced.theme-dark {
@@ -290,7 +320,18 @@ body.theme-light .chronicle-entry,
 body.theme-light #map-targeting-bar,
 body.theme-light #map-add-poi-bar,
 body.theme-light #poi-edit-bar,
-body.theme-light #story-pos-edit-bar {
+body.theme-light #story-pos-edit-bar,
+body.theme-light #map-tactical-hud .map-tac-tile,
+body.theme-light #map-layers-dropdown,
+body.theme-light #map-route-planner .route-planner-body,
+body.theme-light #map-route-planner .route-planner-widget-toggle,
+body.theme-light .compass-drag-handle,
+body.theme-light .compass-widget-toggle,
+body.theme-light .compass-housing,
+body.theme-light .topo-ruler-widget-toggle,
+body.theme-light .topo-ruler-coord,
+body.theme-light .topo-ruler-zone-bar input,
+body.theme-light .map-tool-fab {
     box-shadow: var(--neon-glow);
 }
 
