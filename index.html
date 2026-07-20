@@ -2980,7 +2980,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720b6';
+        var PATRAC_BUILD = '20260720b7';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -3069,7 +3069,7 @@
                     getMap: function() { return map; },
                     getRevealAnchors: collectFogRevealAnchors,
                     isOperator: function() { return isOperatorMode === true; },
-                    revealRadiusM: 300
+                    revealRadiusM: 500
                 });
                 if (typeof refreshMapLayerStack === 'function') refreshMapLayerStack();
                 updateAdminFogButtonUi();

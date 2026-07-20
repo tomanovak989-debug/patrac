@@ -1,12 +1,12 @@
 /**
- * Mlha války — mapa zahalená, odkrývá se kruhy 300 m kolem trvalých bodů / poct / POI.
+ * Mlha války — mapa zahalená, odkrývá se kruhy 500 m kolem trvalých bodů / POI / GPS.
  * Vrstva uvnitř Leaflet (pod body a MGRS mřížkou).
  */
 
 /** Před ostrým startem nechat true; pro launch nastavit false (zůstane jen logika bez UI). */
 export var FOG_ADMIN_UI_ENABLED = true;
 
-export var FOG_REVEAL_RADIUS_M = 300;
+export var FOG_REVEAL_RADIUS_M = 500;
 
 var FOG_PANE_Z = 450;
 
