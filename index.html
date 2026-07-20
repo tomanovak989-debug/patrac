@@ -2647,7 +2647,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260719cd';
+        var PATRAC_BUILD = '20260720aa';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -7081,6 +7081,9 @@
                     map.invalidateSize();
                     ensureMapTouchPan();
                     patracRefreshFogOfWar();
+                    if (topoRulerMod && topoRulerMod.snapTopoRulerToMapView) {
+                        topoRulerMod.snapTopoRulerToMapView();
+                    }
                 }, 150);
             } else {
                 resetMapBearingRotation();

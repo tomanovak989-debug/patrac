@@ -1120,11 +1120,23 @@ export function initTopoRuler(deps) {
     updateRulerWidgetPosition();
 }
 
-function snapTopoRulerToGpsIfAvailable() {
-    if (!_deps || typeof _deps.getGpsLatLng !== 'function') return false;
-    var gps = _deps.getGpsLatLng();
-    if (!gps || !isFinite(gps.lat) || !isFinite(gps.lng)) return false;
-    return snapTopoRulerToLatLng(gps.lat, gps.lng);
+function getMapViewCenterLatLng() {
+    var map = getMap();
+    if (!map || typeof map.getCenter !== 'function') return null;
+    var c = map.getCenter();
+    if (!c || !isFinite(c.lat) || !isFinite(c.lng)) return null;
+    return { lat: c.lat, lng: c.lng };
+}
+
+export function snapTopoRulerToMapView() {
+    if (_mapZooming) return false;
+    var ll = getMapViewCenterLatLng();
+    if (!ll) return false;
+    placeRulerCenterAtLatLng(ll.lat, ll.lng);
+    syncCoordFieldsFromPosition();
+    persistState();
+    if (state.visible) updateRulerPlateVisual();
+    return true;
 }
 
 export function snapTopoRulerToLatLng(lat, lng) {
@@ -1141,11 +1153,11 @@ export function updateTopoRulerDisplay(show) {
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
     state.visible = show !== false;
-    snapTopoRulerToGpsIfAvailable();
     root.style.display = state.visible ? 'block' : 'none';
     root.classList.toggle('is-ready', state.visible);
     if (state.visible) {
         requestAnimationFrame(function() {
+            snapTopoRulerToMapView();
             updateRulerWidgetPosition();
         });
     } else {
