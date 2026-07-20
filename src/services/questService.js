@@ -349,7 +349,8 @@ export async function fetchCommunityQuestsFromCloud(comCode) {
     return normalizeCommunityQuests(data.quests);
 }
 
-export async function hydrateCommunityQuestsFromCloud(comCode, localQuests) {
+export async function hydrateCommunityQuestsFromCloud(comCode, localQuests, options) {
+    options = options || {};
     comCode = normalizeComCode(comCode);
     if (!comCode) return { ok: false };
 
@@ -359,7 +360,7 @@ export async function hydrateCommunityQuestsFromCloud(comCode, localQuests) {
     var merged = mergeCommunityQuests(cloudQuests || normalizeCommunityQuests(null), localQuests || normalizeCommunityQuests(null));
     applyCommunityQuestsToLocalStorage(merged);
 
-    if (!cloudQuests || JSON.stringify(cloudQuests) !== JSON.stringify(merged)) {
+    if (!options.readOnly && (!cloudQuests || JSON.stringify(cloudQuests) !== JSON.stringify(merged))) {
         await saveCommunityQuestsToCloud(comCode, merged);
     }
 

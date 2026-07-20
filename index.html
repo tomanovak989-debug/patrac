@@ -2648,7 +2648,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720ab';
+        var PATRAC_BUILD = '20260720ac';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4553,10 +4553,15 @@
             return chain;
         }
 
+        function isOperatorLocalOnlySession() {
+            return isOperatorMode === true && !localStorage.getItem('patrac_session');
+        }
+
         function syncCommunityPoisToCloud() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
             snapshotCommunityMapCache(comCode);
+            if (isOperatorLocalOnlySession()) return;
             var pois = collectCommunityPoisForCloud();
             var previousImgById = getPreviousPoiImgById();
             import('./src/services/poiService.js').then(function(mod) {
@@ -4910,6 +4915,11 @@
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             if (!comCode) return;
             snapshotCommunityMapCache(comCode);
+            if (isOperatorLocalOnlySession()) {
+                if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
+                if (typeof renderQuestList === 'function') renderQuestList();
+                return;
+            }
             var quests = collectCommunityQuestsForCloud();
             import('./src/services/questService.js').then(function(mod) {
                 return mod.saveCommunityQuestsToCloud(comCode, quests);
@@ -4981,6 +4991,7 @@
         function startCommunityRealtimeSync(comCode) {
             comCode = (comCode || localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
             if (!comCode) return;
+            if (isOperatorLocalOnlySession()) return;
             import('./src/services/questService.js').then(function(mod) {
                 if (patracCommunityUnsubscribe) {
                     patracCommunityUnsubscribe();
@@ -4994,7 +5005,9 @@
                         try { loadCustomCraftedItems(); } catch (e) { console.warn(e); }
                     }
                     if (payload.quests) {
-                        mod.applyCommunityQuestsToLocalStorage(payload.quests);
+                        var merged = mod.mergeCommunityQuests(payload.quests, collectCommunityQuestsForCloud());
+                        mod.applyCommunityQuestsToLocalStorage(merged);
+                        snapshotCommunityMapCache(comCode);
                         try { processCommunityQuestExpiries(); } catch (e) { console.warn(e); }
                         try { ensureClosedStoryPositionsApplied(); } catch (e) { console.warn(e); }
                         try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
@@ -8283,6 +8296,9 @@
                         members: []
                     };
                 }
+                var previousCom = localStorage.getItem('com_code') || '';
+                if (previousCom) snapshotCommunityMapCache(previousCom);
+                clearGlobalSessionGameCache();
                 isOperatorMode = true;
                 operatorComCode = comCode;
                 currentlyEditingPlayerId = null;
@@ -8292,6 +8308,7 @@
                 localStorage.setItem('com_name', comm.name || comCode);
                 try { localStorage.removeItem('patrac_session'); } catch (e) {}
                 localStorage.setItem('items_personal', '[]');
+                restoreCommunityMapCache(comCode);
                 launchGame();
             }).catch(function(err) {
                 if (submitBtn) submitBtn.disabled = false;
@@ -8586,6 +8603,7 @@
 
         function patracExitOperatorKeepIdentity() {
             if (!isOperatorMode) return;
+            snapshotCommunityMapCache(localStorage.getItem('com_code') || operatorComCode || '');
             var userId = currentlyEditingPlayerId || localStorage.getItem('patrac_session');
             if (!userId) {
                 alert('Nejdřív v záložce Útočiště převez identitu hráče (PŘEVZÍT IDENTITU).');
@@ -8689,6 +8707,7 @@
         function initCloudSyncAsync() {
             var comCode = localStorage.getItem('com_code') || operatorComCode || '';
             var session = localStorage.getItem('patrac_session') || '';
+            var operatorLocalOnly = isOperatorLocalOnlySession();
             var skipPlayerHydrate = false;
             var skipCommunityLocalMerge = false;
             try {
@@ -8720,25 +8739,36 @@
                     return import('./src/services/communityService.js').then(function(mod) {
                         return mod.hydrateCommunityFromCloud(comCode);
                     });
+                }).catch(function(err) {
+                    console.warn('[cloud] community meta hydrate', err);
                 });
                 chain = chain.then(function() {
-                    return import('./src/services/poiService.js').then(function(mod) {
+                    return import('./src/services/poiService.js?v=' + PATRAC_BUILD).then(function(mod) {
                         return mod.hydrateCommunityPoisFromCloud(comCode).then(function(result) {
-                            if (result.ok) return result;
-                            if (skipCommunityLocalMerge) return result;
+                            if (result.ok || operatorLocalOnly || skipCommunityLocalMerge) return result;
                             var localPois = collectCommunityPoisForCloud();
                             if (!localPois.length) return result;
                             return mod.saveCommunityPoisToCloud(comCode, localPois, getPreviousPoiImgById());
                         });
                     });
+                }).catch(function(err) {
+                    console.warn('[cloud] pois hydrate', err);
+                    return { ok: false };
                 });
                 chain = chain.then(function() {
-                    return import('./src/services/questService.js').then(function(mod) {
+                    return import('./src/services/questService.js?v=' + PATRAC_BUILD).then(function(mod) {
                         return mod.hydrateCommunityQuestsFromCloud(
                             comCode,
-                            skipCommunityLocalMerge ? emptyCommunityQuestsForCloud() : collectCommunityQuestsForCloud()
+                            skipCommunityLocalMerge ? emptyCommunityQuestsForCloud() : collectCommunityQuestsForCloud(),
+                            { readOnly: operatorLocalOnly }
                         );
                     });
+                }).catch(function(err) {
+                    console.warn('[cloud] quests hydrate', err);
+                    return { ok: false };
+                });
+                chain = chain.then(function() {
+                    snapshotCommunityMapCache(comCode);
                 });
             }
 
