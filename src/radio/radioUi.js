@@ -23,15 +23,52 @@ import {
     GLOBAL_FREQUENCY,
     GLOBAL_ENCRYPTION,
     NOTEBOOK_TABS,
-    NOTEBOOK_TAB_LABELS
+    NOTEBOOK_TAB_LABELS,
+    NOTEBOOK_LINES_PER_PAGE,
+    CHANNEL_SCOPE_LABELS,
+    getNotebookPageCount,
+    getNotebookPageEntries,
+    getNotebookPageIndexForEntry
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
 
 var ctx = {};
 var state = null;
 var notebook = null;
-var activeNotebookTab = 'community';
+var activeNotebookTab = 'station';
 var seenMessageIds = {};
+var flipTimer = null;
+
+function ensureNotebookMeta() {
+    if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
+    if (!Array.isArray(notebook.grids)) notebook.grids = [];
+}
+
+function getCurrentPageIndex() {
+    ensureNotebookMeta();
+    return notebook.pageIndex[activeNotebookTab] || 0;
+}
+
+function setCurrentPageIndex(idx) {
+    ensureNotebookMeta();
+    notebook.pageIndex[activeNotebookTab] = Math.max(0, idx);
+}
+
+function triggerPageFlip(thenRender) {
+    var sheet = el('radio-notebook-sheet');
+    if (!sheet) {
+        if (thenRender) thenRender();
+        return;
+    }
+    if (flipTimer) clearTimeout(flipTimer);
+    sheet.classList.remove('is-flipping');
+    void sheet.offsetWidth;
+    sheet.classList.add('is-flipping');
+    flipTimer = setTimeout(function() {
+        sheet.classList.remove('is-flipping');
+        if (thenRender) thenRender();
+    }, 560);
+}
 
 function getCtx() {
     return {
@@ -80,8 +117,8 @@ function renderDisplay() {
         sig.style.color = tuned ? '#8fdc68' : '#888';
     }
     if (ch) {
-        var tab = classifyChannel(state.frequency, state.encryptionKey, c);
-        ch.textContent = NOTEBOOK_TAB_LABELS[tab] || 'KANÁL';
+        var scope = classifyChannel(state.frequency, state.encryptionKey, c);
+        ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
     }
     var buf = el('radio-display-buffer');
     if (buf) {
@@ -94,21 +131,74 @@ function renderDisplay() {
     updateInputForMode();
 }
 
-function renderNotebook() {
+function renderNotebook(options) {
+    options = options || {};
     var box = el('radio-notebook-lines');
+    var pageNum = el('radio-notebook-page-num');
+    var pageLabel = el('radio-notebook-page-label');
+    var prevBtn = el('radio-notebook-prev');
+    var nextBtn = el('radio-notebook-next');
     if (!box) return;
-    var list = notebook[activeNotebookTab] || [];
-    if (!list.length) {
-        box.innerHTML = '<p class="radio-notebook-empty">Zatím žádné záznamy. Nalaď frekvenci a šifru, pak vysílej.</p>';
+
+    ensureNotebookMeta();
+    var pageIdx = getCurrentPageIndex();
+    var pageCount = getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+
+    if (pageIdx >= pageCount) {
+        pageIdx = pageCount - 1;
+        setCurrentPageIndex(pageIdx);
+    }
+
+    if (activeNotebookTab === 'notes' || activeNotebookTab === 'grids') {
+        var items = notebook[activeNotebookTab] || [];
+        var emptyLabel = activeNotebookTab === 'grids'
+            ? 'MGRS gridy — zatím prázdné.<br>Uložení přes rychlou poznámku přibude brzy.'
+            : 'Poznámky — zatím prázdné.<br>Rychlé poznámky přibydou v další verzi.';
+        if (!items.length) {
+            box.innerHTML = '<p class="radio-notebook-empty">' + emptyLabel + '</p>';
+        } else {
+            var itemsHtml = '';
+            for (var n = 0; n < items.length; n++) {
+                itemsHtml += '<div class="radio-notebook-line">' + items[n] + '</div>';
+            }
+            box.innerHTML = itemsHtml;
+        }
+        if (pageNum) pageNum.textContent = '';
+        if (pageLabel) pageLabel.textContent = NOTEBOOK_TAB_LABELS[activeNotebookTab] || activeNotebookTab;
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
         return;
     }
-    var html = '';
-    for (var i = 0; i < list.length; i++) {
-        var entry = list[i];
-        html += '<div class="radio-notebook-line radio-notebook-line-' + entry.dir + '">' + formatNotebookLine(entry) + '</div>';
+
+    if (activeNotebookTab !== 'station') return;
+
+    var list = getNotebookPageEntries(notebook, 'station', pageIdx, NOTEBOOK_LINES_PER_PAGE);
+    if (!list.length && pageIdx === 0) {
+        box.innerHTML = '<p class="radio-notebook-empty">↓ příchozí · ↑ odchozí<br>Nalaď frekvenci a šifru, pak vysílej.</p>';
+    } else {
+        var html = '';
+        for (var i = 0; i < list.length; i++) {
+            var entry = list[i];
+            html += '<div class="radio-notebook-line radio-notebook-line-' + entry.dir + '">' + formatNotebookLine(entry) + '</div>';
+        }
+        box.innerHTML = html;
     }
-    box.innerHTML = html;
-    box.scrollTop = box.scrollHeight;
+
+    if (pageNum) pageNum.textContent = String(pageIdx + 1);
+    if (pageLabel) pageLabel.textContent = 'List ' + (pageIdx + 1) + ' / ' + pageCount;
+    if (prevBtn) prevBtn.disabled = pageIdx <= 0;
+    if (nextBtn) nextBtn.disabled = pageIdx >= pageCount - 1;
+
+    if (options.flip) triggerPageFlip();
+}
+
+function goNotebookPage(delta) {
+    var pageCount = getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+    var next = getCurrentPageIndex() + delta;
+    if (next < 0 || next >= pageCount) return;
+    setCurrentPageIndex(next);
+    persist();
+    renderNotebook({ flip: true });
 }
 
 function syncNotebookTabs() {
@@ -125,11 +215,23 @@ function persist() {
 }
 
 function recordEntry(entry) {
-    var tab = entry.scope || classifyChannel(entry.frequency, entry.encryptionKey, getCtx());
-    if (!NOTEBOOK_TABS.includes(tab)) tab = 'private';
-    appendNotebookEntry(notebook, tab, entry);
+    var list = notebook.station || [];
+    var entryIndex = list.length;
+    appendNotebookEntry(notebook, 'station', entry);
     persist();
-    if (tab === activeNotebookTab) renderNotebook();
+
+    var pageForEntry = getNotebookPageIndexForEntry(notebook, 'station', entryIndex, NOTEBOOK_LINES_PER_PAGE);
+    var onStationTab = activeNotebookTab === 'station';
+    var pageFull = entryIndex > 0 && (entryIndex % NOTEBOOK_LINES_PER_PAGE) === 0;
+
+    if (onStationTab) {
+        if (pageFull && pageForEntry > getCurrentPageIndex()) {
+            setCurrentPageIndex(pageForEntry);
+            renderNotebook({ flip: true });
+        } else if (pageForEntry === getCurrentPageIndex()) {
+            renderNotebook();
+        }
+    }
 }
 
 function refreshSubscriptions() {
@@ -363,10 +465,21 @@ function bindKeypad() {
         if (tabs[t]._radioCommsBound) continue;
         tabs[t]._radioCommsBound = true;
         tabs[t].addEventListener('click', function() {
-            activeNotebookTab = this.getAttribute('data-tab') || 'community';
+            activeNotebookTab = this.getAttribute('data-tab') || 'station';
             syncNotebookTabs();
             renderNotebook();
         });
+    }
+
+    var prevPage = el('radio-notebook-prev');
+    if (prevPage && !prevPage._radioCommsBound) {
+        prevPage._radioCommsBound = true;
+        prevPage.addEventListener('click', function() { goNotebookPage(-1); });
+    }
+    var nextPage = el('radio-notebook-next');
+    if (nextPage && !nextPage._radioCommsBound) {
+        nextPage._radioCommsBound = true;
+        nextPage.addEventListener('click', function() { goNotebookPage(1); });
     }
 }
 
@@ -377,12 +490,12 @@ export function initRadioCommsSystem(options) {
     notebook = loadNotebook(c.userId);
     seenMessageIds = {};
 
-    if (!notebook.community.length) {
-        appendNotebookEntry(notebook, 'community', {
+    if (!notebook.station.length) {
+        appendNotebookEntry(notebook, 'station', {
             id: 'sys_welcome',
             dir: 'in',
             from: 'SYSTÉM',
-            text: 'Nalaď frekvenci komunity a šifru. Kdo zná obojí, může odposlouchávat.',
+            text: 'Staniční list — záznam provozu vysílačky.',
             frequency: communityFrequencyFromCode(c.comCode),
             encryptionKey: getCommunityRadioKey(c.comCode, c.comName),
             scope: 'community',

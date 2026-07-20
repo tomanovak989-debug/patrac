@@ -6,11 +6,20 @@
 export const GLOBAL_FREQUENCY = '121.500';
 export const GLOBAL_ENCRYPTION = 'SOS';
 
-export const NOTEBOOK_TABS = ['private', 'community', 'global'];
+export const NOTEBOOK_TABS = ['station', 'notes', 'grids'];
 export const NOTEBOOK_TAB_LABELS = {
-    private: 'Soukromé',
-    community: 'Komunitní',
-    global: 'Globální'
+    station: 'Staniční list',
+    notes: 'Poznámky',
+    grids: 'Gridy'
+};
+
+/** Počet řádků na jeden A4 list sešitu. */
+export const NOTEBOOK_LINES_PER_PAGE = 16;
+
+export const CHANNEL_SCOPE_LABELS = {
+    global: 'GLOB',
+    community: 'KOM',
+    private: 'SOUK'
 };
 
 export function normalizeFrequency(value) {
@@ -142,19 +151,38 @@ export function saveRadioState(userId, state) {
     } catch (e) {}
 }
 
+function migrateNotebook(raw) {
+    if (raw && Array.isArray(raw.station)) {
+        if (!raw.pageIndex) raw.pageIndex = { station: 0, notes: 0, grids: 0 };
+        if (!Array.isArray(raw.notes)) raw.notes = [];
+        if (!Array.isArray(raw.grids)) raw.grids = [];
+        if (raw.pageIndex.grids == null) raw.pageIndex.grids = 0;
+        return raw;
+    }
+    var station = [];
+    if (raw && typeof raw === 'object') {
+        var legacy = ['private', 'community', 'global', 'station'];
+        for (var i = 0; i < legacy.length; i++) {
+            var key = legacy[i];
+            if (key === 'station' && Array.isArray(raw.station)) continue;
+            if (Array.isArray(raw[key])) station = station.concat(raw[key]);
+        }
+    }
+    station.sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+    return {
+        station: station,
+        notes: [],
+        grids: [],
+        pageIndex: { station: 0, notes: 0, grids: 0 }
+    };
+}
+
 export function loadNotebook(userId) {
     try {
         var raw = localStorage.getItem(notebookKey(userId));
-        if (raw) {
-            var parsed = JSON.parse(raw);
-            return {
-                private: Array.isArray(parsed.private) ? parsed.private : [],
-                community: Array.isArray(parsed.community) ? parsed.community : [],
-                global: Array.isArray(parsed.global) ? parsed.global : []
-            };
-        }
+        if (raw) return migrateNotebook(JSON.parse(raw));
     } catch (e) {}
-    return { private: [], community: [], global: [] };
+    return { station: [], notes: [], grids: [], pageIndex: { station: 0, notes: 0, grids: 0 } };
 }
 
 export function saveNotebook(userId, notebook) {
@@ -166,8 +194,26 @@ export function saveNotebook(userId, notebook) {
 export function appendNotebookEntry(notebook, tab, entry) {
     if (!notebook[tab]) notebook[tab] = [];
     notebook[tab].push(entry);
-    if (notebook[tab].length > 200) notebook[tab] = notebook[tab].slice(-200);
+    if (notebook[tab].length > 800) notebook[tab] = notebook[tab].slice(-800);
     return notebook;
+}
+
+export function getNotebookPageCount(notebook, tab, linesPerPage) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var list = notebook[tab] || [];
+    return Math.max(1, Math.ceil(list.length / linesPerPage));
+}
+
+export function getNotebookPageEntries(notebook, tab, pageIndex, linesPerPage) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var list = notebook[tab] || [];
+    var start = pageIndex * linesPerPage;
+    return list.slice(start, start + linesPerPage);
+}
+
+export function getNotebookPageIndexForEntry(notebook, tab, entryIndex, linesPerPage) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    return Math.floor(entryIndex / linesPerPage);
 }
 
 export function formatTime(ts) {
