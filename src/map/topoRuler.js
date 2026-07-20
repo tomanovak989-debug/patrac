@@ -642,6 +642,10 @@ function updateRulerPlateVisual() {
         else degEl.textContent = '';
     }
     if (plateWrap) plateWrap.classList.toggle('is-locked', locked);
+    ['topo-ruler-drag-tl', 'topo-ruler-drag-br'].forEach(function(id) {
+        var handle = document.getElementById(id);
+        if (handle) handle.style.display = locked ? 'none' : '';
+    });
     syncFabLockUi();
 }
 
@@ -657,6 +661,17 @@ function applyRulerScreenPos() {
     var top = Math.round(state.screenY);
     if (parseFloat(root.style.left) !== left) root.style.left = left + 'px';
     if (parseFloat(root.style.top) !== top) root.style.top = top + 'px';
+}
+
+function applyRulerFollowMode() {
+    if (state.positionLocked && state.anchor) {
+        syncScreenFromAnchor();
+        return;
+    }
+    if (state.screenX != null && state.screenY != null) {
+        applyRulerScreenPos();
+        syncAnchorFromCenter();
+    }
 }
 
 function updateRulerWidgetPosition() {
@@ -678,11 +693,13 @@ function updateRulerWidgetPosition() {
     root.style.right = 'auto';
     root.style.bottom = 'auto';
 
-    if (state.anchor) {
+    if (state.positionLocked && state.anchor) {
         syncScreenFromAnchor();
     } else if (state.screenX != null && state.screenY != null) {
         applyRulerScreenPos();
         syncAnchorFromCenter();
+    } else if (state.anchor) {
+        syncScreenFromAnchor();
     } else {
         var def = getDefaultScreenPos();
         state.screenX = def.x;
@@ -799,10 +816,6 @@ function bindWidgetDrag(surface) {
     var origin = null;
     var activePointer = null;
 
-    function isDragHandle(target) {
-        return target && target.closest && target.closest('input, select, button, .topo-ruler-center, .topo-ruler-zone-bar, .topo-ruler-bezel-hit');
-    }
-
     function ptrXY(e) {
         if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
         return { x: e.clientX, y: e.clientY };
@@ -833,7 +846,11 @@ function bindWidgetDrag(surface) {
         _widgetDragging = false;
         _widgetDragCleanup = null;
         setMapInteractionEnabled(true);
-        if (moving) persistState();
+        if (moving) {
+            if (!state.positionLocked) syncAnchorFromCenter();
+            persistState();
+            if (_deps && typeof _deps.onUiUpdate === 'function') _deps.onUiUpdate();
+        }
         moving = false;
         start = null;
         origin = null;
@@ -846,7 +863,7 @@ function bindWidgetDrag(surface) {
         var p = ptrXY(e);
         var dx = p.x - start.x;
         var dy = p.y - start.y;
-        if (!moving && Math.hypot(dx, dy) < 4) return;
+        if (!moving && Math.hypot(dx, dy) < 6) return;
         if (!moving) {
             moving = true;
             _widgetDragging = true;
@@ -863,7 +880,6 @@ function bindWidgetDrag(surface) {
             root.style.left = Math.round(nextX) + 'px';
             root.style.top = Math.round(nextY) + 'px';
         }
-        syncAnchorFromCenter();
         syncCoordFieldsFromPosition();
         updateRulerPlateVisual();
         e.preventDefault();
@@ -872,7 +888,6 @@ function bindWidgetDrag(surface) {
 
     function onStart(e) {
         if (state.positionLocked) return;
-        if (isDragHandle(e.target)) return;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         moving = false;
         start = ptrXY(e);
@@ -894,6 +909,8 @@ function bindWidgetDrag(surface) {
         if (surface.setPointerCapture && activePointer != null) {
             try { surface.setPointerCapture(activePointer); } catch (err) {}
         }
+        e.preventDefault();
+        e.stopPropagation();
         detachDoc();
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
@@ -901,6 +918,11 @@ function bindWidgetDrag(surface) {
     }
 
     surface.addEventListener('pointerdown', onStart);
+}
+
+function bindRulerMoveHandles() {
+    bindWidgetDrag(document.getElementById('topo-ruler-drag-tl'));
+    bindWidgetDrag(document.getElementById('topo-ruler-drag-br'));
 }
 
 function bindBearingBezelDrag(bezel) {
@@ -1039,13 +1061,10 @@ function bindFabLongPress() {
 
 function initInteractions() {
     var root = document.getElementById('map-topo-ruler');
-    var plateWrap = root && root.querySelector('.topo-ruler-plate-wrap');
-    var pinCenter = document.getElementById('topo-ruler-center');
     var rulerScene = document.getElementById('topo-ruler-scene');
     var bezelHit = document.getElementById('topo-ruler-bezel-hit');
 
-    bindWidgetDrag(plateWrap);
-    bindMapWheelPassthrough(plateWrap);
+    bindRulerMoveHandles();
     bindMapWheelPassthrough(rulerScene);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
@@ -1073,13 +1092,13 @@ function bindMapEvents() {
 
 function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
-    syncScreenFromAnchor();
+    applyRulerFollowMode();
     updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
     if (_bearingDragging || _widgetDragging) return;
-    syncScreenFromAnchor();
+    applyRulerFollowMode();
     updateRulerPlateVisual();
 }
 
@@ -1099,7 +1118,11 @@ export function initTopoRuler(deps) {
     bindMapEvents();
     syncFabLockUi();
     cachePlateCenterOffset();
-    updateRulerWidgetPosition();
+    if (!state.anchor && state.screenX == null && state.screenY == null) {
+        snapTopoRulerToMapView();
+    } else {
+        updateRulerWidgetPosition();
+    }
 }
 
 function getMapViewCenterLatLng() {
@@ -1139,7 +1162,6 @@ export function updateTopoRulerDisplay(show) {
     root.classList.toggle('is-ready', state.visible);
     if (state.visible) {
         requestAnimationFrame(function() {
-            snapTopoRulerToMapView();
             updateRulerWidgetPosition();
         });
     } else {
@@ -1157,6 +1179,7 @@ export function formatRulerMgrs50(lat, lng) {
 
 export function getRulerCenterLatLng() {
     if (!state.visible) return null;
+    if (state.positionLocked && state.anchor) return { lat: state.anchor.lat, lng: state.anchor.lng };
     if (state.anchor) return { lat: state.anchor.lat, lng: state.anchor.lng };
     return getRulerOriginLatLng();
 }

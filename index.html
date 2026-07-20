@@ -1647,7 +1647,7 @@
             display: none;
             right: auto;
             bottom: auto;
-            z-index: 1003;
+            z-index: 12;
             user-select: none;
             width: 260px;
             height: fit-content;
@@ -1741,12 +1741,32 @@
             height: 260px;
             flex-shrink: 0;
             overflow: visible;
-            pointer-events: auto;
+            pointer-events: none;
             touch-action: auto;
-            cursor: grab;
+            cursor: default;
         }
-        .topo-ruler-plate-wrap.is-dragging { cursor: grabbing; touch-action: none; }
-        .topo-ruler-plate-wrap.is-locked { cursor: default; touch-action: auto; pointer-events: none; }
+        .topo-ruler-plate-wrap.is-locked { touch-action: auto; }
+        .topo-ruler-drag-handle {
+            position: absolute;
+            z-index: 40;
+            width: 22px;
+            height: 22px;
+            padding: 0;
+            border: 1px solid var(--map-float-border);
+            border-radius: 4px;
+            background: var(--map-float-bg);
+            color: var(--text-green-dim);
+            font-size: 12px;
+            line-height: 22px;
+            text-align: center;
+            cursor: grab;
+            box-shadow: var(--neon-glow-soft);
+            pointer-events: auto;
+            touch-action: none;
+        }
+        .topo-ruler-drag-handle:active { cursor: grabbing; background: var(--map-float-bg-active); }
+        #topo-ruler-drag-tl { left: -10px; top: -10px; }
+        #topo-ruler-drag-br { right: -10px; bottom: -10px; }
         .topo-ruler-scene {
             position: absolute;
             inset: 0;
@@ -2190,6 +2210,8 @@
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
             <div class="topo-ruler-plate-wrap">
+                <button type="button" class="topo-ruler-drag-handle map-float-hit" id="topo-ruler-drag-tl" title="Přesunout pravítko">⠿</button>
+                <button type="button" class="topo-ruler-drag-handle map-float-hit" id="topo-ruler-drag-br" title="Přesunout pravítko">⠿</button>
                 <div class="topo-ruler-scene" id="topo-ruler-scene">
                 <svg class="topo-gta-svg topo-ruler-svg" id="topo-ruler-svg" viewBox="0 0 260 260" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                     <g id="topo-ruler-world">
@@ -2228,15 +2250,8 @@
                 <button type="button" id="btn-route-save" title="Uložit">💾</button>
             </div>
             <select id="route-planner-route-select" style="width:100%;margin-bottom:6px"></select>
-            <div class="route-planner-row">
-                <button type="button" id="btn-route-set-start">Start = střed mapy</button>
-                <button type="button" id="btn-route-set-target">Cíl = střed mapy</button>
-            </div>
-            <div class="route-planner-row">
-                <button type="button" id="btn-route-midpoint">+ bod na nejdelší úsek</button>
-            </div>
+            <p style="font-size:8px;color:rgba(184,255,176,0.75);margin:0 0 6px 0;line-height:1.35;text-align:center">Start = GPS · Cíl = střed pravítka<br>Vyžaduje zapnuté pravítko 📐</p>
             <span class="route-planner-total" id="route-planner-total">Σ —</span>
-            <div style="font-size:8px;color:rgba(184,255,176,0.7);margin-top:4px;text-align:center">Klik na úsečku = nový bod</div>
         </div>
     </div>
     <div id="map-compass" aria-label="Kompas s azimutem">
@@ -2933,7 +2948,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720b9';
+        var PATRAC_BUILD = '20260720c1';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6057,6 +6072,10 @@
             var fab = document.getElementById('fab-topo-ruler');
             if (fab) fab.classList.toggle('is-active', show);
             syncMgrsGridWithRuler(show);
+            if (!show) {
+                try { localStorage.setItem('patrac_route_planner_visible', 'false'); } catch (e) {}
+                updateRoutePlannerDisplay();
+            }
             if (!topoRulerMod) {
                 if (root) {
                     root.style.display = show ? 'block' : 'none';
@@ -6072,6 +6091,9 @@
             localStorage.setItem('patrac_topo_ruler_visible', next ? 'true' : 'false');
             updateTopoRulerDisplay();
         };
+        function isTopoRulerActive() {
+            return localStorage.getItem('patrac_topo_ruler_visible') === 'true' && _mapToolsTabActive;
+        }
 
         function initRoutePlannerModule() {
             if (routePlannerMod) {
@@ -6085,7 +6107,19 @@
                     routeLayer: mapRouteLayer,
                     bearingDegrees: bearingDegrees,
                     distanceMeters: distanceMeters,
-                    formatDistance: formatDistance
+                    formatDistance: formatDistance,
+                    getGpsLatLng: function() {
+                        if (lastUserPosition && isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
+                            return { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
+                        }
+                        return null;
+                    },
+                    getRulerCenterLatLng: function() {
+                        if (topoRulerMod && topoRulerMod.getRulerCenterLatLng) {
+                            return topoRulerMod.getRulerCenterLatLng();
+                        }
+                        return null;
+                    }
                 });
                 updateRoutePlannerDisplay();
             }).catch(function(err) { console.error('[routePlanner]', err); });
@@ -6107,6 +6141,10 @@
             routePlannerMod.updateRoutePlannerDisplay(show);
         }
         window.patracToggleRoutePlanner = function() {
+            if (!isTopoRulerActive()) {
+                alert('Plánovač trasy vyžaduje zapnuté pravítko (📐).');
+                return;
+            }
             var next = localStorage.getItem('patrac_route_planner_visible') !== 'true';
             localStorage.setItem('patrac_route_planner_visible', next ? 'true' : 'false');
             updateRoutePlannerDisplay();
@@ -6135,6 +6173,10 @@
             if (!hud) return;
             hud.classList.toggle('visible', !!_mapToolsTabActive);
             if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
+            if (routePlannerMod && routePlannerMod.refreshRouteFromGpsAndRuler &&
+                localStorage.getItem('patrac_route_planner_visible') === 'true' && _mapToolsTabActive) {
+                routePlannerMod.refreshRouteFromGpsAndRuler();
+            }
         }
 
         function updateCompassCenterDeg() {
@@ -7451,9 +7493,6 @@
                     map.invalidateSize();
                     ensureMapTouchPan();
                     patracRefreshFogOfWar();
-                    if (topoRulerMod && topoRulerMod.snapTopoRulerToMapView) {
-                        topoRulerMod.snapTopoRulerToMapView();
-                    }
                 }, 150);
             } else {
                 resetMapBearingRotation();
