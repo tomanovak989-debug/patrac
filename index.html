@@ -973,6 +973,8 @@
         .radio-notebook-sheet {
             position: relative;
             aspect-ratio: 210 / 297;
+            --nb-line: 22px;
+            --nb-lines: 16;
             background: #fff8ea;
             border: 1px solid rgba(80, 60, 30, 0.28);
             box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.12);
@@ -996,10 +998,11 @@
             background: repeating-linear-gradient(
                 to bottom,
                 transparent 0,
-                transparent calc(100% / 20 - 1px),
-                rgba(100, 140, 180, 0.2) calc(100% / 20 - 1px),
-                rgba(100, 140, 180, 0.2) calc(100% / 20)
+                transparent calc(var(--nb-line) - 1px),
+                rgba(100, 140, 180, 0.22) calc(var(--nb-line) - 1px),
+                rgba(100, 140, 180, 0.22) var(--nb-line)
             );
+            background-position: 0 28px;
             pointer-events: none;
         }
         .radio-notebook-page-num {
@@ -1016,18 +1019,22 @@
             z-index: 1;
             height: 100%;
             box-sizing: border-box;
-            padding: 24px 14px 8px 16px;
+            padding: 28px 14px 10px 16px;
             overflow: hidden;
             font-family: 'Patrick Hand', 'Segoe Print', cursive;
-            font-size: clamp(13px, 3.1vw, 16px);
-            line-height: calc(100% / 20);
+            font-size: 15px;
+            line-height: var(--nb-line, 22px);
             color: #2a2418;
         }
         .radio-notebook-line {
+            display: block;
+            height: var(--nb-line, 22px);
+            line-height: var(--nb-line, 22px);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: clip;
-            height: calc(100% / 20);
+            box-sizing: border-box;
+            padding-top: 2px;
         }
         .radio-notebook-line-cont {
             padding-left: 1.1em;
@@ -2948,7 +2955,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720c1';
+        var PATRAC_BUILD = '20260720c2';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
