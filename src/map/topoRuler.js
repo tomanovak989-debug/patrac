@@ -1053,11 +1053,7 @@ function initInteractions() {
         toggle.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            state.expanded = !state.expanded;
-            root.classList.toggle('topo-ruler-collapsed', !state.expanded);
-            toggle.textContent = state.expanded ? '−' : '📐';
-            persistState();
-            updateRulerWidgetPosition();
+            if (typeof window.patracHideTopoRuler === 'function') window.patracHideTopoRuler();
         });
     }
 
@@ -1104,11 +1100,12 @@ export function initTopoRuler(deps) {
     _deps = deps;
     if (!_layer) _layer = deps.routeLayer || null;
     loadState();
+    state.expanded = true;
     var root = document.getElementById('map-topo-ruler');
     if (root) {
-        root.classList.toggle('topo-ruler-collapsed', !state.expanded);
+        root.classList.remove('topo-ruler-collapsed');
         var toggle = document.getElementById('btn-topo-ruler-toggle');
-        if (toggle) toggle.textContent = state.expanded ? '−' : '📐';
+        if (toggle) toggle.textContent = '✕';
     }
     buildRulerDegTicks();
     buildBearingHand();

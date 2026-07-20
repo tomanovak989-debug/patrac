@@ -392,10 +392,7 @@ function initInteractions() {
         toggle.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            state.expanded = !state.expanded;
-            if (root) root.classList.toggle('route-planner-collapsed', !state.expanded);
-            toggle.textContent = state.expanded ? '−' : '🛤';
-            persistState();
+            if (typeof window.patracHideRoutePlanner === 'function') window.patracHideRoutePlanner();
         });
     }
 
@@ -454,11 +451,12 @@ export function initRoutePlanner(deps) {
     _deps = deps;
     if (!_layer) _layer = deps.routeLayer || null;
     loadState();
+    state.expanded = true;
     var root = document.getElementById('map-route-planner');
     if (root) {
-        root.classList.toggle('route-planner-collapsed', !state.expanded);
+        root.classList.remove('route-planner-collapsed');
         var toggle = document.getElementById('btn-route-planner-toggle');
-        if (toggle) toggle.textContent = state.expanded ? '−' : '🛤';
+        if (toggle) toggle.textContent = '✕';
     }
     refreshRouteSelect();
     syncUiFields();

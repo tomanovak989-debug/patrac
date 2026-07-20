@@ -920,7 +920,7 @@
         #map-add-poi-bar, #map-story-bar, #poi-edit-bar, #story-pos-edit-bar {
             display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
             background: var(--overlay-bg); border: 1px solid var(--xp-blue);
-            padding: 16px; box-sizing: border-box; border-radius: 2px;
+            padding: 16px; padding-top: 34px; box-sizing: border-box; border-radius: 2px;
             box-shadow: 0 0 14px rgba(0,136,255,0.4), 0 0 28px rgba(0,136,255,0.12);
             line-height: var(--panel-line-height);
         }
@@ -990,8 +990,68 @@
             border-color: #ffb366;
             box-shadow: 0 0 16px rgba(255, 179, 102, 0.85);
         }
+
+        .map-panel-hide-btn,
         .topo-ruler-widget-toggle,
-        .compass-widget-toggle { display: none !important; }
+        .compass-widget-toggle,
+        .route-planner-widget-toggle {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            z-index: 50;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--hud-border);
+            border-radius: 3px;
+            background: var(--map-float-bg-alt);
+            color: var(--text-green-dim);
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--neon-glow-soft);
+        }
+        .map-panel-hide-btn:hover,
+        .topo-ruler-widget-toggle:hover,
+        .compass-widget-toggle:hover,
+        .route-planner-widget-toggle:hover {
+            color: var(--text-green);
+            border-color: var(--text-green);
+        }
+
+        .map-overlay-panel {
+            position: absolute;
+            padding-top: 34px;
+        }
+        .map-overlay-panel-head {
+            margin: 0 0 8px 0;
+            padding-right: 34px;
+            font-size: var(--text-base);
+            font-weight: bold;
+        }
+        .map-layers-dropdown-head {
+            position: absolute;
+            top: 6px;
+            left: 10px;
+            right: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: var(--text-xs);
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: var(--text-green);
+        }
+        .map-layers-dropdown-head .map-panel-hide-btn {
+            position: static;
+            flex-shrink: 0;
+        }
 
         .leaflet-tooltip.map-point-label {
             background: var(--overlay-bg) !important;
@@ -1062,7 +1122,7 @@
         #map-story-bar, #poi-edit-bar, #story-pos-edit-bar {
             display: none; position: absolute; bottom: 100px; left: 5%; width: 90%; z-index: 500;
             background: var(--overlay-bg); border: 1px solid var(--border-color);
-            padding: 14px; box-sizing: border-box; border-radius: 2px;
+            padding: 14px; padding-top: 34px; box-sizing: border-box; border-radius: 2px;
             box-shadow: var(--neon-glow-strong); max-height: 55vh; overflow-y: auto;
         }
         #poi-edit-bar { border-color: var(--xp-blue); box-shadow: 0 0 14px rgba(0,136,255,0.35); }
@@ -1200,20 +1260,23 @@
         }
         .compass-widget-toggle {
             position: absolute;
-            top: -6px; right: -6px;
+            top: 4px; right: 4px;
             z-index: 360;
-            width: 26px; height: 26px;
+            width: 28px; height: 28px;
             padding: 0;
-            border: 1px solid var(--map-float-border-strong);
-            border-radius: 4px;
-            background: var(--map-float-bg);
+            border: 1px solid var(--hud-border);
+            border-radius: 3px;
+            background: var(--map-float-bg-alt);
             color: var(--text-green);
             font-family: inherit;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 700;
             line-height: 1;
             cursor: pointer;
-            box-shadow: var(--neon-glow);
+            box-shadow: var(--neon-glow-soft);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .compass-widget-toggle:active { background: var(--map-float-bg-active); }
         #map-compass.compass-needs-permission .compass-housing {
@@ -1223,6 +1286,12 @@
         @keyframes compass-pulse {
             0%, 100% { box-shadow: 0 0 6px rgba(255, 200, 80, 0.35); }
             50% { box-shadow: 0 0 14px rgba(255, 200, 80, 0.85); }
+        }
+        .compass-body {
+            padding-top: 32px;
+        }
+        .topo-ruler-body {
+            padding-top: 28px;
         }
         #map-compass .compass-housing { cursor: pointer; }
         .compass-housing {
@@ -1336,13 +1405,13 @@
             box-shadow: 0 0 10px var(--topo-accent-glow);
         }
         .topo-ruler-widget-toggle {
-            position: absolute; top: -8px; right: -8px; z-index: 40;
-            width: 32px; height: 32px; padding: 0;
-            border: 1px solid var(--topo-accent-soft); border-radius: 4px;
+            position: absolute; top: 4px; right: 4px; z-index: 40;
+            width: 28px; height: 28px; padding: 0;
+            border: 1px solid var(--hud-border); border-radius: 3px;
             background: var(--map-float-bg-alt); color: var(--topo-accent);
-            font-family: inherit; font-size: 18px; font-weight: 700; cursor: pointer;
-            text-shadow: var(--topo-text-glow);
-            box-shadow: 0 0 8px var(--topo-accent-glow);
+            font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+            box-shadow: var(--neon-glow-soft);
+            display: flex; align-items: center; justify-content: center;
         }
         #topo-ruler-drag-surface {
             position: relative;
@@ -1763,18 +1832,21 @@
         #map-route-planner.route-planner-collapsed { width: 48px; }
         #map-route-planner.route-planner-collapsed .route-planner-body { display: none; }
         .route-planner-widget-toggle {
-            position: absolute; top: -8px; right: -8px; z-index: 40;
-            width: 32px; height: 32px; padding: 0;
-            border: 1px solid var(--topo-accent-soft); border-radius: 4px;
+            position: absolute; top: 4px; right: 4px; z-index: 40;
+            width: 28px; height: 28px; padding: 0;
+            border: 1px solid var(--hud-border); border-radius: 3px;
             background: var(--map-float-bg-alt); color: var(--rp-accent);
-            font-size: 16px; cursor: pointer;
+            font-size: 14px; font-weight: 700; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: var(--neon-glow-soft);
         }
         .route-planner-body {
             background: var(--map-float-bg);
             border: 1px solid var(--topo-accent-soft);
             border-radius: 6px;
-            padding: 10px 8px 8px;
+            padding: 34px 8px 8px;
             pointer-events: auto;
+            position: relative;
         }
         .route-planner-title {
             font-size: 10px; font-weight: 700; color: var(--rp-accent);
@@ -1844,8 +1916,9 @@
         #map-layers-panel.visible { display: flex; }
         #map-layers-dropdown {
             display: none; background: var(--map-float-bg); border: 1px solid var(--hud-border);
-            padding: 8px 10px; min-width: 160px; box-shadow: var(--neon-glow);
+            padding: 34px 10px 8px; min-width: 160px; box-shadow: var(--neon-glow);
             font-family: 'IBM Plex Mono', monospace; font-size: var(--text-xs);
+            position: relative;
         }
         #map-layers-dropdown.open { display: block; }
         #map-layers-dropdown label {
@@ -1862,7 +1935,7 @@
     <div id="map"></div>
     <div id="map-float-overlay" aria-hidden="true">
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
-        <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko">−</button>
+        <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko" aria-label="Skrýt">✕</button>
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
             <div class="topo-ruler-plate-wrap">
                 <div class="topo-ruler-scene" id="topo-ruler-scene">
@@ -1895,7 +1968,7 @@
         </div>
     </div>
     <div id="map-route-planner" aria-label="Plánovač trasy">
-        <button type="button" id="btn-route-planner-toggle" class="route-planner-widget-toggle map-float-hit" title="Skrýt plánovač">−</button>
+        <button type="button" id="btn-route-planner-toggle" class="route-planner-widget-toggle map-float-hit" title="Skrýt plánovač" aria-label="Skrýt">✕</button>
         <div class="route-planner-body">
             <div class="route-planner-title">PLÁNOVAČ TRASY</div>
             <div class="route-planner-row">
@@ -1915,7 +1988,7 @@
         </div>
     </div>
     <div id="map-compass" aria-label="Kompas s azimutem">
-        <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle map-float-hit" title="Skrýt buzolu">−</button>
+        <button type="button" id="btn-compass-widget-toggle" class="compass-widget-toggle map-float-hit" title="Skrýt buzolu" aria-label="Skrýt">✕</button>
         <div class="compass-body">
         <button type="button" class="compass-drag-handle map-float-hit" id="compass-drag-handle" title="Přesunout buzolu">⠿</button>
         <div class="compass-housing">
@@ -2180,6 +2253,10 @@
 
     <div id="map-layers-panel">
         <div id="map-layers-dropdown">
+            <div class="map-layers-dropdown-head">
+                <span>◫ VRSTVY</span>
+                <button type="button" class="map-panel-hide-btn" onclick="closeMapLayersPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
+            </div>
             <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
             <label><input type="checkbox" id="map-filter-pocta" checked onchange="setMapLayerFilter('pocta', this.checked)"> Pocty</label>
@@ -2219,18 +2296,19 @@
         </select>
     </div>
 
-    <div id="map-add-poi-bar">
-        <div id="map-add-poi-title" style="font-size:var(--text-base); color:var(--xp-blue); font-weight:bold; margin-bottom:6px;">📍 NOVÝ VOLNÝ BOD (GPS POLOHA)</div>
+    <div id="map-add-poi-bar" class="map-overlay-panel">
+        <button type="button" class="map-panel-hide-btn" onclick="closeAddPoiPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
+        <div id="map-add-poi-title" class="map-overlay-panel-head" style="color:var(--xp-blue);">📍 NOVÝ VOLNÝ BOD (GPS POLOHA)</div>
         <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV (NA MAPĚ):</label><input type="text" id="poi-name" placeholder="Mýtina u potoka"></div>
         <div class="form-group" style="margin-bottom:4px;"><label>SKRYTÁ POZNÁMKA (JEN V DETAILU):</label><textarea id="poi-note" rows="2" placeholder="Později doplníš popis, co tu je…"></textarea></div>
         <div class="form-group" style="margin-bottom:6px;"><label>FOTO (VOLITELNĚ):</label><input type="file" id="poi-file" accept="image/*" onchange="previewPoiImage(this)"></div>
         <div class="poi-preview-box" id="poi-create-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--xp-blue); color:var(--xp-blue); padding:8px;" onclick="confirmAddMapPoi()">ULOŽIT BOD</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeAddPoiPanel()">ZRUŠIT</button>
     </div>
 
-    <div id="poi-edit-bar">
-        <div style="font-size:var(--text-base); color:var(--xp-blue); font-weight:bold; margin-bottom:6px;">📝 UPRAVIT VOLNÝ BOD</div>
+    <div id="poi-edit-bar" class="map-overlay-panel">
+        <button type="button" class="map-panel-hide-btn" onclick="closePoiEditor()" title="Skrýt" aria-label="Skrýt">✕</button>
+        <div class="map-overlay-panel-head" style="color:var(--xp-blue);">📝 UPRAVIT VOLNÝ BOD</div>
         <input type="hidden" id="poi-edit-id">
         <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV:</label><input type="text" id="poi-edit-name"></div>
         <div class="form-group" style="margin-bottom:4px;"><label>SKRYTÁ POZNÁMKA:</label><textarea id="poi-edit-note" rows="3"></textarea></div>
@@ -2238,24 +2316,23 @@
         <div class="poi-preview-box" id="poi-edit-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--xp-blue); color:var(--xp-blue); padding:8px;" onclick="savePoiChanges()">ULOŽIT ZMĚNY</button>
         <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--danger-orange); color:var(--danger-orange); padding:6px;" onclick="deleteMapPoiFromEditor()">🗑️ SMAZAT BOD</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closePoiEditor()">ZRUŠIT</button>
     </div>
 
-    <div id="story-pos-edit-bar">
-        <div style="font-size:var(--text-base); color:var(--text-green); font-weight:bold; margin-bottom:6px;">📢 POPIS KOMUNITY — PRVOTNÍ POZICE</div>
+    <div id="story-pos-edit-bar" class="map-overlay-panel">
+        <button type="button" class="map-panel-hide-btn" onclick="closeStoryPosEditor()" title="Skrýt" aria-label="Skrýt">✕</button>
+        <div class="map-overlay-panel-head" style="color:var(--text-green);">📢 POPIS KOMUNITY — PRVOTNÍ POZICE</div>
         <input type="hidden" id="story-pos-edit-id">
         <div class="form-group" style="margin-bottom:4px;"><label>POPIS PRO KOMUNITU:</label><textarea id="story-pos-edit-note" rows="3" placeholder="Např. dočasně nepřístupné, cesta zavalena…"></textarea></div>
         <div class="form-group" style="margin-bottom:4px;"><label>FOTO:</label><input type="file" id="story-pos-edit-file" accept="image/*" onchange="previewStoryPosEditImage(this)"></div>
         <div class="poi-preview-box" id="story-pos-edit-preview">BEZ FOTO</div>
         <button class="btn-accept" style="width:100%; border-color:var(--text-green); color:var(--text-green); padding:8px;" onclick="saveStoryPosChanges()">ULOŽIT POPIS</button>
-        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeStoryPosEditor()">ZRUŠIT</button>
     </div>
 
-    <div id="map-story-bar">
-        <div style="font-size:var(--text-base); color:var(--text-green); font-weight:bold; margin-bottom:8px;">🧭 PRVOTNÍ POZICE — SPRÁVA BODŮ</div>
+    <div id="map-story-bar" class="map-overlay-panel">
+        <button type="button" class="map-panel-hide-btn" onclick="closeStoryPositionsPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
+        <div class="map-overlay-panel-head" style="color:var(--text-green);">🧭 PRVOTNÍ POZICE — SPRÁVA BODŮ</div>
         <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 8px 0;">Tyto body jsou trvalé. Lze je znovu zaměřit nebo resetovat, nikdy nezmizí z hry.</p>
         <div id="map-story-positions-list"></div>
-        <button class="btn-accept" style="width:100%; margin-top:8px; border-color:var(--muted-fg); color:var(--muted-fg); padding:6px;" onclick="closeStoryPositionsPanel()">ZAVŘÍT</button>
     </div>
 
     <!-- STŘEDOVÝ PANEL -->
@@ -2634,7 +2711,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720af';
+        var PATRAC_BUILD = '20260720b0';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5485,6 +5562,24 @@
             if (drop) drop.classList.toggle('open');
         }
 
+        function closeMapLayersPanel() {
+            var drop = document.getElementById('map-layers-dropdown');
+            if (drop) drop.classList.remove('open');
+        }
+
+        window.patracHideTopoRuler = function() {
+            try { localStorage.setItem('patrac_topo_ruler_visible', 'false'); } catch (e) {}
+            updateTopoRulerDisplay();
+        };
+        window.patracHideRoutePlanner = function() {
+            try { localStorage.setItem('patrac_route_planner_visible', 'false'); } catch (e) {}
+            updateRoutePlannerDisplay();
+        };
+        window.patracHideCompass = function() {
+            try { localStorage.setItem('patrac_compass_visible', 'false'); } catch (e) {}
+            updateMapCompassDisplay();
+        };
+
         function getMapPointCategory(meta) {
             var id = meta.id || '';
             if (gameQuests[id]) return 'permanent';
@@ -5833,14 +5928,9 @@
 
         function setCompassWidgetExpanded(expanded) {
             var root = document.getElementById('map-compass');
-            var btn = document.getElementById('btn-compass-widget-toggle');
             if (!root) return;
-            root.classList.toggle('compass-collapsed', !expanded);
-            if (btn) {
-                btn.textContent = expanded ? '−' : '🧭';
-                btn.title = expanded ? 'Skrýt buzolu' : 'Zobrazit buzolu';
-            }
-            try { localStorage.setItem('patrac_compass_expanded', expanded ? '1' : '0'); } catch (e) {}
+            root.classList.remove('compass-collapsed');
+            try { localStorage.setItem('patrac_compass_expanded', '1'); } catch (e) {}
             applyCompassDockPosition();
         }
 
@@ -5848,14 +5938,11 @@
             var btn = document.getElementById('btn-compass-widget-toggle');
             if (!btn || btn._compassToggleBound) return;
             btn._compassToggleBound = true;
-            var expanded = true;
-            try { expanded = localStorage.getItem('patrac_compass_expanded') !== '0'; } catch (e) {}
-            setCompassWidgetExpanded(expanded);
+            setCompassWidgetExpanded(true);
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-                var root = document.getElementById('map-compass');
-                setCompassWidgetExpanded(root && root.classList.contains('compass-collapsed'));
+                if (typeof window.patracHideCompass === 'function') window.patracHideCompass();
             });
         }
 
@@ -10389,6 +10476,7 @@
         window.resetStoryQuestPosition = resetStoryQuestPosition;
         window.startStoryQuestPlacement = startStoryQuestPlacement;
         window.panToStoryQuest = panToStoryQuest;
+        window.closeMapLayersPanel = closeMapLayersPanel;
         window.openStoryPositionsPanel = openStoryPositionsPanel;
         window.closeStoryPositionsPanel = closeStoryPositionsPanel;
         window.openPoiEditor = openPoiEditor;
