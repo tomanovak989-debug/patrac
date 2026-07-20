@@ -209,12 +209,11 @@ function beginMapZoom() {
     }
     cachePlateCenterOffset();
     _mapZooming = true;
-    if (state.anchor) {
+    if (state.positionLocked && state.anchor) {
         _zoomAnchorLl = { lat: state.anchor.lat, lng: state.anchor.lng };
     } else {
-        var ll = getRulerOriginLatLng();
-        _zoomAnchorLl = ll ? { lat: ll.lat, lng: ll.lng } : null;
-        if (_zoomAnchorLl) state.anchor = { lat: _zoomAnchorLl.lat, lng: _zoomAnchorLl.lng };
+        _zoomAnchorLl = null;
+        ensureScreenPos();
     }
 }
 
@@ -231,9 +230,18 @@ function endMapZoomSoon() {
 }
 
 function getVisualCenterLl() {
-    if (_mapZooming && _zoomAnchorLl) return _zoomAnchorLl;
-    if (state.anchor) return state.anchor;
+    if (_mapZooming && state.positionLocked && _zoomAnchorLl) return _zoomAnchorLl;
+    if (state.positionLocked && state.anchor) return state.anchor;
     return getRulerOriginLatLng();
+}
+
+function ensureScreenPos() {
+    if (state.screenX != null && state.screenY != null) return;
+    captureScreenPos();
+    if (state.screenX != null && state.screenY != null) return;
+    var def = getDefaultScreenPos();
+    state.screenX = def.x;
+    state.screenY = def.y;
 }
 
 function syncScreenFromAnchor() {
@@ -668,10 +676,9 @@ function applyRulerFollowMode() {
         syncScreenFromAnchor();
         return;
     }
-    if (state.screenX != null && state.screenY != null) {
-        applyRulerScreenPos();
-        syncAnchorFromCenter();
-    }
+    ensureScreenPos();
+    applyRulerScreenPos();
+    syncAnchorFromCenter();
 }
 
 function updateRulerWidgetPosition() {
@@ -695,15 +702,8 @@ function updateRulerWidgetPosition() {
 
     if (state.positionLocked && state.anchor) {
         syncScreenFromAnchor();
-    } else if (state.screenX != null && state.screenY != null) {
-        applyRulerScreenPos();
-        syncAnchorFromCenter();
-    } else if (state.anchor) {
-        syncScreenFromAnchor();
     } else {
-        var def = getDefaultScreenPos();
-        state.screenX = def.x;
-        state.screenY = def.y;
+        ensureScreenPos();
         applyRulerScreenPos();
         syncAnchorFromCenter();
     }
@@ -753,13 +753,15 @@ function loadState() {
 
 function togglePositionLock() {
     if (!state.positionLocked) {
+        ensureScreenPos();
         captureScreenPos();
-        state.positionLocked = true;
         syncAnchorFromCenter();
+        state.positionLocked = true;
         if (state.bearingDeg == null) state.bearingDeg = 0;
     } else {
         state.positionLocked = false;
         releaseInteractionLocks();
+        ensureScreenPos();
         captureScreenPos();
         syncAnchorFromCenter();
     }
@@ -812,73 +814,63 @@ function bindWidgetDrag(surface) {
     surface._topoDragBound = true;
     var root = document.getElementById('map-topo-ruler');
     var moving = false;
-    var start = null;
-    var origin = null;
-    var activePointer = null;
+    var moveStart = null;
+    var originPos = null;
 
-    function ptrXY(e) {
+    function ptr(e) {
         if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
         return { x: e.clientX, y: e.clientY };
     }
 
     function detachDoc() {
-        document.removeEventListener('pointermove', onMove);
-        document.removeEventListener('pointerup', onEnd);
-        document.removeEventListener('pointercancel', onEnd);
+        document.removeEventListener('mousemove', onMoveDrag);
+        document.removeEventListener('touchmove', onMoveDrag);
+        document.removeEventListener('mouseup', onMoveEnd);
+        document.removeEventListener('touchend', onMoveEnd);
+        document.removeEventListener('pointermove', onMoveDrag);
+        document.removeEventListener('pointerup', onMoveEnd);
+        document.removeEventListener('pointercancel', onMoveEnd);
     }
 
-    function releasePointerCapture(e) {
-        if (!surface || !surface.releasePointerCapture || activePointer == null) return;
-        try {
-            if (!e || e.pointerId == null || e.pointerId === activePointer) {
-                surface.releasePointerCapture(activePointer);
-            }
-        } catch (err) {}
-    }
-
-    function onEnd(e) {
-        if (activePointer != null && e && e.pointerId != null && e.pointerId !== activePointer) return;
+    function onMoveEnd() {
         detachDoc();
-        releasePointerCapture(e);
         document.body.style.cursor = '';
         surface.classList.remove('is-dragging');
-        surface.style.touchAction = '';
         _widgetDragging = false;
         _widgetDragCleanup = null;
         setMapInteractionEnabled(true);
         if (moving) {
-            if (!state.positionLocked) syncAnchorFromCenter();
+            syncAnchorFromCenter();
             persistState();
             if (_deps && typeof _deps.onUiUpdate === 'function') _deps.onUiUpdate();
         }
         moving = false;
-        start = null;
-        origin = null;
-        activePointer = null;
+        moveStart = null;
+        originPos = null;
     }
 
-    function onMove(e) {
-        if (!start || !origin) return;
-        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
-        var p = ptrXY(e);
-        var dx = p.x - start.x;
-        var dy = p.y - start.y;
-        if (!moving && Math.hypot(dx, dy) < 6) return;
+    function onMoveDrag(e) {
+        if (!moveStart || !originPos || state.positionLocked) return;
+        var p = ptr(e);
+        var dx = p.x - moveStart.x;
+        var dy = p.y - moveStart.y;
         if (!moving) {
+            if (Math.hypot(dx, dy) < 6) return;
             moving = true;
             _widgetDragging = true;
             surface.classList.add('is-dragging');
             document.body.style.cursor = 'grabbing';
-            surface.style.touchAction = 'none';
             setMapInteractionEnabled(false);
         }
-        var nextX = origin.x + dx;
-        var nextY = origin.y + dy;
-        state.screenX = nextX;
-        state.screenY = nextY;
+        state.screenX = originPos.x + dx;
+        state.screenY = originPos.y + dy;
         if (root) {
-            root.style.left = Math.round(nextX) + 'px';
-            root.style.top = Math.round(nextY) + 'px';
+            root.classList.remove('topo-ruler-docked');
+            root.classList.add('topo-ruler-positioned');
+            root.style.right = 'auto';
+            root.style.bottom = 'auto';
+            root.style.left = Math.round(state.screenX) + 'px';
+            root.style.top = Math.round(state.screenY) + 'px';
         }
         syncCoordFieldsFromPosition();
         updateRulerPlateVisual();
@@ -886,38 +878,37 @@ function bindWidgetDrag(surface) {
         e.stopPropagation();
     }
 
-    function onStart(e) {
+    function onMoveStart(e) {
         if (state.positionLocked) return;
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.type === 'mousedown' && e.button !== 0) return;
         moving = false;
-        start = ptrXY(e);
-        activePointer = e.pointerId != null ? e.pointerId : null;
-        captureScreenPos();
-        if (state.screenX == null) {
-            var def = getDefaultScreenPos();
-            state.screenX = def.x;
-            state.screenY = def.y;
-        }
-        origin = { x: state.screenX, y: state.screenY };
-        if (root) {
-            root.classList.remove('topo-ruler-docked');
-            root.classList.add('topo-ruler-positioned');
-            root.style.right = 'auto';
-            root.style.bottom = 'auto';
-        }
-        _widgetDragCleanup = function() { onEnd(null); };
-        if (surface.setPointerCapture && activePointer != null) {
-            try { surface.setPointerCapture(activePointer); } catch (err) {}
-        }
+        moveStart = ptr(e);
+        ensureScreenPos();
+        originPos = { x: state.screenX, y: state.screenY };
+        _widgetDragCleanup = onMoveEnd;
         e.preventDefault();
         e.stopPropagation();
         detachDoc();
-        document.addEventListener('pointermove', onMove, { passive: false });
-        document.addEventListener('pointerup', onEnd);
-        document.addEventListener('pointercancel', onEnd);
+        document.addEventListener('mousemove', onMoveDrag);
+        document.addEventListener('touchmove', onMoveDrag, { passive: false });
+        document.addEventListener('mouseup', onMoveEnd);
+        document.addEventListener('touchend', onMoveEnd);
+        document.addEventListener('pointermove', onMoveDrag, { passive: false });
+        document.addEventListener('pointerup', onMoveEnd);
+        document.addEventListener('pointercancel', onMoveEnd);
     }
 
-    surface.addEventListener('pointerdown', onStart);
+    surface.addEventListener('mousedown', onMoveStart);
+    surface.addEventListener('touchstart', onMoveStart, { passive: false });
+    surface.addEventListener('pointerdown', onMoveStart);
+}
+
+function stopMapSteal(el) {
+    if (!el || el._topoStopBound) return;
+    el._topoStopBound = true;
+    el.addEventListener('mousedown', function(e) { e.stopPropagation(); });
+    el.addEventListener('touchstart', function(e) { e.stopPropagation(); }, { passive: true });
+    el.addEventListener('pointerdown', function(e) { e.stopPropagation(); });
 }
 
 function bindRulerMoveHandles() {
@@ -989,6 +980,7 @@ function bindCoordInputs() {
     function bind(el, axis) {
         if (!el || el._bound) return;
         el._bound = true;
+        stopMapSteal(el);
         el.addEventListener('focus', function() { state._coordEditing = true; });
         el.addEventListener('blur', function() {
             state._coordEditing = false;
@@ -1006,12 +998,14 @@ function bindCoordInputs() {
     bind(nEl, 'n');
     if (gzdEl && !gzdEl._bound) {
         gzdEl._bound = true;
+        stopMapSteal(gzdEl);
         gzdEl.addEventListener('blur', function() {
             if (!state.positionLocked) applyCoordAxis('both');
         });
     }
     if (sqEl && !sqEl._bound) {
         sqEl._bound = true;
+        stopMapSteal(sqEl);
         sqEl.addEventListener('blur', function() {
             if (!state.positionLocked) applyCoordAxis('both');
         });

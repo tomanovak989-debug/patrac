@@ -1654,7 +1654,7 @@
             display: none;
             right: auto;
             bottom: auto;
-            z-index: 12;
+            z-index: 330;
             user-select: none;
             width: 260px;
             height: fit-content;
@@ -1690,10 +1690,11 @@
             top: 0;
             left: 50%;
             transform: translate(-50%, calc(-100% - 4px));
-            z-index: 30;
+            z-index: 45;
             display: flex;
             gap: 4px;
             pointer-events: auto;
+            touch-action: manipulation;
         }
         .topo-ruler-zone-bar input {
             width: 38px;
@@ -1708,6 +1709,7 @@
             border: 1px solid var(--topo-accent);
             border-radius: 3px;
             pointer-events: auto;
+            touch-action: manipulation;
             box-shadow: 0 0 6px var(--topo-accent-glow);
         }
         .topo-ruler-zone-bar input.is-readonly { opacity: 0.65; }
@@ -1724,7 +1726,9 @@
             width: 58px;
             text-align: center;
             pointer-events: auto;
+            touch-action: manipulation;
             box-shadow: 0 0 6px var(--topo-accent-glow);
+            z-index: 45;
         }
         .topo-ruler-coord.is-readonly { opacity: 0.7; cursor: default; }
         .topo-ruler-coord-w {
@@ -1755,25 +1759,26 @@
         .topo-ruler-plate-wrap.is-locked { touch-action: auto; }
         .topo-ruler-drag-handle {
             position: absolute;
-            z-index: 40;
-            width: 22px;
-            height: 22px;
+            z-index: 50;
+            width: 30px;
+            height: 30px;
             padding: 0;
             border: 1px solid var(--map-float-border);
             border-radius: 4px;
             background: var(--map-float-bg);
             color: var(--text-green-dim);
-            font-size: 12px;
-            line-height: 22px;
+            font-size: 13px;
+            line-height: 30px;
             text-align: center;
             cursor: grab;
             box-shadow: var(--neon-glow-soft);
             pointer-events: auto;
             touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .topo-ruler-drag-handle:active { cursor: grabbing; background: var(--map-float-bg-active); }
-        #topo-ruler-drag-tl { left: -10px; top: -10px; }
-        #topo-ruler-drag-br { right: -10px; bottom: -10px; }
+        #topo-ruler-drag-tl { left: -12px; top: -12px; }
+        #topo-ruler-drag-br { right: -12px; bottom: -12px; }
         .topo-ruler-scene {
             position: absolute;
             inset: 0;
@@ -2955,7 +2960,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720c2';
+        var PATRAC_BUILD = '20260720c3';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
