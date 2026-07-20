@@ -2711,7 +2711,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720b0';
+        var PATRAC_BUILD = '20260720b2';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -4128,33 +4128,62 @@
             refreshCommunityMembersFromCloud(scrollToActive);
         }
 
-        function reconcileCommunityMembersList(comCode) {
-            comCode = (comCode || localStorage.getItem('com_code') || operatorComCode || '').toUpperCase();
+        function normalizeComCodeValue(comCode) {
+            return String(comCode || '').trim().toUpperCase();
+        }
+
+        function accountBelongsToCommunity(userId, comCode, accounts) {
+            comCode = normalizeComCodeValue(comCode);
+            if (!comCode || !userId) return false;
+            accounts = accounts || getPatracAccounts();
+            var acc = accounts[userId];
+            if (!acc) return true;
+            return normalizeComCodeValue(acc.comCode) === comCode;
+        }
+
+        function sanitizeCommunityMembers(comCode) {
+            comCode = normalizeComCodeValue(comCode);
             if (!comCode) return;
             var comms = getPatracCommunities();
             var comm = comms[comCode];
             if (!comm) return;
-
             var accounts = getPatracAccounts();
-            var merged = Array.isArray(comm.members) ? comm.members.slice() : [];
+            var filtered = [];
             var seen = {};
-            for (var i = 0; i < merged.length; i++) {
-                if (merged[i]) seen[merged[i]] = true;
+            var members = Array.isArray(comm.members) ? comm.members : [];
+            var i;
+            for (i = 0; i < members.length; i++) {
+                var memberId = members[i];
+                if (!memberId || seen[memberId]) continue;
+                if (!accountBelongsToCommunity(memberId, comCode, accounts)) continue;
+                seen[memberId] = true;
+                filtered.push(memberId);
             }
-
             for (var id in accounts) {
-                if (!accounts.hasOwnProperty(id)) continue;
-                if ((accounts[id].comCode || '').toUpperCase() === comCode && !seen[id]) {
-                    merged.push(id);
+                if (!Object.prototype.hasOwnProperty.call(accounts, id)) continue;
+                if (normalizeComCodeValue(accounts[id].comCode) === comCode && !seen[id]) {
                     seen[id] = true;
+                    filtered.push(id);
                 }
             }
-
-            if (merged.length !== (comm.members || []).length) {
-                comm.members = merged;
+            var changed = filtered.length !== members.length;
+            if (!changed) {
+                for (i = 0; i < members.length; i++) {
+                    if (filtered.indexOf(members[i]) === -1) {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (changed) {
+                comm.members = filtered;
                 comms[comCode] = comm;
                 savePatracCommunities(comms);
             }
+        }
+
+        function reconcileCommunityMembersList(comCode) {
+            sanitizeCommunityMembers(comCode);
         }
 
         function refreshCommunityMembersFromCloud(scrollToActive) {
@@ -7204,9 +7233,14 @@
             if (layersPanel) layersPanel.classList.toggle('visible', show);
             var layersDrop = document.getElementById('map-layers-dropdown');
             if (layersDrop && !show) layersDrop.classList.remove('open');
+            var fabsEl = document.getElementById('map-tool-fabs');
+            if (fabsEl && show) fabsEl.style.display = '';
+            var tacticalEl = document.getElementById('map-tactical-hud');
+            if (tacticalEl && show) tacticalEl.style.display = '';
             updateMapToolFabs();
             updateMapCompassDisplay();
             updateTopoRulerDisplay();
+            updateRoutePlannerDisplay();
             updateTacticalHud();
             if (show) {
                 ensureMapTouchPan();
@@ -7747,6 +7781,46 @@
             }
         }
 
+        function teardownGameUiForGate() {
+            _mapToolsTabActive = false;
+            setMapToolsVisible(false);
+            updateRoutePlannerDisplay();
+
+            closeAddPoiPanel();
+            closeStoryPositionsPanel();
+            closePoiEditor();
+            closeStoryPosEditor();
+            closeMapLayersPanel();
+            cancelTargeting();
+
+            if (gpsWatchId !== null && navigator.geolocation) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+            }
+
+            var crosshair = document.getElementById('map-crosshair');
+            if (crosshair) crosshair.style.display = 'none';
+
+            var floatIds = ['map-compass', 'map-topo-ruler', 'map-route-planner', 'map-tools-bar'];
+            for (var fi = 0; fi < floatIds.length; fi++) {
+                var fel = document.getElementById(floatIds[fi]);
+                if (!fel) continue;
+                fel.style.display = 'none';
+                fel.classList.remove('is-ready');
+            }
+
+            var fabs = document.getElementById('map-tool-fabs');
+            if (fabs) fabs.classList.remove('visible');
+            var tactical = document.getElementById('map-tactical-hud');
+            if (tactical) tactical.classList.remove('visible');
+
+            var layersPanel = document.getElementById('map-layers-panel');
+            if (layersPanel) layersPanel.classList.remove('visible');
+
+            if (topoRulerMod && topoRulerMod.updateTopoRulerDisplay) topoRulerMod.updateTopoRulerDisplay(false);
+            if (routePlannerMod && routePlannerMod.updateRoutePlannerDisplay) routePlannerMod.updateRoutePlannerDisplay(false);
+        }
+
         function patracLogout() {
             closeHudMenu();
             syncSessionUserToStorage();
@@ -7776,14 +7850,11 @@
             document.body.classList.remove('admin-editing-player');
             updateAdminBar();
 
-            cancelTargeting();
-            closeAddPoiPanel();
-            closeStoryPositionsPanel();
-            closePoiEditor();
-            closeLoreEditor();
+            teardownGameUiForGate();
 
             var profilePanel = document.getElementById('profile-edit-panel');
             if (profilePanel) profilePanel.classList.remove('open');
+            closeLoreEditor();
 
             document.getElementById('gate-box').style.display = 'flex';
             document.getElementById('hud-top').style.display = 'none';
@@ -8431,6 +8502,7 @@
                 localStorage.setItem('com_name', comm.name || comCode);
                 try { localStorage.removeItem('patrac_session'); } catch (e) {}
                 localStorage.setItem('items_personal', '[]');
+                sanitizeCommunityMembers(comCode);
                 restoreCommunityMapCache(comCode);
                 launchGame();
             }).catch(function(err) {
@@ -9143,7 +9215,9 @@
         }
 
         function getCommunityMemberAccounts(comCode) {
+            comCode = normalizeComCodeValue(comCode);
             if (!comCode) return [];
+            sanitizeCommunityMembers(comCode);
             var accounts = getPatracAccounts();
             var comm = findCommunityByCode(comCode);
             var list = [];
@@ -9153,6 +9227,7 @@
                 for (var m = 0; m < comm.members.length; m++) {
                     var memberId = comm.members[m];
                     if (!memberId || seen[memberId]) continue;
+                    if (!accountBelongsToCommunity(memberId, comCode, accounts)) continue;
                     seen[memberId] = true;
                     var acc = accounts[memberId];
                     if (!acc) {
@@ -9171,8 +9246,8 @@
             }
 
             for (var id in accounts) {
-                if (!accounts.hasOwnProperty(id)) continue;
-                if (accounts[id].comCode === comCode && !seen[id]) {
+                if (!Object.prototype.hasOwnProperty.call(accounts, id)) continue;
+                if (normalizeComCodeValue(accounts[id].comCode) === comCode && !seen[id]) {
                     list.push({ userId: id, account: accounts[id] });
                 }
             }

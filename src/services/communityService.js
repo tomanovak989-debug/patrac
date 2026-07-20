@@ -150,6 +150,20 @@ export async function hydrateCommunityFromCloud(comCode) {
     var existing = comms[comCode] || {};
     var cloudMembers = Array.isArray(data.members) ? data.members.slice() : [];
     var localMembers = Array.isArray(existing.members) ? existing.members.slice() : [];
+    var accounts = {};
+    try {
+        accounts = JSON.parse(localStorage.getItem('patrac_accounts') || '{}');
+    } catch (e) {
+        accounts = {};
+    }
+    function memberAllowed(userId) {
+        if (!userId) return false;
+        var acc = accounts[userId];
+        if (!acc) return true;
+        return normalizeComCode(acc.comCode) === comCode;
+    }
+    cloudMembers = cloudMembers.filter(memberAllowed);
+    localMembers = localMembers.filter(memberAllowed);
     var mergedMembers = mergeUniqueMemberIds(cloudMembers, localMembers);
 
     comms[comCode] = {
