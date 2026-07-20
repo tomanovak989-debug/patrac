@@ -138,6 +138,12 @@
             border-top: 1px dotted rgba(74, 246, 38, 0.25);
         }
         body.admin-mode #map-fog-admin-controls { display: block; }
+        #btn-admin-fog { display: none; }
+        body.admin-mode #btn-admin-fog { display: flex; }
+        #btn-admin-fog.fog-off {
+            opacity: 0.55;
+        }
+        #btn-admin-fog.fog-off div { text-decoration: line-through; }
         #map-fog-admin-controls .fog-admin-heading {
             font-size: var(--text-xxs);
             color: #e8c547;
@@ -934,20 +940,21 @@
         #map-tool-fabs.visible { display: flex; }
         .map-tool-fab {
             width: 52px; height: 52px;
-            border-radius: 50%;
-            border: 2px solid var(--topo-accent, #78ff66);
-            background: rgba(6, 10, 6, 0.92);
-            color: var(--text-green);
+            border-radius: 2px;
+            border: 1px solid var(--hud-border);
+            background: var(--hud-bg);
+            color: var(--badge-fg);
             font-size: 22px;
             line-height: 1;
             cursor: pointer;
             pointer-events: auto;
-            box-shadow: 0 0 10px rgba(107, 255, 90, 0.45);
+            box-shadow: var(--neon-glow);
             padding: 0;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-family: inherit;
         }
         .map-tool-fab-icon {
             font-size: 22px;
@@ -966,9 +973,10 @@
             filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
         }
         .map-tool-fab.is-active {
-            border-color: var(--text-green);
-            box-shadow: 0 0 14px rgba(74, 246, 38, 0.75);
-            background: rgba(12, 24, 12, 0.96);
+            border-color: var(--hud-border);
+            box-shadow: var(--neon-glow);
+            background: var(--panel-bg-alt);
+            color: var(--badge-fg);
         }
         .map-tool-fab.is-locked {
             border-color: #ffb366;
@@ -1646,9 +1654,9 @@
             padding: 1px 4px;
             font-size: 8px;
             font-family: 'IBM Plex Mono', monospace;
-            color: rgba(74,246,38,0.92);
-            background: rgba(6,10,6,0.75);
-            border: 1px solid rgba(74,246,38,0.35);
+            color: rgba(255, 236, 140, 0.96);
+            background: rgba(20, 18, 8, 0.78);
+            border: 1px solid rgba(255, 228, 100, 0.45);
             text-shadow: 0 0 4px #000;
             white-space: nowrap;
         }
@@ -1658,8 +1666,8 @@
             font-size: 9px;
             font-weight: 700;
             transform: translate(4px, 4px);
-            color: var(--text-green);
-            border-color: rgba(74,246,38,0.55);
+            color: rgba(255, 240, 150, 0.98);
+            border-color: rgba(255, 228, 100, 0.6);
         }
         .mgrs-grid-line-n span,
         .mgrs-grid-line-w span {
@@ -1668,11 +1676,11 @@
             line-height: 1.2;
             font-family: 'IBM Plex Mono', monospace;
             font-weight: 500;
-            color: rgba(120, 255, 102, 0.92);
+            color: rgba(255, 236, 130, 0.95);
             background: none;
             border: none;
             padding: 0;
-            text-shadow: 0 0 4px rgba(6, 10, 6, 0.95), 0 0 6px rgba(120, 255, 102, 0.55);
+            text-shadow: 0 0 4px rgba(20, 18, 8, 0.95), 0 0 6px rgba(255, 228, 100, 0.45);
             pointer-events: none;
             white-space: nowrap;
         }
@@ -1851,14 +1859,6 @@
             color: var(--text-green-dim); cursor: pointer;
         }
         #map-layers-dropdown input { accent-color: var(--text-green); }
-        #map-layers-dropdown .mgrs-acc-row {
-            flex-direction: column; align-items: flex-start; gap: 4px;
-            padding-top: 8px; border-top: 1px dotted rgba(74,246,38,0.25);
-        }
-        #map-layers-dropdown .mgrs-acc-row select {
-            width: 100%; background: rgba(6,10,6,0.92); border: 1px solid var(--hud-border);
-            color: var(--text-green); font-family: inherit; font-size: var(--text-xs); padding: 4px;
-        }
         .map-tac-tile-mgrs .map-tac-value { font-size: 11px; letter-spacing: 0.04em; line-height: 1.25; }
         .bottom-hud-wrapper.crt-surface { position: absolute; }
     </style>
@@ -2176,10 +2176,11 @@
     </div>
 
     <div class="hud-element left-toolbar" id="hud-left">
-        <button class="tool-btn" id="btn-center-shelter" style="border-color:#0088ff; color:#0088ff;" onclick="centerMapToShelter()" title="Vycentrovat na útočiště"><div>🏠</div>ÚTULIŠTĚ</button>
+        <button class="tool-btn" id="btn-center-shelter" onclick="centerMapToShelter()" title="Vycentrovat na útočiště"><div>🏠</div>ÚTULIŠTĚ</button>
         <button class="tool-btn" onclick="centerMapToUser()"><div>▲</div>CENTR.</button>
-        <button class="tool-btn" id="btn-center-all-points" onclick="centerMapToAllSavedPoints()" title="Zobrazit všechny uložené body na mapě" style="border-color:#4af626;color:#4af626;"><div>⛶</div>VŠECHNY</button>
-        <button class="tool-btn" style="border-color:#e8c547;color:#e8c547;" onclick="toggleMapLayersPanel()" title="Filtr vrstev mapy"><div>◫</div>VRSTVY</button>
+        <button class="tool-btn" id="btn-center-all-points" onclick="centerMapToAllSavedPoints()" title="Zobrazit všechny uložené body na mapě"><div>⛶</div>VŠECHNY</button>
+        <button class="tool-btn" id="btn-admin-fog" onclick="patracToggleAdminFog()" title="Zapnout / vypnout mlhu války (operátor)"><div>🌫</div><span class="fog-btn-label">MLHA</span></button>
+        <button class="tool-btn" onclick="toggleMapLayersPanel()" title="Filtr vrstev mapy"><div>◫</div>VRSTVY</button>
         <button class="tool-btn" style="border-color:var(--danger-orange); color:var(--danger-orange);" onclick="hardResetData()"><div>☠</div>RESET</button>
     </div>
 
@@ -2189,15 +2190,6 @@
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
             <label><input type="checkbox" id="map-filter-pocta" checked onchange="setMapLayerFilter('pocta', this.checked)"> Pocty</label>
             <label><input type="checkbox" id="map-filter-mgrs" checked onchange="patracToggleMgrsGrid(this.checked)"> MGRS mřížka 1 km</label>
-            <label class="mgrs-acc-row">Přesnost MGRS:
-                <select id="map-mgrs-accuracy" onchange="patracSetMgrsAccuracy(this.value)">
-                    <option value="5">1 m (10 číslic)</option>
-                    <option value="4">10 m (8 číslic)</option>
-                    <option value="3" selected>100 m (6 číslic)</option>
-                    <option value="2">1 km (4 číslice)</option>
-                    <option value="1">10 km (2 číslice)</option>
-                </select>
-            </label>
             <div id="map-fog-admin-controls">
                 <p class="fog-admin-heading">Mlha války — operátor</p>
                 <label><input type="checkbox" id="map-fog-enabled" checked onchange="patracToggleFogEnabled(this.checked)"> Mlha zapnutá</label>
@@ -2224,8 +2216,8 @@
     </div>
 
     <div class="hud-element" id="map-tools-bar">
-        <button class="tool-btn" style="border-color:var(--xp-blue); color:var(--xp-blue);" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
-        <button class="tool-btn" style="border-color:var(--text-green); color:var(--text-green);" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
+        <button class="tool-btn" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
+        <button class="tool-btn" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
         <select id="map-tile-select" onchange="switchMapTile(this.value)" title="Globální mapa">
             <option value="satellite">🛰️ Sat</option>
             <option value="street">🗺️ OSM</option>
@@ -2648,7 +2640,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720ac';
+        var PATRAC_BUILD = '20260720ae';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -2737,17 +2729,53 @@
                     revealRadiusM: 300
                 });
                 if (typeof refreshMapLayerStack === 'function') refreshMapLayerStack();
+                updateAdminFogButtonUi();
             }).catch(function(err) { console.warn('[fogOfWar]', err); });
         }
 
         window.patracToggleFogEnabled = function(on) {
             if (!isOperatorMode || !fogOfWarMod) return;
             fogOfWarMod.setFogEnabled(on);
+            updateAdminFogButtonUi();
+            try { snapshotCommunityMapCache(); } catch (eFogSnap) {}
         };
         window.patracToggleFogRevealAll = function(on) {
             if (!isOperatorMode || !fogOfWarMod) return;
             fogOfWarMod.setFogRevealAll(on);
+            updateAdminFogButtonUi();
+            try { snapshotCommunityMapCache(); } catch (eFogSnap) {}
         };
+
+        function updateAdminFogButtonUi() {
+            var btn = document.getElementById('btn-admin-fog');
+            if (!btn || !fogOfWarMod) return;
+            var enabled = fogOfWarMod.isFogEnabled && fogOfWarMod.isFogEnabled();
+            var revealAll = fogOfWarMod.isFogRevealAll && fogOfWarMod.isFogRevealAll();
+            var fogActive = enabled && !revealAll;
+            btn.classList.toggle('fog-off', !fogActive);
+            btn.title = fogActive
+                ? 'Mlha zapnutá — klepnutím vypnete (operátor)'
+                : (revealAll ? 'Celá mapa viditelná — klepnutím zapnete mlhu' : 'Mlha vypnutá — klepnutím zapnete');
+            var label = btn.querySelector('.fog-btn-label');
+            if (label) label.textContent = fogActive ? 'MLHA' : 'VYP.';
+        }
+
+        window.patracToggleAdminFog = function() {
+            if (!isOperatorMode || !fogOfWarMod) return;
+            var enabled = fogOfWarMod.isFogEnabled && fogOfWarMod.isFogEnabled();
+            var revealAll = fogOfWarMod.isFogRevealAll && fogOfWarMod.isFogRevealAll();
+            if (enabled && !revealAll) {
+                fogOfWarMod.setFogEnabled(false);
+            } else if (revealAll) {
+                fogOfWarMod.setFogRevealAll(false);
+                fogOfWarMod.setFogEnabled(true);
+            } else {
+                fogOfWarMod.setFogEnabled(true);
+            }
+            updateAdminFogButtonUi();
+            try { snapshotCommunityMapCache(); } catch (eFogSnap) {}
+        };
+        window.updateAdminFogButtonUi = updateAdminFogButtonUi;
 
         var routePlannerMod = null;
         var mgrsGridMod = null;
@@ -4353,6 +4381,10 @@
         function captureCommunityMapCachePayload(comCode) {
             comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
             if (!comCode) return null;
+            var fogPrefs = null;
+            if (fogOfWarMod && fogOfWarMod.getFogPrefsForCache) {
+                fogPrefs = fogOfWarMod.getFogPrefsForCache();
+            }
             return {
                 version: 1,
                 comCode: comCode,
@@ -4364,6 +4396,8 @@
                 dismissed: getDismissedQuests(),
                 reqOverrides: getQuestReqOverrides(),
                 launched: getCommunityLaunchedQuests(),
+                fogEnabled: fogPrefs ? fogPrefs.fogEnabled : undefined,
+                fogRevealAll: fogPrefs ? fogPrefs.fogRevealAll : undefined,
                 savedAt: Date.now()
             };
         }
@@ -4398,6 +4432,8 @@
                     dismissed: stored.dismissed || [],
                     reqOverrides: stored.reqOverrides || {},
                     launched: stored.launched || {},
+                    fogEnabled: stored.fogEnabled,
+                    fogRevealAll: stored.fogRevealAll,
                     savedAt: Date.now()
                 };
                 safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(minimal));
@@ -4525,6 +4561,12 @@
                 if (Array.isArray(data.dismissed)) safeLocalStorageSet('dismissed_quests', JSON.stringify(data.dismissed));
                 if (data.reqOverrides) safeLocalStorageSet('quest_req_overrides', JSON.stringify(data.reqOverrides));
                 if (data.launched) setCommunityLaunchedQuests(data.launched);
+                if (fogOfWarMod && fogOfWarMod.applyCommunityFogPrefs) {
+                    var fogApply = {};
+                    if (typeof data.fogEnabled === 'boolean') fogApply.fogEnabled = data.fogEnabled;
+                    if (typeof data.fogRevealAll === 'boolean') fogApply.fogRevealAll = data.fogRevealAll;
+                    if (Object.keys(fogApply).length) fogOfWarMod.applyCommunityFogPrefs(fogApply);
+                }
                 return true;
             } catch (e) {
                 return false;
@@ -5621,11 +5663,6 @@
             try { localStorage.setItem('patrac_mgrs_grid_visible', on ? 'true' : 'false'); } catch (e) {}
         };
 
-        window.patracSetMgrsAccuracy = function(val) {
-            if (mgrsGridMod) mgrsGridMod.setMgrsAccuracy(val);
-            patracUpdateMgrsReadout();
-        };
-
         window.patracUpdateMgrsReadout = function() {
             if (!mgrsGridMod || !_mapToolsTabActive) return;
             var mgrsEl = document.getElementById('map-tac-mgrs');
@@ -5650,7 +5687,7 @@
                 if (subEl) subEl.textContent = 'čekám na GPS…';
                 return;
             }
-            var mgrsAcc = (src.indexOf('GPS') >= 0) ? 5 : (mgrsGridMod.getMgrsAccuracy ? mgrsGridMod.getMgrsAccuracy() : 3);
+            var mgrsAcc = 5;
             if (topoRulerMod && topoRulerMod.formatRulerMgrs50 && mgrsAcc >= 5) {
                 mgrsEl.textContent = topoRulerMod.formatRulerMgrs50(lat, lng);
             } else {
@@ -8348,6 +8385,7 @@
                 if (exitAdminBtn) exitAdminBtn.style.display = 'none';
             }
             if (fogOfWarMod && fogOfWarMod.syncFogAdminControls) fogOfWarMod.syncFogAdminControls();
+            updateAdminFogButtonUi();
             patracRefreshFogOfWar();
         }
 

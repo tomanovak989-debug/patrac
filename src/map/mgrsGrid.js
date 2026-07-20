@@ -15,12 +15,11 @@ var _map = null;
 var _layer = null;
 var _visible = true;
 var _bound = false;
-var _MGRS_ACCURACY = 3;
-var _GREEN = 'rgba(120,255,102,0.58)';
-var _GREEN_BOLD = 'rgba(120,255,102,0.88)';
+var _MGRS_ACCURACY = 5;
+var _YELLOW = 'rgba(255, 236, 130, 0.62)';
+var _YELLOW_BOLD = 'rgba(255, 228, 95, 0.88)';
 
 var STORAGE_KEY = 'patrac_mgrs_grid_visible';
-var ACC_STORAGE_KEY = 'patrac_mgrs_accuracy';
 
 function loadVisiblePref() {
     try {
@@ -31,13 +30,6 @@ function loadVisiblePref() {
     return true;
 }
 
-function loadAccuracyPref() {
-    try {
-        var a = parseInt(localStorage.getItem(ACC_STORAGE_KEY) || '3', 10);
-        if (a >= 0 && a <= 5) return a;
-    } catch (e) {}
-    return 3;
-}
 
 function saveVisiblePref(on) {
     try { localStorage.setItem(STORAGE_KEY, on ? 'true' : 'false'); } catch (e) {}
@@ -130,7 +122,7 @@ function drawGrid() {
         var p2 = utmToLatLng(e, nMax, zone, latHint);
         var bold = e % 10000 === 0;
         var line = window.L.polyline([[p1.lat, p1.lng], [p2.lat, p2.lng]], {
-            color: bold ? _GREEN_BOLD : _GREEN,
+            color: bold ? _YELLOW_BOLD : _YELLOW,
             weight: bold ? 2 : 1.25,
             opacity: bold ? 0.95 : 0.72,
             interactive: false,
@@ -158,7 +150,7 @@ function drawGrid() {
         var q2 = utmToLatLng(eMax, n, zone, latHint);
         var boldN = n % 10000 === 0;
         var lineN = window.L.polyline([[q1.lat, q1.lng], [q2.lat, q2.lng]], {
-            color: boldN ? _GREEN_BOLD : _GREEN,
+            color: boldN ? _YELLOW_BOLD : _YELLOW,
             weight: boldN ? 2 : 1.25,
             opacity: boldN ? 0.95 : 0.72,
             interactive: false,
@@ -249,7 +241,6 @@ export function initMgrsGrid(map) {
     if (!map || !window.L) return;
     _map = map;
     _visible = loadVisiblePref();
-    _MGRS_ACCURACY = loadAccuracyPref();
     if (!_layer) _layer = window.L.layerGroup();
     if (!map.getPane('mapGridPane')) {
         map.createPane('mapGridPane');
@@ -280,12 +271,11 @@ export function isMgrsGridVisible() {
 }
 
 export function getMgrsAccuracy() {
-    return _MGRS_ACCURACY;
+    return 5;
 }
 
 export function setMgrsAccuracy(acc) {
-    _MGRS_ACCURACY = Math.max(0, Math.min(5, parseInt(acc, 10) || 3));
-    try { localStorage.setItem(ACC_STORAGE_KEY, String(_MGRS_ACCURACY)); } catch (e) {}
+    _MGRS_ACCURACY = 5;
 }
 
 export function mgrsAtLatLng(lat, lng, accuracy) {
@@ -304,8 +294,6 @@ export function mgrsPrecisionText(accuracy) {
 export function syncMgrsGridCheckbox() {
     var cb = document.getElementById('map-filter-mgrs');
     if (cb) cb.checked = _visible;
-    var sel = document.getElementById('map-mgrs-accuracy');
-    if (sel) sel.value = String(_MGRS_ACCURACY);
 }
 
 export function refreshMgrsGrid() {

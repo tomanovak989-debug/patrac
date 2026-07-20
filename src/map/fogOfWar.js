@@ -20,6 +20,19 @@ var _revealAll = false;
 var STORAGE_ENABLED = 'patrac_fog_enabled';
 var STORAGE_REVEAL_ALL = 'patrac_fog_reveal_all';
 
+function getComCode() {
+    try {
+        return String(localStorage.getItem('com_code') || '').trim().toUpperCase();
+    } catch (e) {
+        return '';
+    }
+}
+
+function storageKey(base) {
+    var comCode = getComCode();
+    return comCode ? base + '_' + comCode : base;
+}
+
 function getMap() {
     return _deps && _deps.getMap ? _deps.getMap() : null;
 }
@@ -30,7 +43,7 @@ function isOperator() {
 
 function loadEnabledPref() {
     try {
-        var v = localStorage.getItem(STORAGE_ENABLED);
+        var v = localStorage.getItem(storageKey(STORAGE_ENABLED));
         if (v === 'false') return false;
         if (v === 'true') return true;
     } catch (e) {}
@@ -40,17 +53,38 @@ function loadEnabledPref() {
 function loadRevealAllPref() {
     if (!isOperator()) return false;
     try {
-        return localStorage.getItem(STORAGE_REVEAL_ALL) === 'true';
+        return localStorage.getItem(storageKey(STORAGE_REVEAL_ALL)) === 'true';
     } catch (e) {}
     return false;
 }
 
 function saveEnabledPref(on) {
-    try { localStorage.setItem(STORAGE_ENABLED, on ? 'true' : 'false'); } catch (e) {}
+    try { localStorage.setItem(storageKey(STORAGE_ENABLED), on ? 'true' : 'false'); } catch (e) {}
 }
 
 function saveRevealAllPref(on) {
-    try { localStorage.setItem(STORAGE_REVEAL_ALL, on ? 'true' : 'false'); } catch (e) {}
+    try { localStorage.setItem(storageKey(STORAGE_REVEAL_ALL), on ? 'true' : 'false'); } catch (e) {}
+}
+
+export function getFogPrefsForCache() {
+    return {
+        fogEnabled: _enabled,
+        fogRevealAll: _revealAll
+    };
+}
+
+export function applyCommunityFogPrefs(prefs) {
+    if (!prefs || typeof prefs !== 'object') return;
+    if (typeof prefs.fogEnabled === 'boolean') {
+        _enabled = prefs.fogEnabled;
+        saveEnabledPref(_enabled);
+    }
+    if (typeof prefs.fogRevealAll === 'boolean' && isOperator()) {
+        _revealAll = prefs.fogRevealAll;
+        saveRevealAllPref(_revealAll);
+    }
+    syncFogAdminUi();
+    refreshFogOfWar();
 }
 
 function ensureFogPane() {
@@ -217,6 +251,7 @@ function syncFogAdminUi() {
     }
     if (enabledEl) enabledEl.checked = _enabled;
     if (revealAllEl) revealAllEl.checked = _revealAll;
+    if (typeof window.updateAdminFogButtonUi === 'function') window.updateAdminFogButtonUi();
 }
 
 export function syncFogAdminControls() {
