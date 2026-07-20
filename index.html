@@ -2178,6 +2178,7 @@
     <div class="hud-element left-toolbar" id="hud-left">
         <button class="tool-btn" id="btn-center-shelter" style="border-color:#0088ff; color:#0088ff;" onclick="centerMapToShelter()" title="Vycentrovat na útočiště"><div>🏠</div>ÚTULIŠTĚ</button>
         <button class="tool-btn" onclick="centerMapToUser()"><div>▲</div>CENTR.</button>
+        <button class="tool-btn" id="btn-center-all-points" onclick="centerMapToAllSavedPoints()" title="Zobrazit všechny uložené body na mapě" style="border-color:#4af626;color:#4af626;"><div>⛶</div>VŠECHNY</button>
         <button class="tool-btn" style="border-color:#e8c547;color:#e8c547;" onclick="toggleMapLayersPanel()" title="Filtr vrstev mapy"><div>◫</div>VRSTVY</button>
         <button class="tool-btn" style="border-color:var(--danger-orange); color:var(--danger-orange);" onclick="hardResetData()"><div>☠</div>RESET</button>
     </div>
@@ -2647,7 +2648,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720aa';
+        var PATRAC_BUILD = '20260720ab';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -7237,6 +7238,62 @@
             syncCurrentAccountMissionStats();
         }
 
+        function collectAllSavedMapCoords() {
+            var coords = [];
+            var seen = {};
+            function add(lat, lng) {
+                var la = parseFloat(lat);
+                var ln = parseFloat(lng);
+                if (isNaN(la) || isNaN(ln)) return;
+                var key = la.toFixed(6) + ',' + ln.toFixed(6);
+                if (seen[key]) return;
+                seen[key] = true;
+                coords.push([la, ln]);
+            }
+
+            var points = collectCommunityMapPointKeys();
+            for (var qid in points) {
+                if (!Object.prototype.hasOwnProperty.call(points, qid)) continue;
+                add(points[qid].lat, points[qid].lng);
+            }
+
+            var pois = getSafeJSON('map_free_pois');
+            for (var p = 0; p < pois.length; p++) {
+                if (pois[p]) add(pois[p].lat, pois[p].lng);
+            }
+
+            try {
+                var reg = JSON.parse(localStorage.getItem('patrac_pocta_registry') || '{}');
+                var ents = reg.entities || {};
+                for (var id in ents) {
+                    if (!Object.prototype.hasOwnProperty.call(ents, id)) continue;
+                    var ent = ents[id];
+                    if (ent && ent.lat != null && ent.lng != null) add(ent.lat, ent.lng);
+                }
+            } catch (e) {}
+
+            return coords;
+        }
+
+        function centerMapToAllSavedPoints() {
+            if (!map || !window.L) return;
+            var coords = collectAllSavedMapCoords();
+            if (!coords.length) {
+                alert('Na mapě zatím nejsou žádné uložené body.');
+                return;
+            }
+            if (coords.length === 1) {
+                map.setView(coords[0], Math.max(map.getZoom(), 15));
+            } else {
+                map.fitBounds(window.L.latLngBounds(coords), {
+                    padding: [48, 48],
+                    maxZoom: 17,
+                    animate: true
+                });
+            }
+            try { patracRefreshFogOfWar(); } catch (e) {}
+        }
+
         function centerMapToUser() {
             if (userMarker && map) {
                 map.setView(userMarker.getLatLng(), 16);
@@ -10283,6 +10340,7 @@
         window.confirmAddMapPoi = confirmAddMapPoi;
         window.closeAddPoiPanel = closeAddPoiPanel;
         window.centerMapToShelter = centerMapToShelter;
+        window.centerMapToAllSavedPoints = centerMapToAllSavedPoints;
         window.switchMapTile = switchMapTile;
 
         function craftCustomItem() {
