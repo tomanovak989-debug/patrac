@@ -111,6 +111,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /radio_channels/{channelId}/messages/{msgId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && patracUserId() != '';
+      allow update, delete: if false;
+    }
+
     match /entries/{entryId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && patracUserId() != '';

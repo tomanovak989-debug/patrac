@@ -804,6 +804,251 @@
         }
         .chat-msg-box { flex: 1; padding: 10px; overflow-y: auto; font-size: var(--text-md); line-height: var(--panel-line-height); font-weight: var(--font-weight-normal); }
 
+        /* Falcon III — overlay zóny pro display a klávesnici */
+        .radio-device-shell {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto 14px;
+            aspect-ratio: 1 / 1;
+        }
+        .radio-device-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            pointer-events: none;
+            user-select: none;
+        }
+        .radio-device-overlays {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+        .radio-device-overlays > * { pointer-events: auto; }
+        .radio-display-zone {
+            position: absolute;
+            top: 31.2%;
+            left: 27.8%;
+            width: 44.4%;
+            height: 15.8%;
+        }
+        .radio-display-screen {
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 3% 4%;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: clamp(6px, 1.85vw, 10px);
+            line-height: 1.25;
+            color: #1c1c08;
+            background: transparent;
+        }
+        .radio-display-status {
+            display: flex;
+            justify-content: space-between;
+            gap: 4px;
+            font-size: clamp(5px, 1.55vw, 8px);
+            opacity: 0.85;
+            flex-shrink: 0;
+        }
+        .radio-display-main {
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 1px;
+            font-size: clamp(5px, 1.65vw, 9px);
+        }
+        #radio-display-freq { font-weight: bold; }
+        #radio-display-key, #radio-display-preset { opacity: 0.92; }
+        .radio-display-sub {
+            flex-shrink: 0;
+            font-size: clamp(5px, 1.5vw, 8px);
+            opacity: 0.9;
+        }
+        .radio-keypad-zone {
+            position: absolute;
+            top: 48.8%;
+            left: 22.5%;
+            width: 55%;
+            height: 34%;
+            display: grid;
+            grid-template-columns: 14% 1fr 14%;
+            grid-template-rows: 1fr;
+            gap: 1.5%;
+        }
+        .radio-keypad-col {
+            display: flex;
+            flex-direction: column;
+            gap: 4%;
+            min-height: 0;
+        }
+        .radio-keypad-center {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 3%;
+            min-height: 0;
+        }
+        .radio-key {
+            border: none;
+            background: transparent;
+            color: transparent;
+            cursor: pointer;
+            border-radius: 2px;
+            min-height: 0;
+            padding: 0;
+        }
+        .radio-key:focus-visible {
+            outline: 1px dashed rgba(74, 246, 38, 0.55);
+            outline-offset: 1px;
+        }
+        .radio-key:hover { background: rgba(255, 255, 255, 0.06); }
+        .radio-keypad-input-row {
+            grid-column: 1 / -1;
+            display: grid;
+            grid-template-columns: 1fr 3fr 1fr;
+            gap: 3%;
+            align-items: stretch;
+        }
+        .radio-chat-input {
+            grid-column: 2;
+            width: 100%;
+            box-sizing: border-box;
+            border: none;
+            background: rgba(0, 0, 0, 0.22);
+            color: #eef6d8;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: clamp(7px, 2vw, 11px);
+            padding: 4px 6px;
+            border-radius: 2px;
+            min-height: 0;
+        }
+        .radio-chat-input::placeholder { color: rgba(238, 246, 216, 0.45); }
+        .radio-key-send { grid-column: 3; color: transparent; }
+        body.theme-light .radio-display-screen { color: #1a1a0a; }
+        body.theme-light .radio-chat-input {
+            background: rgba(0, 0, 0, 0.12);
+            color: #1a1a0a;
+        }
+
+        /* Sešit — záznam příchozích/odchozích zpráv */
+        .radio-notebook {
+            position: relative;
+            margin: 0 auto 14px;
+            max-width: 440px;
+            border-radius: 4px 8px 8px 4px;
+            background: linear-gradient(90deg, #3a3530 0, #3a3530 14px, #f4ecd8 14px, #efe4c8 100%);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+            padding: 10px 12px 12px 22px;
+        }
+        .radio-notebook::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 12px;
+            bottom: 12px;
+            width: 6px;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 7px,
+                rgba(255, 255, 255, 0.35) 7px,
+                rgba(255, 255, 255, 0.35) 9px
+            );
+            border-radius: 3px;
+        }
+        .radio-notebook-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .radio-notebook-tab {
+            font-family: inherit;
+            font-size: var(--text-xs);
+            font-weight: bold;
+            letter-spacing: 0.04em;
+            padding: 5px 10px;
+            border: 1px solid rgba(80, 60, 30, 0.35);
+            border-bottom: none;
+            border-radius: 4px 4px 0 0;
+            background: #e8dcc0;
+            color: #4a4030;
+            cursor: pointer;
+            transform: translateY(2px);
+        }
+        .radio-notebook-tab.active {
+            background: #fff8ea;
+            color: #2a2418;
+            transform: translateY(0);
+            box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
+        }
+        .radio-notebook-page {
+            background: #fff8ea;
+            border: 1px solid rgba(80, 60, 30, 0.28);
+            min-height: 140px;
+            max-height: 220px;
+            overflow: hidden;
+            position: relative;
+        }
+        .radio-notebook-page::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 22px,
+                rgba(100, 140, 180, 0.22) 22px,
+                rgba(100, 140, 180, 0.22) 23px
+            );
+            pointer-events: none;
+        }
+        .radio-notebook-lines {
+            position: relative;
+            z-index: 1;
+            padding: 8px 10px;
+            max-height: 220px;
+            overflow-y: auto;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-xs);
+            line-height: 1.55;
+            color: #2a2418;
+        }
+        .radio-notebook-line-in { color: #1a4a28; }
+        .radio-notebook-line-out { color: #4a3020; font-style: italic; }
+        .radio-notebook-empty {
+            margin: 0;
+            color: rgba(42, 36, 24, 0.55);
+            font-style: italic;
+            font-size: var(--text-xs);
+        }
+        .radio-comms-hint {
+            max-width: 440px;
+            margin: 0 auto 14px;
+            padding: 8px 10px;
+            font-size: var(--text-xs);
+            color: var(--dim-fg);
+            line-height: 1.45;
+            border: 1px dotted var(--divider-faint);
+        }
+        body.theme-light .radio-notebook {
+            background: linear-gradient(90deg, #6a6458 0, #6a6458 14px, #f7f0de 14px, #f2e9d4 100%);
+        }
+        body.theme-light .radio-notebook-page { background: #fffcf5; }
+        #radio-display-buffer {
+            font-size: clamp(5px, 1.45vw, 8px);
+            color: #3a3a18;
+            min-height: 1em;
+        }
+
         .inventory-layout { display: flex; gap: 10px; margin-top: 8px; }
         .inventory-column { flex: 1; min-width: 0; }
         .inventory-column-title {
@@ -2484,9 +2729,68 @@
             </div><!-- /.panel-content-inner tasks -->
         </div>
 
-        <!-- ZÁLOŽKA KOMUNITA -->
+        <!-- ZÁLOŽKA RADIO (dříve Komunita) -->
         <div id="content-clan" style="display:none;">
             <div class="panel-content-inner">
+
+            <div class="radio-device-shell" id="radio-device-shell">
+                <img class="radio-device-img" src="src/assets/radio-falcon-iii.png" alt="Falcon III vysílačka" draggable="false">
+                <div class="radio-device-overlays">
+                    <div class="radio-display-zone" id="radio-display-zone">
+                        <div class="radio-display-screen" id="radio-display-screen">
+                            <div class="radio-display-status">
+                                <span id="radio-display-channel">KOMUNITNÍ</span>
+                                <span id="radio-display-signal">○ STBY</span>
+                            </div>
+                            <div class="radio-display-main" id="radio-display-main">
+                                <div id="radio-display-freq">462.000 MHz  PT</div>
+                                <div id="radio-display-key">BEZ ŠIFRY</div>
+                                <div id="radio-display-buffer"></div>
+                                <div id="radio-display-preset">—</div>
+                            </div>
+                            <div class="radio-display-sub" id="radio-display-footer">0 KEY · <span id="radio-display-com">—</span></div>
+                        </div>
+                    </div>
+                    <div class="radio-keypad-zone" id="radio-keypad-zone">
+                        <div class="radio-keypad-col">
+                            <button type="button" class="radio-key" id="radio-key-vol-up" title="Frekvence +0.025 MHz" aria-label="Frekvence nahoru"></button>
+                            <button type="button" class="radio-key" id="radio-key-clr" title="Vymazat / TX režim" aria-label="Vymazat"></button>
+                        </div>
+                        <div class="radio-keypad-center" id="radio-keypad-grid">
+                            <button type="button" class="radio-key" data-key="1" aria-label="1"></button>
+                            <button type="button" class="radio-key" data-key="2" aria-label="2"></button>
+                            <button type="button" class="radio-key" data-key="3" id="radio-key-mode" title="Režim: frekvence / šifra / vysílání" aria-label="Režim"></button>
+                            <button type="button" class="radio-key" data-key="4" aria-label="4"></button>
+                            <button type="button" class="radio-key" data-key="5" aria-label="5"></button>
+                            <button type="button" class="radio-key" data-key="6" aria-label="6"></button>
+                            <button type="button" class="radio-key" data-key="7" aria-label="7"></button>
+                            <button type="button" class="radio-key" data-key="8" aria-label="8"></button>
+                            <button type="button" class="radio-key" data-key="9" aria-label="9"></button>
+                            <div class="radio-keypad-input-row">
+                                <button type="button" class="radio-key" data-key="prev" aria-label="Předchozí"></button>
+                                <input type="text" class="radio-chat-input" id="chat-input-field" placeholder="Hlášení…" autocomplete="off" spellcheck="false">
+                                <button type="button" class="radio-key" data-key="next" aria-label="Další"></button>
+                            </div>
+                        </div>
+                        <div class="radio-keypad-col">
+                            <button type="button" class="radio-key" id="radio-key-pre-up" title="Další preset" aria-label="Preset další"></button>
+                            <button type="button" class="radio-key radio-key-send" id="radio-key-ent" title="ENT — potvrdit / vyslat" aria-label="Potvrdit"></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="radio-notebook" id="radio-notebook">
+                <div class="radio-notebook-tabs">
+                    <button type="button" class="radio-notebook-tab" data-tab="private">📓 Soukromé</button>
+                    <button type="button" class="radio-notebook-tab active" data-tab="community">📓 Komunitní</button>
+                    <button type="button" class="radio-notebook-tab" data-tab="global">📓 Globální</button>
+                </div>
+                <div class="radio-notebook-page">
+                    <div class="radio-notebook-lines" id="radio-notebook-lines"></div>
+                </div>
+            </div>
+            <p class="radio-comms-hint">↓ příchozí · ↑ odchozí. Presety 1–9 (Shift+číslo = uložit). Kdo zná frekvenci i šifrovací heslo, může kanál odposlouchávat — i mimo komunitu.</p>
 
             <div id="clan-status-panel" class="quest-card card-tone-operator" style="border-color:var(--community-border); margin-bottom:12px;">
                 <div class="quest-section-title" style="margin-top:0;color:var(--accent-gold);">📊 STATUS KOMUNITY</div>
@@ -2523,15 +2827,6 @@
                 <div class="lustrace-box" onclick="lustrovat('Adam', 'Doprovod: Pes Kousy.')">👦 Adam</div>
             </div>
             <div id="lustrace-output" style="font-size:var(--text-base); color:var(--subtle-fg); margin-bottom:8px; font-style:italic; min-height:24px;">Klikni na jméno pro výpis spisu...</div>
-
-            <div class="quest-section-title">💬 COM_NET: CHAT KOMUNITY</div>
-            <div class="chat-container">
-                <div class="chat-msg-box" id="chat-messages"></div>
-                <div class="chat-input-row">
-                    <input type="text" id="chat-input-field" placeholder="Hlášení...">
-                    <button onclick="sendChatMessage()">SEND</button>
-                </div>
-            </div>
 
             <div class="quest-section-title">🔄 PŘESTUP DO NOVÉ KOMUNITY</div>
             <div class="quest-card card-tone-warn" style="border-color:var(--danger-orange);">
@@ -2687,7 +2982,7 @@
             <button class="action-tab active" onclick="switchMainTab('shelter', this)">🏠 Útočiště</button>
             <button class="action-tab" onclick="switchMainTab('tasks', this)">🗺️ Úkoly</button>
             <button class="action-tab" onclick="switchMainTab('map-only', this)">📡 Mapa HUD</button>
-            <button class="action-tab" onclick="switchMainTab('clan', this)">👥 Komunita</button>
+            <button class="action-tab" onclick="switchMainTab('clan', this)">📻 Radio</button>
             <button class="action-tab" onclick="switchMainTab('terminal', this)">🖥️ Terminál</button>
             <button class="action-tab" onclick="switchMainTab('data-karta', this)">📂 Data</button>
             <button class="action-tab" onclick="switchMainTab('inventory', this)">🎒 Inventář</button>
@@ -2711,14 +3006,13 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720b2';
+        var PATRAC_BUILD = '20260720b4';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
         var base64Avatar = "", base64CraftImg = "", base64EditImg = "", base64PoiImg = "", base64PoiEditImg = "", base64StoryPosEditImg = "";
         var pendingCraftPhotoFile = null;
         var storyPosEditHadImg = false;
-        var localChatData = ["System: Taktická síť zapnuta."];
         var activeTargetingQuest = null;
         var targetingMode = 'complete';
         var baseTileLayer = null;
@@ -7819,6 +8113,7 @@
 
             if (topoRulerMod && topoRulerMod.updateTopoRulerDisplay) topoRulerMod.updateTopoRulerDisplay(false);
             if (routePlannerMod && routePlannerMod.updateRoutePlannerDisplay) routePlannerMod.updateRoutePlannerDisplay(false);
+            if (typeof window.patracStopRadioComms === 'function') window.patracStopRadioComms();
         }
 
         function patracLogout() {
@@ -8841,7 +9136,7 @@
             updateStatsHud();
             loadCustomCraftedItems();
             updateHudMenuUser();
-            renderChat();
+            updateRadioDisplayHud();
             var editBtn = document.getElementById('btn-toggle-profile-edit');
             if (editBtn) editBtn.style.display = 'block';
         }
@@ -9405,6 +9700,7 @@
             var session = localStorage.getItem('patrac_session') || '';
 
             if (comNameEl) comNameEl.textContent = localStorage.getItem('com_name') || '---';
+            updateRadioDisplayHud();
             updateProfileCodeDisplay();
 
             if (!comCode) {
@@ -10188,7 +10484,7 @@
             rebuildCustomLocLinkSelect();
             loadCustomCraftedItems();
             syncCurrentAccountWearLoadout();
-            renderChat();
+            updateRadioDisplayHud();
 
             var craftTypeEl = document.getElementById('craft-item-type');
             if (craftTypeEl && !craftTypeEl._bindListener) {
@@ -10201,6 +10497,7 @@
             renderOperatorClanUI();
 
             initPoctaModuleAsync();
+            initRadioCommsAsync();
             initCloudSyncAsync();
             initDataKartaAsync();
 
@@ -10328,6 +10625,9 @@
                 document.getElementById('content-shelter').style.display = (tab === 'shelter') ? 'block' : 'none';
                 document.getElementById('content-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';
                 document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
+                if (tab === 'clan') {
+                    updateRadioDisplayHud();
+                }
                 document.getElementById('content-terminal').style.display = (tab === 'terminal') ? 'block' : 'none';
                 document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
                 document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
@@ -10967,24 +11267,43 @@
             document.getElementById('lustrace-output').innerHTML = "<strong>" + jmeno + ":</strong> " + spis + rankLine;
         }
 
-        function renderChat() {
-            var b = document.getElementById('chat-messages');
-            if (b) {
-                var html = "";
-                for (var i = 0; i < localChatData.length; i++) html += "<div>" + localChatData[i] + "</div>";
-                b.innerHTML = html;
-                b.scrollTop = b.scrollHeight;
-            }
+        function renderChat() { /* legacy — viz radioUi */ }
+
+        function updateRadioDisplayHud() {
+            if (typeof window.patracRefreshRadioComms === 'function') window.patracRefreshRadioComms();
+        }
+
+        function initRadioCommsAsync() {
+            import('./src/radio/radioUi.js?v=' + PATRAC_BUILD).then(function(mod) {
+                mod.initRadioCommsSystem({
+                    getUserId: function() { return localStorage.getItem('patrac_session') || ''; },
+                    getPlayerName: function() { return localStorage.getItem('player_name') || 'Operativec'; },
+                    getComCode: function() { return localStorage.getItem('com_code') || operatorComCode || ''; },
+                    getComName: function() { return localStorage.getItem('com_name') || ''; },
+                    getCommunityRadioKey: function() {
+                        var code = localStorage.getItem('com_code') || operatorComCode || '';
+                        var name = localStorage.getItem('com_name') || '';
+                        try {
+                            var stored = localStorage.getItem('patrac_com_radio_key_' + code);
+                            if (stored) return stored;
+                        } catch (e) {}
+                        return null;
+                    },
+                    isLocalOnly: function() { return isOperatorLocalOnlySession(); }
+                });
+                window.patracRefreshRadioComms = mod.refreshRadioCommsContext;
+                window.patracStopRadioComms = mod.stopRadioComms;
+            }).catch(function(err) {
+                console.error('initRadioComms', err);
+            });
         }
 
         function sendChatMessage() {
-            var i = document.getElementById('chat-input-field');
-            var v = i.value.trim();
-            if (!v) return;
-            var name = localStorage.getItem('player_name') || "Hráč";
-            localChatData.push(name + ": " + v);
-            i.value = "";
-            renderChat();
+            var input = document.getElementById('chat-input-field');
+            if (input && input.value.trim()) {
+                var ent = document.getElementById('radio-key-ent');
+                if (ent) ent.click();
+            }
         }
 
         window.craftCustomItem = craftCustomItem;
