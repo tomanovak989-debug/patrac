@@ -924,7 +924,7 @@
         .radio-notebook {
             position: relative;
             margin: 0 auto 14px;
-            max-width: min(100%, 300px);
+            max-width: min(100%, 420px);
             padding: 8px 10px 10px 20px;
             border-radius: 4px 8px 8px 4px;
             background: linear-gradient(90deg, #3a3530 0, #3a3530 12px, #f4ecd8 12px, #efe4c8 100%);
@@ -996,9 +996,9 @@
             background: repeating-linear-gradient(
                 to bottom,
                 transparent 0,
-                transparent calc(100% / 16 - 1px),
-                rgba(100, 140, 180, 0.2) calc(100% / 16 - 1px),
-                rgba(100, 140, 180, 0.2) calc(100% / 16)
+                transparent calc(100% / 20 - 1px),
+                rgba(100, 140, 180, 0.2) calc(100% / 20 - 1px),
+                rgba(100, 140, 180, 0.2) calc(100% / 20)
             );
             pointer-events: none;
         }
@@ -1016,18 +1016,22 @@
             z-index: 1;
             height: 100%;
             box-sizing: border-box;
-            padding: 28px 12px 10px 14px;
+            padding: 24px 14px 8px 16px;
             overflow: hidden;
             font-family: 'Patrick Hand', 'Segoe Print', cursive;
-            font-size: clamp(14px, 3.8vw, 17px);
-            line-height: calc(100% / 16);
+            font-size: clamp(13px, 3.1vw, 16px);
+            line-height: calc(100% / 20);
             color: #2a2418;
         }
         .radio-notebook-line {
             white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;
-            height: calc(100% / 16);
+            text-overflow: clip;
+            height: calc(100% / 20);
+        }
+        .radio-notebook-line-cont {
+            padding-left: 1.1em;
+            opacity: 0.92;
         }
         .radio-notebook-line-in { color: #1a4a28; }
         .radio-notebook-line-out { color: #4a3020; }
@@ -1659,26 +1663,6 @@
             left: auto !important;
             top: auto !important;
         }
-        #map-topo-ruler.topo-ruler-collapsed { width: 48px; }
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-plate-wrap,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-footer,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-coord-n,
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-zone-bar { display: none; }
-        #map-topo-ruler.topo-ruler-collapsed .topo-ruler-widget-toggle {
-            position: relative; top: 0; right: 0;
-            width: 48px; height: 48px; border-radius: 50%; font-size: 20px;
-            border: 1px solid var(--topo-accent-soft);
-            box-shadow: 0 0 10px var(--topo-accent-glow);
-        }
-        .topo-ruler-widget-toggle {
-            position: absolute; top: 4px; right: 4px; z-index: 40;
-            width: 28px; height: 28px; padding: 0;
-            border: 1px solid var(--hud-border); border-radius: 3px;
-            background: var(--map-float-bg-alt); color: var(--topo-accent);
-            font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
-            box-shadow: var(--neon-glow-soft);
-            display: flex; align-items: center; justify-content: center;
-        }
         #topo-ruler-drag-surface {
             position: relative;
             width: 260px;
@@ -1687,15 +1671,13 @@
             background: transparent;
             border: none;
             box-shadow: none;
-            pointer-events: auto;
+            pointer-events: none;
             cursor: default;
             overflow: visible;
-            touch-action: none;
+            touch-action: auto;
             -webkit-user-select: none;
             user-select: none;
         }
-        #topo-ruler-drag-surface.is-dragging { cursor: grabbing; }
-        #topo-ruler-drag-surface.is-locked { cursor: default; }
         .topo-ruler-zone-bar {
             position: absolute;
             top: 0;
@@ -1759,7 +1741,12 @@
             height: 260px;
             flex-shrink: 0;
             overflow: visible;
+            pointer-events: auto;
+            touch-action: auto;
+            cursor: grab;
         }
+        .topo-ruler-plate-wrap.is-dragging { cursor: grabbing; touch-action: none; }
+        .topo-ruler-plate-wrap.is-locked { cursor: default; touch-action: auto; pointer-events: none; }
         .topo-ruler-scene {
             position: absolute;
             inset: 0;
@@ -2201,7 +2188,6 @@
     <div id="map"></div>
     <div id="map-float-overlay" aria-hidden="true">
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
-        <button type="button" id="btn-topo-ruler-toggle" class="topo-ruler-widget-toggle map-float-hit" title="Skrýt pravítko" aria-label="Skrýt">✕</button>
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
             <div class="topo-ruler-plate-wrap">
                 <div class="topo-ruler-scene" id="topo-ruler-scene">
@@ -2216,7 +2202,7 @@
                     <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
                     <g id="topo-roamer-scales"></g>
                     <g id="topo-bearing-hand" style="display:none"></g>
-                    <circle id="topo-ruler-bezel-hit" class="topo-ruler-bezel-hit map-float-hit" cx="130" cy="130" r="115" stroke-width="22"/>
+                    <circle id="topo-ruler-bezel-hit" class="topo-ruler-bezel-hit" cx="130" cy="130" r="118" stroke-width="10"/>
                     </g>
                 </svg>
                     <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Střed roameru"></button>
@@ -2525,8 +2511,6 @@
             </div>
             <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
-            <label><input type="checkbox" id="map-filter-pocta" checked onchange="setMapLayerFilter('pocta', this.checked)"> Pocty</label>
-            <label><input type="checkbox" id="map-filter-mgrs" checked onchange="patracToggleMgrsGrid(this.checked)"> MGRS mřížka 1 km</label>
             <div id="map-fog-admin-controls">
                 <p class="fog-admin-heading">Mlha války — operátor</p>
                 <label><input type="checkbox" id="map-fog-enabled" checked onchange="patracToggleFogEnabled(this.checked)"> Mlha zapnutá</label>
@@ -2544,7 +2528,7 @@
     </div>
 
     <div id="map-tool-fabs" aria-hidden="true">
-        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Pravítko · podrž 2 s = zamknout" aria-label="Pravítko">
+        <button type="button" class="map-tool-fab map-float-hit" id="fab-topo-ruler" onclick="patracToggleTopoRuler()" title="Pravítko · podrž 1 s = zamknout" aria-label="Pravítko">
             <span class="map-tool-fab-icon" aria-hidden="true">📐</span>
             <span class="map-tool-fab-lock-badge" aria-hidden="true">🔒</span>
         </button>
@@ -2821,36 +2805,6 @@
             </div>
         </div>
 
-        <!-- ZÁLOŽKA TERMINÁL (POCTA) -->
-        <div id="content-terminal" style="display:none;">
-            <div class="panel-content-inner">
-                <div class="quest-card card-tone-terminal" style="border-color:rgba(232,197,71,0.45);">
-                    <div class="quest-section-title" style="margin-top:0;color:#e8c547;">🖥️ TERMINÁL — ZADAT KÓD</div>
-                    <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 10px 0;line-height:1.5;">6místný kód od Pocty nebo fázovaného úkolu. Po aktivaci se bod objeví na mapě — vlastní (plná barva) vs. sdílené (čárkovaně).</p>
-                    <form id="terminal-code-form" autocomplete="off">
-                        <div class="terminal-code-row">
-                            <input type="text" id="terminal-code-input" maxlength="6" placeholder="ABC123" autocapitalize="characters" autocomplete="off">
-                            <button type="submit" class="btn-accept" style="border-color:#e8c547;color:#e8c547;white-space:nowrap;padding:8px 12px;">AKTIVOVAT</button>
-                        </div>
-                    </form>
-                    <div id="terminal-last-message" style="font-size:var(--text-sm);color:var(--text-green-dim);min-height:14px;margin-bottom:8px;"></div>
-                </div>
-
-                <div class="quest-section-title">📡 AKTIVOVANÉ BODY</div>
-                <div id="terminal-activated-list"></div>
-
-                <div class="quest-section-title" style="margin-top:14px;font-size:var(--text-sm);color:var(--dim-fg);">PROTOTYP — VYTVOŘENÍ TESTU</div>
-                <div class="quest-card card-tone-muted" style="border-color:var(--panel-subtle);">
-                    <p style="font-size:var(--text-xs);color:var(--dim-fg);margin:0 0 8px 0;">Pro lokální test modulu POCTA (data zůstávají v tomto prohlížeči).</p>
-                    <div class="story-pos-actions">
-                        <button type="button" class="btn-accept" id="terminal-sim-quest-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">✅ Simulovat odměnu z mise</button>
-                        <button type="button" class="btn-accept" id="terminal-demo-pocta" style="border-color:#e8c547;color:#e8c547;font-size:var(--text-xs);">✝ Nová Pocta</button>
-                        <button type="button" class="btn-accept" id="terminal-demo-quest" style="border-color:var(--muted-fg);color:var(--muted-fg);font-size:var(--text-xs);">❓ Nový fázovaný úkol</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ZÁLOŽKA DATA KARTA -->
         <div id="data-karta" style="display:none;">
             <div class="panel-content-inner">
@@ -2957,7 +2911,6 @@
             <button class="action-tab" onclick="switchMainTab('tasks', this)">🗺️ Úkoly</button>
             <button class="action-tab" onclick="switchMainTab('map-only', this)">📡 Mapa HUD</button>
             <button class="action-tab" onclick="switchMainTab('clan', this)">📻 Radio</button>
-            <button class="action-tab" onclick="switchMainTab('terminal', this)">🖥️ Terminál</button>
             <button class="action-tab" onclick="switchMainTab('data-karta', this)">📂 Data</button>
             <button class="action-tab" onclick="switchMainTab('inventory', this)">🎒 Inventář</button>
         </div>
@@ -2980,7 +2933,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720b7';
+        var PATRAC_BUILD = '20260720b9';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5804,7 +5757,7 @@
         function getMapLayerFilter() {
             if (mapLayerFilterState) return mapLayerFilterState;
             if (mapV3Module) return mapV3Module.loadMapLayerFilter();
-            return { permanent: true, custom: true, pocta: true };
+            return { permanent: true, custom: true, pocta: false };
         }
 
         function setMapLayerFilter(key, on) {
@@ -5820,10 +5773,14 @@
             var f = getMapLayerFilter();
             var p = document.getElementById('map-filter-permanent');
             var c = document.getElementById('map-filter-custom');
-            var o = document.getElementById('map-filter-pocta');
             if (p) p.checked = f.permanent;
             if (c) c.checked = f.custom;
-            if (o) o.checked = f.pocta;
+        }
+
+        function syncMgrsGridWithRuler(show) {
+            if (mgrsGridMod) {
+                mgrsGridMod.setMgrsGridVisible(!!show);
+            }
         }
 
         function toggleMapLayersPanel() {
@@ -6014,16 +5971,14 @@
             import('./src/map/mgrsGrid.js?v=' + PATRAC_BUILD).then(function(mod) {
                 mgrsGridMod = mod;
                 mod.initMgrsGrid(map);
+                var rulerOn = localStorage.getItem('patrac_topo_ruler_visible') === 'true' && _mapToolsTabActive;
+                syncMgrsGridWithRuler(rulerOn);
                 if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
             }).catch(function(err) { console.warn('[mgrsGrid]', err); });
         }
 
         window.patracToggleMgrsGrid = function(on) {
-            if (mgrsGridMod) {
-                mgrsGridMod.setMgrsGridVisible(on);
-                return;
-            }
-            try { localStorage.setItem('patrac_mgrs_grid_visible', on ? 'true' : 'false'); } catch (e) {}
+            syncMgrsGridWithRuler(on);
         };
 
         window.patracUpdateMgrsReadout = function() {
@@ -6097,10 +6052,11 @@
 
         function updateTopoRulerDisplay() {
             var root = document.getElementById('map-topo-ruler');
-            var userWants = localStorage.getItem('patrac_topo_ruler_visible') !== 'false';
+            var userWants = localStorage.getItem('patrac_topo_ruler_visible') === 'true';
             var show = userWants && _mapToolsTabActive;
             var fab = document.getElementById('fab-topo-ruler');
             if (fab) fab.classList.toggle('is-active', show);
+            syncMgrsGridWithRuler(show);
             if (!topoRulerMod) {
                 if (root) {
                     root.style.display = show ? 'block' : 'none';
@@ -6112,7 +6068,7 @@
             if (fab) fab.classList.toggle('is-active', show);
         }
         window.patracToggleTopoRuler = function() {
-            var next = localStorage.getItem('patrac_topo_ruler_visible') === 'false';
+            var next = localStorage.getItem('patrac_topo_ruler_visible') !== 'true';
             localStorage.setItem('patrac_topo_ruler_visible', next ? 'true' : 'false');
             updateTopoRulerDisplay();
         };
@@ -7465,6 +7421,9 @@
 
         function setMapToolsVisible(show) {
             _mapToolsTabActive = show;
+            if (show) {
+                try { localStorage.setItem('patrac_topo_ruler_visible', 'false'); } catch (e) {}
+            }
             var bar = document.getElementById('map-tools-bar');
             if (bar) bar.style.display = show ? 'flex' : 'none';
             var shelterBtn = document.getElementById('btn-center-shelter');
@@ -10549,12 +10508,8 @@
                 if (tab === 'clan') {
                     updateRadioDisplayHud();
                 }
-                document.getElementById('content-terminal').style.display = (tab === 'terminal') ? 'block' : 'none';
                 document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
                 document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
-                if (tab === 'terminal' && typeof window.patracPoctaRenderTerminal === 'function') {
-                    window.patracPoctaRenderTerminal();
-                }
                 if (isOperatorMode) ensureOperatorEditContext();
             }
         }
@@ -11034,11 +10989,11 @@
                     html += '<div class="item-detail-panel" id="item-detail-' + detailId + '">';
                     html += detailHtml;
                     html += '<div style="margin-top:6px; display:flex; gap:4px; flex-wrap:wrap;">';
-                    if (item.itemType !== 'pocta') {
+                    if (item.itemType === 'pocta') {
+                        html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT POCTU</button>';
+                    } else {
                         html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--accent-gold); color:var(--accent-gold);" onclick="event.stopPropagation(); openLoreEditor(' + i + ', ' + isComm + ')">📝 LORE</button>';
                         html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:var(--danger-orange); color:var(--danger-orange);" onclick="event.stopPropagation(); destroyItem(' + i + ', ' + isComm + ')">🗑️ SMAZAT</button>';
-                    } else if (isComm && item.poctaPhase !== 'anchored') {
-                        html += '<button class="btn-accept" style="font-size:var(--text-xxs); padding:3px 6px; border-color:#e8c547; color:#e8c547;" onclick="event.stopPropagation(); patracAnchorPoctaFromInventory(' + i + ')">📍 UKOTVIT NA GPS</button>';
                     }
                     html += '</div></div></div>';
                 }
@@ -11106,11 +11061,38 @@
             });
         }
 
+        function purgePoctaItem(item) {
+            if (!item || item.itemType !== 'pocta') return;
+            import('./src/pocta/storage.js').then(function(mod) {
+                var registry = mod.loadRegistry();
+                if (item.poctaCode) mod.removeEntityByCode(item.poctaCode, registry);
+                mod.saveRegistry(registry);
+                var userId = localStorage.getItem('patrac_session') || '';
+                if (userId && item.poctaId) {
+                    var term = mod.loadTerminalState(userId);
+                    if (Array.isArray(term.poctaInventoryIds)) {
+                        term.poctaInventoryIds = term.poctaInventoryIds.filter(function(id) {
+                            return id !== item.poctaId;
+                        });
+                        mod.saveTerminalState(userId, term);
+                    }
+                }
+            }).catch(function(err) {
+                console.warn('[pocta] purge', err);
+            });
+        }
+
         function destroyItem(index, isComm) {
             if (isComm) {
                 var resolved = resolveCommunityItemAtDisplayIndex(index);
                 if (resolved && resolved.item.itemType === 'pocta') {
-                    alert('Poctu nelze zničit — lze ji ukotvit na mapě nebo vyzvednout zpět do inventáře.');
+                    if (!confirm('Odstranit Poctu „' + (resolved.item.name || 'Pocta') + '“ z inventáře komunity? Související záznam zmizí i z registry.')) return;
+                    purgePoctaItem(resolved.item);
+                    var raw = getCommunityItemsRaw().slice();
+                    raw.splice(resolved.rawIdx, 1);
+                    saveCommunityItemsRaw(raw);
+                    loadCustomCraftedItems();
+                    if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
                     return;
                 }
             }

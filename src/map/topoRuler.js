@@ -581,8 +581,8 @@ function syncFabLockUi() {
     if (!fab) return;
     fab.classList.toggle('is-locked', state.positionLocked);
     fab.title = state.positionLocked
-        ? 'Pravítko zamčeno · podrž 2 s = odemknout'
-        : 'Pravítko · podrž 2 s = zamknout';
+        ? 'Pravítko zamčeno · podrž 1 s = odemknout'
+        : 'Pravítko · podrž 1 s = zamknout';
     fab.setAttribute('aria-label', state.positionLocked ? 'Pravítko zamčeno' : 'Pravítko');
 }
 
@@ -592,7 +592,7 @@ function renderBearingOnMap() {
 
 function updateRulerPlateVisual() {
     var degEl = document.getElementById('topo-ruler-bearing');
-    var dragSurface = document.getElementById('topo-ruler-drag-surface');
+    var plateWrap = document.querySelector('#map-topo-ruler .topo-ruler-plate-wrap');
     var centerEl = document.getElementById('topo-ruler-center');
     var rulerScene = document.getElementById('topo-ruler-scene');
     var wEl = document.getElementById('topo-ruler-coord-w');
@@ -641,7 +641,7 @@ function updateRulerPlateVisual() {
         else if (locked) degEl.textContent = 'Otoč směrník po rysce';
         else degEl.textContent = '';
     }
-    if (dragSurface) dragSurface.classList.toggle('is-locked', locked);
+    if (plateWrap) plateWrap.classList.toggle('is-locked', locked);
     syncFabLockUi();
 }
 
@@ -852,6 +852,8 @@ function bindWidgetDrag(surface) {
             _widgetDragging = true;
             surface.classList.add('is-dragging');
             document.body.style.cursor = 'grabbing';
+            surface.style.touchAction = 'none';
+            setMapInteractionEnabled(false);
         }
         var nextX = origin.x + dx;
         var nextY = origin.y + dy;
@@ -888,15 +890,10 @@ function bindWidgetDrag(surface) {
             root.style.right = 'auto';
             root.style.bottom = 'auto';
         }
-        surface.style.touchAction = 'none';
-        setMapInteractionEnabled(false);
-        _widgetDragging = true;
         _widgetDragCleanup = function() { onEnd(null); };
         if (surface.setPointerCapture && activePointer != null) {
             try { surface.setPointerCapture(activePointer); } catch (err) {}
         }
-        e.preventDefault();
-        e.stopPropagation();
         detachDoc();
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
@@ -1020,7 +1017,7 @@ function bindFabLongPress() {
             _fabLongPressFired = true;
             togglePositionLock();
             if (navigator.vibrate) navigator.vibrate(30);
-        }, 2000);
+        }, 1000);
     }
 
     fab.addEventListener('mousedown', onPressStart);
@@ -1042,23 +1039,13 @@ function bindFabLongPress() {
 
 function initInteractions() {
     var root = document.getElementById('map-topo-ruler');
-    var toggle = document.getElementById('btn-topo-ruler-toggle');
-    var dragSurface = document.getElementById('topo-ruler-drag-surface');
+    var plateWrap = root && root.querySelector('.topo-ruler-plate-wrap');
     var pinCenter = document.getElementById('topo-ruler-center');
     var rulerScene = document.getElementById('topo-ruler-scene');
     var bezelHit = document.getElementById('topo-ruler-bezel-hit');
 
-    if (toggle && !toggle._bound) {
-        toggle._bound = true;
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (typeof window.patracHideTopoRuler === 'function') window.patracHideTopoRuler();
-        });
-    }
-
-    bindWidgetDrag(dragSurface || root);
-    bindMapWheelPassthrough(dragSurface);
+    bindWidgetDrag(plateWrap);
+    bindMapWheelPassthrough(plateWrap);
     bindMapWheelPassthrough(rulerScene);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
@@ -1104,8 +1091,6 @@ export function initTopoRuler(deps) {
     var root = document.getElementById('map-topo-ruler');
     if (root) {
         root.classList.remove('topo-ruler-collapsed');
-        var toggle = document.getElementById('btn-topo-ruler-toggle');
-        if (toggle) toggle.textContent = '✕';
     }
     buildRulerDegTicks();
     buildBearingHand();

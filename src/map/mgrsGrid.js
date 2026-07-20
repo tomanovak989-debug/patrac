@@ -27,7 +27,7 @@ function loadVisiblePref() {
         if (v === 'false') return false;
         if (v === 'true') return true;
     } catch (e) {}
-    return true;
+    return false;
 }
 
 

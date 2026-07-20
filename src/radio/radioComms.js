@@ -14,7 +14,9 @@ export const NOTEBOOK_TAB_LABELS = {
 };
 
 /** Počet řádků na jeden A4 list sešitu. */
-export const NOTEBOOK_LINES_PER_PAGE = 16;
+export const NOTEBOOK_LINES_PER_PAGE = 20;
+/** Odhad znaků na jeden řádek (Patrick Hand, širší sešit). */
+export const NOTEBOOK_CHARS_PER_LINE = 52;
 
 export const CHANNEL_SCOPE_LABELS = {
     global: 'GLOB',
@@ -235,6 +237,108 @@ export function formatNotebookLine(entry) {
     var who = entry.from || '—';
     var freq = entry.frequency ? (' · ' + entry.frequency) : '';
     return arrow + ' ' + formatTime(entry.ts) + '  ' + who + ': ' + entry.text + freq;
+}
+
+export function wrapNotebookText(text, maxChars) {
+    text = String(text || '').trim();
+    maxChars = maxChars || NOTEBOOK_CHARS_PER_LINE;
+    if (!text) return [''];
+    var words = text.split(/\s+/);
+    var lines = [];
+    var line = '';
+    var i;
+    for (i = 0; i < words.length; i++) {
+        var word = words[i];
+        if (!line) {
+            if (word.length > maxChars) {
+                while (word.length > maxChars) {
+                    lines.push(word.slice(0, maxChars));
+                    word = word.slice(maxChars);
+                }
+                line = word;
+            } else {
+                line = word;
+            }
+            continue;
+        }
+        var next = line + ' ' + word;
+        if (next.length <= maxChars) {
+            line = next;
+            continue;
+        }
+        lines.push(line);
+        if (word.length > maxChars) {
+            while (word.length > maxChars) {
+                lines.push(word.slice(0, maxChars));
+                word = word.slice(maxChars);
+            }
+            line = word;
+        } else {
+            line = word;
+        }
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
+}
+
+export function expandPlainNotebookLines(items, charsPerLine) {
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    items = items || [];
+    var out = [];
+    var i;
+    for (i = 0; i < items.length; i++) {
+        var wrapped = wrapNotebookText(items[i], charsPerLine);
+        var j;
+        for (j = 0; j < wrapped.length; j++) out.push(wrapped[j]);
+    }
+    return out;
+}
+
+export function expandStationEntriesToVisualLines(entries, charsPerLine) {
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    entries = entries || [];
+    var out = [];
+    var i;
+    for (i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        var wrapped = wrapNotebookText(formatNotebookLine(entry), charsPerLine);
+        var j;
+        for (j = 0; j < wrapped.length; j++) {
+            out.push({
+                text: wrapped[j],
+                dir: entry.dir,
+                entryIndex: i,
+                wrapPart: j,
+                isFirst: j === 0
+            });
+        }
+    }
+    return out;
+}
+
+export function getStationVisualPageCount(notebook, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var count = expandStationEntriesToVisualLines(notebook.station || [], charsPerLine).length;
+    return Math.max(1, Math.ceil(count / linesPerPage));
+}
+
+export function getStationVisualPageLines(notebook, pageIndex, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var all = expandStationEntriesToVisualLines(notebook.station || [], charsPerLine);
+    var start = pageIndex * linesPerPage;
+    return all.slice(start, start + linesPerPage);
+}
+
+export function getStationVisualPageIndexForEntry(notebook, entryIndex, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var all = expandStationEntriesToVisualLines(notebook.station || [], charsPerLine);
+    var i;
+    for (i = all.length - 1; i >= 0; i--) {
+        if (all[i].entryIndex === entryIndex) {
+            return Math.floor(i / linesPerPage);
+        }
+    }
+    return getStationVisualPageCount(notebook, linesPerPage, charsPerLine) - 1;
 }
 
 export function buildDisplayLines(state, ctx) {

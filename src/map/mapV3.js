@@ -13,7 +13,7 @@ export const STORY_POINT_ICONS = {
 };
 
 export function defaultMapLayerFilter() {
-    return { permanent: true, custom: true, pocta: true };
+    return { permanent: true, custom: true, pocta: false };
 }
 
 export function loadMapLayerFilter() {
@@ -24,7 +24,7 @@ export function loadMapLayerFilter() {
             return {
                 permanent: parsed.permanent !== false,
                 custom: parsed.custom !== false,
-                pocta: parsed.pocta !== false
+                pocta: parsed.pocta === true
             };
         }
     } catch (e) {}

@@ -7,7 +7,6 @@ import {
     loadNotebook,
     saveNotebook,
     appendNotebookEntry,
-    formatNotebookLine,
     buildDisplayLines,
     applyPreset,
     upsertPreset,
@@ -25,10 +24,13 @@ import {
     NOTEBOOK_TABS,
     NOTEBOOK_TAB_LABELS,
     NOTEBOOK_LINES_PER_PAGE,
+    NOTEBOOK_CHARS_PER_LINE,
     CHANNEL_SCOPE_LABELS,
     getNotebookPageCount,
-    getNotebookPageEntries,
-    getNotebookPageIndexForEntry
+    expandPlainNotebookLines,
+    getStationVisualPageCount,
+    getStationVisualPageLines,
+    getStationVisualPageIndexForEntry
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
 
@@ -142,7 +144,9 @@ function renderNotebook(options) {
 
     ensureNotebookMeta();
     var pageIdx = getCurrentPageIndex();
-    var pageCount = getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+    var pageCount = activeNotebookTab === 'station'
+        ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
+        : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
 
     if (pageIdx >= pageCount) {
         pageIdx = pageCount - 1;
@@ -157,9 +161,10 @@ function renderNotebook(options) {
         if (!items.length) {
             box.innerHTML = '<p class="radio-notebook-empty">' + emptyLabel + '</p>';
         } else {
+            var visualLines = expandPlainNotebookLines(items, NOTEBOOK_CHARS_PER_LINE);
             var itemsHtml = '';
-            for (var n = 0; n < items.length; n++) {
-                itemsHtml += '<div class="radio-notebook-line">' + items[n] + '</div>';
+            for (var n = 0; n < visualLines.length; n++) {
+                itemsHtml += '<div class="radio-notebook-line">' + visualLines[n] + '</div>';
             }
             box.innerHTML = itemsHtml;
         }
@@ -172,14 +177,16 @@ function renderNotebook(options) {
 
     if (activeNotebookTab !== 'station') return;
 
-    var list = getNotebookPageEntries(notebook, 'station', pageIdx, NOTEBOOK_LINES_PER_PAGE);
+    var list = getStationVisualPageLines(notebook, pageIdx, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE);
     if (!list.length && pageIdx === 0) {
         box.innerHTML = '<p class="radio-notebook-empty">↓ příchozí · ↑ odchozí<br>Nalaď frekvenci a šifru, pak vysílej.</p>';
     } else {
         var html = '';
         for (var i = 0; i < list.length; i++) {
-            var entry = list[i];
-            html += '<div class="radio-notebook-line radio-notebook-line-' + entry.dir + '">' + formatNotebookLine(entry) + '</div>';
+            var line = list[i];
+            var cls = 'radio-notebook-line radio-notebook-line-' + line.dir;
+            if (!line.isFirst) cls += ' radio-notebook-line-cont';
+            html += '<div class="' + cls + '">' + line.text + '</div>';
         }
         box.innerHTML = html;
     }
@@ -193,7 +200,9 @@ function renderNotebook(options) {
 }
 
 function goNotebookPage(delta) {
-    var pageCount = getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+    var pageCount = activeNotebookTab === 'station'
+        ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
+        : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
     var next = getCurrentPageIndex() + delta;
     if (next < 0 || next >= pageCount) return;
     setCurrentPageIndex(next);
@@ -220,12 +229,11 @@ function recordEntry(entry) {
     appendNotebookEntry(notebook, 'station', entry);
     persist();
 
-    var pageForEntry = getNotebookPageIndexForEntry(notebook, 'station', entryIndex, NOTEBOOK_LINES_PER_PAGE);
+    var pageForEntry = getStationVisualPageIndexForEntry(notebook, entryIndex, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE);
     var onStationTab = activeNotebookTab === 'station';
-    var pageFull = entryIndex > 0 && (entryIndex % NOTEBOOK_LINES_PER_PAGE) === 0;
 
     if (onStationTab) {
-        if (pageFull && pageForEntry > getCurrentPageIndex()) {
+        if (pageForEntry > getCurrentPageIndex()) {
             setCurrentPageIndex(pageForEntry);
             renderNotebook({ flip: true });
         } else if (pageForEntry === getCurrentPageIndex()) {
