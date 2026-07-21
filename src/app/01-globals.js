@@ -1,7 +1,41 @@
 /* PATRAC app chunk: 01-globals.js — do not reorder script tags in index.html */
 var map = null, userMarker = null;
-var PATRAC_BUILD = '20260721d5';
+var PATRAC_BUILD = '20260721d6';
 window.PATRAC_BUILD = PATRAC_BUILD;
+
+/* Dočasný diagnostický odchytávač chyb — zobrazí běhovou chybu na obrazovce (mobil bez konzole). */
+(function () {
+    if (window.__patracErrTrapBound) return;
+    window.__patracErrTrapBound = true;
+    function show(msg) {
+        try {
+            var box = document.getElementById('patrac-err-trap');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'patrac-err-trap';
+                box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:2147483647;background:#7a0000;color:#fff;font:12px/1.4 monospace;padding:8px 34px 8px 8px;max-height:45%;overflow:auto;white-space:pre-wrap;box-shadow:0 -2px 12px rgba(0,0,0,.6)';
+                var x = document.createElement('button');
+                x.textContent = '✕';
+                x.style.cssText = 'position:absolute;top:4px;right:6px;background:none;border:1px solid #fff;color:#fff;border-radius:3px;cursor:pointer;padding:2px 7px';
+                x.onclick = function () { box.remove(); };
+                box.appendChild(x);
+                var pre = document.createElement('div');
+                pre.id = 'patrac-err-trap-body';
+                box.appendChild(pre);
+                (document.body || document.documentElement).appendChild(box);
+            }
+            var body = document.getElementById('patrac-err-trap-body');
+            if (body) body.textContent += msg + '\n';
+        } catch (e) {}
+    }
+    window.addEventListener('error', function (e) {
+        show('[ERR] ' + (e.message || e.error) + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : ''));
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        show('[PROMISE] ' + ((r && (r.message || r.stack)) || r));
+    });
+})();
 
 /** Dynamický import ES modulů z kořene app (index.html), ne z cesty tohoto souboru. */
 function patracImport(modulePath) {
