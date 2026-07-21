@@ -1,9 +1,8 @@
-import { onGpsProximityTick, reloadPoctaMapMarkers } from './map-bridge.js';
+import { onGpsProximityTick, reloadPoctaMapMarkers, panToEntity } from './map-bridge.js';
 import { loadRegistry } from './storage.js';
 import { maybeGrantPoctaForQuest, simulateQuestPoctaReward } from './quest-rewards.js';
 import { anchorPoctaFromInventory } from './anchoring.js';
-import { panToEntity } from './map-bridge.js';
-import { submitTerminalCode } from './terminal.js';
+import { submitTerminalCode } from './activate.js';
 
 function getContext() {
     return {
