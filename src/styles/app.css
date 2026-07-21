@@ -2091,55 +2091,99 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 
 .mgrs-grid-line-w span { transform: translate(-50%, -50%); }
 
-/* Plánovač trasy */
+/* Plánovač trasy — svislý panel vpravo, roste nahoru (ať nekoliduje s ostatními nástroji) */
 #map-route-planner {
     display: none;
     position: fixed;
-    left: 12px;
-    bottom: 164px;
-    z-index: 1002;
-    width: 220px;
+    right: 12px;
+    bottom: 360px;
+    z-index: 1001;
     font-family: 'IBM Plex Mono', monospace;
+    pointer-events: none;
 }
 #map-route-planner.is-ready { display: block; }
-#map-route-planner.route-planner-collapsed { width: 48px; }
-#map-route-planner.route-planner-collapsed .route-planner-body { display: none; }
-.route-planner-widget-toggle {
-    position: absolute; top: 4px; right: 4px; z-index: 40;
-    width: 28px; height: 28px; padding: 0;
-    border: 1px solid var(--hud-border); border-radius: 3px;
-    background: var(--map-float-bg-alt); color: var(--rp-accent);
-    font-size: 14px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+.route-planner-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    background: var(--map-float-bg);
+    border: 1px solid var(--topo-accent-soft);
+    border-radius: 8px;
+    padding: 8px 6px;
+    pointer-events: auto;
     box-shadow: var(--neon-glow-soft);
 }
-.route-planner-body {
+.rp-icon {
+    position: relative;
+    width: 44px; height: 44px;
+    border: 1px solid var(--topo-accent-soft);
+    border-radius: 4px;
+    background: var(--map-float-bg-solid);
+    color: var(--rp-accent);
+    font-size: 20px; line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--neon-glow-soft);
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+}
+.rp-icon .rp-icon-glyph { pointer-events: none; }
+.rp-lock-badge {
+    display: none;
+    position: absolute; right: -3px; top: -4px;
+    font-size: 13px; line-height: 1;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
+    pointer-events: none;
+}
+.rp-icon.is-locked {
+    border-color: #ffb366;
+    box-shadow: 0 0 14px rgba(255, 179, 102, 0.7);
+    background: rgba(24, 16, 8, 0.96);
+}
+.rp-icon.is-locked .rp-lock-badge { display: block; }
+.rp-total {
+    font-size: 10px; text-align: center;
+    color: var(--rp-accent); min-width: 44px;
+    padding: 2px 0;
+}
+.route-planner-drawer {
+    display: none;
+    position: absolute;
+    right: 58px;
+    bottom: 8px;
+    gap: 4px;
     background: var(--map-float-bg);
     border: 1px solid var(--topo-accent-soft);
     border-radius: 6px;
-    padding: 34px 8px 8px;
+    padding: 6px;
     pointer-events: auto;
-    position: relative;
+    box-shadow: var(--neon-glow-soft);
+    white-space: nowrap;
 }
-.route-planner-title {
-    font-size: 10px; font-weight: 700; color: var(--rp-accent);
-    letter-spacing: 0.08em; margin-bottom: 6px;
-}
-.route-planner-row {
-    display: flex; gap: 4px; margin-bottom: 6px; flex-wrap: wrap;
-}
-.route-planner-row input,
-.route-planner-row select,
-.route-planner-row button {
-    font-family: inherit; font-size: 10px;
+.route-planner-drawer.open { display: flex; }
+.route-planner-drawer input,
+.route-planner-drawer select,
+.route-planner-drawer button {
+    font-family: inherit; font-size: 11px;
     border: 1px solid var(--topo-accent-soft);
     background: var(--map-float-bg-solid); color: var(--rp-accent);
-    border-radius: 3px; padding: 4px 6px;
+    border-radius: 3px; padding: 5px 7px;
 }
-.route-planner-row button { cursor: pointer; flex: 1; min-width: 0; }
-.route-planner-total {
-    display: block; text-align: center; font-size: 11px;
-    color: var(--rp-accent); margin-top: 4px;
+.route-planner-drawer input { width: 150px; }
+.route-planner-drawer select { width: 170px; }
+.route-planner-drawer button { cursor: pointer; font-weight: 700; }
+.route-planner-marker { position: relative; overflow: visible; }
+.route-planner-marker .rp-marker-dot {
+    display: block; border-radius: 50%;
+    border: 1px solid var(--topo-accent);
+    box-shadow: 0 0 5px var(--topo-accent-glow);
+}
+.route-planner-marker.is-locked .rp-marker-dot { border-color: #ffb366; }
+.route-planner-marker .rp-marker-lock {
+    position: absolute; right: -8px; top: -10px;
+    font-size: 11px; line-height: 1;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
 }
 .route-planner-dot span {
     display: block; border-radius: 50%;
@@ -2171,7 +2215,11 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     #map-topo-ruler .topo-ruler-body,
     #topo-ruler-drag-surface { width: 200px; }
     #map-topo-ruler .topo-ruler-plate-wrap { width: 200px; height: 200px; }
-    #map-route-planner { left: 6px; bottom: 104px; width: 190px; }
+    #map-route-planner { right: 6px; bottom: 300px; }
+    .rp-icon { width: 40px; height: 40px; font-size: 18px; }
+    .route-planner-drawer { right: 52px; }
+    .route-planner-drawer input { width: 120px; }
+    .route-planner-drawer select { width: 140px; }
     .compass-drag-handle { width: 20px; height: 32px; line-height: 32px; font-size: 12px; left: -8px; }
     .compass-housing { width: 118px; height: 118px; }
     .compass-center-deg { font-size: 28px; }

@@ -1228,12 +1228,22 @@ export function snapMapZoomForRulerSync() {
 export function updateTopoRulerDisplay(show) {
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
+    var wasVisible = state.visible;
     state.visible = show !== false;
     root.style.display = state.visible ? 'block' : 'none';
     root.classList.toggle('is-ready', state.visible);
     if (state.visible) {
+        /* Při ZAPNUTÍ (přechod skryté→viditelné) vrať pravítko do středu aktuálního
+           výhledu — pokud není zamčená jeho pozice ani cíl trasy. */
+        var justEnabled = !wasVisible;
+        var routeTargetLocked = !!(_deps && _deps.isRouteTargetLocked && _deps.isRouteTargetLocked());
+        var recenter = justEnabled && !state.positionLocked && !routeTargetLocked;
         requestAnimationFrame(function() {
-            updateRulerWidgetPosition();
+            if (recenter) {
+                snapTopoRulerToMapView();
+            } else {
+                updateRulerWidgetPosition();
+            }
             snapMapZoomForRulerSync();
             if (_deps && typeof _deps.onUiUpdate === 'function') _deps.onUiUpdate();
         });

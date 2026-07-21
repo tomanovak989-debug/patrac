@@ -440,6 +440,9 @@ function initTopoRulerModule() {
             },
             refreshMgrsGrid: function() {
                 if (mgrsGridMod) mgrsGridMod.refreshMgrsGrid();
+            },
+            isRouteTargetLocked: function() {
+                return !!(routePlannerMod && routePlannerMod.isTargetLocked && routePlannerMod.isTargetLocked());
             }
         });
         updateTopoRulerDisplay();
@@ -453,10 +456,8 @@ function updateTopoRulerDisplay() {
     var fab = document.getElementById('fab-topo-ruler');
     if (fab) fab.classList.toggle('is-active', show);
     syncMgrsGridWithRuler(show);
-    if (!show) {
-        if (hud) hud.writeBool(hud.LS.route, false);
-        updateRoutePlannerDisplay();
-    }
+    /* Panel trasy sleduje pravítko; grafika trasy zůstane, když je start/cíl zamčený. */
+    updateRoutePlannerDisplay();
     if (!topoRulerMod) {
         if (root) {
             root.style.display = show ? 'block' : 'none';
@@ -502,7 +503,9 @@ function initRoutePlannerModule() {
                     return topoRulerMod.getRulerCenterLatLng();
                 }
                 return null;
-            }
+            },
+            isRulerActive: function() { return isTopoRulerActive(); },
+            isRouteWanted: function() { return !!(mapHud() && mapHud().isRouteWanted()); }
         });
         updateRoutePlannerDisplay();
     }).catch(function(err) { console.error('[routePlanner]', err); });
@@ -510,17 +513,17 @@ function initRoutePlannerModule() {
 
 function updateRoutePlannerDisplay() {
     var root = document.getElementById('map-route-planner');
-    var show = mapHud() ? mapHud().isRouteEffective() : false;
+    var panelShow = !!(mapHud() && mapHud().isRouteEffective()) && isTopoRulerActive();
     var fab = document.getElementById('fab-route-planner');
-    if (fab) fab.classList.toggle('is-active', show);
+    if (fab) fab.classList.toggle('is-active', panelShow);
     if (!routePlannerMod) {
         if (root) {
-            root.style.display = show ? 'block' : 'none';
-            root.classList.toggle('is-ready', show);
+            root.style.display = panelShow ? 'block' : 'none';
+            root.classList.toggle('is-ready', panelShow);
         }
         return;
     }
-    routePlannerMod.updateRoutePlannerDisplay(show);
+    routePlannerMod.update();
 }
 window.patracToggleRoutePlanner = function() {
     if (!isTopoRulerActive()) {
@@ -559,9 +562,9 @@ function updateTacticalHud() {
     if (!hud) return;
     hud.classList.toggle('visible', !!(mapHud() && mapHud().isMapToolsTabActive()));
     if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
-    if (routePlannerMod && routePlannerMod.refreshRouteFromGpsAndRuler &&
-        mapHud() && mapHud().isRouteEffective()) {
-        routePlannerMod.refreshRouteFromGpsAndRuler();
+    /* Trasa: start sleduje GPS, cíl střed pravítka — překresli při pohybu/GPS (pokud je zapojená). */
+    if (routePlannerMod && routePlannerMod.isRouteEngaged && routePlannerMod.isRouteEngaged()) {
+        routePlannerMod.update();
     }
 }
 
