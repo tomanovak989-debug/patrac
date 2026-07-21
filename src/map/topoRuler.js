@@ -672,13 +672,11 @@ function applyRulerScreenPos() {
 }
 
 function applyRulerFollowMode() {
-    if (state.positionLocked && state.anchor) {
-        syncScreenFromAnchor();
-        return;
-    }
     ensureScreenPos();
     applyRulerScreenPos();
-    syncAnchorFromCenter();
+    if (!state.positionLocked) {
+        syncAnchorFromCenter();
+    }
 }
 
 function updateRulerWidgetPosition() {
@@ -700,11 +698,9 @@ function updateRulerWidgetPosition() {
     root.style.right = 'auto';
     root.style.bottom = 'auto';
 
-    if (state.positionLocked && state.anchor) {
-        syncScreenFromAnchor();
-    } else {
-        ensureScreenPos();
-        applyRulerScreenPos();
+    ensureScreenPos();
+    applyRulerScreenPos();
+    if (!state.positionLocked) {
         syncAnchorFromCenter();
     }
 
@@ -1176,6 +1172,23 @@ export function getRulerCenterLatLng() {
     if (state.positionLocked && state.anchor) return { lat: state.anchor.lat, lng: state.anchor.lng };
     if (state.anchor) return { lat: state.anchor.lat, lng: state.anchor.lng };
     return getRulerOriginLatLng();
+}
+
+export function getMapScaleReadout(lat, lng) {
+    var map = getMap();
+    if (!map || lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) return null;
+    var zoom = map.getZoom();
+    var pxKm = pxPerKmAt(lat, lng);
+    var roamer = roamerScaleAt(lat, lng);
+    var dpi = 96;
+    var mapMeters = (pxKm / dpi) * 0.0254;
+    var rf = mapMeters > 0 ? Math.round(1000 / mapMeters) : null;
+    return {
+        zoom: zoom,
+        pxPerKm: Math.round(pxKm),
+        roamerScale: roamer,
+        scaleRatio: rf ? ('1:' + String(rf).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) : '—'
+    };
 }
 
 export function wasFabLongPress() {

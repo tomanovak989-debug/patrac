@@ -2096,7 +2096,8 @@
             background: var(--map-float-bg); border: 1px solid var(--map-float-border);
             padding: 6px 10px; backdrop-filter: blur(6px); box-shadow: var(--neon-glow);
         }
-        .map-tac-tile.map-tac-tile-bezel { flex: 0.85; }
+        .map-tac-tile.map-tac-tile-mgrs { flex: 1.2; min-width: 0; }
+        .map-tac-tile.map-tac-tile-scale { flex: 0.75; min-width: 0; }
         .map-tac-label { display: block; font-size: 8px; color: var(--stat-label-color); letter-spacing: 0.1em; }
         .map-tac-value { display: block; font-size: 15px; color: var(--text-green); font-weight: 700; text-shadow: var(--text-glow); margin-top: 2px; }
         .map-tac-sub { font-size: 9px; color: var(--dim-fg); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -2547,6 +2548,11 @@
     </div>
 
     <div id="map-tactical-hud" aria-hidden="true">
+        <div class="map-tac-tile map-tac-tile-scale">
+            <span class="map-tac-label">MĚŘÍTKO · ZOOM</span>
+            <span class="map-tac-value" id="map-tac-scale">—</span>
+            <span class="map-tac-sub" id="map-tac-scale-sub">—</span>
+        </div>
         <div class="map-tac-tile map-tac-tile-mgrs">
             <span class="map-tac-label">MGRS NATO · GPS</span>
             <span class="map-tac-value" id="map-tac-mgrs">—</span>
@@ -2960,7 +2966,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260720c3';
+        var PATRAC_BUILD = '20260721c1';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -5728,11 +5734,12 @@
                 var tileSel = document.getElementById('map-tile-select');
                 if (tileSel) tileSel.value = tilePref;
 
-                map.on('moveend', function() {
+                map.on('moveend zoomend zoom', function() {
                     var c = map.getCenter();
                     localStorage.setItem('map_last_lat', c.lat);
                     localStorage.setItem('map_last_lng', c.lng);
                     localStorage.setItem('map_last_zoom', map.getZoom());
+                    updateTacticalHud();
                 });
 
                 reloadAllMapPoints();
@@ -6012,6 +6019,8 @@
             if (!mgrsGridMod || !_mapToolsTabActive) return;
             var mgrsEl = document.getElementById('map-tac-mgrs');
             var subEl = document.getElementById('map-tac-mgrs-sub');
+            var scaleEl = document.getElementById('map-tac-scale');
+            var scaleSubEl = document.getElementById('map-tac-scale-sub');
             if (!mgrsEl) return;
             var lat = null;
             var lng = null;
@@ -6027,9 +6036,17 @@
                 lat = c.lat;
                 lng = c.lng;
             }
+            if (topoRulerMod && topoRulerMod.getRulerCenterLatLng && topoRulerMod.getRulerCenterLatLng()) {
+                var rc = topoRulerMod.getRulerCenterLatLng();
+                lat = rc.lat;
+                lng = rc.lng;
+                src = 'střed pravítka';
+            }
             if (lat == null) {
                 mgrsEl.textContent = '—';
                 if (subEl) subEl.textContent = 'čekám na GPS…';
+                if (scaleEl) scaleEl.textContent = '—';
+                if (scaleSubEl) scaleSubEl.textContent = '—';
                 return;
             }
             var mgrsAcc = 5;
@@ -6040,6 +6057,15 @@
             }
             if (subEl) {
                 subEl.textContent = formatLatLngDegrees(lat, lng) + ' · ' + src + ' · ' + mgrsGridMod.mgrsPrecisionText(mgrsAcc);
+            }
+            if (topoRulerMod && topoRulerMod.getMapScaleReadout && scaleEl) {
+                var scaleInfo = topoRulerMod.getMapScaleReadout(lat, lng);
+                if (scaleInfo) {
+                    scaleEl.textContent = scaleInfo.scaleRatio + ' · Z' + scaleInfo.zoom;
+                    if (scaleSubEl) {
+                        scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px · roamer ×' + scaleInfo.roamerScale.toFixed(2);
+                    }
+                }
             }
         };
 
