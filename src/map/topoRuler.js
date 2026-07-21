@@ -1142,6 +1142,8 @@ function keepRulerPinned() {
 function onMapMoveLive() {
     if (_bearingDragging) return;
     keepRulerPinned();
+    /* Odemčené pravítko = záměrovač uprostřed: souřadnice čti živě už během posunu mapy. */
+    if (!state.positionLocked) syncCoordFieldsFromPosition();
 }
 
 function onMapZoom() {
