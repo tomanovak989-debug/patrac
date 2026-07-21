@@ -449,9 +449,11 @@ function getDefaultScreenPos() {
     var vpW = window.innerWidth;
     var vpH = window.innerHeight;
     var sz = getRulerWidgetSize();
+    /* Volná zóna je uprostřed: nahoře je taktický HUD, dole kompas/FAB/plánovač.
+       Umísti pravítko do vertikálního středu (mírně nad polovinu), ať nepřekrývá panely. */
     return {
         x: Math.max(12, vpW * 0.5 - sz.w / 2),
-        y: Math.max(100, Math.min(vpH * 0.58, vpH - sz.h - 88))
+        y: Math.max(96, Math.min(vpH * 0.5 - sz.h / 2 - 20, vpH - sz.h - 96))
     };
 }
 
@@ -1115,19 +1117,37 @@ function bindMapEvents() {
         endMapZoomSoon();
     });
     map.on('zoom zoomanim', onMapZoom);
+    map.on('move', onMapMoveLive);
     map.on('moveend viewreset resize', onMapPanOrResize);
+}
+
+/** Živý posun mapy: zamčené pravítko drží zeměpisný bod (jede s mapou), odemčené je fixní na obrazovce. */
+function onMapMoveLive() {
+    if (_bearingDragging || _widgetDragging) return;
+    if (state.positionLocked && state.anchor) {
+        syncScreenFromAnchor();
+    }
 }
 
 function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
-    applyRulerScreenPosOnly();
-    if (!state.positionLocked) syncAnchorFromCenter();
+    if (state.positionLocked && state.anchor) {
+        syncScreenFromAnchor();
+    } else {
+        applyRulerScreenPosOnly();
+        syncAnchorFromCenter();
+    }
     updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
     if (_bearingDragging || _widgetDragging) return;
-    applyRulerScreenPosOnly();
+    if (state.positionLocked && state.anchor) {
+        syncScreenFromAnchor();
+        updateRulerPlateVisual();
+    } else {
+        applyRulerScreenPosOnly();
+    }
 }
 
 export function initTopoRuler(deps) {

@@ -75,7 +75,6 @@ export function refreshRouteFromGpsAndRuler() {
     state.target = { lat: ruler.lat, lng: ruler.lng };
     state.waypoints = [];
     persistState();
-    if (state.visible) renderRouteOnMap();
     return true;
 }
 
@@ -259,8 +258,12 @@ function initInteractions() {
     if (routeSel && !routeSel._bound) {
         routeSel._bound = true;
         routeSel.addEventListener('change', function() {
-            if (routeSel.value) loadRouteById(routeSel.value);
-            else refreshRouteFromGpsAndRuler();
+            if (routeSel.value) {
+                loadRouteById(routeSel.value);
+            } else {
+                refreshRouteFromGpsAndRuler();
+                renderRouteOnMap();
+            }
         });
     }
 }
