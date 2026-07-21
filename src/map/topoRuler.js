@@ -272,6 +272,20 @@ function syncScreenFromAnchor() {
     placeRulerCenterAtLatLng(state.anchor.lat, state.anchor.lng, true);
 }
 
+/** Umísti desku pravítka na střed aktuálního výřezu mapy; kotva = střed. */
+function centerReticleOnMapView() {
+    var ll = getMapViewCenterLatLng();
+    if (ll) placeRulerCenterAtLatLng(ll.lat, ll.lng);
+}
+
+/** Přepsání souřadnic (odemčené pravítko): mapa se vycentruje na bod, záměrovač zůstane uprostřed. */
+function centerMapOnLatLng(lat, lng) {
+    var map = getMap();
+    if (!map) return;
+    map.setView([lat, lng], map.getZoom(), { animate: false });
+    centerReticleOnMapView();
+}
+
 function getPlateCenterScreenPoint() {
     var root = document.getElementById('map-topo-ruler');
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
@@ -550,17 +564,17 @@ function applyCoordAxis(axis) {
         var baseE = Math.floor(utm.easting / 100000) * 100000;
         var newE = baseE + parseInt(w5, 10);
         var ptW = utmToLatLng(newE, utm.northing, zone, ll.lat);
-        placeRulerCenterAtLatLng(ptW.lat, ptW.lng);
+        centerMapOnLatLng(ptW.lat, ptW.lng);
     } else if (axis === 'n' && ll) {
         var utmN = latLngToUtm(ll.lat, ll.lng);
         var zoneN = utmN.zone;
         var baseN = Math.floor(utmN.northing / 100000) * 100000;
         var newN = baseN + parseInt(n5, 10);
         var ptN = utmToLatLng(utmN.easting, newN, zoneN, ll.lat);
-        placeRulerCenterAtLatLng(ptN.lat, ptN.lng);
+        centerMapOnLatLng(ptN.lat, ptN.lng);
     } else {
         var full = latLngFromCoordInputs(w5, n5);
-        if (full) placeRulerCenterAtLatLng(full.lat, full.lng);
+        if (full) centerMapOnLatLng(full.lat, full.lng);
     }
     syncCoordFieldsFromPosition();
     persistState();
@@ -646,7 +660,8 @@ function updateRulerPlateVisual() {
     if (centerEl) {
         centerEl.style.transform = '';
         centerEl.classList.toggle('is-locked', state.positionLocked);
-        centerEl.style.pointerEvents = state.positionLocked ? 'none' : 'auto';
+        /* Křížek nechytá dotyk — přes střed jde posouvat mapou (záměrovač). */
+        centerEl.style.pointerEvents = 'none';
     }
 
     var locked = state.positionLocked;
@@ -675,9 +690,10 @@ function updateRulerPlateVisual() {
         else degEl.textContent = '';
     }
     if (plateWrap) plateWrap.classList.toggle('is-locked', locked);
+    /* Přetahování pravítka je zrušené — úchyty vždy skryté. */
     ['topo-ruler-drag-tl', 'topo-ruler-drag-br'].forEach(function(id) {
         var handle = document.getElementById(id);
-        if (handle) handle.style.display = locked ? 'none' : '';
+        if (handle) handle.style.display = 'none';
     });
     syncFabLockUi();
 }
@@ -724,10 +740,10 @@ function updateRulerWidgetPosition() {
     root.style.right = 'auto';
     root.style.bottom = 'auto';
 
-    ensureScreenPos();
-    applyRulerScreenPos();
-    if (!state.positionLocked) {
-        syncAnchorFromCenter();
+    if (state.positionLocked && state.anchor) {
+        syncScreenFromAnchor();
+    } else {
+        centerReticleOnMapView();
     }
 
     updateRulerPlateVisual();
@@ -789,17 +805,14 @@ function loadState() {
 
 function togglePositionLock() {
     if (!state.positionLocked) {
-        ensureScreenPos();
-        captureScreenPos();
+        /* Zamkni na aktuálním středu (záměrovači) — od teď drží zeměpisný bod. */
         syncAnchorFromCenter();
         state.positionLocked = true;
         if (state.bearingDeg == null) state.bearingDeg = 0;
     } else {
+        /* Odemkni → zpět na záměrovač uprostřed aktuálního výřezu. */
         state.positionLocked = false;
         releaseInteractionLocks();
-        ensureScreenPos();
-        captureScreenPos();
-        syncAnchorFromCenter();
     }
     persistState();
     updateRulerWidgetPosition();
@@ -1094,7 +1107,6 @@ function initInteractions() {
     var rulerScene = document.getElementById('topo-ruler-scene');
     var bezelHit = document.getElementById('topo-ruler-bezel-hit');
 
-    bindRulerMoveHandles();
     bindMapWheelPassthrough(rulerScene);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
@@ -1121,32 +1133,33 @@ function bindMapEvents() {
     map.on('moveend viewreset resize', onMapPanOrResize);
 }
 
-/** Živý posun mapy: zamčené pravítko drží zeměpisný bod (jede s mapou), odemčené je fixní na obrazovce. */
-function onMapMoveLive() {
-    if (_bearingDragging || _widgetDragging) return;
-    if (state.positionLocked && state.anchor) {
-        syncScreenFromAnchor();
-    }
-}
-
-function onMapZoom() {
-    if (_bearingDragging || _widgetDragging) return;
+/** Odemčené pravítko = záměrovač natvrdo uprostřed výřezu mapy; zamčené drží zeměpisný bod (jede s mapou). */
+function keepRulerPinned() {
     if (state.positionLocked && state.anchor) {
         syncScreenFromAnchor();
     } else {
-        applyRulerScreenPosOnly();
-        syncAnchorFromCenter();
+        centerReticleOnMapView();
     }
+}
+
+function onMapMoveLive() {
+    if (_bearingDragging) return;
+    keepRulerPinned();
+}
+
+function onMapZoom() {
+    if (_bearingDragging) return;
+    keepRulerPinned();
     updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
-    if (_bearingDragging || _widgetDragging) return;
-    if (state.positionLocked && state.anchor) {
-        syncScreenFromAnchor();
-        updateRulerPlateVisual();
-    } else {
-        applyRulerScreenPosOnly();
+    if (_bearingDragging) return;
+    keepRulerPinned();
+    updateRulerPlateVisual();
+    if (!state.positionLocked) {
+        syncCoordFieldsFromPosition();
+        persistState();
     }
 }
 
@@ -1233,17 +1246,15 @@ export function updateTopoRulerDisplay(show) {
     root.style.display = state.visible ? 'block' : 'none';
     root.classList.toggle('is-ready', state.visible);
     if (state.visible) {
-        /* Při ZAPNUTÍ (přechod skryté→viditelné) vrať pravítko do středu aktuálního
-           výhledu — pokud není zamčená jeho pozice ani cíl trasy. */
+        /* Zapnutí ZAMČENÉHO pravítka vycentruje mapu zpět na jeho kotvu (rychlý skok na bod).
+           Odemčené pravítko je vždy záměrovač uprostřed aktuálního výřezu. */
         var justEnabled = !wasVisible;
-        var routeTargetLocked = !!(_deps && _deps.isRouteTargetLocked && _deps.isRouteTargetLocked());
-        var recenter = justEnabled && !state.positionLocked && !routeTargetLocked;
         requestAnimationFrame(function() {
-            if (recenter) {
-                snapTopoRulerToMapView();
-            } else {
-                updateRulerWidgetPosition();
+            if (justEnabled && state.positionLocked && state.anchor) {
+                var m = getMap();
+                if (m) m.setView([state.anchor.lat, state.anchor.lng], m.getZoom(), { animate: false });
             }
+            updateRulerWidgetPosition();
             snapMapZoomForRulerSync();
             if (_deps && typeof _deps.onUiUpdate === 'function') _deps.onUiUpdate();
         });
