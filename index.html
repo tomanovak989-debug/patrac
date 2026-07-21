@@ -973,7 +973,7 @@
         .radio-notebook-sheet {
             position: relative;
             aspect-ratio: 210 / 297;
-            --nb-line: 22px;
+            --nb-line: 18px;
             --nb-lines: 16;
             background: #fff8ea;
             border: 1px solid rgba(80, 60, 30, 0.28);
@@ -1019,17 +1019,17 @@
             z-index: 1;
             height: 100%;
             box-sizing: border-box;
-            padding: 28px 14px 10px 16px;
+            padding: 26px 14px 10px 16px;
             overflow: hidden;
             font-family: 'Patrick Hand', 'Segoe Print', cursive;
-            font-size: 15px;
-            line-height: var(--nb-line, 22px);
+            font-size: 12px;
+            line-height: var(--nb-line, 18px);
             color: #2a2418;
         }
         .radio-notebook-line {
             display: block;
-            height: var(--nb-line, 22px);
-            line-height: var(--nb-line, 22px);
+            height: var(--nb-line, 18px);
+            line-height: var(--nb-line, 18px);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: clip;
@@ -1654,7 +1654,7 @@
             display: none;
             right: auto;
             bottom: auto;
-            z-index: 330;
+            z-index: 8;
             user-select: none;
             width: 260px;
             height: fit-content;
@@ -1666,7 +1666,7 @@
         #map-topo-ruler.topo-ruler-positioned { right: auto; bottom: auto; }
         #map-topo-ruler.topo-ruler-docked {
             right: 12px !important;
-            bottom: 164px !important;
+            bottom: 108px !important;
             left: auto !important;
             top: auto !important;
         }
@@ -2180,7 +2180,7 @@
             .map-tac-sub { font-size: 8px; }
             #map-compass { width: 118px; }
             #map-compass.compass-docked { bottom: 48px !important; right: 6px !important; }
-            #map-topo-ruler.topo-ruler-docked { bottom: 104px !important; right: 6px !important; }
+            #map-topo-ruler.topo-ruler-docked { bottom: 62px !important; right: 6px !important; }
             #map-topo-ruler .topo-ruler-body,
             #topo-ruler-drag-surface { width: 200px; }
             #map-topo-ruler .topo-ruler-plate-wrap { width: 200px; height: 200px; }
@@ -2966,7 +2966,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         var map = null, userMarker = null;
-        var PATRAC_BUILD = '20260721c1';
+        var PATRAC_BUILD = '20260721c2';
         function importAuthService() {
             return import('./src/services/authService.js?v=' + PATRAC_BUILD);
         }
@@ -6063,7 +6063,8 @@
                 if (scaleInfo) {
                     scaleEl.textContent = scaleInfo.scaleRatio + ' · Z' + scaleInfo.zoom;
                     if (scaleSubEl) {
-                        scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px · roamer ×' + scaleInfo.roamerScale.toFixed(2);
+                        scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px · roamer ×' + scaleInfo.roamerScale.toFixed(2) +
+                            (scaleInfo.synced ? ' · SYNC' : '');
                     }
                 }
             }

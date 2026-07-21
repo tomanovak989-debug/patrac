@@ -15,8 +15,8 @@ export const NOTEBOOK_TAB_LABELS = {
 
 /** Počet řádků na jeden A4 list sešitu. */
 export const NOTEBOOK_LINES_PER_PAGE = 16;
-/** Odhad znaků na jeden řádek (Patrick Hand, širší sešit). */
-export const NOTEBOOK_CHARS_PER_LINE = 52;
+/** Odhad znaků na jeden řádek (Patrick Hand, užší sešit). */
+export const NOTEBOOK_CHARS_PER_LINE = 58;
 
 export const CHANNEL_SCOPE_LABELS = {
     global: 'GLOB',

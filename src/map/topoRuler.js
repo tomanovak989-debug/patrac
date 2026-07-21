@@ -11,6 +11,8 @@ var _bound = false;
 var PLATE_PX = 260;
 var KM_SQUARE_SVG_PX = 100;
 var NEON = '#78ff66';
+/** Referenční měřítko mapy při roamer ×1 (synchronní s pravítkem). */
+var RULER_REF_SCALE = 46657;
 
 var state = {
     expanded: true,
@@ -149,6 +151,14 @@ function pxPerKmAt(lat, lng) {
     return Math.max(1, (pxE + pxN) * 0.5);
 }
 
+function metersPerPixelAtLatZoom(lat, zoom) {
+    return 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+}
+
+function pxPerKmAtZoom(lat, zoom) {
+    return 1000 / Math.max(1e-6, metersPerPixelAtLatZoom(lat, zoom));
+}
+
 /** Šířka desky v CSS px (260 desktop, 200 mobil). */
 function plateWidthPx() {
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
@@ -231,7 +241,7 @@ function endMapZoomSoon() {
 
 function getVisualCenterLl() {
     if (_mapZooming && state.positionLocked && _zoomAnchorLl) return _zoomAnchorLl;
-    if (state.positionLocked && state.anchor) return state.anchor;
+    if (state.anchor) return state.anchor;
     return getRulerOriginLatLng();
 }
 
@@ -428,7 +438,7 @@ function getDefaultScreenPos() {
     var sz = getRulerWidgetSize();
     return {
         x: Math.max(12, vpW * 0.5 - sz.w / 2),
-        y: Math.max(38, Math.min(vpH * 0.32, vpH - sz.h - 12))
+        y: Math.max(100, Math.min(vpH * 0.58, vpH - sz.h - 88))
     };
 }
 
@@ -671,12 +681,13 @@ function applyRulerScreenPos() {
     if (parseFloat(root.style.top) !== top) root.style.top = top + 'px';
 }
 
-function applyRulerFollowMode() {
+function applyRulerScreenPosOnly() {
     ensureScreenPos();
     applyRulerScreenPos();
-    if (!state.positionLocked) {
-        syncAnchorFromCenter();
-    }
+}
+
+function applyRulerFollowMode() {
+    applyRulerScreenPosOnly();
 }
 
 function updateRulerWidgetPosition() {
@@ -689,7 +700,7 @@ function updateRulerWidgetPosition() {
         root.style.left = '';
         root.style.top = '';
         root.style.right = (window.innerWidth <= 480 ? 6 : 12) + 'px';
-        root.style.bottom = (window.innerWidth <= 480 ? 48 : 108) + 56 + 'px';
+        root.style.bottom = (window.innerWidth <= 480 ? 62 : 108) + 'px';
         return;
     }
 
@@ -1077,19 +1088,19 @@ function bindMapEvents() {
         endMapZoomSoon();
     });
     map.on('zoom zoomanim', onMapZoom);
-    map.on('move moveend viewreset resize', onMapPanOrResize);
+    map.on('moveend viewreset resize', onMapPanOrResize);
 }
 
 function onMapZoom() {
     if (_bearingDragging || _widgetDragging) return;
-    applyRulerFollowMode();
+    applyRulerScreenPosOnly();
+    if (!state.positionLocked) syncAnchorFromCenter();
     updateRulerPlateVisual();
 }
 
 function onMapPanOrResize() {
     if (_bearingDragging || _widgetDragging) return;
-    applyRulerFollowMode();
-    updateRulerPlateVisual();
+    applyRulerScreenPosOnly();
 }
 
 export function initTopoRuler(deps) {
@@ -1144,6 +1155,29 @@ export function snapTopoRulerToLatLng(lat, lng) {
     return true;
 }
 
+export function snapMapZoomForRulerSync() {
+    var map = getMap();
+    if (!map) return false;
+    var ll = getRulerOriginLatLng() || getMapViewCenterLatLng();
+    if (!ll) return false;
+    var targetPx = kmSquareBaseScreenPx();
+    var bestZ = map.getZoom();
+    var bestDiff = Infinity;
+    var z;
+    for (z = map.getMinZoom(); z <= map.getMaxZoom(); z++) {
+        var diff = Math.abs(pxPerKmAtZoom(ll.lat, z) - targetPx);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestZ = z;
+        }
+    }
+    if (bestZ !== map.getZoom()) map.setZoom(bestZ, { animate: false });
+    syncAnchorFromCenter();
+    updateRulerPlateVisual();
+    persistState();
+    return true;
+}
+
 export function updateTopoRulerDisplay(show) {
     var root = document.getElementById('map-topo-ruler');
     if (!root) return;
@@ -1153,6 +1187,8 @@ export function updateTopoRulerDisplay(show) {
     if (state.visible) {
         requestAnimationFrame(function() {
             updateRulerWidgetPosition();
+            snapMapZoomForRulerSync();
+            if (_deps && typeof _deps.onUiUpdate === 'function') _deps.onUiUpdate();
         });
     } else {
         clearMapGraphics();
@@ -1180,14 +1216,13 @@ export function getMapScaleReadout(lat, lng) {
     var zoom = map.getZoom();
     var pxKm = pxPerKmAt(lat, lng);
     var roamer = roamerScaleAt(lat, lng);
-    var dpi = 96;
-    var mapMeters = (pxKm / dpi) * 0.0254;
-    var rf = mapMeters > 0 ? Math.round(1000 / mapMeters) : null;
+    var rf = Math.round(RULER_REF_SCALE / Math.max(0.05, roamer));
     return {
         zoom: zoom,
         pxPerKm: Math.round(pxKm),
         roamerScale: roamer,
-        scaleRatio: rf ? ('1:' + String(rf).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')) : '—'
+        scaleRatio: '1:' + String(rf).replace(/\B(?=(\d{3})+(?!\d))/g, ' '),
+        synced: Math.abs(roamer - 1) < 0.12
     };
 }
 
