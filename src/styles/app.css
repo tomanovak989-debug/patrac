@@ -1861,8 +1861,9 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 #topo-bearing-hand circle {
     pointer-events: none;
 }
-/* Úchop směrníku na špičce ručičky — vytáhne se ze středu pravítka */
-#topo-bearing-knob {
+/* Úchop směrníku na špičce ručičky — vytáhne se ze středu pravítka.
+   Vyšší specificita než pravidlo výše (#topo-bearing-hand circle), jinak by úchop zdědil pointer-events:none. */
+#topo-bearing-hand #topo-bearing-knob {
     pointer-events: all;
     cursor: grab;
     touch-action: none;

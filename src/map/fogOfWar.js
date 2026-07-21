@@ -11,7 +11,8 @@ export var FOG_REVEAL_RADIUS_M = 500;
 var FOG_PANE_Z = 450;
 
 var _deps = null;
-var _overlay = null;
+var _canvas = null;
+var _ctx = null;
 var _bound = false;
 var _enabled = true;
 var _revealAll = false;
@@ -99,27 +100,27 @@ function ensureFogPane() {
     }
 }
 
-function ensureOverlay() {
+function ensureCanvas() {
     var map = getMap();
     if (!map) return;
     ensureFogPane();
     var pane = map.getPane('mapFogPane');
     if (!pane) return;
 
-    if (!_overlay) {
-        _overlay = document.createElement('div');
-        _overlay.id = 'map-fog-gray';
-        _overlay.className = 'map-fog-gray';
-        _overlay.setAttribute('aria-hidden', 'true');
-        _overlay.style.position = 'absolute';
-        _overlay.style.left = '0';
-        _overlay.style.top = '0';
-        _overlay.style.pointerEvents = 'none';
-        /* Mapu pod fogem uděláme skutečně černobílou (detailní jako ČB fotka),
-           osvětlené kruhy vyřízneme přes clip-path → zůstanou barevné. */
-        _overlay.style.webkitBackdropFilter = 'grayscale(1)';
-        _overlay.style.backdropFilter = 'grayscale(1)';
-        pane.appendChild(_overlay);
+    if (!_canvas) {
+        _canvas = document.createElement('canvas');
+        _canvas.id = 'map-fog-canvas';
+        _canvas.className = 'map-fog-canvas';
+        _canvas.setAttribute('aria-hidden', 'true');
+        _canvas.style.position = 'absolute';
+        _canvas.style.left = '0';
+        _canvas.style.top = '0';
+        _canvas.style.pointerEvents = 'none';
+        /* Místo černé clony odbarvíme mapu pod sebou: šedá výplň + blend "saturation"
+           udělá terén černobílý (s měkkými přechody), vypíchnuté kruhy zůstanou barevné. */
+        _canvas.style.mixBlendMode = 'saturation';
+        pane.appendChild(_canvas);
+        _ctx = _canvas.getContext('2d');
     }
 }
 
@@ -131,15 +132,18 @@ function latLngToCanvasPoint(lat, lng) {
     return { x: layerPt.x - origin.x, y: layerPt.y - origin.y };
 }
 
-function positionOverlay() {
+function positionFogCanvas() {
     var map = getMap();
-    if (!map || !_overlay || !window.L) return null;
+    if (!map || !_canvas || !window.L) return null;
     var size = map.getSize();
     if (!size || size.x < 1 || size.y < 1) return null;
-    _overlay.style.width = size.x + 'px';
-    _overlay.style.height = size.y + 'px';
+    var dpr = window.devicePixelRatio || 1;
+    _canvas.width = Math.round(size.x * dpr);
+    _canvas.height = Math.round(size.y * dpr);
+    _canvas.style.width = size.x + 'px';
+    _canvas.style.height = size.y + 'px';
     var topLeft = map.containerPointToLayerPoint(window.L.point(0, 0));
-    window.L.DomUtil.setPosition(_overlay, topLeft);
+    window.L.DomUtil.setPosition(_canvas, topLeft);
     return size;
 }
 
@@ -153,42 +157,46 @@ function metersToPixelRadius(lat, lng, meters) {
     return Math.max(6, Math.hypot(p1.x - p0.x, p1.y - p0.y));
 }
 
-function buildRevealClipPath(size, anchors, radiusM) {
-    var w = size.x;
-    var h = size.y;
-    /* Vnější obdélník = zamlžená plocha; kruhy = díry (evenodd) → tam se ČB filtr neuplatní. */
-    var d = 'M0 0 H' + w + ' V' + h + ' H0 Z';
-    for (var i = 0; i < anchors.length; i++) {
-        var a = anchors[i];
-        if (!a || !isFinite(a.lat) || !isFinite(a.lng)) continue;
-        var c = latLngToCanvasPoint(a.lat, a.lng);
-        if (!c) continue;
-        var r = metersToPixelRadius(a.lat, a.lng, radiusM);
-        var cx = c.x.toFixed(1);
-        var cy = c.y.toFixed(1);
-        var rr = r.toFixed(1);
-        var d2 = (r * 2).toFixed(1);
-        d += ' M' + (c.x - r).toFixed(1) + ' ' + cy +
-             ' a' + rr + ' ' + rr + ' 0 1 0 ' + d2 + ' 0' +
-             ' a' + rr + ' ' + rr + ' 0 1 0 -' + d2 + ' 0 Z';
-    }
-    return d;
+function drawRevealCircle(ctx, lat, lng, radiusM) {
+    var center = latLngToCanvasPoint(lat, lng);
+    if (!center) return;
+    var radiusPx = metersToPixelRadius(lat, lng, radiusM);
+    var grad = ctx.createRadialGradient(center.x, center.y, 0, center.x, center.y, radiusPx);
+    grad.addColorStop(0, 'rgba(0,0,0,1)');
+    grad.addColorStop(0.7, 'rgba(0,0,0,0.92)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radiusPx, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 export function refreshFogOfWar() {
     var map = getMap();
     if (!map) return;
-    ensureOverlay();
-    if (!_overlay) return;
+    ensureCanvas();
+    if (!_canvas || !_ctx) return;
 
     if (!_enabled || (_revealAll && isOperator())) {
-        _overlay.style.display = 'none';
+        _canvas.style.display = 'none';
         return;
     }
 
-    var size = positionOverlay();
+    var size = positionFogCanvas();
     if (!size) return;
-    _overlay.style.display = 'block';
+
+    var dpr = window.devicePixelRatio || 1;
+    _canvas.style.display = 'block';
+
+    var ctx = _ctx;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, size.x, size.y);
+    /* Neutrální šedá (sytost 0) → přes mix-blend-mode: saturation odbarví mapu.
+       Alfa = síla filtru: vyšší = méně průhledné (výraznější odbarvení). */
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.8)';
+    ctx.fillRect(0, 0, size.x, size.y);
+
+    ctx.globalCompositeOperation = 'destination-out';
 
     var anchors = [];
     if (_deps && typeof _deps.getRevealAnchors === 'function') {
@@ -197,10 +205,14 @@ export function refreshFogOfWar() {
     var radiusM = FOG_REVEAL_RADIUS_M;
     if (_deps && _deps.revealRadiusM != null) radiusM = _deps.revealRadiusM;
 
-    var d = buildRevealClipPath(size, anchors, radiusM);
-    var cp = 'path(evenodd, "' + d + '")';
-    _overlay.style.webkitClipPath = cp;
-    _overlay.style.clipPath = cp;
+    var i;
+    for (i = 0; i < anchors.length; i++) {
+        var a = anchors[i];
+        if (!a || !isFinite(a.lat) || !isFinite(a.lng)) continue;
+        drawRevealCircle(ctx, a.lat, a.lng, radiusM);
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
 }
 
 function bindMapEvents() {
@@ -255,7 +267,7 @@ export function initFogOfWar(deps) {
     _deps = deps;
     _enabled = loadEnabledPref();
     _revealAll = loadRevealAllPref();
-    ensureOverlay();
+    ensureCanvas();
     bindMapEvents();
     syncFogAdminUi();
     requestAnimationFrame(function() {
