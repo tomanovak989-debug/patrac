@@ -1,6 +1,6 @@
 /* PATRAC app chunk: 01-globals.js — do not reorder script tags in index.html */
 var map = null, userMarker = null;
-var PATRAC_BUILD = '20260721d6';
+var PATRAC_BUILD = '20260721d7';
 window.PATRAC_BUILD = PATRAC_BUILD;
 
 /* Dočasný diagnostický odchytávač chyb — zobrazí běhovou chybu na obrazovce (mobil bez konzole). */
@@ -37,13 +37,11 @@ window.PATRAC_BUILD = PATRAC_BUILD;
     });
 })();
 
-/** Dynamický import ES modulů z kořene app (index.html), ne z cesty tohoto souboru. */
+/** Dynamický import ES modulů — cesta relativní k dokumentu (index.html), s cache-bustem. */
 function patracImport(modulePath) {
-    if (typeof window.patracImport === 'function') {
-        return window.patracImport(modulePath);
-    }
     return import('./src/' + modulePath + '?v=' + PATRAC_BUILD);
 }
+window.patracImport = patracImport;
 
 function importAuthService() {
     return patracImport('services/authService.js');
