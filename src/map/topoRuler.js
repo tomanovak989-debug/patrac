@@ -206,6 +206,9 @@ function cachePlateCenterOffset() {
     var root = document.getElementById('map-topo-ruler');
     var plateWrap = document.querySelector('.topo-ruler-plate-wrap');
     if (!root || !plateWrap) return;
+    /* Neukládej nulový offset z doby, kdy bylo pravítko skryté (display:none) —
+       jinak by se centrování rozbilo a už nikdy nepřepočítalo. */
+    if (!plateWrap.offsetWidth && !plateWrap.offsetHeight) return;
     _plateCenterOffset = {
         x: plateWrap.offsetLeft + plateWrap.offsetWidth * 0.5,
         y: plateWrap.offsetTop + plateWrap.offsetHeight * 0.5
@@ -247,8 +250,18 @@ function getVisualCenterLl() {
 
 function ensureScreenPos() {
     if (state.screenX != null && state.screenY != null) return;
-    captureScreenPos();
-    if (state.screenX != null && state.screenY != null) return;
+    /* Zachyť jen skutečně aplikovanou pozici — jinak by getBoundingClientRect
+       vrátil nepozicovaný roh (0,0) a pravítko by se přilepilo vlevo nahoře. */
+    var root = document.getElementById('map-topo-ruler');
+    if (root && root.classList.contains('topo-ruler-positioned')) {
+        var left = parseFloat(root.style.left);
+        var top = parseFloat(root.style.top);
+        if (!isNaN(left) && !isNaN(top)) {
+            state.screenX = left;
+            state.screenY = top;
+            return;
+        }
+    }
     var def = getDefaultScreenPos();
     state.screenX = def.x;
     state.screenY = def.y;

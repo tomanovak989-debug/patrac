@@ -1,6 +1,6 @@
 /* PATRAC app chunk: 01-globals.js — do not reorder script tags in index.html */
 var map = null, userMarker = null;
-var PATRAC_BUILD = '20260721d7';
+var PATRAC_BUILD = '20260721d8';
 window.PATRAC_BUILD = PATRAC_BUILD;
 
 /* Dočasný diagnostický odchytávač chyb — zobrazí běhovou chybu na obrazovce (mobil bez konzole). */
