@@ -191,8 +191,9 @@ export function refreshFogOfWar() {
     var ctx = _ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.x, size.y);
-    /* Neutrální šedá (sytost 0) → přes mix-blend-mode: saturation odbarví mapu na černobílou. */
-    ctx.fillStyle = 'rgba(128, 128, 128, 1)';
+    /* Neutrální šedá (sytost 0) → přes mix-blend-mode: saturation odbarví mapu.
+       Alfa = síla filtru: nižší = průhlednější (barvy víc prosvítají). */
+    ctx.fillStyle = 'rgba(128, 128, 128, 0.6)';
     ctx.fillRect(0, 0, size.x, size.y);
 
     ctx.globalCompositeOperation = 'destination-out';
