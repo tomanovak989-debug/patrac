@@ -1019,6 +1019,9 @@ function bindBearingHandDrag() {
     }
 
     knob.addEventListener('pointerdown', onStart);
+    /* Na Androidu dlouhý stisk (~0,5 s) jinak spustí kontextové menu / výběr → pointercancel a ztrátu tahu. */
+    knob.addEventListener('contextmenu', function(ev) { ev.preventDefault(); });
+    knob.addEventListener('touchstart', function(ev) { ev.preventDefault(); }, { passive: false });
 }
 
 function bindCoordInputs() {

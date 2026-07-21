@@ -1867,6 +1867,10 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     pointer-events: all;
     cursor: grab;
     touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 #topo-bearing-hand.is-dragging #topo-bearing-knob { cursor: grabbing; }
 .topo-ruler-center {

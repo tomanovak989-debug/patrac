@@ -10,12 +10,11 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260721e9" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260721e10" />
 </head>
 <body class="theme-standard theme-dark">
 
     <div id="map"></div>
-    <div id="map-float-overlay" aria-hidden="true">
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
             <div class="topo-ruler-coord-row" aria-label="MGRS souřadnice">
@@ -50,6 +49,7 @@
             </div>
         </div>
     </div>
+    <div id="map-float-overlay" aria-hidden="true">
     <div id="map-route-planner" aria-label="Plánovač trasy">
         <div class="route-planner-rail">
             <button type="button" id="btn-rp-start" class="rp-icon map-float-hit" title="Start (GPS) · podrž 1 s = zamknout/odemknout">
@@ -766,21 +766,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260721e9"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260721e10"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e9';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e10';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260721e9';
+        window.PATRAC_BUILD = '20260721e10';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260721e9"></script>
-    <script src="src/app/02-quests.js?v=20260721e9"></script>
-    <script src="src/app/03-map.js?v=20260721e9"></script>
-    <script src="src/app/04-game.js?v=20260721e9"></script>
+    <script src="src/app/01-globals.js?v=20260721e10"></script>
+    <script src="src/app/02-quests.js?v=20260721e10"></script>
+    <script src="src/app/03-map.js?v=20260721e10"></script>
+    <script src="src/app/04-game.js?v=20260721e10"></script>
 </body>
 </html>
