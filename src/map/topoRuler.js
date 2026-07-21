@@ -749,6 +749,19 @@ function persistState() {
     } catch (e) {}
 }
 
+/** Zahoď poškozenou uloženou pozici (roh 0,0, mimo obraz, pod záhlavím) → použije se default center. */
+function sanitizeScreenPos() {
+    var x = state.screenX;
+    var y = state.screenY;
+    if (x == null || y == null) { state.screenX = state.screenY = null; return; }
+    if (!isFinite(x) || !isFinite(y)) { state.screenX = state.screenY = null; return; }
+    var vpW = window.innerWidth || 360;
+    var vpH = window.innerHeight || 640;
+    var badCorner = (x < 6 && y < 70);
+    var offscreen = (x < -40 || y < -40 || x > vpW - 40 || y > vpH - 40);
+    if (badCorner || offscreen) { state.screenX = state.screenY = null; }
+}
+
 function loadState() {
     try {
         var raw = localStorage.getItem('patrac_topo_ruler_state');
@@ -763,6 +776,7 @@ function loadState() {
         if (typeof data.positionLocked === 'boolean') state.positionLocked = data.positionLocked;
         state.screenX = data.screenX;
         state.screenY = data.screenY;
+        sanitizeScreenPos();
         if (typeof data.expanded === 'boolean') state.expanded = data.expanded;
         if (data.gzd) state.gzd = data.gzd;
         if (data.square) state.square = data.square;
