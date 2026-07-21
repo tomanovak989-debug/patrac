@@ -102,17 +102,6 @@ function pointIcon(color, size, locked) {
     });
 }
 
-/** Úchop na středu úseku — tažením vznikne nový vrchol přímo na trase. */
-function midHandleIcon() {
-    var s = 22;
-    return window.L.divIcon({
-        className: 'route-planner-mid',
-        html: '<span class="rp-mid-dot"></span>',
-        iconSize: [s, s],
-        iconAnchor: [s / 2, s / 2]
-    });
-}
-
 /** Živé překreslení jen polylinie během tažení (bez rušení taženého markeru). */
 function updateLineLive() {
     if (!_line) return;
@@ -120,6 +109,29 @@ function updateLineLive() {
     var c = [];
     for (var i = 0; i < pts.length; i++) c.push([pts[i].lat, pts[i].lng]);
     _line.setLatLngs(c);
+}
+
+/** Poklep na čáru → nový vrchol přesně na nejbližší úsek (v místě poklepu, přichycený na čáru). */
+function insertVertexOnLine(latlng) {
+    var map = getMap();
+    if (!map || !latlng) return;
+    var pts = routePoints();
+    if (pts.length < 2) return;
+    var p = map.latLngToLayerPoint(latlng);
+    var bestD = Infinity, bestSeg = 0, bestPt = null;
+    for (var i = 0; i < pts.length - 1; i++) {
+        var a = map.latLngToLayerPoint([pts[i].lat, pts[i].lng]);
+        var b = map.latLngToLayerPoint([pts[i + 1].lat, pts[i + 1].lng]);
+        var cp = window.L.LineUtil.closestPointOnSegment(p, a, b);
+        var d = p.distanceTo(cp);
+        if (d < bestD) { bestD = d; bestSeg = i; bestPt = cp; }
+    }
+    if (!bestPt) return;
+    var ll = map.layerPointToLatLng(bestPt);
+    /* Segment bestSeg spojuje pts[bestSeg]→pts[bestSeg+1] → nový mezibod na index bestSeg. */
+    state.waypoints.splice(bestSeg, 0, { lat: ll.lat, lng: ll.lng });
+    persistState();
+    renderRouteOnMap();
 }
 
 /** Aktualizuj sledující (nezamčené) body z jejich zdrojů. */
@@ -223,46 +235,18 @@ function renderRouteOnMap() {
         mapObjs.labels.push(label);
     }
 
-    /* Úchopy na středech úseků — tažením vznikne nový vrchol přesně na trase.
-       Editace jen když je cíl zamčený (trasa je stabilní). */
+    /* Neviditelný „tlustý" záchytný pruh na čáře — poklep = nový vrchol přesně na trase.
+       Aktivní jen se zamčeným cílem (trasa je stabilní). Pak nový bod přetáhneš do zatáčky. */
     if (state.targetLocked) {
-        for (var h = 0; h < pts.length - 1; h++) {
-            (function(segIndex) {
-                var a2 = pts[segIndex], b2 = pts[segIndex + 1];
-                var mid = { lat: (a2.lat + b2.lat) / 2, lng: (a2.lng + b2.lng) / 2 };
-                var handle = window.L.marker([mid.lat, mid.lng], {
-                    draggable: true,
-                    icon: midHandleIcon(),
-                    pane: 'mapMeasurePane',
-                    zIndexOffset: 900
-                }).addTo(_layer);
-                handle.bindTooltip('Táhni = nový bod na trase', { direction: 'top' });
-                var created = false;
-                handle.on('dragstart', function() {
-                    _dragging = true;
-                    var ll = handle.getLatLng();
-                    /* Segment segIndex spojuje pts[segIndex]→pts[segIndex+1];
-                       nový bod patří na pozici segIndex v poli mezibodů. */
-                    state.waypoints.splice(segIndex, 0, { lat: ll.lat, lng: ll.lng });
-                    _activeWp = segIndex;
-                    created = true;
-                });
-                handle.on('drag', function() {
-                    if (!created || _activeWp == null) return;
-                    var ll = handle.getLatLng();
-                    state.waypoints[_activeWp] = { lat: ll.lat, lng: ll.lng };
-                    updateLineLive();
-                });
-                handle.on('dragend', function() {
-                    created = false;
-                    _activeWp = null;
-                    _dragging = false;
-                    persistState();
-                    renderRouteOnMap();
-                });
-                mapObjs.handles.push(handle);
-            })(h);
-        }
+        var hit = window.L.polyline(coords, {
+            color: '#78ff66', opacity: 0, weight: 26, lineCap: 'round',
+            pane: 'mapMeasurePane', interactive: true, bubblingMouseEvents: false
+        }).addTo(_layer);
+        hit.on('click', function(e) {
+            if (e && e.originalEvent) window.L.DomEvent.stop(e);
+            insertVertexOnLine(e.latlng);
+        });
+        mapObjs.handles.push(hit);
     }
 
     mapObjs.markers.start = makeDraggableMarker(

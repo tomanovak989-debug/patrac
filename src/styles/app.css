@@ -2232,21 +2232,6 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     box-shadow: 0 0 5px var(--topo-accent-glow);
     box-sizing: border-box;
 }
-/* Úchop na středu úseku — táhne se pro vytvoření nového vrcholu */
-.route-planner-mid {
-    display: flex; align-items: center; justify-content: center;
-    cursor: grab; touch-action: none;
-    -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
-    -webkit-tap-highlight-color: transparent;
-}
-.route-planner-mid:active { cursor: grabbing; }
-.route-planner-mid .rp-mid-dot {
-    display: block; width: 12px; height: 12px; border-radius: 50%;
-    box-sizing: border-box;
-    border: 2px dashed var(--topo-accent);
-    background: rgba(120, 255, 102, 0.18);
-    box-shadow: 0 0 5px var(--topo-accent-glow);
-}
 .route-planner-marker.is-locked .rp-marker-dot { border-color: #ffb366; }
 .route-planner-marker .rp-marker-lock {
     position: absolute; right: -8px; top: -10px;
