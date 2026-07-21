@@ -765,14 +765,19 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260721d2';
+        window.PATRAC_BUILD = '20260721d3';
         window.patracImport = function(modulePath) {
             return import('./src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
     <script src="src/app/01-globals.js"></script>
-    <script src="src/app/02-quests.js"></script>
+    <script src="src/app/quests/core.js"></script>
+    <script src="src/app/quests/community.js"></script>
+    <script src="src/app/quests/geo.js"></script>
     <script src="src/app/03-map.js"></script>
-    <script src="src/app/04-game.js"></script>
+    <script src="src/app/game/inventory.js"></script>
+    <script src="src/app/game/gate.js"></script>
+    <script src="src/app/game/session.js"></script>
+    <script src="src/app/game/ui.js"></script>
 </body>
 </html>

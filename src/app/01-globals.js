@@ -1,6 +1,6 @@
 /* PATRAC app chunk: 01-globals.js — do not reorder script tags in index.html */
 var map = null, userMarker = null;
-var PATRAC_BUILD = '20260721d2';
+var PATRAC_BUILD = '20260721d3';
 window.PATRAC_BUILD = PATRAC_BUILD;
 
 /** Dynamický import ES modulů z kořene app (index.html), ne z cesty tohoto souboru. */
