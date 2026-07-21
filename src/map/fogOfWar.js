@@ -116,6 +116,9 @@ function ensureCanvas() {
         _canvas.style.left = '0';
         _canvas.style.top = '0';
         _canvas.style.pointerEvents = 'none';
+        /* Místo černé clony odbarvíme mapu pod sebou: šedá výplň + blend "saturation"
+           udělá terén černobílý, vypíchnuté kruhy (průhledné) zůstanou barevné. */
+        _canvas.style.mixBlendMode = 'saturation';
         pane.appendChild(_canvas);
         _ctx = _canvas.getContext('2d');
     }
@@ -188,7 +191,8 @@ export function refreshFogOfWar() {
     var ctx = _ctx;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.x, size.y);
-    ctx.fillStyle = 'rgba(2, 4, 2, 0.94)';
+    /* Neutrální šedá (sytost 0) → přes mix-blend-mode: saturation odbarví mapu na černobílou. */
+    ctx.fillStyle = 'rgba(128, 128, 128, 1)';
     ctx.fillRect(0, 0, size.x, size.y);
 
     ctx.globalCompositeOperation = 'destination-out';
