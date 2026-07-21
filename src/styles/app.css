@@ -2225,9 +2225,11 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 .route-planner-drawer input { width: 150px; }
 .route-planner-drawer select { width: 170px; }
 .route-planner-drawer button { cursor: pointer; font-weight: 700; }
-.route-planner-marker { position: relative; overflow: visible; }
+.route-planner-marker { position: relative; overflow: visible; width: 0; height: 0; }
 .route-planner-marker .rp-marker-dot {
-    display: block; border-radius: 50%;
+    display: block; position: relative;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
     border: 1px solid var(--topo-accent);
     box-shadow: 0 0 5px var(--topo-accent-glow);
     box-sizing: border-box;

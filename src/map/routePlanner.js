@@ -94,11 +94,13 @@ function clearMapGraphics() {
 
 function pointIcon(color, size, locked) {
     var lock = locked ? '<b class="rp-marker-lock">🔒</b>' : '';
+    /* iconSize [0,0] + centrování přes transform (stejně jako popisky úseků) →
+       střed bodu přesně na souřadnici, nezávisle na paně. */
     return window.L.divIcon({
         className: 'route-planner-marker' + (locked ? ' is-locked' : ''),
-        html: '<span class="rp-marker-dot" style="background:' + color + ';width:' + size + 'px;height:' + size + 'px"></span>' + lock,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2]
+        html: '<span class="rp-marker-dot" style="background:' + color + ';width:' + size + 'px;height:' + size + 'px">' + lock + '</span>',
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
     });
 }
 
