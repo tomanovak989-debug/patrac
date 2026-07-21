@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260721e13" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260721e14" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -766,21 +766,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260721e13"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260721e14"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e13';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e14';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260721e13';
+        window.PATRAC_BUILD = '20260721e14';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260721e13"></script>
-    <script src="src/app/02-quests.js?v=20260721e13"></script>
-    <script src="src/app/03-map.js?v=20260721e13"></script>
-    <script src="src/app/04-game.js?v=20260721e13"></script>
+    <script src="src/app/01-globals.js?v=20260721e14"></script>
+    <script src="src/app/02-quests.js?v=20260721e14"></script>
+    <script src="src/app/03-map.js?v=20260721e14"></script>
+    <script src="src/app/04-game.js?v=20260721e14"></script>
 </body>
 </html>

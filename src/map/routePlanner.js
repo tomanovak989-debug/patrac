@@ -202,6 +202,8 @@ function makeDraggableMarker(latlng, icon, draggable, onDragEnd, tooltip, onDrag
 }
 
 function renderRouteOnMap() {
+    /* Během tažení bodu nepřekresluj (smazalo by tažený marker → „odepnutí"). */
+    if (_dragging) return;
     clearMapGraphics();
     var map = getMap();
     if (!map || !_layer) return;
@@ -215,7 +217,8 @@ function renderRouteOnMap() {
     var coords = [];
     for (var i = 0; i < pts.length; i++) coords.push([pts[i].lat, pts[i].lng]);
     _line = window.L.polyline(coords, {
-        color: NEON, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane', interactive: false
+        color: NEON, weight: 3, opacity: 0.95, lineCap: 'round', lineJoin: 'round',
+        pane: 'mapMeasurePane', interactive: false
     }).addTo(_layer);
     mapObjs.lines.push(_line);
 
