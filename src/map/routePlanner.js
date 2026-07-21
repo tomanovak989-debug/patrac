@@ -496,11 +496,34 @@ function centerOnPoint(pt) {
     if (map && pt) map.panTo([pt.lat, pt.lng], { animate: true });
 }
 
+/**
+ * Najdi, do kterého úseku trasy nový bod nejlépe patří (nejmenší přidaná délka),
+ * aby přímky navazovaly a netvořil se cikcak. Vrací index do state.waypoints.
+ */
+function bestWaypointInsertIndex(pt) {
+    var pts = routePoints();
+    if (pts.length < 2) return state.waypoints.length;
+    var bestI = 0;
+    var bestCost = Infinity;
+    for (var i = 0; i < pts.length - 1; i++) {
+        var a = pts[i], b = pts[i + 1];
+        var direct = distM(a.lat, a.lng, b.lat, b.lng);
+        var detour = distM(a.lat, a.lng, pt.lat, pt.lng) + distM(pt.lat, pt.lng, b.lat, b.lng);
+        var cost = detour - direct;
+        if (cost < bestCost) { bestCost = cost; bestI = i; }
+    }
+    /* Segment i spojuje pts[i]→pts[i+1]; start je pts[0], mezibody pts[1..].
+       Vložení do tohoto segmentu = index i ve state.waypoints. */
+    return bestI;
+}
+
 function onMapClickAddWaypoint(e) {
     /* Mezibody lze přidávat jen se zamčeným cílem. */
     if (!state.targetLocked || !isEngaged()) return;
     if (!e || !e.latlng) return;
-    state.waypoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+    var pt = { lat: e.latlng.lat, lng: e.latlng.lng };
+    var idx = bestWaypointInsertIndex(pt);
+    state.waypoints.splice(idx, 0, pt);
     persistState();
     renderRouteOnMap();
 }
