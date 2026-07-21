@@ -1,8 +1,9 @@
-import { bindTerminalUi, renderTerminalPanel, submitTerminalCode, terminalPanTo } from './terminal.js';
 import { onGpsProximityTick, reloadPoctaMapMarkers } from './map-bridge.js';
 import { loadRegistry } from './storage.js';
 import { maybeGrantPoctaForQuest, simulateQuestPoctaReward } from './quest-rewards.js';
 import { anchorPoctaFromInventory } from './anchoring.js';
+import { panToEntity } from './map-bridge.js';
+import { submitTerminalCode } from './terminal.js';
 
 function getContext() {
     return {
@@ -11,6 +12,7 @@ function getContext() {
     };
 }
 
+/** Runtime bez terminálového UI — mapa, questy, inventář. */
 export function initPoctaModule(bridge) {
     window.patracPoctaBridge = Object.assign({
         map: null,
@@ -24,23 +26,19 @@ export function initPoctaModule(bridge) {
     }, bridge || {});
 
     var ctx = getContext();
-    bindTerminalUi(ctx);
     reloadPoctaMapMarkers(ctx.userId);
 
     window.patracTerminalSubmit = function(code) {
         return submitTerminalCode(code, getContext());
     };
     window.patracTerminalPanTo = function(code) {
-        return terminalPanTo(code);
+        return panToEntity(code);
     };
     window.patracPoctaReloadMap = function() {
         reloadPoctaMapMarkers(getContext().userId);
     };
     window.patracPoctaOnGps = function() {
         onGpsProximityTick(getContext().userId);
-    };
-    window.patracPoctaRenderTerminal = function() {
-        renderTerminalPanel(getContext());
     };
     window.patracMaybeGrantPoctaReward = function(quest) {
         return maybeGrantPoctaForQuest(quest);
