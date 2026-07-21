@@ -12,6 +12,9 @@
 var _deps = null;
 var _layer = null;
 var _bound = false;
+var _line = null;
+var _activeWp = null;
+var _dragging = false;
 
 var NEON = '#78ff66';
 var START_COLOR = '#b8ffb0';
@@ -28,7 +31,7 @@ var state = {
     routeName: 'Trasa 1'
 };
 
-var mapObjs = { lines: [], labels: [], markers: {}, waypoints: [] };
+var mapObjs = { lines: [], labels: [], markers: {}, waypoints: [], handles: [] };
 
 function uid() {
     return 'rp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -60,9 +63,10 @@ function routeWanted() {
     return !!(_deps && _deps.isRouteWanted && _deps.isRouteWanted());
 }
 
-/** Panel (4 ikony) je vidět jen když je pravítko zapnuté a plánovač zapnutý. */
+/** Panel (4 ikony) je vidět, když je pravítko + plánovač zapnutý,
+    NEBO když je aspoň jeden bod zamčený (aby šlo ovládat trasu i s vypnutým pravítkem). */
 function isPanelVisible() {
-    return rulerActive() && routeWanted();
+    return (rulerActive() && routeWanted()) || state.startLocked || state.targetLocked;
 }
 
 /** Trasa se kreslí, když je panel aktivní NEBO je aspoň jeden bod zamčený. */
@@ -76,9 +80,12 @@ function clearMapGraphics() {
     for (k = 0; k < mapObjs.lines.length; k++) _layer.removeLayer(mapObjs.lines[k]);
     for (k = 0; k < mapObjs.labels.length; k++) _layer.removeLayer(mapObjs.labels[k]);
     for (k = 0; k < mapObjs.waypoints.length; k++) _layer.removeLayer(mapObjs.waypoints[k]);
+    for (k = 0; k < mapObjs.handles.length; k++) _layer.removeLayer(mapObjs.handles[k]);
     mapObjs.lines = [];
     mapObjs.labels = [];
     mapObjs.waypoints = [];
+    mapObjs.handles = [];
+    _line = null;
     for (k in mapObjs.markers) {
         if (mapObjs.markers.hasOwnProperty(k)) _layer.removeLayer(mapObjs.markers[k]);
     }
@@ -93,6 +100,26 @@ function pointIcon(color, size, locked) {
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2]
     });
+}
+
+/** Úchop na středu úseku — tažením vznikne nový vrchol přímo na trase. */
+function midHandleIcon() {
+    var s = 22;
+    return window.L.divIcon({
+        className: 'route-planner-mid',
+        html: '<span class="rp-mid-dot"></span>',
+        iconSize: [s, s],
+        iconAnchor: [s / 2, s / 2]
+    });
+}
+
+/** Živé překreslení jen polylinie během tažení (bez rušení taženého markeru). */
+function updateLineLive() {
+    if (!_line) return;
+    var pts = routePoints();
+    var c = [];
+    for (var i = 0; i < pts.length; i++) c.push([pts[i].lat, pts[i].lng]);
+    _line.setLatLngs(c);
 }
 
 /** Aktualizuj sledující (nezamčené) body z jejich zdrojů. */
@@ -135,7 +162,7 @@ function setTotalText(txt) {
     if (el) el.textContent = txt;
 }
 
-function makeDraggableMarker(latlng, icon, draggable, onDragEnd, tooltip) {
+function makeDraggableMarker(latlng, icon, draggable, onDragEnd, tooltip, onDrag) {
     var m = window.L.marker([latlng.lat, latlng.lng], {
         draggable: !!draggable,
         icon: icon,
@@ -143,10 +170,20 @@ function makeDraggableMarker(latlng, icon, draggable, onDragEnd, tooltip) {
         zIndexOffset: 1000
     }).addTo(_layer);
     if (tooltip) m.bindTooltip(tooltip, { direction: 'top' });
-    if (draggable && onDragEnd) {
+    if (draggable) {
+        m.on('dragstart', function() { _dragging = true; });
+        if (onDrag) {
+            m.on('drag', function() {
+                var ll = m.getLatLng();
+                onDrag({ lat: ll.lat, lng: ll.lng });
+            });
+        }
         m.on('dragend', function() {
-            var ll = m.getLatLng();
-            onDragEnd({ lat: ll.lat, lng: ll.lng });
+            _dragging = false;
+            if (onDragEnd) {
+                var ll = m.getLatLng();
+                onDragEnd({ lat: ll.lat, lng: ll.lng });
+            }
         });
     }
     return m;
@@ -165,10 +202,10 @@ function renderRouteOnMap() {
 
     var coords = [];
     for (var i = 0; i < pts.length; i++) coords.push([pts[i].lat, pts[i].lng]);
-    var line = window.L.polyline(coords, {
+    _line = window.L.polyline(coords, {
         color: NEON, weight: 2, dashArray: '6,5', pane: 'mapMeasurePane', interactive: false
     }).addTo(_layer);
-    mapObjs.lines.push(line);
+    mapObjs.lines.push(_line);
 
     for (var s = 1; s < pts.length; s++) {
         var a = pts[s - 1], b = pts[s];
@@ -186,12 +223,55 @@ function renderRouteOnMap() {
         mapObjs.labels.push(label);
     }
 
+    /* Úchopy na středech úseků — tažením vznikne nový vrchol přesně na trase.
+       Editace jen když je cíl zamčený (trasa je stabilní). */
+    if (state.targetLocked) {
+        for (var h = 0; h < pts.length - 1; h++) {
+            (function(segIndex) {
+                var a2 = pts[segIndex], b2 = pts[segIndex + 1];
+                var mid = { lat: (a2.lat + b2.lat) / 2, lng: (a2.lng + b2.lng) / 2 };
+                var handle = window.L.marker([mid.lat, mid.lng], {
+                    draggable: true,
+                    icon: midHandleIcon(),
+                    pane: 'mapMeasurePane',
+                    zIndexOffset: 900
+                }).addTo(_layer);
+                handle.bindTooltip('Táhni = nový bod na trase', { direction: 'top' });
+                var created = false;
+                handle.on('dragstart', function() {
+                    _dragging = true;
+                    var ll = handle.getLatLng();
+                    /* Segment segIndex spojuje pts[segIndex]→pts[segIndex+1];
+                       nový bod patří na pozici segIndex v poli mezibodů. */
+                    state.waypoints.splice(segIndex, 0, { lat: ll.lat, lng: ll.lng });
+                    _activeWp = segIndex;
+                    created = true;
+                });
+                handle.on('drag', function() {
+                    if (!created || _activeWp == null) return;
+                    var ll = handle.getLatLng();
+                    state.waypoints[_activeWp] = { lat: ll.lat, lng: ll.lng };
+                    updateLineLive();
+                });
+                handle.on('dragend', function() {
+                    created = false;
+                    _activeWp = null;
+                    _dragging = false;
+                    persistState();
+                    renderRouteOnMap();
+                });
+                mapObjs.handles.push(handle);
+            })(h);
+        }
+    }
+
     mapObjs.markers.start = makeDraggableMarker(
         state.start,
         pointIcon(START_COLOR, 14, state.startLocked),
         state.startLocked,
         function(ll) { state.start = ll; persistState(); renderRouteOnMap(); },
-        state.startLocked ? 'Start (zamčený) — tažením přesuň' : 'Start (GPS)'
+        state.startLocked ? 'Start (zamčený) — tažením přesuň' : 'Start (GPS)',
+        function(ll) { state.start = ll; updateLineLive(); }
     );
 
     for (var w = 0; w < state.waypoints.length; w++) {
@@ -199,10 +279,11 @@ function renderRouteOnMap() {
             var wp = state.waypoints[idx];
             var m = makeDraggableMarker(
                 wp,
-                pointIcon(WP_COLOR, 12, false),
+                pointIcon(WP_COLOR, 13, false),
                 true,
                 function(ll) { state.waypoints[idx] = ll; persistState(); renderRouteOnMap(); },
-                'Mezibod ' + (idx + 1) + ' — klik = smazat'
+                'Mezibod ' + (idx + 1) + ' — klik = smazat',
+                function(ll) { state.waypoints[idx] = ll; updateLineLive(); }
             );
             m.on('click', function(e) {
                 if (e && e.originalEvent) window.L.DomEvent.stop(e);
@@ -219,7 +300,8 @@ function renderRouteOnMap() {
         pointIcon(TARGET_COLOR, 16, state.targetLocked),
         state.targetLocked,
         function(ll) { state.target = ll; persistState(); renderRouteOnMap(); },
-        state.targetLocked ? 'Cíl (zamčený) — tažením přesuň' : 'Cíl (střed pravítka)'
+        state.targetLocked ? 'Cíl (zamčený) — tažením přesuň' : 'Cíl (střed pravítka)',
+        function(ll) { state.target = ll; updateLineLive(); }
     );
 
     setTotalText('Σ ' + fmtDist(totalMeters()));
@@ -496,47 +578,17 @@ function centerOnPoint(pt) {
     if (map && pt) map.panTo([pt.lat, pt.lng], { animate: true });
 }
 
-/**
- * Najdi, do kterého úseku trasy nový bod nejlépe patří (nejmenší přidaná délka),
- * aby přímky navazovaly a netvořil se cikcak. Vrací index do state.waypoints.
- */
-function bestWaypointInsertIndex(pt) {
-    var pts = routePoints();
-    if (pts.length < 2) return state.waypoints.length;
-    var bestI = 0;
-    var bestCost = Infinity;
-    for (var i = 0; i < pts.length - 1; i++) {
-        var a = pts[i], b = pts[i + 1];
-        var direct = distM(a.lat, a.lng, b.lat, b.lng);
-        var detour = distM(a.lat, a.lng, pt.lat, pt.lng) + distM(pt.lat, pt.lng, b.lat, b.lng);
-        var cost = detour - direct;
-        if (cost < bestCost) { bestCost = cost; bestI = i; }
-    }
-    /* Segment i spojuje pts[i]→pts[i+1]; start je pts[0], mezibody pts[1..].
-       Vložení do tohoto segmentu = index i ve state.waypoints. */
-    return bestI;
-}
-
-function onMapClickAddWaypoint(e) {
-    /* Mezibody lze přidávat jen se zamčeným cílem. */
-    if (!state.targetLocked || !isEngaged()) return;
-    if (!e || !e.latlng) return;
-    var pt = { lat: e.latlng.lat, lng: e.latlng.lng };
-    var idx = bestWaypointInsertIndex(pt);
-    state.waypoints.splice(idx, 0, pt);
-    persistState();
-    renderRouteOnMap();
-}
-
 function bindMapEvents() {
     if (_bound) return;
     var map = getMap();
     if (!map) return;
     _bound = true;
     map.on('moveend zoomend resize', function() {
+        /* Během tažení bodu/úchopu nepřekresluj (zrušilo by tažený marker). */
+        if (_dragging || _activeWp != null) return;
         if (isEngaged()) renderRouteOnMap();
     });
-    map.on('click', onMapClickAddWaypoint);
+    /* Body se tvoří tažením úchopu na úseku (přesné), ne klikem do mapy. */
 }
 
 export function initRoutePlanner(deps) {

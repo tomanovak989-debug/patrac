@@ -513,7 +513,8 @@ function initRoutePlannerModule() {
 
 function updateRoutePlannerDisplay() {
     var root = document.getElementById('map-route-planner');
-    var panelShow = !!(mapHud() && mapHud().isRouteEffective()) && isTopoRulerActive();
+    var engaged = !!(routePlannerMod && routePlannerMod.isRouteEngaged && routePlannerMod.isRouteEngaged());
+    var panelShow = (!!(mapHud() && mapHud().isRouteEffective()) && isTopoRulerActive()) || engaged;
     var fab = document.getElementById('fab-route-planner');
     if (fab) fab.classList.toggle('is-active', panelShow);
     if (!routePlannerMod) {
