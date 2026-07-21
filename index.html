@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260721e2" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260721e3" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -18,6 +18,12 @@
     <div id="map-float-overlay" aria-hidden="true">
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
+            <div class="topo-ruler-coord-row" aria-label="MGRS souřadnice">
+                <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
+                <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
+                <input type="text" class="map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="Easting (E)" autocomplete="off">
+                <input type="text" class="map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="Northing (N)" autocomplete="off">
+            </div>
             <div class="topo-ruler-plate-wrap">
                 <button type="button" class="topo-ruler-drag-handle map-float-hit" id="topo-ruler-drag-tl" title="Přesunout pravítko">⠿</button>
                 <button type="button" class="topo-ruler-drag-handle map-float-hit" id="topo-ruler-drag-br" title="Přesunout pravítko">⠿</button>
@@ -32,17 +38,11 @@
                     <text x="26" y="134" text-anchor="middle" fill="#b8ffb0" font-size="7" font-family="IBM Plex Mono, monospace">270</text>
                     <polygon points="130,18 126,28 134,28" fill="#78ff66"/>
                     <g id="topo-roamer-scales"></g>
-                    <g id="topo-bearing-hand" style="display:none"></g>
                     <circle id="topo-ruler-bezel-hit" class="topo-ruler-bezel-hit" cx="130" cy="130" r="118" stroke-width="10"/>
+                    <g id="topo-bearing-hand" style="display:none"></g>
                     </g>
                 </svg>
                     <button type="button" class="topo-ruler-center map-float-hit" id="topo-ruler-center" title="Střed roameru"></button>
-                    <div class="topo-ruler-zone-bar">
-                        <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
-                        <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
-                    </div>
-                    <input type="text" class="topo-ruler-coord topo-ruler-coord-w map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="West (E)" autocomplete="off">
-                    <input type="text" class="topo-ruler-coord topo-ruler-coord-n map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="North (N)" autocomplete="off">
                 </div>
             </div>
             <div class="topo-ruler-footer">
@@ -767,21 +767,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260721e2"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260721e3"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e2';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260721e3';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260721e2';
+        window.PATRAC_BUILD = '20260721e3';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260721e2"></script>
-    <script src="src/app/02-quests.js?v=20260721e2"></script>
-    <script src="src/app/03-map.js?v=20260721e2"></script>
-    <script src="src/app/04-game.js?v=20260721e2"></script>
+    <script src="src/app/01-globals.js?v=20260721e3"></script>
+    <script src="src/app/02-quests.js?v=20260721e3"></script>
+    <script src="src/app/03-map.js?v=20260721e3"></script>
+    <script src="src/app/04-game.js?v=20260721e3"></script>
 </body>
 </html>

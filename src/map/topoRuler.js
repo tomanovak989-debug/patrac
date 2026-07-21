@@ -348,12 +348,14 @@ function buildRulerDegTicks() {
 
 function buildBearingHand() {
     var g = document.getElementById('topo-bearing-hand');
-    if (!g || g.getAttribute('data-built') === '1') return;
-    g.setAttribute('data-built', '1');
+    if (!g || g.getAttribute('data-built') === '2') return;
+    g.setAttribute('data-built', '2');
     g.innerHTML =
-        '<line x1="130" y1="130" x2="130" y2="34" stroke="#ffb366" stroke-width="1.2" stroke-linecap="round"/>' +
-        '<polygon points="130,30 126,40 134,40" fill="#ffb366"/>' +
-        '<circle cx="130" cy="130" r="3.5" fill="#ffb366" opacity="0.95"/>';
+        '<line x1="130" y1="130" x2="130" y2="46" stroke="#ffb366" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<polygon points="130,30 124,44 136,44" fill="#ffb366"/>' +
+        '<circle cx="130" cy="130" r="3.5" fill="#ffb366" opacity="0.95"/>' +
+        '<circle id="topo-bearing-knob" cx="130" cy="46" r="15" fill="#ffb366" fill-opacity="0.22" stroke="#ffb366" stroke-width="1.2"/>' +
+        '<circle cx="130" cy="46" r="4" fill="#ffb366"/>';
 }
 
 function bearingDegFromPointer(e) {
@@ -380,20 +382,15 @@ function bearingDegFromPointer(e) {
 function syncBearingHand() {
     var hand = document.getElementById('topo-bearing-hand');
     var hit = document.getElementById('topo-ruler-bezel-hit');
-    var show = state.positionLocked;
+    /* Směrník je vždy vytažený ze středu pravítka a tahá se za úchop na špičce. */
     if (hand) {
-        if (show && state.bearingDeg != null) {
-            hand.style.display = '';
-            hand.setAttribute('transform', 'rotate(' + normalizeDeg360(state.bearingDeg).toFixed(2) + ' 130 130)');
-        } else {
-            hand.style.display = 'none';
-            hand.removeAttribute('transform');
-        }
+        var deg = state.bearingDeg == null ? 0 : normalizeDeg360(state.bearingDeg);
+        hand.style.display = '';
+        hand.setAttribute('transform', 'rotate(' + deg.toFixed(2) + ' 130 130)');
+        hand.classList.toggle('is-dragging', _bearingDragging);
     }
-    if (hit) {
-        hit.style.pointerEvents = show ? 'stroke' : 'none';
-        hit.style.cursor = show ? (_bearingDragging ? 'grabbing' : 'grab') : 'default';
-    }
+    /* Prstenec už nepoužíváme jako terč — tahá se úchop. */
+    if (hit) hit.style.pointerEvents = 'none';
 }
 
 function buildRoamerScales() {
@@ -685,9 +682,7 @@ function updateRulerPlateVisual() {
 
     var brng = getBearingDeg();
     if (degEl) {
-        if (locked && brng != null) degEl.textContent = Math.round(brng) + '° směrník';
-        else if (locked) degEl.textContent = 'Otoč směrník po rysce';
-        else degEl.textContent = '';
+        degEl.textContent = (brng != null) ? (Math.round(brng) + '° směrník') : 'Vytáhni směrník ze středu';
     }
     if (plateWrap) plateWrap.classList.toggle('is-locked', locked);
     /* Přetahování pravítka je zrušené — úchyty vždy skryté. */
@@ -965,9 +960,10 @@ function bindRulerMoveHandles() {
     bindWidgetDrag(document.getElementById('topo-ruler-drag-br'));
 }
 
-function bindBearingBezelDrag(bezel) {
-    if (!bezel || bezel._bearingBound) return;
-    bezel._bearingBound = true;
+function bindBearingHandDrag() {
+    var knob = document.getElementById('topo-bearing-knob');
+    if (!knob || knob._bearingBound) return;
+    knob._bearingBound = true;
     var dragging = false;
     var activePointer = null;
 
@@ -977,13 +973,17 @@ function bindBearingBezelDrag(bezel) {
         document.removeEventListener('pointercancel', onEnd);
     }
 
-    function onMove(e) {
-        if (!state.positionLocked || !dragging) return;
-        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
+    function apply(e) {
         var deg = bearingDegFromPointer(e);
         if (deg != null) state.bearingDeg = deg;
         syncBearingHand();
         updateRulerPlateVisual();
+    }
+
+    function onMove(e) {
+        if (!dragging) return;
+        if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
+        apply(e);
         e.preventDefault();
     }
 
@@ -993,31 +993,29 @@ function bindBearingBezelDrag(bezel) {
         document.body.style.cursor = '';
         dragging = false;
         _bearingDragging = false;
+        try { if (knob.releasePointerCapture && e && e.pointerId != null) knob.releasePointerCapture(e.pointerId); } catch (_) {}
         activePointer = null;
         syncBearingHand();
         persistState();
     }
 
     function onStart(e) {
-        if (!state.positionLocked) return;
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         dragging = true;
         _bearingDragging = true;
         activePointer = e.pointerId != null ? e.pointerId : null;
         document.body.style.cursor = 'grabbing';
-        syncBearingHand();
+        try { if (knob.setPointerCapture && e.pointerId != null) knob.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
         e.stopPropagation();
         detachDoc();
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
         document.addEventListener('pointercancel', onEnd);
-        var deg = bearingDegFromPointer(e);
-        if (deg != null) state.bearingDeg = deg;
-        updateRulerPlateVisual();
+        apply(e);
     }
 
-    bezel.addEventListener('pointerdown', onStart);
+    knob.addEventListener('pointerdown', onStart);
 }
 
 function bindCoordInputs() {
@@ -1105,14 +1103,13 @@ function bindFabLongPress() {
 function initInteractions() {
     var root = document.getElementById('map-topo-ruler');
     var rulerScene = document.getElementById('topo-ruler-scene');
-    var bezelHit = document.getElementById('topo-ruler-bezel-hit');
 
     bindMapWheelPassthrough(rulerScene);
     if (root) {
         var hits = root.querySelectorAll('.map-float-hit');
         for (var hi = 0; hi < hits.length; hi++) bindMapWheelPassthrough(hits[hi]);
     }
-    bindBearingBezelDrag(bezelHit);
+    bindBearingHandDrag();
     bindCoordInputs();
     bindFabLongPress();
     bindInteractionSafetyListeners();

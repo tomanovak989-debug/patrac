@@ -1733,6 +1733,46 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     margin: 0;
     z-index: 30;
 }
+/* MGRS řádek nad pravítkem — pořadí: GZD · 100km blok · easting · northing */
+.topo-ruler-coord-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    max-width: 260px;
+    margin: 0 auto 5px;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 46;
+}
+.topo-ruler-coord-row input {
+    position: static;
+    transform: none;
+    left: auto; top: auto; right: auto; bottom: auto;
+    margin: 0;
+    box-sizing: border-box;
+    min-width: 0;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--topo-accent);
+    background: var(--map-float-bg-solid);
+    border: 1px solid var(--topo-accent);
+    border-radius: 3px;
+    padding: 3px 2px;
+    box-shadow: 0 0 6px var(--topo-accent-glow);
+    pointer-events: auto;
+    touch-action: manipulation;
+}
+.topo-ruler-coord-row #topo-ruler-gzd { width: 40px; }
+.topo-ruler-coord-row #topo-ruler-square { width: 32px; }
+.topo-ruler-coord-row #topo-ruler-coord-w,
+.topo-ruler-coord-row #topo-ruler-coord-n { width: 56px; }
+.topo-ruler-coord-row input.is-readonly { opacity: 0.6; }
 .topo-ruler-plate-wrap {
     position: relative;
     width: 260px;
@@ -1821,6 +1861,13 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 #topo-bearing-hand circle {
     pointer-events: none;
 }
+/* Úchop směrníku na špičce ručičky — vytáhne se ze středu pravítka */
+#topo-bearing-knob {
+    pointer-events: all;
+    cursor: grab;
+    touch-action: none;
+}
+#topo-bearing-hand.is-dragging #topo-bearing-knob { cursor: grabbing; }
 .topo-ruler-center {
     position: absolute;
     left: 50%; top: 50%;
