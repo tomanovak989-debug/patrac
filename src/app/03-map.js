@@ -591,15 +591,9 @@ function setCompassWidgetExpanded(expanded) {
 }
 
 function initCompassWidgetToggle() {
-    var btn = document.getElementById('btn-compass-widget-toggle');
-    if (!btn || btn._compassToggleBound) return;
-    btn._compassToggleBound = true;
+    /* Křížek pro zavření buzoly byl odstraněn (duplicitní ovládání – schovává se přes FAB).
+       Buzolu jen zajistíme jako rozbalenou. */
     setCompassWidgetExpanded(true);
-    btn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof window.patracHideCompass === 'function') window.patracHideCompass();
-    });
 }
 
 function shortestDegDelta(from, to) {

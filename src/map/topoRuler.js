@@ -995,6 +995,7 @@ function bindBearingHandDrag() {
         _bearingDragging = false;
         try { if (knob.releasePointerCapture && e && e.pointerId != null) knob.releasePointerCapture(e.pointerId); } catch (_) {}
         activePointer = null;
+        setMapInteractionEnabled(true);
         syncBearingHand();
         persistState();
     }
@@ -1005,6 +1006,8 @@ function bindBearingHandDrag() {
         _bearingDragging = true;
         activePointer = e.pointerId != null ? e.pointerId : null;
         document.body.style.cursor = 'grabbing';
+        /* Vypneme tažení/zoom mapy, jinak Leaflet gesto po chvíli přebere a vyvolá pointercancel. */
+        setMapInteractionEnabled(false);
         try { if (knob.setPointerCapture && e.pointerId != null) knob.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
         e.stopPropagation();
