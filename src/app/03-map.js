@@ -432,6 +432,11 @@ function initTopoRulerModule() {
             distanceMeters: distanceMeters,
             formatDistance: formatDistance,
             onUiUpdate: updateTacticalHud,
+            onRulerCenterLive: function() {
+                if (routePlannerMod && routePlannerMod.followUnlockedTargetLive) {
+                    routePlannerMod.followUnlockedTargetLive();
+                }
+            },
             getGpsLatLng: function() {
                 if (lastUserPosition && isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
                     return { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
@@ -511,10 +516,22 @@ function initRoutePlannerModule() {
     }).catch(function(err) { console.error('[routePlanner]', err); });
 }
 
+function hasRouteTargetOnMap() {
+    if (routePlannerMod && typeof routePlannerMod.hasRouteTargetOnMap === 'function') {
+        return !!routePlannerMod.hasRouteTargetOnMap();
+    }
+    if (topoRulerMod && topoRulerMod.getRulerCenterLatLng) {
+        var rc = topoRulerMod.getRulerCenterLatLng();
+        if (rc && isFinite(rc.lat) && isFinite(rc.lng)) return true;
+    }
+    return false;
+}
+
 function updateRoutePlannerDisplay() {
     var root = document.getElementById('map-route-planner');
     var engaged = !!(routePlannerMod && routePlannerMod.isRouteEngaged && routePlannerMod.isRouteEngaged());
-    var panelShow = (!!(mapHud() && mapHud().isRouteEffective()) && isTopoRulerActive()) || engaged;
+    var wanted = !!(mapHud() && mapHud().isRouteEffective());
+    var panelShow = (wanted && hasRouteTargetOnMap()) || engaged;
     var fab = document.getElementById('fab-route-planner');
     if (fab) fab.classList.toggle('is-active', panelShow);
     if (!routePlannerMod) {
@@ -527,13 +544,14 @@ function updateRoutePlannerDisplay() {
     routePlannerMod.update();
 }
 window.patracToggleRoutePlanner = function() {
-    if (!isTopoRulerActive()) {
-        alert('Plánovač trasy vyžaduje zapnuté pravítko (📐).');
-        return;
-    }
     var hud = mapHud();
     if (!hud) return;
     var next = !hud.isRouteWanted();
+    /* Zapnutí jen když už je na mapě cíl (zahájená trasa / střed pravítka). Vypnutí vždy. */
+    if (next && !hasRouteTargetOnMap()) {
+        alert('Plánovač trasy vyžaduje cílový bod na mapě (zapni pravítko nebo načti/zamkni trasu).');
+        return;
+    }
     hud.writeBool(hud.LS.route, next);
     updateRoutePlannerDisplay();
 };

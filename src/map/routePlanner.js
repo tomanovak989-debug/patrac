@@ -55,18 +55,21 @@ function fmtDist(m) {
     return (m / 1000).toFixed(2) + ' km';
 }
 
-function rulerActive() {
-    return !!(_deps && _deps.isRulerActive && _deps.isRulerActive());
-}
-
 function routeWanted() {
     return !!(_deps && _deps.isRouteWanted && _deps.isRouteWanted());
 }
 
-/** Panel (4 ikony) je vidět, když je pravítko + plánovač zapnutý,
-    NEBO když je aspoň jeden bod zamčený (aby šlo ovládat trasu i s vypnutým pravítkem). */
+/** Cíl je na mapě: zamčený / aktuální cíl, nebo střed pravítka (živý zdroj). */
+function hasTargetOnMap() {
+    if (state.target && isFinite(state.target.lat) && isFinite(state.target.lng)) return true;
+    var ruler = _deps && _deps.getRulerCenterLatLng ? _deps.getRulerCenterLatLng() : null;
+    return !!(ruler && isFinite(ruler.lat) && isFinite(ruler.lng));
+}
+
+/** Panel (4 ikony) je vidět, když je plánovač zapnutý a na mapě je cíl,
+    NEBO když je aspoň jeden bod zamčený (ovládání i bez pravítka). */
 function isPanelVisible() {
-    return (rulerActive() && routeWanted()) || state.startLocked || state.targetLocked;
+    return (routeWanted() && hasTargetOnMap()) || state.startLocked || state.targetLocked;
 }
 
 /** Trasa se kreslí, když je panel aktivní NEBO je aspoň jeden bod zamčený. */
@@ -95,10 +98,10 @@ function clearMapGraphics() {
 function pointIcon(color, size, locked) {
     var lock = locked ? '<b class="rp-marker-lock">🔒</b>' : '';
     /* iconSize [0,0] + centrování přes transform (stejně jako popisky úseků) →
-       střed bodu přesně na souřadnici, nezávisle na paně. */
+       střed bodu přesně na souřadnici. Větší .rp-marker-hit = snazší úchop. */
     return window.L.divIcon({
         className: 'route-planner-marker' + (locked ? ' is-locked' : ''),
-        html: '<span class="rp-marker-dot" style="background:' + color + ';width:' + size + 'px;height:' + size + 'px">' + lock + '</span>',
+        html: '<span class="rp-marker-hit"><span class="rp-marker-dot" style="background:' + color + ';width:' + size + 'px;height:' + size + 'px"></span>' + lock + '</span>',
         iconSize: [0, 0],
         iconAnchor: [0, 0]
     });
@@ -111,6 +114,19 @@ function updateLineLive() {
     var c = [];
     for (var i = 0; i < pts.length; i++) c.push([pts[i].lat, pts[i].lng]);
     _line.setLatLngs(c);
+}
+
+/** Během posunu mapy/pravítka: odemčený cíl sleduje střed pravítka okamžitě. */
+export function followUnlockedTargetLive() {
+    if (_dragging || _activeWp != null) return;
+    if (!isEngaged() || state.targetLocked) return;
+    refreshFollowingPoints();
+    if (!state.target) return;
+    if (mapObjs.markers.target) {
+        mapObjs.markers.target.setLatLng([state.target.lat, state.target.lng]);
+    }
+    updateLineLive();
+    setTotalText('Σ ' + fmtDist(totalMeters()));
 }
 
 /** Poklep na čáru → nový vrchol přesně na nejbližší úsek (v místě poklepu, přichycený na čáru). */
@@ -256,7 +272,7 @@ function renderRouteOnMap() {
 
     mapObjs.markers.start = makeDraggableMarker(
         state.start,
-        pointIcon(START_COLOR, 14, state.startLocked),
+        pointIcon(START_COLOR, 16, state.startLocked),
         state.startLocked,
         function(ll) { state.start = ll; persistState(); renderRouteOnMap(); },
         state.startLocked ? 'Start (zamčený) — tažením přesuň' : 'Start (GPS)',
@@ -268,7 +284,7 @@ function renderRouteOnMap() {
             var wp = state.waypoints[idx];
             var m = makeDraggableMarker(
                 wp,
-                pointIcon(WP_COLOR, 13, false),
+                pointIcon(WP_COLOR, 15, false),
                 true,
                 function(ll) { state.waypoints[idx] = ll; persistState(); renderRouteOnMap(); },
                 'Mezibod ' + (idx + 1) + ' — klik = smazat',
@@ -286,7 +302,7 @@ function renderRouteOnMap() {
 
     mapObjs.markers.target = makeDraggableMarker(
         state.target,
-        pointIcon(TARGET_COLOR, 16, state.targetLocked),
+        pointIcon(TARGET_COLOR, 18, state.targetLocked),
         state.targetLocked,
         function(ll) { state.target = ll; persistState(); renderRouteOnMap(); },
         state.targetLocked ? 'Cíl (zamčený) — tažením přesuň' : 'Cíl (střed pravítka)',
@@ -577,7 +593,7 @@ function bindMapEvents() {
         if (_dragging || _activeWp != null) return;
         if (isEngaged()) renderRouteOnMap();
     });
-    /* Body se tvoří tažením úchopu na úseku (přesné), ne klikem do mapy. */
+    /* Body se tvoří poklepem na čáru (přesné). */
 }
 
 export function initRoutePlanner(deps) {
@@ -619,6 +635,10 @@ export function isStartLocked() {
 
 export function isRouteEngaged() {
     return isEngaged();
+}
+
+export function hasRouteTargetOnMap() {
+    return hasTargetOnMap();
 }
 
 export function getRoutePlannerState() {

@@ -2226,9 +2226,16 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 .route-planner-drawer select { width: 170px; }
 .route-planner-drawer button { cursor: pointer; font-weight: 700; }
 .route-planner-marker { position: relative; overflow: visible; width: 0; height: 0; }
-.route-planner-marker .rp-marker-dot {
-    display: block; position: relative;
+.route-planner-marker .rp-marker-hit {
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    width: 44px; height: 44px;
     transform: translate(-50%, -50%);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.route-planner-marker .rp-marker-dot {
+    display: block;
     border-radius: 50%;
     border: 1px solid var(--topo-accent);
     box-shadow: 0 0 5px var(--topo-accent-glow);
@@ -2236,9 +2243,10 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 }
 .route-planner-marker.is-locked .rp-marker-dot { border-color: #ffb366; }
 .route-planner-marker .rp-marker-lock {
-    position: absolute; right: -8px; top: -10px;
+    position: absolute; right: 2px; top: 2px;
     font-size: 11px; line-height: 1;
     filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
+    pointer-events: none;
 }
 .route-planner-dot span {
     display: block; border-radius: 50%;

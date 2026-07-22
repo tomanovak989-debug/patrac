@@ -966,11 +966,23 @@ function bindBearingHandDrag() {
     knob._bearingBound = true;
     var dragging = false;
     var activePointer = null;
+    var moved = false;
+    var lastTapAt = 0;
+    var startX = 0;
+    var startY = 0;
 
     function detachDoc() {
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onEnd);
         document.removeEventListener('pointercancel', onEnd);
+    }
+
+    function snapToNorth() {
+        state.bearingDeg = 0; /* 360° / sever */
+        syncBearingHand();
+        updateRulerPlateVisual();
+        persistState();
+        if (navigator.vibrate) { try { navigator.vibrate(20); } catch (_) {} }
     }
 
     function apply(e) {
@@ -983,7 +995,10 @@ function bindBearingHandDrag() {
     function onMove(e) {
         if (!dragging) return;
         if (activePointer != null && e.pointerId != null && e.pointerId !== activePointer) return;
-        apply(e);
+        var dx = (e.clientX || 0) - startX;
+        var dy = (e.clientY || 0) - startY;
+        if (!moved && (dx * dx + dy * dy) > 36) moved = true;
+        if (moved) apply(e);
         e.preventDefault();
     }
 
@@ -996,6 +1011,19 @@ function bindBearingHandDrag() {
         try { if (knob.releasePointerCapture && e && e.pointerId != null) knob.releasePointerCapture(e.pointerId); } catch (_) {}
         activePointer = null;
         setMapInteractionEnabled(true);
+        /* Dvojité poklepání (bez tahu) → směrník na 360°. */
+        if (!moved) {
+            var now = Date.now();
+            if (now - lastTapAt < 350) {
+                lastTapAt = 0;
+                snapToNorth();
+                return;
+            }
+            lastTapAt = now;
+            syncBearingHand();
+            return;
+        }
+        lastTapAt = 0;
         syncBearingHand();
         persistState();
     }
@@ -1003,8 +1031,11 @@ function bindBearingHandDrag() {
     function onStart(e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         dragging = true;
+        moved = false;
         _bearingDragging = true;
         activePointer = e.pointerId != null ? e.pointerId : null;
+        startX = e.clientX || 0;
+        startY = e.clientY || 0;
         document.body.style.cursor = 'grabbing';
         /* Vypneme tažení/zoom mapy, jinak Leaflet gesto po chvíli přebere a vyvolá pointercancel. */
         setMapInteractionEnabled(false);
@@ -1015,13 +1046,18 @@ function bindBearingHandDrag() {
         document.addEventListener('pointermove', onMove, { passive: false });
         document.addEventListener('pointerup', onEnd);
         document.addEventListener('pointercancel', onEnd);
-        apply(e);
+        /* apply až při tahu — jinak by první ťuknutí dvojkliku otočilo směrník pryč z 360°. */
     }
 
     knob.addEventListener('pointerdown', onStart);
     /* Na Androidu dlouhý stisk (~0,5 s) jinak spustí kontextové menu / výběr → pointercancel a ztrátu tahu. */
     knob.addEventListener('contextmenu', function(ev) { ev.preventDefault(); });
     knob.addEventListener('touchstart', function(ev) { ev.preventDefault(); }, { passive: false });
+    knob.addEventListener('dblclick', function(ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        snapToNorth();
+    });
 }
 
 function bindCoordInputs() {
@@ -1145,17 +1181,24 @@ function keepRulerPinned() {
     }
 }
 
+function notifyRulerCenterLive() {
+    if (_deps && typeof _deps.onRulerCenterLive === 'function') _deps.onRulerCenterLive();
+}
+
 function onMapMoveLive() {
     if (_bearingDragging) return;
     keepRulerPinned();
     /* Odemčené pravítko = záměrovač uprostřed: souřadnice čti živě už během posunu mapy. */
     if (!state.positionLocked) syncCoordFieldsFromPosition();
+    /* Trasa: odemčený cíl sleduje střed pravítka okamžitě (ne až po pustění). */
+    notifyRulerCenterLive();
 }
 
 function onMapZoom() {
     if (_bearingDragging) return;
     keepRulerPinned();
     updateRulerPlateVisual();
+    notifyRulerCenterLive();
 }
 
 function onMapPanOrResize() {
@@ -1166,6 +1209,7 @@ function onMapPanOrResize() {
         syncCoordFieldsFromPosition();
         persistState();
     }
+    notifyRulerCenterLive();
 }
 
 export function initTopoRuler(deps) {
