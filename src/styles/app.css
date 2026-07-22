@@ -494,7 +494,7 @@ body.admin-mode .operator-clan-section { display: block; }
     border-color: var(--text-green); color: var(--text-green);
     box-shadow: var(--neon-glow);
 }
-.left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; }
+.left-toolbar { top: 44px; left: 5px; display: none; flex-direction: column; gap: 6px; border: none; background: none; box-shadow: none; z-index: 360; }
 .tool-btn {
     background-color: var(--hud-bg); border: 1px solid var(--hud-border);
     color: var(--badge-fg); width: 50px; min-height: var(--touch-min-h, 42px);
@@ -2172,8 +2172,9 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     display: none;
     position: absolute;
     top: 44px;
-    left: 58px;
-    right: 64px;
+    /* Vlevo prostor pro left-toolbar (5 + 50 + mezera), vpravo pro BOD+/POZICE (52). */
+    left: 64px;
+    right: 66px;
     z-index: 340;
     gap: 6px;
     flex-wrap: nowrap;
@@ -2189,27 +2190,28 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     max-width: 100%;
     background: var(--map-float-bg);
     border: 1px solid var(--map-float-border);
-    padding: 6px 10px;
+    padding: 6px 8px;
     backdrop-filter: blur(6px);
     box-shadow: var(--neon-glow);
     border-radius: var(--map-ui-radius, 8px);
     overflow: hidden;
     box-sizing: border-box;
+    text-align: left;
 }
-.map-tac-tile.map-tac-tile-mgrs { flex: 1.35; min-width: 0; }
-.map-tac-tile.map-tac-tile-scale { flex: 0.9; min-width: 0; }
+.map-tac-tile.map-tac-tile-mgrs { flex: 1.4; min-width: 0; }
+.map-tac-tile.map-tac-tile-scale { flex: 1; min-width: 0; }
 .map-tac-label {
     display: block;
     font-size: 8px;
     color: var(--stat-label-color);
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .map-tac-value {
     display: block;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--text-green);
     font-weight: 700;
     text-shadow: var(--text-glow);
@@ -2218,6 +2220,7 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    letter-spacing: 0.02em;
 }
 .map-tac-sub {
     display: block;
@@ -2361,9 +2364,9 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 @media (max-width: 480px) {
     #map-tactical-hud {
         top: 40px;
-        left: 54px;
-        right: 58px;
-        gap: 4px;
+        left: 62px;  /* 5 + 50 (tool-btn) + 7 mezera — nezasahuje do ÚTOČIŠTĚ */
+        right: 60px;
+        gap: 5px;
         justify-content: center;
     }
     #map-tools-bar { top: 40px; right: 4px; }
@@ -2371,9 +2374,11 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     #map-zoom-controls { bottom: 52px; right: 6px; }
     .map-zoom-btn { width: 40px; height: 40px; font-size: 22px; border-radius: var(--map-ui-radius, 8px); }
     .map-tool-fab { width: 46px; height: 46px; font-size: 20px; border-radius: var(--map-ui-radius, 8px); }
-    .map-tac-tile { padding: 4px 6px; border-radius: var(--map-ui-radius, 8px); }
-    .map-tac-value { font-size: 11px; margin-top: 1px; }
-    .map-tac-label { font-size: 6px; letter-spacing: 0.05em; }
+    .map-tac-tile { padding: 5px 7px; border-radius: var(--map-ui-radius, 8px); }
+    .map-tac-tile.map-tac-tile-scale { flex: 1; }
+    .map-tac-tile.map-tac-tile-mgrs { flex: 1.25; }
+    .map-tac-value { font-size: 12px; margin-top: 2px; letter-spacing: 0; }
+    .map-tac-label { font-size: 7px; letter-spacing: 0.04em; }
     .map-tac-sub { font-size: 8px; }
     .map-tac-tile-mgrs .map-tac-value { font-size: 10px; }
     #map-compass { width: 118px; }
