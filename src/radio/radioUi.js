@@ -33,6 +33,12 @@ import {
     getStationVisualPageIndexForEntry
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
+import {
+    getGridPageCount,
+    getGridPage,
+    renderGridPageHtml,
+    copyGridLineText
+} from './radioGrids.js';
 
 var ctx = {};
 var state = null;
@@ -144,6 +150,24 @@ function renderNotebook(options) {
 
     ensureNotebookMeta();
     var pageIdx = getCurrentPageIndex();
+
+    if (activeNotebookTab === 'grids') {
+        var gridCount = getGridPageCount(NOTEBOOK_LINES_PER_PAGE);
+        if (pageIdx >= gridCount) {
+            pageIdx = gridCount - 1;
+            setCurrentPageIndex(pageIdx);
+        }
+        var gridPage = getGridPage(pageIdx, NOTEBOOK_LINES_PER_PAGE);
+        box.innerHTML = renderGridPageHtml(gridPage);
+        bindGridCopyButtons(box);
+        if (pageNum) pageNum.textContent = String(pageIdx + 1);
+        if (pageLabel) pageLabel.textContent = (gridPage.title || 'Gridy') + ' · ' + (pageIdx + 1) + '/' + gridCount;
+        if (prevBtn) prevBtn.disabled = pageIdx <= 0;
+        if (nextBtn) nextBtn.disabled = pageIdx >= gridCount - 1;
+        if (options.flip) triggerPageFlip();
+        return;
+    }
+
     var pageCount = activeNotebookTab === 'station'
         ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
         : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
@@ -153,13 +177,10 @@ function renderNotebook(options) {
         setCurrentPageIndex(pageIdx);
     }
 
-    if (activeNotebookTab === 'notes' || activeNotebookTab === 'grids') {
-        var items = notebook[activeNotebookTab] || [];
-        var emptyLabel = activeNotebookTab === 'grids'
-            ? 'MGRS gridy — zatím prázdné.<br>Uložení přes rychlou poznámku přibude brzy.'
-            : 'Poznámky — zatím prázdné.<br>Rychlé poznámky přibydou v další verzi.';
+    if (activeNotebookTab === 'notes') {
+        var items = notebook.notes || [];
         if (!items.length) {
-            box.innerHTML = '<p class="radio-notebook-empty">' + emptyLabel + '</p>';
+            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — zatím prázdné.<br>Rychlé poznámky přibydou v další verzi.</p>';
         } else {
             var visualLines = expandPlainNotebookLines(items, NOTEBOOK_CHARS_PER_LINE);
             var itemsHtml = '';
@@ -169,7 +190,7 @@ function renderNotebook(options) {
             box.innerHTML = itemsHtml;
         }
         if (pageNum) pageNum.textContent = '';
-        if (pageLabel) pageLabel.textContent = NOTEBOOK_TAB_LABELS[activeNotebookTab] || activeNotebookTab;
+        if (pageLabel) pageLabel.textContent = NOTEBOOK_TAB_LABELS.notes || 'Poznámky';
         if (prevBtn) prevBtn.disabled = true;
         if (nextBtn) nextBtn.disabled = true;
         return;
@@ -199,10 +220,36 @@ function renderNotebook(options) {
     if (options.flip) triggerPageFlip();
 }
 
+function bindGridCopyButtons(box) {
+    if (!box) return;
+    var btns = box.querySelectorAll('.radio-grid-copy');
+    for (var i = 0; i < btns.length; i++) {
+        if (btns[i]._gridCopyBound) continue;
+        btns[i]._gridCopyBound = true;
+        btns[i].addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var text = this.getAttribute('data-copy') || '';
+            var btn = this;
+            copyGridLineText(text).then(function(ok) {
+                if (!ok) return;
+                btn.classList.add('is-copied');
+                btn.textContent = '✓';
+                setTimeout(function() {
+                    btn.classList.remove('is-copied');
+                    btn.textContent = '⧉';
+                }, 900);
+            });
+        });
+    }
+}
+
 function goNotebookPage(delta) {
-    var pageCount = activeNotebookTab === 'station'
-        ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
-        : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+    var pageCount = activeNotebookTab === 'grids'
+        ? getGridPageCount(NOTEBOOK_LINES_PER_PAGE)
+        : (activeNotebookTab === 'station'
+            ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
+            : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE));
     var next = getCurrentPageIndex() + delta;
     if (next < 0 || next >= pageCount) return;
     setCurrentPageIndex(next);
@@ -474,6 +521,7 @@ function bindKeypad() {
         tabs[t]._radioCommsBound = true;
         tabs[t].addEventListener('click', function() {
             activeNotebookTab = this.getAttribute('data-tab') || 'station';
+            if (activeNotebookTab === 'grids') setCurrentPageIndex(0);
             syncNotebookTabs();
             renderNotebook();
         });

@@ -1025,6 +1025,54 @@ body.theme-light .radio-chat-input { color: #1a1a0a; }
     box-sizing: border-box;
     padding-top: 2px;
 }
+.radio-grid-line.radio-grid-point {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+}
+.radio-grid-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.radio-grid-line.radio-grid-header {
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #1a3a22;
+}
+.radio-grid-line.radio-grid-empty {
+    font-style: italic;
+    color: rgba(42, 36, 24, 0.45);
+}
+.radio-grid-copy {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 16px;
+    padding: 0;
+    margin: 0;
+    border: 1px solid rgba(42, 36, 24, 0.35);
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.55);
+    color: #1a3a22;
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.radio-grid-copy:active,
+.radio-grid-copy.is-copied {
+    background: #78ff66;
+    border-color: #1a3a22;
+    color: #061408;
+}
 .radio-notebook-line-cont {
     padding-left: 1.1em;
     opacity: 0.92;
