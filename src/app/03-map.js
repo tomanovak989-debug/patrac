@@ -512,7 +512,8 @@ function initRoutePlannerModule() {
                 return null;
             },
             isRulerActive: function() { return isTopoRulerActive(); },
-            isRouteWanted: function() { return !!(mapHud() && mapHud().isRouteWanted()); }
+            isRouteWanted: function() { return !!(mapHud() && mapHud().isRouteWanted()); },
+            isMapTabActive: function() { return !!(mapHud() && mapHud().isMapToolsTabActive()); }
         });
         updateRoutePlannerDisplay();
     }).catch(function(err) { console.error('[routePlanner]', err); });
@@ -531,9 +532,10 @@ function hasRouteTargetOnMap() {
 
 function updateRoutePlannerDisplay() {
     var root = document.getElementById('map-route-planner');
+    var onMap = !!(mapHud() && mapHud().isMapToolsTabActive());
     var engaged = !!(routePlannerMod && routePlannerMod.isRouteEngaged && routePlannerMod.isRouteEngaged());
     var wanted = !!(mapHud() && mapHud().isRouteEffective());
-    var panelShow = (wanted && hasRouteTargetOnMap()) || engaged;
+    var panelShow = onMap && ((wanted && hasRouteTargetOnMap()) || engaged);
     var fab = document.getElementById('fab-route-planner');
     if (fab) fab.classList.toggle('is-active', panelShow);
     if (!routePlannerMod) {

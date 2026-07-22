@@ -59,6 +59,10 @@ function routeWanted() {
     return !!(_deps && _deps.isRouteWanted && _deps.isRouteWanted());
 }
 
+function mapTabActive() {
+    return !!(_deps && _deps.isMapTabActive && _deps.isMapTabActive());
+}
+
 /** Cíl je na mapě: zamčený / aktuální cíl, nebo střed pravítka (živý zdroj). */
 function hasTargetOnMap() {
     if (state.target && isFinite(state.target.lat) && isFinite(state.target.lng)) return true;
@@ -66,15 +70,15 @@ function hasTargetOnMap() {
     return !!(ruler && isFinite(ruler.lat) && isFinite(ruler.lng));
 }
 
-/** Panel (4 ikony) je vidět, když je plánovač zapnutý a na mapě je cíl,
-    NEBO když je aspoň jeden bod zamčený (ovládání i bez pravítka). */
+/** Panel (4 ikony) jen na záložce Mapa — jinak se propírá do ostatních karet. */
 function isPanelVisible() {
+    if (!mapTabActive()) return false;
     return (routeWanted() && hasTargetOnMap()) || state.startLocked || state.targetLocked;
 }
 
-/** Trasa se kreslí, když je panel aktivní NEBO je aspoň jeden bod zamčený. */
+/** Trasa na mapě: panel aktivní NEBO zamčený bod (grafika může zůstat i mimo panel). */
 function isEngaged() {
-    return isPanelVisible() || state.startLocked || state.targetLocked;
+    return state.startLocked || state.targetLocked || (mapTabActive() && routeWanted() && hasTargetOnMap());
 }
 
 function clearMapGraphics() {
