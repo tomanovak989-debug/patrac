@@ -510,6 +510,7 @@ body.admin-mode .operator-clan-section { display: block; }
     line-height: var(--panel-line-height);
     position: absolute;
     box-sizing: border-box;
+    z-index: 400;
 }
 .panel-content-inner {
     width: 100%;
@@ -975,22 +976,30 @@ body.theme-light .radio-chat-input { color: #1a1a0a; }
     animation: radio-notebook-flip-next 0.2s ease-in forwards;
 }
 .radio-notebook-sheet.is-flipping-prev {
-    animation: radio-notebook-flip-prev 0.2s ease-in forwards;
+    animation: radio-notebook-flip-prev 0.2s ease-out forwards;
 }
-/* Po odklopení okamžitě nový list — bez zpětné animace. */
+/* Po odklopení (vpřed) okamžitě nový list — bez zpětné animace. */
 .radio-notebook-sheet.is-flip-reset {
     animation: none !important;
     transition: none !important;
     transform: none !important;
     opacity: 1 !important;
 }
+/* Výchozí stav před doklopením (zpět) = konec animace vpřed. */
+.radio-notebook-sheet.is-flip-armed-prev {
+    animation: none !important;
+    transition: none !important;
+    transform: rotateY(-92deg);
+    opacity: 0.2;
+    box-shadow: -4px 2px 12px rgba(0, 0, 0, 0.2);
+}
 @keyframes radio-notebook-flip-next {
     from { transform: rotateY(0deg); opacity: 1; }
     to { transform: rotateY(-92deg); opacity: 0.2; box-shadow: -4px 2px 12px rgba(0, 0, 0, 0.2); }
 }
 @keyframes radio-notebook-flip-prev {
-    from { transform: rotateY(0deg); opacity: 1; }
-    to { transform: rotateY(92deg); opacity: 0.2; box-shadow: 4px 2px 12px rgba(0, 0, 0, 0.2); }
+    from { transform: rotateY(-92deg); opacity: 0.2; box-shadow: -4px 2px 12px rgba(0, 0, 0, 0.2); }
+    to { transform: rotateY(0deg); opacity: 1; box-shadow: 2px 3px 8px rgba(0, 0, 0, 0.12); }
 }
 .radio-notebook-sheet::before {
     content: '';

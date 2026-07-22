@@ -69,14 +69,28 @@ function triggerPageFlip(thenRender, direction) {
         return;
     }
     if (flipTimer) clearTimeout(flipTimer);
-    sheet.classList.remove('is-flipping', 'is-flipping-prev', 'is-flip-reset');
+    sheet.classList.remove('is-flipping', 'is-flipping-prev', 'is-flip-reset', 'is-flip-armed-prev');
     void sheet.offsetWidth;
-    /* Jen odklopení listu — na vrcholu vyměnit obsah a hned položit nový list (bez zpětné animace). */
-    sheet.classList.add(direction < 0 ? 'is-flipping-prev' : 'is-flipping');
+
+    if (direction < 0) {
+        /* Zpět = obrácený první krok: nejdřív nový list, pak doklopení z -92° na 0°. */
+        if (thenRender) thenRender();
+        sheet.classList.add('is-flip-armed-prev');
+        void sheet.offsetWidth;
+        sheet.classList.remove('is-flip-armed-prev');
+        sheet.classList.add('is-flipping-prev');
+        flipTimer = setTimeout(function() {
+            sheet.classList.remove('is-flipping-prev');
+        }, 200);
+        return;
+    }
+
+    /* Vpřed: odklopit aktuální list, na vrcholu vyměnit obsah, položit nový bez zpětné animace. */
+    sheet.classList.add('is-flipping');
     flipTimer = setTimeout(function() {
         if (thenRender) thenRender();
         sheet.classList.add('is-flip-reset');
-        sheet.classList.remove('is-flipping', 'is-flipping-prev');
+        sheet.classList.remove('is-flipping');
         void sheet.offsetWidth;
         sheet.classList.remove('is-flip-reset');
     }, 200);

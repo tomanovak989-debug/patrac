@@ -2953,6 +2953,7 @@ function switchMainTab(tab, element) {
         closeAddPoiPanel();
         closeStoryPositionsPanel();
         closePoiEditor();
+        closeStoryPosEditor();
     }
 
     setMapToolsVisible(tab === 'map-only');

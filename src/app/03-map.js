@@ -1922,12 +1922,17 @@ function setMapToolsVisible(show) {
         mapHud().setMapToolsTabActive(show);
         if (show) mapHud().resetRulerOnMapTabEnter();
     }
+    var left = document.getElementById('hud-left');
+    if (left) left.style.display = show ? 'flex' : 'none';
     var bar = document.getElementById('map-tools-bar');
     if (bar) bar.style.display = show ? 'flex' : 'none';
     var shelterBtn = document.getElementById('btn-center-shelter');
     if (shelterBtn) shelterBtn.style.display = show ? 'flex' : 'none';
     var layersPanel = document.getElementById('map-layers-panel');
-    if (layersPanel) layersPanel.classList.toggle('visible', show);
+    if (layersPanel) {
+        if (show) layersPanel.classList.add('visible');
+        else layersPanel.classList.remove('visible');
+    }
     var layersDrop = document.getElementById('map-layers-dropdown');
     if (layersDrop && !show) layersDrop.classList.remove('open');
     var fabsEl = document.getElementById('map-tool-fabs');
