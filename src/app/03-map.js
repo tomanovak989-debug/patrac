@@ -400,15 +400,26 @@ window.patracUpdateMgrsReadout = function() {
         mgrsEl.textContent = mgrsGridMod.mgrsAtLatLng(lat, lng, mgrsAcc);
     }
     if (subEl) {
-        subEl.textContent = formatLatLngDegrees(lat, lng) + ' · ' + src + ' · ' + mgrsGridMod.mgrsPrecisionText(mgrsAcc);
+        var latLngTxt = formatLatLngDegrees(lat, lng);
+        var precTxt = mgrsGridMod.mgrsPrecisionText(mgrsAcc);
+        if (window.matchMedia && window.matchMedia('(max-width: 480px)').matches) {
+            subEl.textContent = latLngTxt + ' · ' + src;
+        } else {
+            subEl.textContent = latLngTxt + ' · ' + src + ' · ' + precTxt;
+        }
     }
     if (topoRulerMod && topoRulerMod.getMapScaleReadout && scaleEl) {
         var scaleInfo = topoRulerMod.getMapScaleReadout(lat, lng);
         if (scaleInfo) {
             scaleEl.textContent = scaleInfo.scaleRatio + ' · Z' + scaleInfo.zoom;
             if (scaleSubEl) {
-                scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px · roamer ×' + scaleInfo.roamerScale.toFixed(2) +
-                    (scaleInfo.synced ? ' · SYNC' : '');
+                if (window.matchMedia && window.matchMedia('(max-width: 480px)').matches) {
+                    scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px' +
+                        (scaleInfo.synced ? ' · SYNC' : '');
+                } else {
+                    scaleSubEl.textContent = '1 km = ' + scaleInfo.pxPerKm + ' px · roamer ×' + scaleInfo.roamerScale.toFixed(2) +
+                        (scaleInfo.synced ? ' · SYNC' : '');
+                }
             }
         }
     }
