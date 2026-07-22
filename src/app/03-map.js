@@ -544,12 +544,12 @@ function hasRouteTargetOnMap() {
 function updateRoutePlannerDisplay() {
     var root = document.getElementById('map-route-planner');
     var onMap = !!(mapHud() && mapHud().isMapToolsTabActive());
-    var engaged = !!(routePlannerMod && routePlannerMod.isRouteEngaged && routePlannerMod.isRouteEngaged());
-    var wanted = !!(mapHud() && mapHud().isRouteEffective());
-    var panelShow = onMap && ((wanted && hasRouteTargetOnMap()) || engaged);
+    var wanted = !!(mapHud() && mapHud().isRouteWanted());
     var fab = document.getElementById('fab-route-planner');
-    if (fab) fab.classList.toggle('is-active', panelShow);
+    /* FAB aktivní = uživatel má trasování zapnuté (ne podle zámků). */
+    if (fab) fab.classList.toggle('is-active', onMap && wanted);
     if (!routePlannerMod) {
+        var panelShow = onMap && wanted && hasRouteTargetOnMap();
         if (root) {
             root.style.display = panelShow ? 'block' : 'none';
             root.classList.toggle('is-ready', panelShow);
@@ -562,7 +562,7 @@ window.patracToggleRoutePlanner = function() {
     var hud = mapHud();
     if (!hud) return;
     var next = !hud.isRouteWanted();
-    /* Zapnutí jen když už je na mapě cíl (zahájená trasa / střed pravítka). Vypnutí vždy. */
+    /* Zapnutí jen když je cíl/trasa; vypnutí vždy schová trasu (stav zůstane). */
     if (next && !hasRouteTargetOnMap()) {
         alert('Plánovač trasy vyžaduje cílový bod na mapě (zapni pravítko nebo načti/zamkni trasu).');
         return;

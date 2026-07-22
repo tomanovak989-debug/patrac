@@ -70,15 +70,18 @@ function hasTargetOnMap() {
     return !!(ruler && isFinite(ruler.lat) && isFinite(ruler.lng));
 }
 
-/** Panel (4 ikony) jen na záložce Mapa — jinak se propírá do ostatních karet. */
+/** Panel (4 ikony) jen na záložce Mapa a když je plánovač zapnutý.
+    Stav trasy (zámky/body) zůstává i po vypnutí — jen se schová. */
 function isPanelVisible() {
-    if (!mapTabActive()) return false;
-    return (routeWanted() && hasTargetOnMap()) || state.startLocked || state.targetLocked;
+    if (!mapTabActive() || !routeWanted()) return false;
+    return hasTargetOnMap() || state.startLocked || state.targetLocked;
 }
 
-/** Trasa na mapě: panel aktivní NEBO zamčený bod (grafika může zůstat i mimo panel). */
+/** Grafika trasy: jen když je plánovač zapnutý (vypnutí = schovej, stav nech). */
 function isEngaged() {
-    return state.startLocked || state.targetLocked || (mapTabActive() && routeWanted() && hasTargetOnMap());
+    if (!routeWanted()) return false;
+    if (!mapTabActive()) return false;
+    return state.startLocked || state.targetLocked || hasTargetOnMap();
 }
 
 function clearMapGraphics() {
@@ -239,21 +242,25 @@ function showSegmentLabels() {
 }
 
 /**
- * Úhel úseku ve screen coords + čitelný text (ne vzhůru nohama).
- * offsetY drží popisek „nad“ čárou na stejné straně obrazovky.
+ * Popisek podél úseku, vždy na straně „nahoru“ na obrazovce (čára pod textem).
+ * Text otočený podél čáry, čitelně (ne vzhůru nohama).
  */
-function segmentLabelOrientation(a, b) {
+function segmentLabelPlacement(a, b) {
     var map = getMap();
     var pa = map.latLngToContainerPoint([a.lat, a.lng]);
     var pb = map.latLngToContainerPoint([b.lat, b.lng]);
-    var ang = Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI;
-    var textAng = ang;
-    var offsetY = -11;
-    if (textAng > 90 || textAng < -90) {
-        textAng += textAng > 0 ? -180 : 180;
-        offsetY = 11;
-    }
-    return { deg: textAng, offsetY: offsetY };
+    var mid = map.latLngToContainerPoint([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2]);
+    var dx = pb.x - pa.x;
+    var dy = pb.y - pa.y;
+    var len = Math.sqrt(dx * dx + dy * dy) || 1;
+    /* Jednotkový kolmý vektor; bereme ten, který míří k hornímu okraji obrazovky (menší Y). */
+    var nx = -dy / len;
+    var ny = dx / len;
+    if (ny > 0) { nx = -nx; ny = -ny; }
+    var ll = map.containerPointToLatLng([mid.x + nx * 10, mid.y + ny * 10]);
+    var ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (ang > 90 || ang < -90) ang += ang > 0 ? -180 : 180;
+    return { lat: ll.lat, lng: ll.lng, deg: ang };
 }
 
 function renderRouteOnMap() {
@@ -277,18 +284,17 @@ function renderRouteOnMap() {
     }).addTo(_layer);
     mapObjs.lines.push(_line);
 
-    /* Jen vzdálenost, podél čáry, nad ní; od 1:30 000 skryté (směrník = pravítko). */
+    /* Jen vzdálenost, podél čáry, text vždy nad čárou; od 1:30 000 skryté. */
     if (showSegmentLabels()) {
         for (var s = 1; s < pts.length; s++) {
             var a = pts[s - 1], b = pts[s];
             var segM = distM(a.lat, a.lng, b.lat, b.lng);
-            var ori = segmentLabelOrientation(a, b);
-            var label = window.L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
+            var place = segmentLabelPlacement(a, b);
+            var label = window.L.marker([place.lat, place.lng], {
                 icon: window.L.divIcon({
                     className: 'route-planner-seg-label',
                     html: '<span style="transform:translate(-50%,-50%) rotate(' +
-                        ori.deg.toFixed(1) + 'deg) translateY(' + ori.offsetY + 'px)">' +
-                        fmtDist(segM) + '</span>',
+                        place.deg.toFixed(1) + 'deg)">' + fmtDist(segM) + '</span>',
                     iconSize: [0, 0]
                 }),
                 pane: 'mapMeasurePane',
