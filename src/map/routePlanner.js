@@ -3,7 +3,7 @@
  *
  * Model:
  *  - start i cíl mají dva režimy: SLEDUJE zdroj (GPS / střed pravítka) nebo ZAMČENO.
- *  - zamčení = 1 s podržení ikony start/cíl na panelu; zamčený bod přestane sledovat
+ *  - zamčení = 0,5 s podržení ikony start/cíl na panelu; zamčený bod přestane sledovat
  *    zdroj, jde jím hýbat tažením a zůstane, i když se pravítko vypne.
  *  - mezibody lze přidávat klikem do mapy jen když je cíl zamčený; klik na mezibod ho smaže.
  *  - odemknutím OBOU bodů se trasa smaže a po zapnutí pravítka běží výchozí funkce.
@@ -497,7 +497,7 @@ function bindLongPress(el, onLong, onShort) {
             timer = null;
             fired = true;
             onLong();
-        }, 1000);
+        }, 500);
     }
     function clear() {
         if (timer) { clearTimeout(timer); timer = null; }

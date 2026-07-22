@@ -625,8 +625,8 @@ function syncFabLockUi() {
     if (!fab) return;
     fab.classList.toggle('is-locked', state.positionLocked);
     fab.title = state.positionLocked
-        ? 'Pravítko zamčeno · podrž 1 s = odemknout'
-        : 'Pravítko · podrž 1 s = zamknout';
+        ? 'Pravítko zamčeno · podrž 0,5 s = odemknout'
+        : 'Pravítko · podrž 0,5 s = zamknout';
     fab.setAttribute('aria-label', state.positionLocked ? 'Pravítko zamčeno' : 'Pravítko');
 }
 
@@ -1122,7 +1122,7 @@ function bindFabLongPress() {
             _fabLongPressFired = true;
             togglePositionLock();
             if (navigator.vibrate) navigator.vibrate(30);
-        }, 1000);
+        }, 500);
     }
 
     fab.addEventListener('mousedown', onPressStart);
