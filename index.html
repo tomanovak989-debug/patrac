@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260722e30" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260722e31" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -597,28 +597,29 @@
                     </div>
                     <div class="radio-keypad-zone" id="radio-keypad-zone">
                         <div class="radio-keypad-col">
-                            <button type="button" class="radio-key" id="radio-key-vol-up" title="Frekvence +0.025 MHz">VOL+</button>
-                            <button type="button" class="radio-key" id="radio-key-clr" title="Vymazat / TX režim">CLR</button>
+                            <button type="button" class="radio-key radio-key-fn" id="radio-key-vol-up" title="Frekvence +0.025 MHz"><span class="radio-key-digit">VOL+</span></button>
+                            <button type="button" class="radio-key radio-key-fn" id="radio-key-mode" title="Režim: frekvence / šifra / TX"><span class="radio-key-digit">MD</span></button>
+                            <button type="button" class="radio-key radio-key-fn" id="radio-key-clr" title="Vymazat / TX režim"><span class="radio-key-digit">CLR</span></button>
                         </div>
                         <div class="radio-keypad-center" id="radio-keypad-grid">
-                            <button type="button" class="radio-key" data-key="1">1</button>
-                            <button type="button" class="radio-key" data-key="2">2</button>
-                            <button type="button" class="radio-key" data-key="3" id="radio-key-mode" title="Režim: frekvence / šifra / TX">MD</button>
-                            <button type="button" class="radio-key" data-key="4">4</button>
-                            <button type="button" class="radio-key" data-key="5">5</button>
-                            <button type="button" class="radio-key" data-key="6">6</button>
-                            <button type="button" class="radio-key" data-key="7">7</button>
-                            <button type="button" class="radio-key" data-key="8">8</button>
-                            <button type="button" class="radio-key" data-key="9">9</button>
+                            <button type="button" class="radio-key radio-key-num" data-key="1"><span class="radio-key-digit">1</span><span class="radio-key-letters">&nbsp;</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="2"><span class="radio-key-digit">2</span><span class="radio-key-letters">abc</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="3"><span class="radio-key-digit">3</span><span class="radio-key-letters">def</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="4"><span class="radio-key-digit">4</span><span class="radio-key-letters">ghi</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="5"><span class="radio-key-digit">5</span><span class="radio-key-letters">jkl</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="6"><span class="radio-key-digit">6</span><span class="radio-key-letters">mno</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="7"><span class="radio-key-digit">7</span><span class="radio-key-letters">pqrs</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="8"><span class="radio-key-digit">8</span><span class="radio-key-letters">tuv</span></button>
+                            <button type="button" class="radio-key radio-key-num" data-key="9"><span class="radio-key-digit">9</span><span class="radio-key-letters">wxyz</span></button>
                             <div class="radio-keypad-input-row">
-                                <button type="button" class="radio-key" data-key="prev" title="Frekvence −">−</button>
+                                <button type="button" class="radio-key radio-key-fn" data-key="prev" title="Frekvence −"><span class="radio-key-digit">−</span></button>
                                 <input type="text" class="radio-chat-input" id="chat-input-field" placeholder="Hlášení…" autocomplete="off" spellcheck="false">
-                                <button type="button" class="radio-key" data-key="next" title="Frekvence +">+</button>
+                                <button type="button" class="radio-key radio-key-fn" data-key="next" title="Frekvence +"><span class="radio-key-digit">+</span></button>
                             </div>
                         </div>
                         <div class="radio-keypad-col">
-                            <button type="button" class="radio-key" id="radio-key-pre-up" title="Další preset">PRE</button>
-                            <button type="button" class="radio-key radio-key-send" id="radio-key-ent" title="Potvrdit / vyslat">ENT</button>
+                            <button type="button" class="radio-key radio-key-fn" id="radio-key-pre-up" title="Další preset"><span class="radio-key-digit">PRE</span></button>
+                            <button type="button" class="radio-key radio-key-fn radio-key-send" id="radio-key-ent" title="Potvrdit / vyslat"><span class="radio-key-digit">ENT</span></button>
                         </div>
                     </div>
                 </div>
@@ -769,21 +770,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260722e30"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260722e31"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e30';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e31';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260722e30';
+        window.PATRAC_BUILD = '20260722e31';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260722e30"></script>
-    <script src="src/app/02-quests.js?v=20260722e30"></script>
-    <script src="src/app/03-map.js?v=20260722e30"></script>
-    <script src="src/app/04-game.js?v=20260722e30"></script>
+    <script src="src/app/01-globals.js?v=20260722e31"></script>
+    <script src="src/app/02-quests.js?v=20260722e31"></script>
+    <script src="src/app/03-map.js?v=20260722e31"></script>
+    <script src="src/app/04-game.js?v=20260722e31"></script>
 </body>
 </html>
