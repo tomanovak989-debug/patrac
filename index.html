@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260722e21" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260722e22" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -339,7 +339,6 @@
         <div id="map-layers-dropdown">
             <div class="map-layers-dropdown-head">
                 <span>◫ VRSTVY</span>
-                <button type="button" class="map-panel-hide-btn" onclick="closeMapLayersPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
             </div>
             <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
@@ -379,8 +378,8 @@
     </div>
 
     <div class="hud-element" id="map-tools-bar">
-        <button class="tool-btn" onclick="openAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
-        <button class="tool-btn" onclick="openStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
+        <button class="tool-btn" onclick="toggleAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
+        <button class="tool-btn" onclick="toggleStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
         <select id="map-tile-select" onchange="switchMapTile(this.value)" title="Globální mapa">
             <option value="satellite">🛰️ Sat</option>
             <option value="street">🗺️ OSM</option>
@@ -389,7 +388,6 @@
     </div>
 
     <div id="map-add-poi-bar" class="map-overlay-panel">
-        <button type="button" class="map-panel-hide-btn" onclick="closeAddPoiPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
         <div id="map-add-poi-title" class="map-overlay-panel-head" style="color:var(--xp-blue);">📍 NOVÝ VOLNÝ BOD (GPS POLOHA)</div>
         <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV (NA MAPĚ):</label><input type="text" id="poi-name" placeholder="Mýtina u potoka"></div>
         <div class="form-group" style="margin-bottom:4px;"><label>SKRYTÁ POZNÁMKA (JEN V DETAILU):</label><textarea id="poi-note" rows="2" placeholder="Později doplníš popis, co tu je…"></textarea></div>
@@ -421,7 +419,6 @@
     </div>
 
     <div id="map-story-bar" class="map-overlay-panel">
-        <button type="button" class="map-panel-hide-btn" onclick="closeStoryPositionsPanel()" title="Skrýt" aria-label="Skrýt">✕</button>
         <div class="map-overlay-panel-head" style="color:var(--text-green);">🧭 PRVOTNÍ POZICE — SPRÁVA BODŮ</div>
         <p style="font-size:var(--text-sm); color:var(--subtle-fg); margin:0 0 8px 0;">Tyto body jsou trvalé. Lze je znovu zaměřit nebo resetovat, nikdy nezmizí z hry.</p>
         <div id="map-story-positions-list"></div>
@@ -771,21 +768,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260722e21"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260722e22"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e21';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e22';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260722e21';
+        window.PATRAC_BUILD = '20260722e22';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260722e21"></script>
-    <script src="src/app/02-quests.js?v=20260722e21"></script>
-    <script src="src/app/03-map.js?v=20260722e21"></script>
-    <script src="src/app/04-game.js?v=20260722e21"></script>
+    <script src="src/app/01-globals.js?v=20260722e22"></script>
+    <script src="src/app/02-quests.js?v=20260722e22"></script>
+    <script src="src/app/03-map.js?v=20260722e22"></script>
+    <script src="src/app/04-game.js?v=20260722e22"></script>
 </body>
 </html>

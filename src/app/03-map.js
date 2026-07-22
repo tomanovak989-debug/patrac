@@ -1177,6 +1177,15 @@ function closeStoryPositionsPanel() {
     updateMapCrosshair();
 }
 
+function toggleStoryPositionsPanel() {
+    var el = document.getElementById('map-story-bar');
+    if (el && el.style.display === 'block') {
+        closeStoryPositionsPanel();
+        return;
+    }
+    openStoryPositionsPanel();
+}
+
 function closeAllMapPanels() {
     closeAddPoiPanel();
     closeStoryPositionsPanel();
@@ -1980,6 +1989,15 @@ function openAddPoiPanel() {
 function closeAddPoiPanel() {
     document.getElementById('map-add-poi-bar').style.display = 'none';
     updateMapCrosshair();
+}
+
+function toggleAddPoiPanel() {
+    var el = document.getElementById('map-add-poi-bar');
+    if (el && el.style.display === 'block') {
+        closeAddPoiPanel();
+        return;
+    }
+    openAddPoiPanel();
 }
 
 function confirmAddMapPoi() {
