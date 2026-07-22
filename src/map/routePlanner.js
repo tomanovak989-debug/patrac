@@ -223,6 +223,39 @@ function makeDraggableMarker(latlng, icon, draggable, onDragEnd, tooltip, onDrag
     return m;
 }
 
+/** Měřítko mapy (jmenovatel 1:N) — stejná logika jako HUD (≈96 DPI Web Mercator). */
+function mapScaleDenominator() {
+    var map = getMap();
+    if (!map) return Infinity;
+    var lat = map.getCenter().lat;
+    var zoom = map.getZoom();
+    var mpp = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, zoom);
+    return mpp / (0.0254 / 96);
+}
+
+/** Popisky úseků jen při přiblížení pod 1:30 000. */
+function showSegmentLabels() {
+    return mapScaleDenominator() < 30000;
+}
+
+/**
+ * Úhel úseku ve screen coords + čitelný text (ne vzhůru nohama).
+ * offsetY drží popisek „nad“ čárou na stejné straně obrazovky.
+ */
+function segmentLabelOrientation(a, b) {
+    var map = getMap();
+    var pa = map.latLngToContainerPoint([a.lat, a.lng]);
+    var pb = map.latLngToContainerPoint([b.lat, b.lng]);
+    var ang = Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI;
+    var textAng = ang;
+    var offsetY = -11;
+    if (textAng > 90 || textAng < -90) {
+        textAng += textAng > 0 ? -180 : 180;
+        offsetY = 11;
+    }
+    return { deg: textAng, offsetY: offsetY };
+}
+
 function renderRouteOnMap() {
     /* Během tažení bodu nepřekresluj (smazalo by tažený marker → „odepnutí"). */
     if (_dragging) return;
@@ -244,20 +277,25 @@ function renderRouteOnMap() {
     }).addTo(_layer);
     mapObjs.lines.push(_line);
 
-    for (var s = 1; s < pts.length; s++) {
-        var a = pts[s - 1], b = pts[s];
-        var segM = distM(a.lat, a.lng, b.lat, b.lng);
-        var brng = bearing(a.lat, a.lng, b.lat, b.lng);
-        var label = window.L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
-            icon: window.L.divIcon({
-                className: 'route-planner-seg-label',
-                html: '<span>' + fmtDist(segM) + '<br>' + Math.round(brng) + '°</span>',
-                iconSize: [0, 0]
-            }),
-            pane: 'mapMeasurePane',
-            interactive: false
-        }).addTo(_layer);
-        mapObjs.labels.push(label);
+    /* Jen vzdálenost, podél čáry, nad ní; od 1:30 000 skryté (směrník = pravítko). */
+    if (showSegmentLabels()) {
+        for (var s = 1; s < pts.length; s++) {
+            var a = pts[s - 1], b = pts[s];
+            var segM = distM(a.lat, a.lng, b.lat, b.lng);
+            var ori = segmentLabelOrientation(a, b);
+            var label = window.L.marker([(a.lat + b.lat) / 2, (a.lng + b.lng) / 2], {
+                icon: window.L.divIcon({
+                    className: 'route-planner-seg-label',
+                    html: '<span style="transform:translate(-50%,-50%) rotate(' +
+                        ori.deg.toFixed(1) + 'deg) translateY(' + ori.offsetY + 'px)">' +
+                        fmtDist(segM) + '</span>',
+                    iconSize: [0, 0]
+                }),
+                pane: 'mapMeasurePane',
+                interactive: false
+            }).addTo(_layer);
+            mapObjs.labels.push(label);
+        }
     }
 
     /* Neviditelný „tlustý" záchytný pruh na čáře — poklep = nový vrchol přesně na trase.

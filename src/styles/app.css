@@ -2344,7 +2344,7 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     box-shadow: 0 0 4px var(--topo-accent-glow);
 }
 .route-planner-seg-label span {
-    display: inline-block; transform: translate(-50%, -50%);
+    display: inline-block;
     font-size: 9px; font-family: 'IBM Plex Mono', monospace;
     color: #061408;
     background: var(--topo-accent, #78ff66);
@@ -2353,6 +2353,8 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     padding: 2px 5px; text-align: center; white-space: nowrap;
     font-weight: 700;
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.55);
+    transform-origin: center center;
+    pointer-events: none;
 }
 
 /* Leaflet posouvá mapPane přes transform — nezasahovat. */
