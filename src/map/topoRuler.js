@@ -579,6 +579,82 @@ function applyCoordAxis(axis) {
     renderBearingOnMap();
 }
 
+/**
+ * Extrahuje kandidáta na celé MGRS z vloženého textu.
+ * Zvládne čisté MGRS i řádek s názvem / číslem bodu:
+ *   „ÚTOČIŠTĚ  33U VR 12345 67890“
+ *   „1  33U VR 12345 67890“
+ *   „utociste 33uVx 33333 33333“
+ */
+function extractFullMgrsCandidate(raw) {
+    var t = String(raw || '').trim().toUpperCase().replace(/\u00A0/g, ' ');
+    if (!t) return null;
+
+    /* Ber poslední shodu — název/číslo je vlevo, souřadnice vpravo. */
+    var reSpaced = /(\d{1,2})\s*([C-HJ-NP-X])\s*([A-Z]{2})\s+(\d{2,5})(?:\s+(\d{2,5}))?/g;
+    var last = null;
+    var m;
+    while ((m = reSpaced.exec(t)) !== null) {
+        var digits = m[4] + (m[5] || '');
+        if (digits.length >= 4 && digits.length % 2 === 0 && digits.length <= 10) {
+            last = m[1] + m[2] + m[3] + digits;
+        }
+    }
+    if (last) return last;
+
+    var compact = t.replace(/\s+/g, '');
+    var reCompact = /(\d{1,2}[C-HJ-NP-X][A-Z]{2}\d{4,10})/g;
+    last = null;
+    while ((m = reCompact.exec(compact)) !== null) {
+        var body = m[1];
+        var digitPart = body.replace(/^\d{1,2}[C-HJ-NP-X][A-Z]{2}/, '');
+        if (digitPart.length >= 4 && digitPart.length % 2 === 0) last = body;
+    }
+    return last;
+}
+
+function tryApplyFullMgrsPaste(raw) {
+    var mgrs = extractFullMgrsCandidate(raw);
+    if (!mgrs) return false;
+    var pt;
+    try {
+        pt = toPoint(mgrs);
+    } catch (e) {
+        return false;
+    }
+    if (!pt || !isFinite(pt[0]) || !isFinite(pt[1])) return false;
+
+    var lat = pt[1];
+    var lng = pt[0];
+    var meta = parseMgrsHead(lat, lng);
+    var dig = digitsAtLatLng(lat, lng);
+    state.gzd = meta.gzd;
+    state.square = meta.square;
+    state.coordW = dig.w;
+    state.coordN = dig.n;
+
+    var gzdEl = document.getElementById('topo-ruler-gzd');
+    var sqEl = document.getElementById('topo-ruler-square');
+    var wEl = document.getElementById('topo-ruler-coord-w');
+    var nEl = document.getElementById('topo-ruler-coord-n');
+    if (gzdEl) gzdEl.value = state.gzd;
+    if (sqEl) sqEl.value = state.square;
+    if (wEl) wEl.value = state.coordW;
+    if (nEl) nEl.value = state.coordN;
+
+    if (state.positionLocked) {
+        state.anchor = { lat: lat, lng: lng };
+        updateRulerWidgetPosition();
+    } else {
+        centerMapOnLatLng(lat, lng);
+    }
+    syncCoordFieldsFromPosition();
+    persistState();
+    updateRulerPlateVisual();
+    renderBearingOnMap();
+    return true;
+}
+
 function setMapInteractionEnabled(on) {
     var map = getMap();
     if (!map) return;
@@ -1060,6 +1136,49 @@ function bindBearingHandDrag() {
     });
 }
 
+function flashPasteBtn(btn, ok) {
+    if (!btn) return;
+    btn.classList.remove('is-ok', 'is-err');
+    btn.classList.add(ok ? 'is-ok' : 'is-err');
+    var prev = btn.textContent;
+    btn.textContent = ok ? 'OK' : '!';
+    setTimeout(function() {
+        btn.classList.remove('is-ok', 'is-err');
+        btn.textContent = prev === 'OK' || prev === '!' ? 'VLOŽ' : prev;
+    }, 900);
+}
+
+async function readClipboardText() {
+    try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            return await navigator.clipboard.readText();
+        }
+    } catch (e) {}
+    return '';
+}
+
+function bindPasteFromClipboard() {
+    var btn = document.getElementById('topo-ruler-paste');
+    if (!btn || btn._bound) return;
+    btn._bound = true;
+    stopMapSteal(btn);
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        readClipboardText().then(function(clip) {
+            var ok = tryApplyFullMgrsPaste(clip);
+            flashPasteBtn(btn, ok);
+            if (!ok && !String(clip || '').trim()) {
+                btn.title = 'Schránka prázdná nebo bez oprávnění — zkopíruj řádek v Gridy a zkus znovu';
+            } else if (!ok) {
+                btn.title = 'Ve schránce není platná MGRS';
+            } else {
+                btn.title = 'Vložit MGRS ze schránky';
+            }
+        });
+    });
+}
+
 function bindCoordInputs() {
     var wEl = document.getElementById('topo-ruler-coord-w');
     var nEl = document.getElementById('topo-ruler-coord-n');
@@ -1099,6 +1218,7 @@ function bindCoordInputs() {
             if (!state.positionLocked) applyCoordAxis('both');
         });
     }
+    bindPasteFromClipboard();
 }
 
 function bindFabLongPress() {

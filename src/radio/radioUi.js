@@ -62,20 +62,24 @@ function setCurrentPageIndex(idx) {
     notebook.pageIndex[activeNotebookTab] = Math.max(0, idx);
 }
 
-function triggerPageFlip(thenRender) {
+function triggerPageFlip(thenRender, direction) {
     var sheet = el('radio-notebook-sheet');
     if (!sheet) {
         if (thenRender) thenRender();
         return;
     }
     if (flipTimer) clearTimeout(flipTimer);
-    sheet.classList.remove('is-flipping');
+    sheet.classList.remove('is-flipping', 'is-flipping-prev', 'is-flip-reset');
     void sheet.offsetWidth;
-    sheet.classList.add('is-flipping');
+    /* Jen odklopení listu — na vrcholu vyměnit obsah a hned položit nový list (bez zpětné animace). */
+    sheet.classList.add(direction < 0 ? 'is-flipping-prev' : 'is-flipping');
     flipTimer = setTimeout(function() {
-        sheet.classList.remove('is-flipping');
         if (thenRender) thenRender();
-    }, 560);
+        sheet.classList.add('is-flip-reset');
+        sheet.classList.remove('is-flipping', 'is-flipping-prev');
+        void sheet.offsetWidth;
+        sheet.classList.remove('is-flip-reset');
+    }, 200);
 }
 
 function getCtx() {
@@ -164,7 +168,6 @@ function renderNotebook(options) {
         if (pageLabel) pageLabel.textContent = (gridPage.title || 'Gridy') + ' · ' + (pageIdx + 1) + '/' + gridCount;
         if (prevBtn) prevBtn.disabled = pageIdx <= 0;
         if (nextBtn) nextBtn.disabled = pageIdx >= gridCount - 1;
-        if (options.flip) triggerPageFlip();
         return;
     }
 
@@ -216,8 +219,6 @@ function renderNotebook(options) {
     if (pageLabel) pageLabel.textContent = 'List ' + (pageIdx + 1) + ' / ' + pageCount;
     if (prevBtn) prevBtn.disabled = pageIdx <= 0;
     if (nextBtn) nextBtn.disabled = pageIdx >= pageCount - 1;
-
-    if (options.flip) triggerPageFlip();
 }
 
 function bindGridCopyButtons(box) {
@@ -245,6 +246,7 @@ function bindGridCopyButtons(box) {
 }
 
 function goNotebookPage(delta) {
+    if (activeNotebookTab === 'notes') return;
     var pageCount = activeNotebookTab === 'grids'
         ? getGridPageCount(NOTEBOOK_LINES_PER_PAGE)
         : (activeNotebookTab === 'station'
@@ -252,9 +254,56 @@ function goNotebookPage(delta) {
             : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE));
     var next = getCurrentPageIndex() + delta;
     if (next < 0 || next >= pageCount) return;
-    setCurrentPageIndex(next);
-    persist();
-    renderNotebook({ flip: true });
+    /* Nejdřív odklopit aktuální list, teprve pak vyměnit obsah. */
+    triggerPageFlip(function() {
+        setCurrentPageIndex(next);
+        persist();
+        renderNotebook();
+    }, delta);
+}
+
+function bindNotebookSwipe() {
+    var sheet = el('radio-notebook-sheet');
+    if (!sheet || sheet._swipeBound) return;
+    sheet._swipeBound = true;
+    var startX = 0;
+    var startY = 0;
+    var tracking = false;
+
+    function isBusyFlip() {
+        return sheet.classList.contains('is-flipping') || sheet.classList.contains('is-flipping-prev');
+    }
+
+    function ignoreTarget(target) {
+        if (!target || !target.closest) return false;
+        return !!(target.closest('.radio-grid-copy') ||
+            target.closest('input, textarea, button, a, select'));
+    }
+
+    sheet.addEventListener('touchstart', function(e) {
+        if (!e.touches || e.touches.length !== 1) return;
+        if (ignoreTarget(e.target) || isBusyFlip()) return;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        tracking = true;
+    }, { passive: true });
+
+    sheet.addEventListener('touchend', function(e) {
+        if (!tracking) return;
+        tracking = false;
+        if (isBusyFlip()) return;
+        var t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        var dx = t.clientX - startX;
+        var dy = t.clientY - startY;
+        if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+        /* Prst doleva = další list, doprava = předchozí. */
+        goNotebookPage(dx < 0 ? 1 : -1);
+    }, { passive: true });
+
+    sheet.addEventListener('touchcancel', function() {
+        tracking = false;
+    }, { passive: true });
 }
 
 function syncNotebookTabs() {
@@ -281,8 +330,10 @@ function recordEntry(entry) {
 
     if (onStationTab) {
         if (pageForEntry > getCurrentPageIndex()) {
-            setCurrentPageIndex(pageForEntry);
-            renderNotebook({ flip: true });
+            triggerPageFlip(function() {
+                setCurrentPageIndex(pageForEntry);
+                renderNotebook();
+            }, 1);
         } else if (pageForEntry === getCurrentPageIndex()) {
             renderNotebook();
         }
@@ -537,6 +588,7 @@ function bindKeypad() {
         nextPage._radioCommsBound = true;
         nextPage.addEventListener('click', function() { goNotebookPage(1); });
     }
+    bindNotebookSwipe();
 }
 
 export function initRadioCommsSystem(options) {

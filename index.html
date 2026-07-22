@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260722e25" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260722e29" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -18,10 +18,11 @@
     <div id="map-topo-ruler" aria-label="Topografické pravítko">
         <div class="topo-ruler-body" id="topo-ruler-drag-surface">
             <div class="topo-ruler-coord-row" aria-label="MGRS souřadnice">
-                <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off">
-                <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off">
-                <input type="text" class="map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="Easting (E)" autocomplete="off">
-                <input type="text" class="map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="Northing (N)" autocomplete="off">
+                <input type="text" class="map-float-hit" id="topo-ruler-gzd" maxlength="4" placeholder="33U" title="Zóna GZD" autocomplete="off" spellcheck="false">
+                <input type="text" class="map-float-hit" id="topo-ruler-square" maxlength="2" placeholder="UR" title="100 km blok" autocomplete="off" spellcheck="false">
+                <input type="text" class="map-float-hit" id="topo-ruler-coord-w" maxlength="5" inputmode="numeric" placeholder="00000" title="Easting (E)" autocomplete="off" spellcheck="false">
+                <input type="text" class="map-float-hit" id="topo-ruler-coord-n" maxlength="5" inputmode="numeric" placeholder="00000" title="Northing (N)" autocomplete="off" spellcheck="false">
+                <button type="button" class="topo-ruler-paste map-float-hit" id="topo-ruler-paste" title="Vložit MGRS ze schránky" aria-label="Vložit MGRS ze schránky">VLOŽ</button>
             </div>
             <div class="topo-ruler-plate-wrap">
                 <button type="button" class="topo-ruler-drag-handle map-float-hit" id="topo-ruler-drag-tl" title="Přesunout pravítko">⠿</button>
@@ -768,21 +769,21 @@
         }
     }
     </script>
-    <script type="module" src="src/bootstrap-i18n.js?v=20260722e25"></script>
+    <script type="module" src="src/bootstrap-i18n.js?v=20260722e29"></script>
     <script type="module">
-        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e25';
+        import * as patracMapHud from './src/map/mapHudState.js?v=20260722e29';
         window.patracMapHud = patracMapHud;
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260722e25';
+        window.PATRAC_BUILD = '20260722e29';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260722e25"></script>
-    <script src="src/app/02-quests.js?v=20260722e25"></script>
-    <script src="src/app/03-map.js?v=20260722e25"></script>
-    <script src="src/app/04-game.js?v=20260722e25"></script>
+    <script src="src/app/01-globals.js?v=20260722e29"></script>
+    <script src="src/app/02-quests.js?v=20260722e29"></script>
+    <script src="src/app/03-map.js?v=20260722e29"></script>
+    <script src="src/app/04-game.js?v=20260722e29"></script>
 </body>
 </html>

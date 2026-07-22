@@ -972,13 +972,25 @@ body.theme-light .radio-chat-input { color: #1a1a0a; }
     transition: box-shadow 0.3s ease;
 }
 .radio-notebook-sheet.is-flipping {
-    animation: radio-notebook-flip 0.55s ease-in-out;
+    animation: radio-notebook-flip-next 0.2s ease-in forwards;
 }
-@keyframes radio-notebook-flip {
-    0% { transform: rotateY(0deg); }
-    45% { transform: rotateY(-88deg); box-shadow: -4px 2px 12px rgba(0, 0, 0, 0.2); }
-    55% { transform: rotateY(-92deg); }
-    100% { transform: rotateY(0deg); }
+.radio-notebook-sheet.is-flipping-prev {
+    animation: radio-notebook-flip-prev 0.2s ease-in forwards;
+}
+/* Po odklopení okamžitě nový list — bez zpětné animace. */
+.radio-notebook-sheet.is-flip-reset {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+}
+@keyframes radio-notebook-flip-next {
+    from { transform: rotateY(0deg); opacity: 1; }
+    to { transform: rotateY(-92deg); opacity: 0.2; box-shadow: -4px 2px 12px rgba(0, 0, 0, 0.2); }
+}
+@keyframes radio-notebook-flip-prev {
+    from { transform: rotateY(0deg); opacity: 1; }
+    to { transform: rotateY(92deg); opacity: 0.2; box-shadow: 4px 2px 12px rgba(0, 0, 0, 0.2); }
 }
 .radio-notebook-sheet::before {
     content: '';
@@ -1831,7 +1843,7 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     align-items: center;
     gap: 4px;
     width: 100%;
-    max-width: 260px;
+    max-width: 280px;
     margin: 0 auto 5px;
     box-sizing: border-box;
     pointer-events: none;
@@ -1864,6 +1876,33 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
 .topo-ruler-coord-row #topo-ruler-coord-w,
 .topo-ruler-coord-row #topo-ruler-coord-n { width: 56px; }
 .topo-ruler-coord-row input.is-readonly { opacity: 0.6; }
+.topo-ruler-paste {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 3px 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    color: var(--topo-accent);
+    background: var(--map-float-bg-solid);
+    border: 1px solid var(--topo-accent);
+    border-radius: 3px;
+    box-shadow: 0 0 6px var(--topo-accent-glow);
+    pointer-events: auto;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+.topo-ruler-paste:active,
+.topo-ruler-paste.is-ok {
+    background: color-mix(in srgb, var(--topo-accent) 28%, var(--map-float-bg-solid));
+}
+.topo-ruler-paste.is-err {
+    border-color: #ff8866;
+    color: #ffb090;
+    box-shadow: 0 0 6px rgba(255, 120, 80, 0.35);
+}
 .topo-ruler-plate-wrap {
     position: relative;
     width: 260px;
