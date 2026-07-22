@@ -48,6 +48,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initFogOfWarModule();
+        bindMapZoomControls();
         return;
     }
     try {
@@ -92,6 +93,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initFogOfWarModule();
+        bindMapZoomControls();
     } catch(e) {
         console.error('initMap', e);
     }
@@ -565,9 +567,38 @@ window.patracToggleCompass = function() {
 };
 
 function updateMapToolFabs() {
+    var onMap = !!(mapHud() && mapHud().isMapToolsTabActive());
     var fabs = document.getElementById('map-tool-fabs');
-    if (fabs) fabs.classList.toggle('visible', !!(mapHud() && mapHud().isMapToolsTabActive()));
+    if (fabs) fabs.classList.toggle('visible', onMap);
+    var zoom = document.getElementById('map-zoom-controls');
+    if (zoom) {
+        zoom.classList.toggle('visible', onMap);
+        zoom.setAttribute('aria-hidden', onMap ? 'false' : 'true');
+    }
 }
+
+function bindMapZoomControls() {
+    var inn = document.getElementById('btn-map-zoom-in');
+    var out = document.getElementById('btn-map-zoom-out');
+    if (inn && !inn._zoomBound) {
+        inn._zoomBound = true;
+        inn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (map) map.zoomIn();
+        });
+    }
+    if (out && !out._zoomBound) {
+        out._zoomBound = true;
+        out.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (map) map.zoomOut();
+        });
+    }
+}
+window.patracMapZoomIn = function() { if (map) map.zoomIn(); };
+window.patracMapZoomOut = function() { if (map) map.zoomOut(); };
 
 function setMapNavTarget(lat, lng, label) {
     mapNavTarget = { lat: lat, lng: lng, label: label || 'Cíl' };

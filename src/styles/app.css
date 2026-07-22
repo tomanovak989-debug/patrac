@@ -1202,6 +1202,42 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     pointer-events: none;
 }
 #map-tool-fabs.visible { display: flex; }
+/* Jednoprstý zoom — pravý dolní roh nad spodní lištou */
+#map-zoom-controls {
+    display: none;
+    position: fixed;
+    right: 8px;
+    bottom: 58px;
+    z-index: 1002;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+}
+#map-zoom-controls.visible { display: flex; }
+.map-zoom-btn {
+    width: 46px; height: 46px;
+    border-radius: 2px;
+    border: 1px solid var(--hud-border);
+    background: var(--hud-bg);
+    color: var(--badge-fg);
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: var(--neon-glow);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+.map-zoom-btn:active {
+    background: var(--panel-bg-alt);
+}
 .map-tool-fab {
     width: 52px; height: 52px;
     border-radius: 2px;
@@ -2267,6 +2303,8 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
         top: 38px; left: 50px; right: 64px; gap: 3px;
     }
     #map-tool-fabs { bottom: 104px; right: 6px; }
+    #map-zoom-controls { bottom: 52px; right: 6px; }
+    .map-zoom-btn { width: 42px; height: 42px; font-size: 24px; }
     .map-tool-fab { width: 46px; height: 46px; font-size: 20px; }
     .map-tac-tile { padding: 3px 5px; }
     .map-tac-value { font-size: 11px; margin-top: 1px; }

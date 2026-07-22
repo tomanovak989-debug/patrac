@@ -475,6 +475,11 @@ function teardownGameUiForGate() {
 
     var fabs = document.getElementById('map-tool-fabs');
     if (fabs) fabs.classList.remove('visible');
+    var zoom = document.getElementById('map-zoom-controls');
+    if (zoom) {
+        zoom.classList.remove('visible');
+        zoom.setAttribute('aria-hidden', 'true');
+    }
     var tactical = document.getElementById('map-tactical-hud');
     if (tactical) tactical.classList.remove('visible');
 
