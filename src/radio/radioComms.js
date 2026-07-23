@@ -257,6 +257,7 @@ function migrateNotebook(raw) {
     if (raw && Array.isArray(raw.station)) {
         if (!raw.pageIndex) raw.pageIndex = { station: 0, notes: 0, grids: 0 };
         if (!Array.isArray(raw.notes)) raw.notes = [];
+        else raw.notes = normalizeNotesList(raw.notes);
         if (!Array.isArray(raw.grids)) raw.grids = [];
         if (raw.pageIndex.grids == null) raw.pageIndex.grids = 0;
         return raw;
@@ -456,6 +457,133 @@ export function expandPlainNotebookLines(items, charsPerLine) {
         for (j = 0; j < wrapped.length; j++) out.push(wrapped[j]);
     }
     return out;
+}
+
+export function normalizeNoteEntry(raw) {
+    if (raw == null) return null;
+    if (typeof raw === 'string') {
+        var t = raw.trim();
+        if (!t) return null;
+        return { id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), text: t, ts: Date.now() };
+    }
+    if (typeof raw !== 'object') return null;
+    var text = String(raw.text != null ? raw.text : raw).trim();
+    if (!text) return null;
+    return {
+        id: raw.id || ('note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)),
+        text: text,
+        ts: typeof raw.ts === 'number' ? raw.ts : Date.now()
+    };
+}
+
+export function normalizeNotesList(list) {
+    var out = [];
+    if (!Array.isArray(list)) return out;
+    for (var i = 0; i < list.length; i++) {
+        var n = normalizeNoteEntry(list[i]);
+        if (n) out.push(n);
+    }
+    return out;
+}
+
+export function formatNoteLine(note) {
+    note = normalizeNoteEntry(note);
+    if (!note) return '';
+    return formatTime(note.ts) + '  ' + note.text;
+}
+
+export function expandNotesToVisualLines(notes, charsPerLine) {
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    notes = normalizeNotesList(notes);
+    var out = [];
+    for (var i = 0; i < notes.length; i++) {
+        var wrapped = wrapNotebookText(formatNoteLine(notes[i]), charsPerLine);
+        for (var j = 0; j < wrapped.length; j++) {
+            out.push({
+                text: wrapped[j],
+                noteId: notes[i].id,
+                entryIndex: i,
+                wrapPart: j,
+                isFirst: j === 0
+            });
+        }
+    }
+    return out;
+}
+
+export function getNotesVisualPageCount(notebook, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var count = expandNotesToVisualLines((notebook && notebook.notes) || [], charsPerLine).length;
+    return Math.max(1, Math.ceil(count / linesPerPage) || 1);
+}
+
+export function getNotesVisualPageLines(notebook, pageIndex, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var all = expandNotesToVisualLines((notebook && notebook.notes) || [], charsPerLine);
+    var start = pageIndex * linesPerPage;
+    return all.slice(start, start + linesPerPage);
+}
+
+export function getNotesVisualPageIndexForEntry(notebook, entryIndex, linesPerPage, charsPerLine) {
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    var all = expandNotesToVisualLines((notebook && notebook.notes) || [], charsPerLine);
+    for (var i = all.length - 1; i >= 0; i--) {
+        if (all[i].entryIndex === entryIndex) return Math.floor(i / linesPerPage);
+    }
+    return getNotesVisualPageCount(notebook, linesPerPage, charsPerLine) - 1;
+}
+
+/** Smaže poznámky začínající na posledním listu. */
+export function removeLastNotesPage(notebook, linesPerPage, charsPerLine) {
+    notebook = notebook || { notes: [] };
+    notebook.notes = normalizeNotesList(notebook.notes);
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    if (!notebook.notes.length) return { removed: 0, notebook: notebook };
+
+    var all = expandNotesToVisualLines(notebook.notes, charsPerLine);
+    var pageCount = Math.max(1, Math.ceil(all.length / linesPerPage));
+    if (pageCount <= 1) {
+        var removedAll = notebook.notes.length;
+        notebook.notes = [];
+        return { removed: removedAll, notebook: notebook };
+    }
+    var startLine = (pageCount - 1) * linesPerPage;
+    var drop = {};
+    for (var i = startLine; i < all.length; i++) {
+        if (all[i] && all[i].isFirst) drop[all[i].entryIndex] = true;
+    }
+    var next = [];
+    var removed = 0;
+    for (var j = 0; j < notebook.notes.length; j++) {
+        if (drop[j]) { removed++; continue; }
+        next.push(notebook.notes[j]);
+    }
+    notebook.notes = next;
+    return { removed: removed, notebook: notebook };
+}
+
+export function trimNotesToMaxPages(notebook, maxPages, linesPerPage, charsPerLine) {
+    notebook = notebook || { notes: [] };
+    notebook.notes = normalizeNotesList(notebook.notes);
+    maxPages = maxPages || NOTEBOOK_MAX_PAGES;
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    var guard = 0;
+    while (guard++ < 2000) {
+        var pages = getNotesVisualPageCount(notebook, linesPerPage, charsPerLine);
+        if (pages <= maxPages || !notebook.notes.length) break;
+        notebook.notes.shift();
+    }
+    return notebook;
+}
+
+export function deleteNoteById(notebook, noteId) {
+    notebook = notebook || { notes: [] };
+    notebook.notes = normalizeNotesList(notebook.notes);
+    var before = notebook.notes.length;
+    notebook.notes = notebook.notes.filter(function(n) { return n.id !== noteId; });
+    return { removed: before - notebook.notes.length, notebook: notebook };
 }
 
 export function expandStationEntriesToVisualLines(entries, charsPerLine) {

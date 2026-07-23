@@ -34,7 +34,15 @@ import {
     getStationVisualPageLines,
     getStationVisualPageIndexForEntry,
     removeLastStationPage,
-    trimStationToMaxPages
+    trimStationToMaxPages,
+    normalizeNoteEntry,
+    normalizeNotesList,
+    getNotesVisualPageCount,
+    getNotesVisualPageLines,
+    getNotesVisualPageIndexForEntry,
+    removeLastNotesPage,
+    trimNotesToMaxPages,
+    deleteNoteById
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
 import {
@@ -60,6 +68,7 @@ var flipTimer = null;
 function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
     if (!Array.isArray(notebook.grids)) notebook.grids = [];
+    notebook.notes = normalizeNotesList(notebook.notes);
 }
 
 /**
@@ -202,6 +211,8 @@ function updateInputForMode() {
     } else if (state.keypadMode === 'encrypt') {
         input.placeholder = 'Šifrovací heslo (slovo)…';
         input.value = state.dialBuffer || '';
+    } else if (activeNotebookTab === 'notes') {
+        input.placeholder = 'Poznámka do sešitu…';
     } else {
         input.placeholder = 'Hlášení…';
     }
@@ -277,7 +288,9 @@ function renderNotebook(options) {
 
     var pageCount = activeNotebookTab === 'station'
         ? getStationVisualPageCount(notebook, linesPerPage, charsPerLine)
-        : getNotebookPageCount(notebook, activeNotebookTab, linesPerPage);
+        : (activeNotebookTab === 'notes'
+            ? getNotesVisualPageCount(notebook, linesPerPage, charsPerLine)
+            : getNotebookPageCount(notebook, activeNotebookTab, linesPerPage));
 
     if (pageIdx >= pageCount) {
         pageIdx = pageCount - 1;
@@ -285,22 +298,39 @@ function renderNotebook(options) {
     }
 
     if (activeNotebookTab === 'notes') {
-        var items = notebook.notes || [];
-        if (!items.length) {
-            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — zatím prázdné.<br>Rychlé poznámky přibydou v další verzi.</p>';
-        } else {
-            var visualLines = expandPlainNotebookLines(items, charsPerLine);
-            var itemsHtml = '';
-            for (var n = 0; n < visualLines.length; n++) {
-                itemsHtml += '<div class="radio-notebook-line">' + visualLines[n] + '</div>';
-            }
-            box.innerHTML = itemsHtml;
+        var notesCount = getNotesVisualPageCount(notebook, linesPerPage, charsPerLine);
+        if (pageIdx >= notesCount) {
+            pageIdx = notesCount - 1;
+            setCurrentPageIndex(pageIdx);
         }
-        if (pageNum) pageNum.textContent = '';
-        if (pageLabel) pageLabel.textContent = NOTEBOOK_TAB_LABELS.notes || 'Poznámky';
-        if (prevBtn) prevBtn.disabled = true;
-        if (nextBtn) nextBtn.disabled = true;
-        if (tearBtn) tearBtn.style.display = 'none';
+        var noteLines = getNotesVisualPageLines(notebook, pageIdx, linesPerPage, charsPerLine);
+        if (!noteLines.length && pageIdx === 0) {
+            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — vlastní zápisky.<br>Napiš text do „Hlášení…“ a ENT, nebo klepni ✕ u řádku.</p>';
+        } else {
+            var notesHtml = '';
+            for (var ni = 0; ni < noteLines.length; ni++) {
+                var nl = noteLines[ni];
+                var ncls = 'radio-notebook-line radio-notebook-line-note';
+                if (!nl.isFirst) ncls += ' radio-notebook-line-cont';
+                notesHtml += '<div class="' + ncls + '" data-note-id="' + nl.noteId + '">';
+                if (nl.isFirst) {
+                    notesHtml += '<button type="button" class="radio-note-del" data-note-id="' + nl.noteId + '" title="Smazat poznámku">✕</button>';
+                }
+                notesHtml += '<span class="radio-note-text">' + escapeHtml(nl.text) + '</span></div>';
+            }
+            box.innerHTML = notesHtml;
+            bindNoteDeleteButtons(box);
+        }
+        if (pageNum) pageNum.textContent = String(pageIdx + 1);
+        if (pageLabel) pageLabel.textContent = 'Poznámky · ' + (pageIdx + 1) + ' / ' + notesCount;
+        if (prevBtn) prevBtn.disabled = pageIdx <= 0;
+        if (nextBtn) nextBtn.disabled = pageIdx >= notesCount - 1;
+        if (tearBtn) {
+            tearBtn.style.display = '';
+            tearBtn.disabled = !(notebook.notes && notebook.notes.length);
+            tearBtn.title = 'Vytrhnout poslední list poznámek';
+        }
+        updateInputForMode();
         return;
     }
 
@@ -326,10 +356,65 @@ function renderNotebook(options) {
     if (nextBtn) nextBtn.disabled = pageIdx >= pageCount - 1;
     if (tearBtn) {
         tearBtn.style.display = '';
+        tearBtn.title = 'Vytrhnout poslední list';
         var hasTearable = (notebook.station || []).some(function(e) {
             return e && e.id !== 'sys_welcome';
         });
         tearBtn.disabled = !hasTearable;
+    }
+}
+
+function escapeHtml(str) {
+    return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function bindNoteDeleteButtons(box) {
+    if (!box) return;
+    var btns = box.querySelectorAll('.radio-note-del');
+    for (var i = 0; i < btns.length; i++) {
+        if (btns[i]._noteDelBound) continue;
+        btns[i]._noteDelBound = true;
+        btns[i].addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var id = this.getAttribute('data-note-id');
+            if (!id) return;
+            if (!confirm('Smazat tuto poznámku?')) return;
+            var result = deleteNoteById(notebook, id);
+            notebook = result.notebook;
+            persist();
+            renderNotebook();
+        });
+    }
+}
+
+function addNoteEntry(text) {
+    text = String(text || '').trim();
+    if (!text) return;
+    ensureNotebookMeta();
+    var layout = stationPageMetrics();
+    var note = normalizeNoteEntry({ text: text, ts: Date.now() });
+    if (!note) return;
+    if (!notebook.notes) notebook.notes = [];
+    notebook.notes.push(note);
+    trimNotesToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+    var entryIndex = notebook.notes.length - 1;
+    var pageForEntry = getNotesVisualPageIndexForEntry(notebook, entryIndex, layout.linesPerPage, layout.charsPerLine);
+    activeNotebookTab = 'notes';
+    syncNotebookTabs();
+    persist();
+    if (pageForEntry > getCurrentPageIndex()) {
+        triggerPageFlip(function() {
+            setCurrentPageIndex(pageForEntry);
+            renderNotebook();
+        }, 1);
+    } else {
+        setCurrentPageIndex(pageForEntry);
+        renderNotebook();
     }
 }
 
@@ -358,16 +443,16 @@ function bindGridCopyButtons(box) {
 }
 
 function goNotebookPage(delta) {
-    if (activeNotebookTab === 'notes') return;
     var layout = stationPageMetrics();
     var pageCount = activeNotebookTab === 'grids'
         ? getGridPageCount(layout.linesPerPage)
         : (activeNotebookTab === 'station'
             ? getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine)
-            : getNotebookPageCount(notebook, activeNotebookTab, layout.linesPerPage));
+            : (activeNotebookTab === 'notes'
+                ? getNotesVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine)
+                : getNotebookPageCount(notebook, activeNotebookTab, layout.linesPerPage)));
     var next = getCurrentPageIndex() + delta;
     if (next < 0 || next >= pageCount) return;
-    /* Nejdřív odklopit aktuální list, teprve pak vyměnit obsah. */
     triggerPageFlip(function() {
         setCurrentPageIndex(next);
         persist();
@@ -376,8 +461,23 @@ function goNotebookPage(delta) {
 }
 
 function tearLastStationPage() {
-    if (activeNotebookTab !== 'station') return;
     var layout = stationPageMetrics();
+    if (activeNotebookTab === 'notes') {
+        var notePages = getNotesVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
+        var noteMsg = notePages <= 1
+            ? 'Smazat všechny poznámky?'
+            : 'Vytrhnout poslední list poznámek (list ' + notePages + ')?';
+        if (!confirm(noteMsg)) return;
+        var noteResult = removeLastNotesPage(notebook, layout.linesPerPage, layout.charsPerLine);
+        notebook = noteResult.notebook;
+        trimNotesToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+        var noteCount = getNotesVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
+        if (getCurrentPageIndex() >= noteCount) setCurrentPageIndex(Math.max(0, noteCount - 1));
+        persist();
+        renderNotebook();
+        return;
+    }
+    if (activeNotebookTab !== 'station') return;
     var pages = getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
     var msg = pages <= 1
         ? 'Smazat všechny záznamy na staničním listu?'
@@ -658,6 +758,12 @@ function saveToPresetSlot(slot) {
 async function transmitMessage(text) {
     text = String(text || '').trim();
     if (!text) return;
+
+    if (activeNotebookTab === 'notes' && state.keypadMode === 'tx') {
+        addNoteEntry(text);
+        return;
+    }
+
     if (!state.frequency) {
         alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');
         return;
@@ -848,6 +954,7 @@ function bindKeypad() {
             activeNotebookTab = this.getAttribute('data-tab') || 'station';
             if (activeNotebookTab === 'grids') setCurrentPageIndex(0);
             syncNotebookTabs();
+            updateInputForMode();
             renderNotebook();
         });
     }
