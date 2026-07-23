@@ -233,8 +233,8 @@ body.admin-editing-player .hud-center-panel {
 body.admin-mode .operator-shelter-section { display: block; }
 .operator-clan-section { display: none; margin-bottom: 12px; }
 body.admin-mode .operator-clan-section { display: block; }
-.admin-only-section { display: none; }
-body.admin-mode .admin-only-section { display: block; }
+.admin-only-section { display: none !important; }
+body.admin-mode .admin-only-section { display: block !important; }
 
 .qdef-toolbar {
     display: flex; align-items: center; justify-content: space-between;

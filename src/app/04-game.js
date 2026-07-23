@@ -1239,6 +1239,9 @@ function updateAdminBar() {
     if (fogOfWarMod && fogOfWarMod.syncFogAdminControls) fogOfWarMod.syncFogAdminControls();
     updateAdminFogButtonUi();
     patracRefreshFogOfWar();
+    if (typeof window.patracRefreshQuestAdmin === 'function') {
+        try { window.patracRefreshQuestAdmin(); } catch (eQ) {}
+    }
 }
 
 function renderOperatorMemberList() {

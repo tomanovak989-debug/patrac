@@ -337,7 +337,7 @@ function renderStoryPositionsContent() {
 
 var QUEST_SECTION_DEFAULTS = {
     'active-orders': true,
-    'quest-defs': false,
+    'quest-defs': true,
     'custom-form': false,
     'story-positions': true
 };
