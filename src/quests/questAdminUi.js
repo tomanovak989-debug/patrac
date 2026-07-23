@@ -1,22 +1,23 @@
 /**
- * Admin UI — katalog definic questů (atributy 1–7).
+ * Admin UI — Quest Line Editor (katalog definic).
  */
 import {
     QUEST_TYPE_MAIN,
     QUEST_TYPE_SIDE,
-    QUEST_TYPE_LABELS,
     OBJECTIVE_LABELS,
     RADIO_RANGE_PRESETS_KM,
-    createEmptyQuestDefinition,
     normalizeQuestDefinition,
     normalizeQuestDefinitionList,
     suggestQuestIdFromName,
-    definitionToRuntimeQuest
+    definitionToRuntimeQuest,
+    findQuestDefinitionById
 } from './questDefinition.js';
 
 var STORAGE_KEY = 'quest_definitions_list';
 var editingId = null;
+var listFilter = 'all';
 var bound = false;
+var mgrsMod = null;
 
 function el(id) {
     return document.getElementById(id);
@@ -41,8 +42,6 @@ function saveDefinitions(list) {
     }
     if (typeof window.syncCommunityQuestsToCloud === 'function') {
         window.syncCommunityQuestsToCloud();
-    } else if (typeof window.patracSyncCommunityQuests === 'function') {
-        window.patracSyncCommunityQuests();
     }
     return list;
 }
@@ -57,6 +56,39 @@ function setVal(id, value) {
     if (node) node.value = value == null ? '' : String(value);
 }
 
+function escapeHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s) {
+    return escapeHtml(s).replace(/'/g, '&#39;');
+}
+
+function storyPrereqOptions() {
+    return [
+        { id: 'roxy', name: 'Útočiště (Roxy)' },
+        { id: 'sef', name: 'Zdroj vody (Šéf)' },
+        { id: 'herbert', name: 'Lesní sklad (Herbert)' },
+        { id: 'ino', name: 'Cvičiště (Ino)' },
+        { id: 'adam', name: 'Rozhledna (Adam)' }
+    ];
+}
+
+function resolvePrereqLabel(prereqId, defs) {
+    if (!prereqId) return '—';
+    var found = findQuestDefinitionById(defs, prereqId);
+    if (found) return found.name || found.id;
+    var story = storyPrereqOptions();
+    for (var i = 0; i < story.length; i++) {
+        if (story[i].id === prereqId) return story[i].name;
+    }
+    return prereqId;
+}
+
 function fillPrerequisiteOptions(selectedId, excludeId) {
     var sel = el('qdef-prereq');
     if (!sel) return;
@@ -69,20 +101,10 @@ function fillPrerequisiteOptions(selectedId, excludeId) {
         html += '<option value="' + escapeAttr(d.id) + '"' + selAttr + '>' +
             escapeHtml(d.name || d.id) + ' (' + escapeHtml(d.id) + ')</option>';
     }
-    /* Story questy jako možné prerekvizity */
-    var story = [
-        { id: 'roxy', name: 'Útočiště (Roxy)' },
-        { id: 'sef', name: 'Zdroj vody (Šéf)' },
-        { id: 'herbert', name: 'Lesní sklad (Herbert)' },
-        { id: 'ino', name: 'Cvičiště (Ino)' },
-        { id: 'adam', name: 'Rozhledna (Adam)' }
-    ];
+    var story = storyPrereqOptions();
     for (var s = 0; s < story.length; s++) {
         if (excludeId && story[s].id === excludeId) continue;
-        var already = false;
-        for (var j = 0; j < defs.length; j++) {
-            if (defs[j].id === story[s].id) { already = true; break; }
-        }
+        var already = !!findQuestDefinitionById(defs, story[s].id);
         if (already) continue;
         var selS = selectedId && story[s].id === selectedId ? ' selected' : '';
         html += '<option value="' + escapeAttr(story[s].id) + '"' + selS + '>' +
@@ -91,10 +113,10 @@ function fillPrerequisiteOptions(selectedId, excludeId) {
     sel.innerHTML = html;
 }
 
-function fillRangeOptions(selected) {
-    var sel = el('qdef-min-range');
+function fillRangeSelect(selId, selected, includeEmpty) {
+    var sel = el(selId);
     if (!sel) return;
-    var html = '<option value="">— bez limitu —</option>';
+    var html = includeEmpty ? '<option value="">— bez limitu —</option>' : '';
     for (var i = 0; i < RADIO_RANGE_PRESETS_KM.length; i++) {
         var km = RADIO_RANGE_PRESETS_KM[i];
         var selAttr = selected != null && Number(selected) === km ? ' selected' : '';
@@ -115,16 +137,119 @@ function fillObjectiveOptions(selected) {
     sel.innerHTML = html;
 }
 
-function escapeHtml(s) {
-    return String(s || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+function collectMapPoints() {
+    var points = [];
+    var storyIds = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
+    var labels = {
+        roxy: 'Útočiště',
+        sef: 'Zdroj vody',
+        herbert: 'Lesní sklad',
+        ino: 'Cvičiště',
+        adam: 'Rozhledna'
+    };
+    for (var i = 0; i < storyIds.length; i++) {
+        var id = storyIds[i];
+        var lat = parseFloat(localStorage.getItem('point_' + id + '_lat'));
+        var lng = parseFloat(localStorage.getItem('point_' + id + '_lng'));
+        if (isFinite(lat) && isFinite(lng)) {
+            points.push({ id: id, name: labels[id] || id, lat: lat, lng: lng });
+        }
+    }
+    try {
+        var custom = JSON.parse(localStorage.getItem('custom_quests_list') || '[]');
+        if (Array.isArray(custom)) {
+            for (var c = 0; c < custom.length; c++) {
+                var q = custom[c];
+                if (!q || !q.id) continue;
+                var clat = parseFloat(localStorage.getItem('point_' + q.id + '_lat'));
+                var clng = parseFloat(localStorage.getItem('point_' + q.id + '_lng'));
+                if (!isFinite(clat) || !isFinite(clng)) continue;
+                points.push({
+                    id: q.id,
+                    name: q.mapLabel || q.title || q.id,
+                    lat: clat,
+                    lng: clng
+                });
+            }
+        }
+    } catch (e) {}
+    try {
+        var pois = JSON.parse(localStorage.getItem('map_free_pois') || '[]');
+        if (Array.isArray(pois)) {
+            for (var p = 0; p < pois.length; p++) {
+                var poi = pois[p];
+                if (!poi || !poi.id || !isFinite(poi.lat) || !isFinite(poi.lng)) continue;
+                points.push({
+                    id: poi.id,
+                    name: poi.name || poi.id,
+                    lat: poi.lat,
+                    lng: poi.lng
+                });
+            }
+        }
+    } catch (e2) {}
+    return points;
 }
 
-function escapeAttr(s) {
-    return escapeHtml(s).replace(/'/g, '&#39;');
+function fillMapPointOptions(selectedId) {
+    var sel = el('qdef-map-point');
+    if (!sel) return;
+    var points = collectMapPoints();
+    var html = '<option value="">— žádný / ruční souřadnice —</option>';
+    for (var i = 0; i < points.length; i++) {
+        var pt = points[i];
+        var selAttr = selectedId && pt.id === selectedId ? ' selected' : '';
+        html += '<option value="' + escapeAttr(pt.id) + '"' + selAttr +
+            ' data-lat="' + pt.lat + '" data-lng="' + pt.lng + '">' +
+            escapeHtml(pt.name) + ' (' + escapeHtml(pt.id) + ')</option>';
+    }
+    sel.innerHTML = html;
+}
+
+function applyMapPointSelection() {
+    var sel = el('qdef-map-point');
+    if (!sel || !sel.value) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt) return;
+    var lat = opt.getAttribute('data-lat');
+    var lng = opt.getAttribute('data-lng');
+    if (lat != null) setVal('qdef-lat', lat);
+    if (lng != null) setVal('qdef-lng', lng);
+    fillMgrsFromLatLng();
+}
+
+function ensureMgrsMod(cb) {
+    if (mgrsMod) {
+        cb(mgrsMod);
+        return;
+    }
+    var importer = typeof window.patracImport === 'function' ? window.patracImport : null;
+    if (!importer) {
+        cb(null);
+        return;
+    }
+    importer('map/mgrsGrid.js').then(function(mod) {
+        mgrsMod = mod;
+        cb(mod);
+    }).catch(function() {
+        cb(null);
+    });
+}
+
+function fillMgrsFromLatLng() {
+    var lat = parseFloat(val('qdef-lat'));
+    var lng = parseFloat(val('qdef-lng'));
+    if (!isFinite(lat) || !isFinite(lng)) {
+        alert('Nejdřív vyplň LAT a LNG.');
+        return;
+    }
+    ensureMgrsMod(function(mod) {
+        if (!mod || typeof mod.mgrsAtLatLng !== 'function') {
+            alert('MGRS modul není dostupný.');
+            return;
+        }
+        setVal('qdef-mgrs', mod.mgrsAtLatLng(lat, lng, 5) || '');
+    });
 }
 
 function readForm() {
@@ -135,25 +260,32 @@ function readForm() {
     }
     var type = val('qdef-type') === QUEST_TYPE_MAIN ? QUEST_TYPE_MAIN : QUEST_TYPE_SIDE;
     var minRangeRaw = val('qdef-min-range');
+    var rewardRangeRaw = val('qdef-reward-range');
     return normalizeQuestDefinition({
         id: id,
         name: name,
         type: type,
         trigger: {
             prerequisiteQuestId: val('qdef-prereq') || null,
-            minRadioRangeKm: minRangeRaw === '' ? null : parseFloat(minRangeRaw)
+            minRadioRangeKm: minRangeRaw === '' ? null : parseFloat(minRangeRaw),
+            signalId: val('qdef-signal-id') || null,
+            signalFrequency: val('qdef-signal-freq') || null
         },
         content: {
             description: val('qdef-desc'),
             objectiveType: val('qdef-objective-type'),
-            objectiveText: val('qdef-objective-text')
+            objectiveText: val('qdef-objective-text'),
+            dispatchText: val('qdef-dispatch'),
+            applySignalGarble: !!(el('qdef-garble') && el('qdef-garble').checked)
         },
         rewards: {
             xp: val('qdef-xp'),
             reputation: val('qdef-reputation'),
             unlockFrequency: val('qdef-reward-freq') || null,
             unlockEncryptionKey: val('qdef-reward-key') || null,
-            itemName: val('qdef-reward-item') || null
+            itemName: val('qdef-reward-item') || null,
+            unlockRangeKm: rewardRangeRaw === '' ? null : parseFloat(rewardRangeRaw),
+            consequencesNote: val('qdef-consequences') || null
         },
         radio: {
             frequency: val('qdef-radio-freq') || null,
@@ -162,6 +294,8 @@ function readForm() {
         geo: {
             lat: val('qdef-lat') || null,
             lng: val('qdef-lng') || null,
+            mgrs: val('qdef-mgrs') || null,
+            mapPointId: val('qdef-map-point') || null,
             radiusM: val('qdef-radius') || null,
             timeLimitHours: val('qdef-time-limit') || null
         },
@@ -188,11 +322,37 @@ function writeForm(def) {
             id: '',
             name: '',
             type: QUEST_TYPE_SIDE,
-            trigger: { prerequisiteQuestId: null, minRadioRangeKm: null },
-            content: { description: '', objectiveType: 'location', objectiveText: '' },
-            rewards: { xp: 0, reputation: 0, unlockFrequency: null, unlockEncryptionKey: null, itemName: null },
+            trigger: {
+                prerequisiteQuestId: null,
+                minRadioRangeKm: null,
+                signalId: null,
+                signalFrequency: null
+            },
+            content: {
+                description: '',
+                objectiveType: 'location',
+                objectiveText: '',
+                dispatchText: '',
+                applySignalGarble: true
+            },
+            rewards: {
+                xp: 0,
+                reputation: 0,
+                unlockFrequency: null,
+                unlockEncryptionKey: null,
+                itemName: null,
+                unlockRangeKm: null,
+                consequencesNote: null
+            },
             radio: { frequency: null, encryptionKey: null },
-            geo: { lat: null, lng: null, radiusM: null, timeLimitHours: null },
+            geo: {
+                lat: null,
+                lng: null,
+                mgrs: null,
+                mapPointId: null,
+                radiusM: null,
+                timeLimitHours: null
+            },
             char: '',
             mapLabel: ''
         };
@@ -207,20 +367,29 @@ function writeForm(def) {
     setVal('qdef-map-label', def.mapLabel || '');
     setVal('qdef-desc', def.content.description || '');
     setVal('qdef-objective-text', def.content.objectiveText || '');
+    setVal('qdef-dispatch', def.content.dispatchText || '');
+    var garbleCb = el('qdef-garble');
+    if (garbleCb) garbleCb.checked = def.content.applySignalGarble !== false;
+    setVal('qdef-signal-id', def.trigger.signalId || '');
+    setVal('qdef-signal-freq', def.trigger.signalFrequency || '');
     setVal('qdef-xp', def.rewards.xp || 0);
     setVal('qdef-reputation', def.rewards.reputation || 0);
     setVal('qdef-reward-freq', def.rewards.unlockFrequency || '');
     setVal('qdef-reward-key', def.rewards.unlockEncryptionKey || '');
     setVal('qdef-reward-item', def.rewards.itemName || '');
+    setVal('qdef-consequences', def.rewards.consequencesNote || '');
     setVal('qdef-radio-freq', def.radio.frequency || '');
     setVal('qdef-radio-key', def.radio.encryptionKey || '');
     setVal('qdef-lat', def.geo.lat != null ? def.geo.lat : '');
     setVal('qdef-lng', def.geo.lng != null ? def.geo.lng : '');
+    setVal('qdef-mgrs', def.geo.mgrs || '');
     setVal('qdef-radius', def.geo.radiusM != null ? def.geo.radiusM : '');
     setVal('qdef-time-limit', def.geo.timeLimitHours != null ? def.geo.timeLimitHours : '');
     fillObjectiveOptions(def.content.objectiveType);
-    fillRangeOptions(def.trigger.minRadioRangeKm);
+    fillRangeSelect('qdef-min-range', def.trigger.minRadioRangeKm, true);
+    fillRangeSelect('qdef-reward-range', def.rewards.unlockRangeKm, true);
     fillPrerequisiteOptions(def.trigger.prerequisiteQuestId, def.id || null);
+    fillMapPointOptions(def.geo.mapPointId);
     var idInput = el('qdef-id');
     if (idInput) idInput.readOnly = !!editingId;
     var title = el('qdef-form-title');
@@ -233,26 +402,49 @@ function asStringSafe(v) {
 
 function renderList() {
     var box = el('qdef-list');
+    var countEl = el('qdef-count');
     if (!box) return;
     var defs = loadDefinitions();
+    var filtered = defs.filter(function(d) {
+        if (listFilter === 'main') return d.type === QUEST_TYPE_MAIN;
+        if (listFilter === 'side') return d.type === QUEST_TYPE_SIDE;
+        return true;
+    });
+    if (countEl) {
+        countEl.textContent = filtered.length + ' / ' + defs.length;
+    }
     if (!defs.length) {
         box.innerHTML = '<p class="qdef-empty">Zatím žádné definice. Vytvoř první quest níže.</p>';
         return;
     }
+    if (!filtered.length) {
+        box.innerHTML = '<p class="qdef-empty">Žádné questy v tomto filtru.</p>';
+        return;
+    }
     var html = '';
-    for (var i = 0; i < defs.length; i++) {
-        var d = defs[i];
+    for (var i = 0; i < filtered.length; i++) {
+        var d = filtered[i];
         var typeLabel = d.type === QUEST_TYPE_MAIN ? 'MAIN' : 'SIDE';
         var typeClass = d.type === QUEST_TYPE_MAIN ? 'qdef-badge-main' : 'qdef-badge-side';
         var range = d.trigger.minRadioRangeKm != null ? (d.trigger.minRadioRangeKm + ' km') : '—';
-        var prereq = d.trigger.prerequisiteQuestId || '—';
+        var prereqId = d.trigger.prerequisiteQuestId || '';
+        var prereqLabel = resolvePrereqLabel(prereqId, defs);
+        var sig = d.trigger.signalId || d.trigger.signalFrequency || '—';
+        var mgrs = d.geo.mgrs || '—';
         html += '<div class="qdef-row' + (editingId === d.id ? ' is-active' : '') + '" data-id="' + escapeAttr(d.id) + '">' +
             '<div class="qdef-row-main">' +
             '<span class="qdef-badge ' + typeClass + '">' + typeLabel + '</span> ' +
             '<strong>' + escapeHtml(d.name || d.id) + '</strong>' +
             '<div class="qdef-row-meta">id: ' + escapeHtml(d.id) +
-            ' · prerekv.: ' + escapeHtml(prereq) +
-            ' · dosah: ' + escapeHtml(range) + '</div>' +
+            ' · dosah: ' + escapeHtml(range) +
+            ' · signál: ' + escapeHtml(sig) +
+            ' · MGRS: ' + escapeHtml(mgrs) + '</div>' +
+            '<div class="qdef-row-meta">prerekv.: ' +
+            (prereqId
+                ? ('<button type="button" class="qdef-link" data-act="goto-prereq" data-prereq="' +
+                    escapeAttr(prereqId) + '">' + escapeHtml(prereqLabel) + '</button>')
+                : '—') +
+            '</div>' +
             '</div>' +
             '<div class="qdef-row-actions">' +
             '<button type="button" class="qdef-btn" data-act="edit">Upravit</button>' +
@@ -283,7 +475,6 @@ function saveFromForm() {
         return;
     }
     if (idx === -1 && editingId) {
-        /* rename id: remove old */
         list = list.filter(function(d) { return d.id !== editingId; });
         def.createdAt = Date.now();
         list.push(def);
@@ -311,11 +502,7 @@ function deleteDefinition(id) {
 }
 
 function activateDefinition(id) {
-    var def = null;
-    var list = loadDefinitions();
-    for (var i = 0; i < list.length; i++) {
-        if (list[i].id === id) { def = list[i]; break; }
-    }
+    var def = findQuestDefinitionById(loadDefinitions(), id);
     if (!def) return;
     var runtime = definitionToRuntimeQuest(def);
     if (!runtime) return;
@@ -345,7 +532,13 @@ function activateDefinition(id) {
             localStorage.setItem('point_' + def.id + '_lng', String(def.geo.lng));
         } catch (e3) {}
         if (typeof window.renderPointOnMap === 'function') {
-            window.renderPointOnMap(def.id, def.geo.lat, def.geo.lng, def.mapLabel || def.name, def.content.description);
+            window.renderPointOnMap(
+                def.id,
+                def.geo.lat,
+                def.geo.lng,
+                def.mapLabel || def.name,
+                def.content.description
+            );
         }
     }
 
@@ -360,13 +553,32 @@ function resetForm() {
     writeForm(null);
 }
 
+function openDefinition(id) {
+    var def = findQuestDefinitionById(loadDefinitions(), id);
+    if (!def) {
+        /* story prereq bez definice — jen info */
+        alert('„' + id + '“ není v katalogu definic (story quest / jiný odkaz).');
+        return;
+    }
+    writeForm(def);
+    renderList();
+    var form = el('qdef-form-title');
+    if (form && form.scrollIntoView) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 function onListClick(e) {
     var btn = e.target.closest('[data-act]');
     var row = e.target.closest('.qdef-row');
+    if (!btn && !row) return;
+    var act = btn ? btn.getAttribute('data-act') : 'edit';
+    if (act === 'goto-prereq') {
+        e.preventDefault();
+        openDefinition(btn.getAttribute('data-prereq'));
+        return;
+    }
     if (!row) return;
     var id = row.getAttribute('data-id');
     if (!id) return;
-    var act = btn ? btn.getAttribute('data-act') : 'edit';
     if (act === 'delete') {
         deleteDefinition(id);
         return;
@@ -375,14 +587,7 @@ function onListClick(e) {
         activateDefinition(id);
         return;
     }
-    var list = loadDefinitions();
-    for (var i = 0; i < list.length; i++) {
-        if (list[i].id === id) {
-            writeForm(list[i]);
-            renderList();
-            break;
-        }
-    }
+    openDefinition(id);
 }
 
 function bindUi() {
@@ -401,6 +606,25 @@ function bindUi() {
         resetForm();
         renderList();
     });
+    var filter = el('qdef-filter-type');
+    if (filter) {
+        filter.value = listFilter;
+        filter.addEventListener('change', function() {
+            listFilter = filter.value || 'all';
+            renderList();
+        });
+    }
+    var mapPoint = el('qdef-map-point');
+    if (mapPoint) {
+        mapPoint.addEventListener('change', applyMapPointSelection);
+    }
+    var mgrsBtn = el('qdef-mgrs-fill');
+    if (mgrsBtn) {
+        mgrsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            fillMgrsFromLatLng();
+        });
+    }
     var nameInput = el('qdef-name');
     if (nameInput) {
         nameInput.addEventListener('blur', function() {
@@ -414,14 +638,12 @@ function bindUi() {
 
 export function refreshQuestAdminUi() {
     bindUi();
+    var filter = el('qdef-filter-type');
+    if (filter) filter.value = listFilter;
     renderList();
     if (!editingId) resetForm();
     else {
-        var list = loadDefinitions();
-        var found = null;
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].id === editingId) { found = list[i]; break; }
-        }
+        var found = findQuestDefinitionById(loadDefinitions(), editingId);
         if (found) writeForm(found);
         else resetForm();
     }

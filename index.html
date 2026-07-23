@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e51" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e53" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -534,8 +534,18 @@
                 </button>
                 <div id="section-quest-defs" class="quest-section-body">
                     <p style="font-size:var(--text-sm);color:var(--muted-fg);margin:0 0 8px 0;">
-                        Katalog misí: Main/Side, spouštěče, rádio, odměny, geografie. „Aktivovat“ přidá quest do aktivních rozkazů.
+                        Katalog misí (Quest Line Editor). Automatické spouštění podle dosahu přijde později — teď správa definic + „Aktivovat“.
                     </p>
+                    <div class="qdef-toolbar">
+                        <label>Filtr
+                            <select id="qdef-filter-type">
+                                <option value="all">Vše</option>
+                                <option value="main">Main</option>
+                                <option value="side">Side</option>
+                            </select>
+                        </label>
+                        <span id="qdef-count" class="qdef-count"></span>
+                    </div>
                     <div id="qdef-list" class="qdef-list"></div>
                     <div class="quest-card card-tone-operator qdef-form" style="border-color:var(--danger-orange);margin-top:10px;">
                         <div class="quest-section-title" id="qdef-form-title" style="margin-top:0;color:var(--danger-orange);">＋ Nový quest</div>
@@ -560,15 +570,29 @@
                             <div class="form-group"><label>PREREKVIZITA (předchozí quest)</label><select id="qdef-prereq"></select></div>
                             <div class="form-group"><label>MIN. RÁDIOVÝ DOSAH</label><select id="qdef-min-range"></select></div>
                         </div>
+                        <div class="qdef-grid-2">
+                            <div class="form-group"><label>SIGNAL ID (éter)</label><input type="text" id="qdef-signal-id" placeholder="např. SIG-07 / callsign"></div>
+                            <div class="form-group"><label>ZACHYCENÁ FREKVENCE</label><input type="text" id="qdef-signal-freq" placeholder="462.550"></div>
+                        </div>
 
                         <div class="quest-section-title" style="font-size:var(--text-sm);">📜 OBSAH</div>
-                        <div class="form-group"><label>POPIS / NARATIV</label><textarea id="qdef-desc" rows="3" placeholder="Text pro hráče…"></textarea></div>
+                        <div class="form-group"><label>POPIS / NARATIV</label><textarea id="qdef-desc" rows="3" placeholder="Text pro hráče v seznamu úkolů…"></textarea></div>
                         <div class="qdef-grid-2">
                             <div class="form-group"><label>TYP CÍLE</label><select id="qdef-objective-type"></select></div>
                             <div class="form-group"><label>CÍL (detail)</label><input type="text" id="qdef-objective-text" placeholder="Co musí hráč udělat"></div>
                         </div>
 
-                        <div class="quest-section-title" style="font-size:var(--text-sm);">🎁 ODMĚNY</div>
+                        <div class="quest-section-title" style="font-size:var(--text-sm);">📻 ZADÁNÍ A TEXT DEPEŠE</div>
+                        <div class="form-group">
+                            <label>TEXT DEPEŠE (co rádio přehrává / zobrazí)</label>
+                            <textarea id="qdef-dispatch" rows="4" placeholder="Plný plaintext hlášení. Při slabém signálu se ořízne / rozpadne podle matice dosahu."></textarea>
+                        </div>
+                        <label class="qdef-check">
+                            <input type="checkbox" id="qdef-garble" checked>
+                            Uplatnit ořez / útržky / šum podle vzdálenosti (matice 5 / 7,5 / 10 / 12,5 km)
+                        </label>
+
+                        <div class="quest-section-title" style="font-size:var(--text-sm);">🎁 ODMĚNY A DŮSLEDKY</div>
                         <div class="qdef-grid-2">
                             <div class="form-group"><label>XP</label><input type="number" id="qdef-xp" min="0" step="1" value="0"></div>
                             <div class="form-group"><label>REPUTACE</label><input type="number" id="qdef-reputation" min="0" step="1" value="0"></div>
@@ -577,18 +601,30 @@
                             <div class="form-group"><label>ODEMKNE FREKVENCI</label><input type="text" id="qdef-reward-freq" placeholder="462.550"></div>
                             <div class="form-group"><label>ODEMKNE ŠIFRU / KLÍČ</label><input type="text" id="qdef-reward-key" placeholder="heslo"></div>
                         </div>
-                        <div class="form-group"><label>PŘEDMĚT DO INVENTÁŘE</label><input type="text" id="qdef-reward-item" placeholder="Název předmětu"></div>
+                        <div class="qdef-grid-2">
+                            <div class="form-group"><label>TALISMAN / PŘEDMĚT</label><input type="text" id="qdef-reward-item" placeholder="Název předmětu"></div>
+                            <div class="form-group"><label>ODEMKNE DOSAH (km)</label><select id="qdef-reward-range"></select></div>
+                        </div>
+                        <div class="form-group"><label>DŮSLEDEK / POZNÁMKA K PŘÍBĚHU</label><textarea id="qdef-consequences" rows="2" placeholder="Posun příběhu, odemčení oblasti…"></textarea></div>
 
-                        <div class="quest-section-title" style="font-size:var(--text-sm);">📡 RÁDIOVÝ KONTEXT</div>
+                        <div class="quest-section-title" style="font-size:var(--text-sm);">📡 RÁDIOVÝ KONTEXT MISE</div>
                         <div class="qdef-grid-2">
                             <div class="form-group"><label>FREKVENCE MISE</label><input type="text" id="qdef-radio-freq" placeholder="462.550"></div>
                             <div class="form-group"><label>ŠIFRA / KLÍČ</label><input type="text" id="qdef-radio-key" placeholder="PT = prázdné"></div>
                         </div>
 
                         <div class="quest-section-title" style="font-size:var(--text-sm);">📍 GEOGRAFIE &amp; LOGISTIKA</div>
+                        <div class="form-group"><label>BOD NA MAPĚ (volitelně)</label><select id="qdef-map-point"></select></div>
                         <div class="qdef-grid-2">
                             <div class="form-group"><label>LAT</label><input type="number" id="qdef-lat" step="any" placeholder="49.77…"></div>
                             <div class="form-group"><label>LNG</label><input type="number" id="qdef-lng" step="any" placeholder="13.98…"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>MGRS</label>
+                            <div class="qdef-mgrs-row">
+                                <input type="text" id="qdef-mgrs" placeholder="33U VR …">
+                                <button type="button" class="qdef-btn" id="qdef-mgrs-fill" title="Spočítat z LAT/LNG">Z GPS</button>
+                            </div>
                         </div>
                         <div class="qdef-grid-2">
                             <div class="form-group"><label>RADIUS (m)</label><input type="number" id="qdef-radius" min="0" step="1" placeholder="80"></div>
@@ -856,14 +892,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e51';
+        window.PATRAC_BUILD = '20260723e53';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e51"></script>
-    <script src="src/app/02-quests.js?v=20260723e51"></script>
-    <script src="src/app/03-map.js?v=20260723e51"></script>
-    <script src="src/app/04-game.js?v=20260723e51"></script>
+    <script src="src/app/01-globals.js?v=20260723e53"></script>
+    <script src="src/app/02-quests.js?v=20260723e53"></script>
+    <script src="src/app/03-map.js?v=20260723e53"></script>
+    <script src="src/app/04-game.js?v=20260723e53"></script>
 </body>
 </html>

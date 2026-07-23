@@ -236,7 +236,23 @@ body.admin-mode .operator-clan-section { display: block; }
 .admin-only-section { display: none; }
 body.admin-mode .admin-only-section { display: block; }
 
-.qdef-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.qdef-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-bottom: 8px; font-size: var(--text-sm);
+}
+.qdef-toolbar select {
+    margin-left: 6px; font-family: inherit; font-size: var(--text-sm);
+    background: rgba(0,0,0,0.35); color: inherit; border: 1px solid rgba(255,85,0,0.4);
+    padding: 2px 6px;
+}
+.qdef-count { color: var(--muted-fg); font-size: var(--text-xxs); }
+.qdef-link {
+    appearance: none; border: 0; background: transparent; padding: 0;
+    color: var(--xp-blue); text-decoration: underline; cursor: pointer;
+    font: inherit; font-size: inherit;
+}
+.qdef-mgrs-row { display: flex; gap: 6px; align-items: center; }
+.qdef-mgrs-row input { flex: 1; }
 .qdef-empty { font-size: var(--text-sm); color: var(--muted-fg); margin: 0; }
 .qdef-row {
     display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;
@@ -268,6 +284,12 @@ body.admin-mode .admin-only-section { display: block; }
     display: flex; gap: 8px; margin-top: 10px;
 }
 .qdef-form-actions .btn-accept { flex: 1; }
+.qdef-check {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: var(--text-sm); color: var(--muted-fg);
+    margin: 0 0 10px 0; cursor: pointer;
+}
+.qdef-check input { margin-top: 2px; flex-shrink: 0; }
 .operator-member-row {
     display: flex; align-items: center; gap: 8px;
     padding: 8px; margin-bottom: 6px;
