@@ -1,9 +1,11 @@
 /**
- * Rádiové zprávy ve Firestore — kanál = hash(frekvence|šifra).
+ * Rádiové zprávy ve Firestore — kanál = frekvence (freq-first).
+ * Cesta: radio_freq/{f_400025}/messages/{msgId}
  */
 import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth } from '../services/authService.js';
+import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
 
 var channelUnsubs = {};
 
@@ -17,12 +19,14 @@ async function ensureRadioAuth() {
 
 export async function sendRadioTransmission(payload) {
     await ensureRadioAuth();
-    if (!payload || !payload.channelId) {
-        throw new Error('Chybí kanál vysílání.');
+    var freq = normalizeFrequency(payload && payload.frequency);
+    var channelId = (payload && payload.channelId) || frequencyChannelId(freq);
+    if (!freq || !channelId) {
+        throw new Error('Chybí frekvence vysílání.');
     }
     var docPayload = {
-        channelId: payload.channelId,
-        frequency: payload.frequency || '',
+        channelId: channelId,
+        frequency: freq,
         encryptionKey: payload.encryptionKey || '',
         scope: payload.scope || 'private',
         comCode: payload.comCode || '',
@@ -31,22 +35,38 @@ export async function sendRadioTransmission(payload) {
         text: String(payload.text || '').trim(),
         timestamp: payload.timestamp || Date.now()
     };
+    if (payload.originLat != null && payload.originLng != null &&
+        isFinite(Number(payload.originLat)) && isFinite(Number(payload.originLng))) {
+        docPayload.originLat = Number(payload.originLat);
+        docPayload.originLng = Number(payload.originLng);
+    }
     if (!docPayload.text) throw new Error('Prázdná zpráva.');
 
-    var col = collection(getDb(), 'radio_channels', payload.channelId, 'messages');
+    var col = collection(getDb(), 'radio_freq', channelId, 'messages');
     var ref = await addDoc(col, docPayload);
     return { id: ref.id, ...docPayload };
 }
 
-export function subscribeRadioChannels(channelIds, onMessage) {
+/**
+ * @param {string[]} frequenciesOrIds — normalizované frekvence („400.025“) nebo id („f_400025“)
+ */
+export function subscribeRadioChannels(frequenciesOrIds, onMessage) {
     stopRadioSubscriptions();
-    if (!Array.isArray(channelIds) || !channelIds.length) return;
+    if (!Array.isArray(frequenciesOrIds) || !frequenciesOrIds.length) return;
 
-    for (var i = 0; i < channelIds.length; i++) {
-        (function(channelId) {
+    for (var i = 0; i < frequenciesOrIds.length; i++) {
+        (function(raw) {
+            var freq = normalizeFrequency(raw);
+            var channelId = freq ? frequencyChannelId(freq) : String(raw || '');
             if (!channelId || channelUnsubs[channelId]) return;
+            if (!freq && channelId.indexOf('f_') === 0) {
+                /* id už je f_XXXXXX */
+            } else if (!freq) {
+                return;
+            }
+
             var q = query(
-                collection(getDb(), 'radio_channels', channelId, 'messages'),
+                collection(getDb(), 'radio_freq', channelId, 'messages'),
                 orderBy('timestamp', 'desc'),
                 limit(40)
             );
@@ -71,20 +91,22 @@ export function subscribeRadioChannels(channelIds, onMessage) {
                     onMessage({
                         id: msgId,
                         channelId: channelId,
-                        frequency: data.frequency,
+                        frequency: data.frequency || freq,
                         encryptionKey: data.encryptionKey,
                         scope: data.scope,
                         comCode: data.comCode,
                         senderId: data.senderId,
                         senderName: data.senderName,
                         text: data.text,
-                        timestamp: data.timestamp
+                        timestamp: data.timestamp,
+                        originLat: data.originLat,
+                        originLng: data.originLng
                     });
                 }
             }, function(err) {
                 console.warn('[radioService] subscribe', channelId, err);
             });
-        })(channelIds[i]);
+        })(frequenciesOrIds[i]);
     }
 }
 

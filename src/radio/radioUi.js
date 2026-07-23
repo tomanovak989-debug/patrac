@@ -10,11 +10,11 @@ import {
     buildDisplayLines,
     applyPreset,
     upsertPreset,
-    adjustFrequency,
+    cycleDialPreset,
     normalizeFrequency,
     normalizeEncryptionKey,
     classifyChannel,
-    collectKnownChannelIds,
+    collectTunedFrequencies,
     createOutgoingEntry,
     createIncomingEntry,
     communityFrequencyFromCode,
@@ -33,6 +33,12 @@ import {
     getStationVisualPageIndexForEntry
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
+import {
+    evaluateRadioReception,
+    applyReceptionToMessage,
+    noisePlaceholder,
+    SIGNAL_NOISE
+} from './radioPropagation.js';
 import {
     getGridPageCount,
     getGridPage,
@@ -96,13 +102,39 @@ function triggerPageFlip(thenRender, direction) {
     }, 200);
 }
 
+function getShelterLatLng() {
+    if (ctx.getShelterLatLng) {
+        try {
+            return ctx.getShelterLatLng();
+        } catch (e) {}
+    }
+    try {
+        var lat = parseFloat(localStorage.getItem('point_roxy_lat'));
+        var lng = parseFloat(localStorage.getItem('point_roxy_lng'));
+        if (isFinite(lat) && isFinite(lng)) return { lat: lat, lng: lng };
+    } catch (e2) {}
+    return null;
+}
+
+function getPlayerLatLng() {
+    if (ctx.getPlayerLatLng) {
+        try {
+            return ctx.getPlayerLatLng();
+        } catch (e) {}
+    }
+    return getShelterLatLng();
+}
+
 function getCtx() {
+    var shelter = getShelterLatLng();
     return {
         userId: ctx.getUserId ? ctx.getUserId() : '',
         playerName: ctx.getPlayerName ? ctx.getPlayerName() : 'Operativec',
         comCode: ctx.getComCode ? ctx.getComCode() : '',
         comName: ctx.getComName ? ctx.getComName() : '',
-        communityRadioKey: ctx.getCommunityRadioKey ? ctx.getCommunityRadioKey() : getCommunityRadioKey(ctx.getComCode && ctx.getComCode(), ctx.getComName && ctx.getComName())
+        communityRadioKey: ctx.getCommunityRadioKey ? ctx.getCommunityRadioKey() : getCommunityRadioKey(ctx.getComCode && ctx.getComCode(), ctx.getComName && ctx.getComName()),
+        originLat: shelter ? shelter.lat : null,
+        originLng: shelter ? shelter.lng : null
     };
 }
 
@@ -356,13 +388,45 @@ function recordEntry(entry) {
 
 function refreshSubscriptions() {
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
-    var ids = collectKnownChannelIds(state, getCtx());
-    subscribeRadioChannels(ids, function(payload) {
+    var freqs = collectTunedFrequencies(state);
+    subscribeRadioChannels(freqs, function(payload) {
         var c = getCtx();
         if (payload.senderId && payload.senderId === c.userId) return;
         if (seenMessageIds[payload.id]) return;
+
+        var origin = (payload.originLat != null && payload.originLng != null)
+            ? { lat: payload.originLat, lng: payload.originLng }
+            : null;
+        var receiver = getPlayerLatLng();
+        var reception = evaluateRadioReception(origin, receiver);
+        if (!reception.receivable) return;
+
+        var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
+        var myKey = normalizeEncryptionKey(state.encryptionKey || '');
+        var canRead = !msgKey || msgKey === myKey;
+
+        var applied;
+        if (!canRead) {
+            /* Stejná frekvence, cizí šifra → jen šum/anomálie (plné luštění = F3). */
+            applied = {
+                text: noisePlaceholder(payload.frequency),
+                signalQuality: SIGNAL_NOISE,
+                distanceKm: reception.distanceKm
+            };
+        } else {
+            applied = applyReceptionToMessage(payload.text, reception, {
+                seed: payload.id || payload.text,
+                frequency: payload.frequency
+            });
+        }
+        if (!applied) return;
+
         seenMessageIds[payload.id] = true;
-        var entry = createIncomingEntry(payload, c);
+        var entry = createIncomingEntry(Object.assign({}, payload, {
+            text: applied.text,
+            signalQuality: applied.signalQuality,
+            distanceKm: applied.distanceKm
+        }), c);
         recordEntry(entry);
     });
 }
@@ -371,7 +435,10 @@ function applyDialBuffer() {
     var input = el('chat-input-field');
     if (state.keypadMode === 'freq') {
         var raw = (state.dialBuffer || (input && input.value) || '').trim();
-        if (raw) state.frequency = normalizeFrequency(raw);
+        if (raw) {
+            state.frequency = normalizeFrequency(raw);
+            state.activePresetSlot = null;
+        }
     } else if (state.keypadMode === 'encrypt') {
         var keyRaw = (state.dialBuffer || (input && input.value) || '').trim();
         if (keyRaw) state.encryptionKey = normalizeEncryptionKey(keyRaw);
@@ -404,8 +471,8 @@ function saveToPresetSlot(slot) {
 async function transmitMessage(text) {
     text = String(text || '').trim();
     if (!text) return;
-    if (!state.frequency || !state.encryptionKey) {
-        alert('Nejdřív nalaď frekvenci (MODE → čísla) a zadej šifru (MODE → písmena).');
+    if (!state.frequency) {
+        alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');
         return;
     }
 
@@ -426,7 +493,9 @@ async function transmitMessage(text) {
             senderId: c.userId,
             senderName: c.playerName,
             text: text,
-            timestamp: entry.ts
+            timestamp: entry.ts,
+            originLat: c.originLat,
+            originLng: c.originLng
         });
     } catch (err) {
         console.warn('[radioUi] send', err);
@@ -487,11 +556,11 @@ function bindKeypad() {
     if (volUp && !volUp._radioCommsBound) {
         volUp._radioCommsBound = true;
         volUp.addEventListener('click', function() {
-            state.keypadMode = 'freq';
-            adjustFrequency(state, 0.025);
-            persist();
-            renderDisplay();
-            refreshSubscriptions();
+            if (cycleDialPreset(state, 1)) {
+                persist();
+                renderDisplay();
+                refreshSubscriptions();
+            }
         });
     }
 
@@ -499,15 +568,11 @@ function bindKeypad() {
     if (preUp && !preUp._radioCommsBound) {
         preUp._radioCommsBound = true;
         preUp.addEventListener('click', function() {
-            var slots = (state.presets || []).map(function(p) { return p.slot; }).sort(function(a, b) { return a - b; });
-            if (!slots.length) return;
-            var cur = state.activePresetSlot || slots[0];
-            var idx = slots.indexOf(cur);
-            var next = slots[(idx + 1) % slots.length];
-            applyPreset(state, next);
-            persist();
-            renderDisplay();
-            refreshSubscriptions();
+            if (cycleDialPreset(state, 1)) {
+                persist();
+                renderDisplay();
+                refreshSubscriptions();
+            }
         });
     }
 
@@ -532,17 +597,19 @@ function bindKeypad() {
             var key = btn.getAttribute('data-key');
 
             if (key === 'prev') {
-                adjustFrequency(state, -0.025);
-                persist();
-                renderDisplay();
-                refreshSubscriptions();
+                if (cycleDialPreset(state, -1)) {
+                    persist();
+                    renderDisplay();
+                    refreshSubscriptions();
+                }
                 return;
             }
             if (key === 'next') {
-                adjustFrequency(state, 0.025);
-                persist();
-                renderDisplay();
-                refreshSubscriptions();
+                if (cycleDialPreset(state, 1)) {
+                    persist();
+                    renderDisplay();
+                    refreshSubscriptions();
+                }
                 return;
             }
 
@@ -603,6 +670,34 @@ function bindKeypad() {
         nextPage.addEventListener('click', function() { goNotebookPage(1); });
     }
     bindNotebookSwipe();
+    bindDisplayDialSwipe();
+}
+
+function bindDisplayDialSwipe() {
+    var screen = el('radio-display-screen');
+    if (!screen || screen._dialSwipeBound) return;
+    screen._dialSwipeBound = true;
+    var startX = 0;
+    var tracking = false;
+    screen.addEventListener('touchstart', function(e) {
+        if (!e.touches || e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        tracking = true;
+    }, { passive: true });
+    screen.addEventListener('touchend', function(e) {
+        if (!tracking) return;
+        tracking = false;
+        var t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        var dx = t.clientX - startX;
+        if (Math.abs(dx) < 36) return;
+        if (cycleDialPreset(state, dx < 0 ? 1 : -1)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        }
+    }, { passive: true });
+    screen.addEventListener('touchcancel', function() { tracking = false; }, { passive: true });
 }
 
 export function initRadioCommsSystem(options) {

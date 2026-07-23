@@ -1,10 +1,41 @@
 /**
  * Rádiová komunikace — frekvence, šifrování, presety, sešit (příchozí/odchozí).
- * Kanál = frekvence + šifrovací heslo. Kdo zná obojí, může odposlouchávat.
+ * Kanál (zatím): frekvence + šifrovací heslo. Pásmo/ladění: radioBand.js.
  */
+import {
+    BAND_MIN_MHZ,
+    BAND_MAX_MHZ,
+    TUNE_STEP_MHZ,
+    EMERGENCY_FREQUENCY,
+    EMERGENCY_ENCRYPTION,
+    GLOBAL_FREQUENCY,
+    GLOBAL_ENCRYPTION,
+    normalizeFrequency,
+    formatFrequency,
+    stepFrequency,
+    channelFromCode,
+    frequencyChannelId,
+    buildDefaultDialPresets,
+    findDialIndex,
+    parseFrequencyMHz
+} from './radioBand.js';
 
-export const GLOBAL_FREQUENCY = '121.500';
-export const GLOBAL_ENCRYPTION = 'SOS';
+export {
+    BAND_MIN_MHZ,
+    BAND_MAX_MHZ,
+    TUNE_STEP_MHZ,
+    EMERGENCY_FREQUENCY,
+    EMERGENCY_ENCRYPTION,
+    GLOBAL_FREQUENCY,
+    GLOBAL_ENCRYPTION,
+    normalizeFrequency,
+    formatFrequency,
+    stepFrequency,
+    channelFromCode,
+    frequencyChannelId,
+    buildDefaultDialPresets,
+    findDialIndex
+};
 
 export const NOTEBOOK_TABS = ['station', 'notes', 'grids'];
 export const NOTEBOOK_TAB_LABELS = {
@@ -24,16 +55,6 @@ export const CHANNEL_SCOPE_LABELS = {
     private: 'SOUK'
 };
 
-export function normalizeFrequency(value) {
-    var s = String(value || '').trim().replace(',', '.');
-    if (!s) return '';
-    var m = s.match(/^(\d{1,3})\.?(\d{0,3})?/);
-    if (!m) return s;
-    var whole = m[1];
-    var frac = (m[2] || '000').padEnd(3, '0').slice(0, 3);
-    return whole + '.' + frac;
-}
-
 export function normalizeEncryptionKey(value) {
     return String(value || '').trim().toLowerCase();
 }
@@ -48,13 +69,7 @@ export function hashChannelId(frequency, encryptionKey) {
 }
 
 export function communityFrequencyFromCode(comCode) {
-    comCode = String(comCode || '').trim().toUpperCase();
-    if (!comCode) return '462.000';
-    var n = 0;
-    for (var i = 0; i < comCode.length; i++) {
-        n = ((n * 31) + comCode.charCodeAt(i)) >>> 0;
-    }
-    return '462.' + String((n % 999) + 1).padStart(3, '0');
+    return channelFromCode(comCode, 435);
 }
 
 export function communityEncryptionDefault(comCode, comName) {
@@ -77,9 +92,9 @@ export function classifyChannel(frequency, encryptionKey, ctx) {
     ctx = ctx || {};
     var freq = normalizeFrequency(frequency);
     var key = normalizeEncryptionKey(encryptionKey);
-    if (!freq || !key) return 'private';
+    if (!freq) return 'private';
 
-    if (freq === normalizeFrequency(GLOBAL_FREQUENCY) && key === normalizeEncryptionKey(GLOBAL_ENCRYPTION)) {
+    if (freq === normalizeFrequency(EMERGENCY_FREQUENCY) && key === normalizeEncryptionKey(EMERGENCY_ENCRYPTION)) {
         return 'global';
     }
 
@@ -94,30 +109,20 @@ export function classifyChannel(frequency, encryptionKey, ctx) {
 
 export function defaultRadioState(userId, ctx) {
     ctx = ctx || {};
-    var comFreq = ctx.comCode ? communityFrequencyFromCode(ctx.comCode) : '462.550';
+    var comFreq = communityFrequencyFromCode(ctx.comCode);
     var comKey = ctx.comCode ? getCommunityRadioKey(ctx.comCode, ctx.comName) : '';
+    var presets = buildDefaultDialPresets({
+        comCode: ctx.comCode,
+        comFreq: comFreq,
+        comKey: comKey
+    });
     return {
         frequency: comFreq,
         encryptionKey: comKey,
         keypadMode: 'tx',
         dialBuffer: '',
-        activePresetSlot: null,
-        presets: [
-            {
-                slot: 1,
-                label: 'Komunita',
-                frequency: comFreq,
-                encryptionKey: comKey,
-                scope: 'community'
-            },
-            {
-                slot: 2,
-                label: 'Globální',
-                frequency: GLOBAL_FREQUENCY,
-                encryptionKey: GLOBAL_ENCRYPTION,
-                scope: 'global'
-            }
-        ]
+        activePresetSlot: 1,
+        presets: presets
     };
 }
 
@@ -131,20 +136,22 @@ function notebookKey(userId) {
 
 export function loadRadioState(userId, ctx) {
     var key = radioStateKey(userId);
+    var base = defaultRadioState(userId, ctx);
     try {
         var raw = localStorage.getItem(key);
         if (raw) {
             var parsed = JSON.parse(raw);
-            var base = defaultRadioState(userId, ctx);
-            if (!parsed.presets || !parsed.presets.length) parsed.presets = base.presets;
+            if (!parsed.presets || parsed.presets.length < 8) parsed.presets = base.presets;
             if (!parsed.frequency) parsed.frequency = base.frequency;
+            else parsed.frequency = normalizeFrequency(parsed.frequency) || base.frequency;
             if (parsed.encryptionKey == null) parsed.encryptionKey = base.encryptionKey;
             if (!parsed.keypadMode) parsed.keypadMode = 'tx';
             if (!parsed.dialBuffer) parsed.dialBuffer = '';
+            if (parsed.activePresetSlot == null) parsed.activePresetSlot = 1;
             return parsed;
         }
     } catch (e) {}
-    return defaultRadioState(userId, ctx);
+    return base;
 }
 
 export function saveRadioState(userId, state) {
@@ -236,7 +243,10 @@ export function formatNotebookLine(entry) {
     var arrow = entry.dir === 'out' ? '↑' : '↓';
     var who = entry.from || '—';
     var freq = entry.frequency ? (' · ' + entry.frequency) : '';
-    return arrow + ' ' + formatTime(entry.ts) + '  ' + who + ': ' + entry.text + freq;
+    var sig = '';
+    if (entry.dir === 'in' && entry.signalQuality === 'weak') sig = ' [slabý]';
+    else if (entry.dir === 'in' && entry.signalQuality === 'noise') sig = ' [šum]';
+    return arrow + ' ' + formatTime(entry.ts) + '  ' + who + ': ' + entry.text + freq + sig;
 }
 
 export function wrapNotebookText(text, maxChars) {
@@ -349,14 +359,18 @@ export function buildDisplayLines(state, ctx) {
         state.keypadMode === 'encrypt' ? 'NASTAV ŠIFRU' :
             state.keypadMode === 'preset-save' ? 'ULOŽ PRESET' : 'TX';
     var cipher = key ? 'CT' : 'PT';
-    var presetLabel = '—';
-    if (state.activePresetSlot) {
-        var preset = findPreset(state, state.activePresetSlot);
-        if (preset) presetLabel = 'PRE ' + preset.slot + ' · ' + (preset.label || 'KANÁL');
+    var presetLabel = 'DIAL · přímý zápis';
+    var preset = state.activePresetSlot != null ? findPreset(state, state.activePresetSlot) : null;
+    if (!preset && state.presets) {
+        var di = findDialIndex(state.presets, state.frequency, null);
+        if (di >= 0) preset = state.presets[di];
+    }
+    if (preset) {
+        presetLabel = 'DIAL ' + preset.slot + '/' + (state.presets || []).length + ' · ' + (preset.label || 'KANÁL');
     }
     return {
         line1: freq + ' MHz  ' + cipher + '  ·  ' + modeLabel,
-        line2: key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — kanál není zabezpečen',
+        line2: key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — otevřený kanál',
         line3: presetLabel,
         footer: ctx.comCode ? (ctx.comName || ctx.comCode) : 'VOLNÝ KANÁL'
     };
@@ -399,69 +413,87 @@ export function applyPreset(state, slot) {
 }
 
 export function adjustFrequency(state, delta) {
-    var freq = parseFloat(normalizeFrequency(state.frequency));
-    if (isNaN(freq)) freq = 462.5;
-    freq = Math.max(118, Math.min(512, freq + delta));
-    state.frequency = freq.toFixed(3);
+    var steps = 1;
+    if (typeof delta === 'number' && isFinite(delta) && TUNE_STEP_MHZ > 0) {
+        steps = Math.round(delta / TUNE_STEP_MHZ) || (delta < 0 ? -1 : 1);
+    }
+    state.frequency = stepFrequency(state.frequency, steps);
+    state.activePresetSlot = null;
     return state;
 }
 
+/** Hlavní kolečko — přepnutí na další/předchozí preset (ne krok 0.025 po pásmu). */
+export function cycleDialPreset(state, direction) {
+    var presets = state.presets || [];
+    if (!presets.length) return false;
+    var dir = direction < 0 ? -1 : 1;
+    var idx = findDialIndex(presets, state.frequency, state.activePresetSlot);
+    if (idx < 0) idx = dir > 0 ? -1 : 0;
+    var next = (idx + dir + presets.length * 10) % presets.length;
+    var p = presets[next];
+    if (!p) return false;
+    state.frequency = normalizeFrequency(p.frequency);
+    state.encryptionKey = p.encryptionKey || '';
+    state.activePresetSlot = p.slot;
+    state.dialBuffer = '';
+    state.keypadMode = 'tx';
+    return true;
+}
+
+/**
+ * Frekvence, které právě posloucháme (freq-first).
+ * Zatím jen naladěný kanál — jako reálná vysílačka.
+ */
+export function collectTunedFrequencies(state) {
+    var freq = normalizeFrequency(state && state.frequency);
+    return freq ? [freq] : [];
+}
+
+/** @deprecated alias — dřív hash(freq|key), teď jen naladěné frekvence. */
 export function collectKnownChannelIds(state, ctx) {
-    ctx = ctx || {};
-    var ids = {};
-    function add(freq, key) {
-        if (!freq || !key) return;
-        ids[hashChannelId(freq, key)] = true;
-    }
-
-    add(GLOBAL_FREQUENCY, GLOBAL_ENCRYPTION);
-
-    if (ctx.comCode) {
-        add(
-            communityFrequencyFromCode(ctx.comCode),
-            getCommunityRadioKey(ctx.comCode, ctx.comName)
-        );
-    }
-
-    if (state.presets) {
-        for (var i = 0; i < state.presets.length; i++) {
-            var p = state.presets[i];
-            add(p.frequency, p.encryptionKey);
-        }
-    }
-
-    add(state.frequency, state.encryptionKey);
-    return Object.keys(ids);
+    return collectTunedFrequencies(state).map(frequencyChannelId);
 }
 
 export function createOutgoingEntry(text, ctx, state) {
     var tab = classifyChannel(state.frequency, state.encryptionKey, ctx);
-    return {
+    var freq = normalizeFrequency(state.frequency);
+    var entry = {
         id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         dir: 'out',
         text: text,
         from: ctx.playerName || 'Ty',
-        frequency: normalizeFrequency(state.frequency),
-        encryptionKey: state.encryptionKey,
-        channelId: hashChannelId(state.frequency, state.encryptionKey),
+        frequency: freq,
+        encryptionKey: state.encryptionKey || '',
+        channelId: frequencyChannelId(freq),
         scope: tab,
         comCode: ctx.comCode || '',
         ts: Date.now()
     };
+    if (ctx.originLat != null && ctx.originLng != null) {
+        entry.originLat = ctx.originLat;
+        entry.originLng = ctx.originLng;
+    }
+    return entry;
 }
 
 export function createIncomingEntry(payload, ctx) {
     var tab = classifyChannel(payload.frequency, payload.encryptionKey, ctx);
-    return {
+    var freq = normalizeFrequency(payload.frequency);
+    var entry = {
         id: payload.id || ('rx_' + Date.now()),
         dir: 'in',
         text: payload.text || '',
         from: payload.senderName || payload.from || 'Neznámý',
-        frequency: normalizeFrequency(payload.frequency),
+        frequency: freq,
         encryptionKey: payload.encryptionKey || '',
-        channelId: payload.channelId || hashChannelId(payload.frequency, payload.encryptionKey),
+        channelId: payload.channelId || frequencyChannelId(freq),
         scope: tab,
         comCode: payload.comCode || '',
         ts: payload.timestamp || payload.ts || Date.now()
     };
+    if (payload.signalQuality) entry.signalQuality = payload.signalQuality;
+    if (payload.distanceKm != null) entry.distanceKm = payload.distanceKm;
+    if (payload.originLat != null) entry.originLat = payload.originLat;
+    if (payload.originLng != null) entry.originLng = payload.originLng;
+    return entry;
 }
