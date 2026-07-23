@@ -5,6 +5,10 @@
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getDb, ensureFirebaseAuth } from '../lib/firebase.js';
 import { ensurePatracAuth } from './authService.js';
+import {
+    normalizeQuestDefinitionList,
+    mergeQuestDefinitionLists
+} from '../quests/questDefinition.js';
 
 const COLLECTION = 'communities';
 const STORY_QUEST_IDS = ['roxy', 'sef', 'herbert', 'ino', 'adam'];
@@ -52,6 +56,7 @@ export function normalizeCommunityQuests(raw) {
             dismissed: [],
             reqOverrides: {},
             launched: {},
+            definitions: [],
             updatedAt: 0
         };
     }
@@ -88,6 +93,7 @@ export function normalizeCommunityQuests(raw) {
             dismissed: Array.isArray(raw.dismissed) ? raw.dismissed.slice() : [],
             reqOverrides: raw.reqOverrides && typeof raw.reqOverrides === 'object' ? raw.reqOverrides : {},
             launched: raw.launched && typeof raw.launched === 'object' ? raw.launched : {},
+            definitions: normalizeQuestDefinitionList(raw.definitions),
             updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : 0
         };
     }
@@ -271,6 +277,7 @@ export function mergeCommunityQuests(cloudQuests, localQuests) {
         dismissed: mergeUniqueStrings(cloudQuests.dismissed, localQuests.dismissed),
         reqOverrides: mergeReqOverrides(cloudQuests.reqOverrides, localQuests.reqOverrides),
         launched: mergeLaunchedMaps(cloudQuests.launched, localQuests.launched),
+        definitions: mergeQuestDefinitionLists(cloudQuests.definitions, localQuests.definitions),
         updatedAt: Math.max(cloudQuests.updatedAt || 0, localQuests.updatedAt || 0, Date.now())
     });
 }
@@ -309,6 +316,7 @@ export function applyCommunityQuestsToLocalStorage(quests) {
     localStorage.setItem('random_quests_list', JSON.stringify(data.random));
     localStorage.setItem('dismissed_quests', JSON.stringify(data.dismissed));
     localStorage.setItem('quest_req_overrides', JSON.stringify(data.reqOverrides));
+    localStorage.setItem('quest_definitions_list', JSON.stringify(data.definitions || []));
 
     var comCode = '';
     try { comCode = (localStorage.getItem('com_code') || '').toUpperCase(); } catch (e) {}

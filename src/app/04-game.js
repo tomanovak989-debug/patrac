@@ -663,6 +663,7 @@ function clearGlobalSessionGameCache(options) {
         safeLocalStorageSet('random_quests_list', '[]');
         safeLocalStorageSet('dismissed_quests', '[]');
         safeLocalStorageSet('quest_req_overrides', '{}');
+        safeLocalStorageSet('quest_definitions_list', '[]');
     }
     safeLocalStorageSet('quest_sections_state', '{}');
 }
@@ -690,6 +691,7 @@ function emptyCommunityQuestsForCloud() {
         dismissed: [],
         reqOverrides: {},
         launched: {},
+        definitions: [],
         updatedAt: Date.now()
     };
 }
@@ -2875,6 +2877,7 @@ function launchGame() {
     renderOperatorClanUI();
 
     initPoctaModuleAsync();
+    initQuestAdminAsync();
     initRadioCommsAsync();
     initCloudSyncAsync();
     initDataKartaAsync();
@@ -3665,6 +3668,16 @@ function renderChat() { /* legacy — viz radioUi */ }
 
 function updateRadioDisplayHud() {
     if (typeof window.patracRefreshRadioComms === 'function') window.patracRefreshRadioComms();
+}
+
+function initQuestAdminAsync() {
+    patracImport('quests/questAdminUi.js').then(function(mod) {
+        mod.initQuestAdminUi();
+        window.patracRefreshQuestAdmin = mod.refreshQuestAdminUi;
+        window.patracGetQuestDefinitions = mod.getQuestDefinitions;
+    }).catch(function(err) {
+        console.warn('[questAdmin]', err);
+    });
 }
 
 function initRadioCommsAsync() {

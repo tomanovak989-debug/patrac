@@ -337,6 +337,7 @@ function renderStoryPositionsContent() {
 
 var QUEST_SECTION_DEFAULTS = {
     'active-orders': true,
+    'quest-defs': false,
     'custom-form': false,
     'story-positions': true
 };
@@ -366,7 +367,7 @@ function toggleQuestSection(sectionId) {
 
 function initQuestSections() {
     var state = getQuestSectionsState();
-    var keys = ['active-orders', 'custom-form', 'story-positions'];
+    var keys = ['active-orders', 'quest-defs', 'custom-form', 'story-positions'];
     for (var i = 0; i < keys.length; i++) {
         var id = keys[i];
         var open = state.hasOwnProperty(id) ? state[id] : QUEST_SECTION_DEFAULTS[id];
@@ -1551,6 +1552,7 @@ function captureCommunityMapCachePayload(comCode) {
         dismissed: getDismissedQuests(),
         reqOverrides: getQuestReqOverrides(),
         launched: getCommunityLaunchedQuests(),
+        questDefinitions: getSafeJSON('quest_definitions_list'),
         fogEnabled: fogPrefs ? fogPrefs.fogEnabled : undefined,
         fogRevealAll: fogPrefs ? fogPrefs.fogRevealAll : undefined,
         savedAt: Date.now()
@@ -1767,6 +1769,9 @@ function restoreCommunityMapCache(comCode, options) {
             if (Array.isArray(data.randomQuests)) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
             if (Array.isArray(data.dismissed)) safeLocalStorageSet('dismissed_quests', JSON.stringify(data.dismissed));
             if (data.reqOverrides) safeLocalStorageSet('quest_req_overrides', JSON.stringify(data.reqOverrides));
+            if (Array.isArray(data.questDefinitions)) {
+                safeLocalStorageSet('quest_definitions_list', JSON.stringify(data.questDefinitions));
+            }
             if (data.launched) setCommunityLaunchedQuests(data.launched);
         } else {
             if (Array.isArray(data.freePois)) {
@@ -1780,6 +1785,12 @@ function restoreCommunityMapCache(comCode, options) {
             if (Array.isArray(data.randomQuests)) {
                 var curRandom = getRandomQuestsList();
                 if (!curRandom.length) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
+            }
+            if (Array.isArray(data.questDefinitions)) {
+                var curDefs = getSafeJSON('quest_definitions_list');
+                if (!curDefs.length) {
+                    safeLocalStorageSet('quest_definitions_list', JSON.stringify(data.questDefinitions));
+                }
             }
             if (data.launched && Object.keys(getCommunityLaunchedQuests()).length === 0) {
                 setCommunityLaunchedQuests(data.launched);
@@ -2176,6 +2187,7 @@ function collectCommunityQuestsForCloud() {
         dismissed: getDismissedQuests(),
         reqOverrides: getQuestReqOverrides(),
         launched: getCommunityLaunchedQuests(),
+        definitions: getSafeJSON('quest_definitions_list'),
         updatedAt: Date.now()
     };
 }
@@ -2187,6 +2199,7 @@ function syncCommunityQuestsToCloud() {
     if (isOperatorLocalOnlySession()) {
         if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
         if (typeof renderQuestList === 'function') renderQuestList();
+        if (typeof window.patracRefreshQuestAdmin === 'function') window.patracRefreshQuestAdmin();
         return;
     }
     var localQuests = collectCommunityQuestsForCloud();
@@ -2199,10 +2212,12 @@ function syncCommunityQuestsToCloud() {
     }).then(function() {
         if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
         if (typeof renderQuestList === 'function') renderQuestList();
+        if (typeof window.patracRefreshQuestAdmin === 'function') window.patracRefreshQuestAdmin();
     }).catch(function(err) {
         console.warn('[cloud] quests sync', err);
     });
 }
+window.syncCommunityQuestsToCloud = syncCommunityQuestsToCloud;
 
 function collectPlayerQuestProgressForCloud(userId) {
     userId = userId || localStorage.getItem('patrac_session') || '';
@@ -2285,6 +2300,9 @@ function startCommunityRealtimeSync(comCode) {
                 try { ensureClosedStoryPositionsApplied(); } catch (e) { console.warn(e); }
                 try { reloadAllMapPoints(); } catch (e) { console.warn(e); }
                 try { renderQuestList(); } catch (e) { console.warn(e); }
+                if (typeof window.patracRefreshQuestAdmin === 'function') {
+                    try { window.patracRefreshQuestAdmin(); } catch (eAdm) {}
+                }
             }
         }).then(function(unsub) {
             patracCommunityUnsubscribe = unsub;

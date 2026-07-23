@@ -233,6 +233,41 @@ body.admin-editing-player .hud-center-panel {
 body.admin-mode .operator-shelter-section { display: block; }
 .operator-clan-section { display: none; margin-bottom: 12px; }
 body.admin-mode .operator-clan-section { display: block; }
+.admin-only-section { display: none; }
+body.admin-mode .admin-only-section { display: block; }
+
+.qdef-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.qdef-empty { font-size: var(--text-sm); color: var(--muted-fg); margin: 0; }
+.qdef-row {
+    display: flex; gap: 8px; align-items: flex-start; justify-content: space-between;
+    padding: 8px; border: 1px solid rgba(255, 85, 0, 0.35);
+    background: rgba(20, 10, 6, 0.55);
+}
+.qdef-row.is-active { border-color: var(--accent-gold); background: rgba(30, 20, 6, 0.7); }
+.qdef-row-main { min-width: 0; flex: 1; font-size: var(--text-sm); }
+.qdef-row-meta { font-size: var(--text-xxs); color: var(--muted-fg); margin-top: 2px; }
+.qdef-row-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.qdef-btn {
+    font-family: inherit; font-size: var(--text-xxs); padding: 4px 6px; cursor: pointer;
+    border: 1px solid var(--danger-orange); color: var(--danger-orange); background: transparent;
+}
+.qdef-btn-danger { border-color: #aa4444; color: #cc6666; }
+.qdef-badge {
+    display: inline-block; font-size: 9px; letter-spacing: 0.06em; padding: 1px 4px;
+    border: 1px solid currentColor; margin-right: 4px; vertical-align: middle;
+}
+.qdef-badge-main { color: var(--accent-gold); }
+.qdef-badge-side { color: var(--xp-blue); }
+.qdef-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+@media (max-width: 520px) {
+    .qdef-grid-2 { grid-template-columns: 1fr; }
+}
+.qdef-form-actions {
+    display: flex; gap: 8px; margin-top: 10px;
+}
+.qdef-form-actions .btn-accept { flex: 1; }
 .operator-member-row {
     display: flex; align-items: center; gap: 8px;
     padding: 8px; margin-bottom: 6px;
