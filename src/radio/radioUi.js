@@ -305,7 +305,7 @@ function renderNotebook(options) {
         }
         var noteLines = getNotesVisualPageLines(notebook, pageIdx, linesPerPage, charsPerLine);
         if (!noteLines.length && pageIdx === 0) {
-            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — vlastní zápisky.<br>Napiš text do „Hlášení…“ a ENT, nebo klepni ✕ u řádku.</p>';
+            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — jen tvoje (ne komunita).<br>Napiš text a ENT · ✕ smaže řádek.</p>';
         } else {
             var notesHtml = '';
             for (var ni = 0; ni < noteLines.length; ni++) {
