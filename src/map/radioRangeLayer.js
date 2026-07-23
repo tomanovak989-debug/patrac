@@ -42,7 +42,7 @@ function bandStyle(bandIndex, role) {
     var weights = [2.4, 1.6, 1.1];
     var opacities = [0.85, 0.5, 0.28];
     var fills = [0.06, 0.03, 0.01];
-    var color = isBase ? '#c8a060' : '#4af626';
+    var color = isBase ? '#ff3355' : '#ff0033';
     return {
         color: color,
         weight: weights[bandIndex] || 1,
