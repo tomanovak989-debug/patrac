@@ -47,23 +47,41 @@ export async function sendRadioTransmission(payload) {
     return { id: ref.id, ...docPayload };
 }
 
+function mapDocToPayload(docSnap, fallbackFreq, channelId) {
+    var data = docSnap.data() || {};
+    return {
+        id: docSnap.id,
+        channelId: channelId,
+        frequency: data.frequency || fallbackFreq,
+        encryptionKey: data.encryptionKey,
+        scope: data.scope,
+        comCode: data.comCode,
+        senderId: data.senderId,
+        senderName: data.senderName,
+        text: data.text,
+        timestamp: data.timestamp,
+        originLat: data.originLat,
+        originLng: data.originLng
+    };
+}
+
 /**
  * @param {string[]} frequenciesOrIds — normalizované frekvence („400.025“) nebo id („f_400025“)
+ * @param {(payload: object) => void} onMessage
+ * @returns {Promise<void>}
  */
-export function subscribeRadioChannels(frequenciesOrIds, onMessage) {
+export async function subscribeRadioChannels(frequenciesOrIds, onMessage) {
     stopRadioSubscriptions();
     if (!Array.isArray(frequenciesOrIds) || !frequenciesOrIds.length) return;
+
+    await ensureRadioAuth();
 
     for (var i = 0; i < frequenciesOrIds.length; i++) {
         (function(raw) {
             var freq = normalizeFrequency(raw);
             var channelId = freq ? frequencyChannelId(freq) : String(raw || '');
             if (!channelId || channelUnsubs[channelId]) return;
-            if (!freq && channelId.indexOf('f_') === 0) {
-                /* id už je f_XXXXXX */
-            } else if (!freq) {
-                return;
-            }
+            if (!freq && channelId.indexOf('f_') !== 0) return;
 
             var q = query(
                 collection(getDb(), 'radio_freq', channelId, 'messages'),
@@ -75,8 +93,12 @@ export function subscribeRadioChannels(frequenciesOrIds, onMessage) {
             channelUnsubs[channelId] = onSnapshot(q, function(snap) {
                 if (initialSnap) {
                     initialSnap = false;
-                    for (var s = 0; s < snap.docs.length; s++) {
-                        seen[snap.docs[s].id] = true;
+                    /* Backfill: chronologicky (starší → novější), ať přepnutí profilu
+                       dostane nedávný provoz na naladěné frekvenci do staničníku. */
+                    var docs = snap.docs.slice().reverse();
+                    for (var s = 0; s < docs.length; s++) {
+                        seen[docs[s].id] = true;
+                        onMessage(mapDocToPayload(docs[s], freq, channelId));
                     }
                     return;
                 }
@@ -87,21 +109,7 @@ export function subscribeRadioChannels(frequenciesOrIds, onMessage) {
                     var msgId = docSnap.id;
                     if (seen[msgId]) continue;
                     seen[msgId] = true;
-                    var data = docSnap.data();
-                    onMessage({
-                        id: msgId,
-                        channelId: channelId,
-                        frequency: data.frequency || freq,
-                        encryptionKey: data.encryptionKey,
-                        scope: data.scope,
-                        comCode: data.comCode,
-                        senderId: data.senderId,
-                        senderName: data.senderName,
-                        text: data.text,
-                        timestamp: data.timestamp,
-                        originLat: data.originLat,
-                        originLng: data.originLng
-                    });
+                    onMessage(mapDocToPayload(docSnap, freq, channelId));
                 }
             }, function(err) {
                 console.warn('[radioService] subscribe', channelId, err);

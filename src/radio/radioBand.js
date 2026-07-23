@@ -152,11 +152,22 @@ export function buildDefaultDialPresets(ctx) {
         dial: true
     });
 
+    /* Otevřený kanál 400.000 PT — bez šifry, sdílený provoz mezi profily. */
+    list.push({
+        slot: slot++,
+        label: 'Otevřený 400',
+        frequency: normalizeFrequency(BAND_MIN_MHZ),
+        encryptionKey: '',
+        scope: 'private',
+        dial: true
+    });
+
     /* Průzkumné kanály po 5 MHz — rychlé procházení pásma (šum / anomálie). */
     var f;
     for (f = BAND_MIN_MHZ; f <= BAND_MAX_MHZ - 5; f += 5) {
         var freq = normalizeFrequency(f);
         if (freq === normalizeFrequency(comFreq) || freq === EMERGENCY_FREQUENCY) continue;
+        if (freq === normalizeFrequency(BAND_MIN_MHZ)) continue;
         list.push({
             slot: slot++,
             label: 'CH ' + String(Math.round(f)),

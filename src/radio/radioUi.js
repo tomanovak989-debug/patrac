@@ -170,8 +170,10 @@ function renderDisplay() {
     if (p) p.textContent = lines.line3;
     if (foot) foot.textContent = lines.footer;
     if (sig) {
-        var tuned = state.frequency && state.encryptionKey;
-        sig.textContent = tuned ? '● TX/RX' : '○ STBY';
+        /* PT (bez šifry) je platný otevřený kanál — ne STBY. */
+        var tuned = !!normalizeFrequency(state.frequency);
+        var pt = !normalizeEncryptionKey(state.encryptionKey || '');
+        sig.textContent = tuned ? (pt ? '● TX/RX PT' : '● TX/RX CT') : '○ STBY';
         sig.style.color = tuned ? '#8fdc68' : '#888';
     }
     if (ch) {
@@ -249,7 +251,7 @@ function renderNotebook(options) {
 
     var list = getStationVisualPageLines(notebook, pageIdx, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE);
     if (!list.length && pageIdx === 0) {
-        box.innerHTML = '<p class="radio-notebook-empty">↓ příchozí · ↑ odchozí<br>Nalaď frekvenci a šifru, pak vysílej.</p>';
+        box.innerHTML = '<p class="radio-notebook-empty">↓ příchozí · ↑ odchozí<br>Nalaď frekvenci (PT = bez šifry OK), pak vysílej.</p>';
     } else {
         var html = '';
         for (var i = 0; i < list.length; i++) {
@@ -365,7 +367,19 @@ function persist() {
     saveNotebook(getCtx().userId, notebook);
 }
 
+function notebookHasId(id) {
+    if (!id || !notebook || !notebook.station) return false;
+    for (var i = 0; i < notebook.station.length; i++) {
+        if (notebook.station[i] && notebook.station[i].id === id) return true;
+    }
+    return false;
+}
+
 function recordEntry(entry) {
+    if (!entry) return;
+    if (entry.id && (seenMessageIds[entry.id] || notebookHasId(entry.id))) return;
+    if (entry.id) seenMessageIds[entry.id] = true;
+
     var list = notebook.station || [];
     var entryIndex = list.length;
     appendNotebookEntry(notebook, 'station', entry);
@@ -386,48 +400,56 @@ function recordEntry(entry) {
     }
 }
 
+function ingestIncomingPayload(payload) {
+    var c = getCtx();
+    if (!payload || !payload.id) return;
+    if (payload.senderId && payload.senderId === c.userId) return;
+    if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
+        seenMessageIds[payload.id] = true;
+        return;
+    }
+
+    var origin = (payload.originLat != null && payload.originLng != null)
+        ? { lat: payload.originLat, lng: payload.originLng }
+        : null;
+    var receiver = getPlayerLatLng();
+    var reception = evaluateRadioReception(origin, receiver);
+    if (!reception.receivable) return;
+
+    var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
+    var myKey = normalizeEncryptionKey(state.encryptionKey || '');
+    /* Otevřený kanál (PT): prázdná šifra na zprávě i u přijímače → čitelný text.
+       Cizí heslo na stejné frekvenci → šum. */
+    var canRead = !msgKey || msgKey === myKey;
+
+    var applied;
+    if (!canRead) {
+        applied = {
+            text: noisePlaceholder(payload.frequency),
+            signalQuality: SIGNAL_NOISE,
+            distanceKm: reception.distanceKm
+        };
+    } else {
+        applied = applyReceptionToMessage(payload.text, reception, {
+            seed: payload.id || payload.text,
+            frequency: payload.frequency
+        });
+    }
+    if (!applied) return;
+
+    var entry = createIncomingEntry(Object.assign({}, payload, {
+        text: applied.text,
+        signalQuality: applied.signalQuality,
+        distanceKm: applied.distanceKm
+    }), c);
+    recordEntry(entry);
+}
+
 function refreshSubscriptions() {
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
     var freqs = collectTunedFrequencies(state);
-    subscribeRadioChannels(freqs, function(payload) {
-        var c = getCtx();
-        if (payload.senderId && payload.senderId === c.userId) return;
-        if (seenMessageIds[payload.id]) return;
-
-        var origin = (payload.originLat != null && payload.originLng != null)
-            ? { lat: payload.originLat, lng: payload.originLng }
-            : null;
-        var receiver = getPlayerLatLng();
-        var reception = evaluateRadioReception(origin, receiver);
-        if (!reception.receivable) return;
-
-        var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
-        var myKey = normalizeEncryptionKey(state.encryptionKey || '');
-        var canRead = !msgKey || msgKey === myKey;
-
-        var applied;
-        if (!canRead) {
-            /* Stejná frekvence, cizí šifra → jen šum/anomálie (plné luštění = F3). */
-            applied = {
-                text: noisePlaceholder(payload.frequency),
-                signalQuality: SIGNAL_NOISE,
-                distanceKm: reception.distanceKm
-            };
-        } else {
-            applied = applyReceptionToMessage(payload.text, reception, {
-                seed: payload.id || payload.text,
-                frequency: payload.frequency
-            });
-        }
-        if (!applied) return;
-
-        seenMessageIds[payload.id] = true;
-        var entry = createIncomingEntry(Object.assign({}, payload, {
-            text: applied.text,
-            signalQuality: applied.signalQuality,
-            distanceKm: applied.distanceKm
-        }), c);
-        recordEntry(entry);
+    subscribeRadioChannels(freqs, ingestIncomingPayload).catch(function(err) {
+        console.warn('[radioUi] subscribe', err);
     });
 }
 
@@ -706,6 +728,12 @@ export function initRadioCommsSystem(options) {
     state = loadRadioState(c.userId, c);
     notebook = loadNotebook(c.userId);
     seenMessageIds = {};
+    if (notebook && notebook.station) {
+        for (var i = 0; i < notebook.station.length; i++) {
+            var e = notebook.station[i];
+            if (e && e.id) seenMessageIds[e.id] = true;
+        }
+    }
 
     if (!notebook.station.length) {
         appendNotebookEntry(notebook, 'station', {

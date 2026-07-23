@@ -50,11 +50,13 @@ export function evaluateRadioReception(origin, receiver) {
     var from = parseLatLng(origin);
     var to = parseLatLng(receiver);
     if (!from || !to) {
+        /* Bez GPS/útočiště neshazovat provoz — lokální / stejné zařízení by jinak
+           nikdy nezapsalo příchozí do staničníku. Dosah se uplatní, až budou coords. */
         return {
-            quality: SIGNAL_NONE,
-            distanceKm: null,
-            receivable: false,
-            reason: 'missing_coords'
+            quality: SIGNAL_CLEAR,
+            distanceKm: 0,
+            receivable: true,
+            reason: 'missing_coords_assumed_local'
         };
     }
 
