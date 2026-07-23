@@ -69,6 +69,13 @@ function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
     if (!Array.isArray(notebook.grids)) notebook.grids = [];
     notebook.notes = normalizeNotesList(notebook.notes);
+    if (typeof notebook.notesText !== 'string') {
+        if (notebook.notes.length) {
+            notebook.notesText = notebook.notes.map(function(n) { return n.text; }).join('\n');
+        } else {
+            notebook.notesText = '';
+        }
+    }
 }
 
 /**
@@ -185,16 +192,27 @@ function getPlayerLatLng() {
     return getShelterLatLng();
 }
 
-function getCtx() {
+/**
+ * Pozice rádia teď = útočiště profilu (TX i RX).
+ * GPS telefonu až jako handset uzel — jinak při testu profilů na jednom mobilu
+ * vždy „vysíláš/přijímáš odtud“, kde fyzicky stojíš.
+ */
+function getRadioLatLng() {
     var shelter = getShelterLatLng();
+    if (shelter) return shelter;
+    return getPlayerLatLng();
+}
+
+function getCtx() {
+    var radioPos = getRadioLatLng();
     return {
         userId: ctx.getUserId ? ctx.getUserId() : '',
         playerName: ctx.getPlayerName ? ctx.getPlayerName() : 'Operativec',
         comCode: ctx.getComCode ? ctx.getComCode() : '',
         comName: ctx.getComName ? ctx.getComName() : '',
         communityRadioKey: ctx.getCommunityRadioKey ? ctx.getCommunityRadioKey() : getCommunityRadioKey(ctx.getComCode && ctx.getComCode(), ctx.getComName && ctx.getComName()),
-        originLat: shelter ? shelter.lat : null,
-        originLng: shelter ? shelter.lng : null
+        originLat: radioPos ? radioPos.lat : null,
+        originLng: radioPos ? radioPos.lng : null
     };
 }
 
@@ -211,8 +229,6 @@ function updateInputForMode() {
     } else if (state.keypadMode === 'encrypt') {
         input.placeholder = 'Šifrovací heslo (slovo)…';
         input.value = state.dialBuffer || '';
-    } else if (activeNotebookTab === 'notes') {
-        input.placeholder = 'Poznámka do sešitu…';
     } else {
         input.placeholder = 'Hlášení…';
     }
@@ -298,41 +314,31 @@ function renderNotebook(options) {
     }
 
     if (activeNotebookTab === 'notes') {
-        var notesCount = getNotesVisualPageCount(notebook, linesPerPage, charsPerLine);
-        if (pageIdx >= notesCount) {
-            pageIdx = notesCount - 1;
-            setCurrentPageIndex(pageIdx);
+        var notesText = typeof notebook.notesText === 'string' ? notebook.notesText : '';
+        box.innerHTML =
+            '<textarea id="radio-notes-field" class="radio-notes-field" spellcheck="true" ' +
+            'placeholder="Osobní poznámky (jen ty, ne komunita)…"></textarea>';
+        var field = el('radio-notes-field');
+        if (field) {
+            field.value = notesText;
+            bindNotesField(field);
         }
-        var noteLines = getNotesVisualPageLines(notebook, pageIdx, linesPerPage, charsPerLine);
-        if (!noteLines.length && pageIdx === 0) {
-            box.innerHTML = '<p class="radio-notebook-empty">Poznámky — jen tvoje (ne komunita).<br>Napiš text a ENT · ✕ smaže řádek.</p>';
-        } else {
-            var notesHtml = '';
-            for (var ni = 0; ni < noteLines.length; ni++) {
-                var nl = noteLines[ni];
-                var ncls = 'radio-notebook-line radio-notebook-line-note';
-                if (!nl.isFirst) ncls += ' radio-notebook-line-cont';
-                notesHtml += '<div class="' + ncls + '" data-note-id="' + nl.noteId + '">';
-                if (nl.isFirst) {
-                    notesHtml += '<button type="button" class="radio-note-del" data-note-id="' + nl.noteId + '" title="Smazat poznámku">✕</button>';
-                }
-                notesHtml += '<span class="radio-note-text">' + escapeHtml(nl.text) + '</span></div>';
-            }
-            box.innerHTML = notesHtml;
-            bindNoteDeleteButtons(box);
-        }
-        if (pageNum) pageNum.textContent = String(pageIdx + 1);
-        if (pageLabel) pageLabel.textContent = 'Poznámky · ' + (pageIdx + 1) + ' / ' + notesCount;
-        if (prevBtn) prevBtn.disabled = pageIdx <= 0;
-        if (nextBtn) nextBtn.disabled = pageIdx >= notesCount - 1;
+        if (pageNum) pageNum.textContent = '';
+        if (pageLabel) pageLabel.textContent = 'Poznámky · osobní';
+        if (prevBtn) { prevBtn.disabled = true; prevBtn.style.visibility = 'hidden'; }
+        if (nextBtn) { nextBtn.disabled = true; nextBtn.style.visibility = 'hidden'; }
         if (tearBtn) {
             tearBtn.style.display = '';
-            tearBtn.disabled = !(notebook.notes && notebook.notes.length);
-            tearBtn.title = 'Vytrhnout poslední list poznámek';
+            tearBtn.style.visibility = '';
+            tearBtn.textContent = '🗑';
+            tearBtn.title = 'Smazat všechny poznámky';
+            tearBtn.disabled = !String(notesText || '').trim();
         }
-        updateInputForMode();
         return;
     }
+
+    if (prevBtn) prevBtn.style.visibility = '';
+    if (nextBtn) nextBtn.style.visibility = '';
 
     if (activeNotebookTab !== 'station') return;
 
@@ -356,6 +362,8 @@ function renderNotebook(options) {
     if (nextBtn) nextBtn.disabled = pageIdx >= pageCount - 1;
     if (tearBtn) {
         tearBtn.style.display = '';
+        tearBtn.style.visibility = '';
+        tearBtn.textContent = '⌫ list';
         tearBtn.title = 'Vytrhnout poslední list';
         var hasTearable = (notebook.station || []).some(function(e) {
             return e && e.id !== 'sys_welcome';
@@ -372,50 +380,41 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
-function bindNoteDeleteButtons(box) {
-    if (!box) return;
-    var btns = box.querySelectorAll('.radio-note-del');
-    for (var i = 0; i < btns.length; i++) {
-        if (btns[i]._noteDelBound) continue;
-        btns[i]._noteDelBound = true;
-        btns[i].addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var id = this.getAttribute('data-note-id');
-            if (!id) return;
-            if (!confirm('Smazat tuto poznámku?')) return;
-            var result = deleteNoteById(notebook, id);
-            notebook = result.notebook;
-            persist();
-            renderNotebook();
-        });
+function bindNotesField(field) {
+    if (!field || field._notesBound) return;
+    field._notesBound = true;
+    var saveTimer = null;
+    function flushNotes() {
+        ensureNotebookMeta();
+        notebook.notesText = field.value || '';
+        /* Drž i legacy pole notes synchronní (jeden blok textu). */
+        var trimmed = String(notebook.notesText).trim();
+        notebook.notes = trimmed
+            ? [normalizeNoteEntry({ text: trimmed, ts: Date.now(), id: 'notes_block' })].filter(Boolean)
+            : [];
+        persist();
+        var tearBtn = el('radio-notebook-tear');
+        if (tearBtn && activeNotebookTab === 'notes') {
+            tearBtn.disabled = !trimmed;
+        }
     }
+    field.addEventListener('input', function() {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(flushNotes, 280);
+    });
+    field.addEventListener('blur', function() {
+        if (saveTimer) clearTimeout(saveTimer);
+        flushNotes();
+    });
 }
 
-function addNoteEntry(text) {
-    text = String(text || '').trim();
-    if (!text) return;
+function clearPersonalNotes() {
+    if (!confirm('Smazat všechny osobní poznámky?')) return;
     ensureNotebookMeta();
-    var layout = stationPageMetrics();
-    var note = normalizeNoteEntry({ text: text, ts: Date.now() });
-    if (!note) return;
-    if (!notebook.notes) notebook.notes = [];
-    notebook.notes.push(note);
-    trimNotesToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
-    var entryIndex = notebook.notes.length - 1;
-    var pageForEntry = getNotesVisualPageIndexForEntry(notebook, entryIndex, layout.linesPerPage, layout.charsPerLine);
-    activeNotebookTab = 'notes';
-    syncNotebookTabs();
+    notebook.notesText = '';
+    notebook.notes = [];
     persist();
-    if (pageForEntry > getCurrentPageIndex()) {
-        triggerPageFlip(function() {
-            setCurrentPageIndex(pageForEntry);
-            renderNotebook();
-        }, 1);
-    } else {
-        setCurrentPageIndex(pageForEntry);
-        renderNotebook();
-    }
+    renderNotebook();
 }
 
 function bindGridCopyButtons(box) {
@@ -461,23 +460,12 @@ function goNotebookPage(delta) {
 }
 
 function tearLastStationPage() {
-    var layout = stationPageMetrics();
     if (activeNotebookTab === 'notes') {
-        var notePages = getNotesVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
-        var noteMsg = notePages <= 1
-            ? 'Smazat všechny poznámky?'
-            : 'Vytrhnout poslední list poznámek (list ' + notePages + ')?';
-        if (!confirm(noteMsg)) return;
-        var noteResult = removeLastNotesPage(notebook, layout.linesPerPage, layout.charsPerLine);
-        notebook = noteResult.notebook;
-        trimNotesToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
-        var noteCount = getNotesVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
-        if (getCurrentPageIndex() >= noteCount) setCurrentPageIndex(Math.max(0, noteCount - 1));
-        persist();
-        renderNotebook();
+        clearPersonalNotes();
         return;
     }
     if (activeNotebookTab !== 'station') return;
+    var layout = stationPageMetrics();
     var pages = getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
     var msg = pages <= 1
         ? 'Smazat všechny záznamy na staničním listu?'
@@ -677,7 +665,7 @@ function ingestIncomingPayload(payload) {
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
         : null;
-    var receiver = getPlayerLatLng();
+    var receiver = getRadioLatLng();
     var reception = evaluateRadioReception(origin, receiver);
     if (!reception.receivable) return;
 
@@ -758,11 +746,6 @@ function saveToPresetSlot(slot) {
 async function transmitMessage(text) {
     text = String(text || '').trim();
     if (!text) return;
-
-    if (activeNotebookTab === 'notes' && state.keypadMode === 'tx') {
-        addNoteEntry(text);
-        return;
-    }
 
     if (!state.frequency) {
         alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');

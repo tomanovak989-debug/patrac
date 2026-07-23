@@ -1181,36 +1181,26 @@ body.theme-light .radio-chat-input {
     padding-left: 1.1em;
     opacity: 0.92;
 }
-.radio-notebook-line-note {
-    display: flex;
-    align-items: flex-start;
-    gap: 4px;
-    color: #2a2418;
-}
-.radio-note-del {
-    flex: 0 0 auto;
-    width: 16px;
-    height: var(--nb-line, 18px);
-    padding: 0;
+.radio-notes-field {
+    display: block;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
     margin: 0;
+    padding: 0;
     border: none;
+    outline: none;
+    resize: none;
     background: transparent;
-    color: rgba(120, 50, 30, 0.55);
-    font-size: 11px;
+    color: #2a2418;
+    font-family: 'Patrick Hand', 'Segoe Print', cursive;
+    font-size: 12px;
     line-height: var(--nb-line, 18px);
-    cursor: pointer;
-    font-family: inherit;
+    caret-color: #4a3020;
 }
-.radio-note-del:active { color: #a03020; }
-.radio-note-text {
-    flex: 1 1 auto;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: clip;
-    white-space: nowrap;
-}
-.radio-notebook-line-note.radio-notebook-line-cont .radio-note-text {
-    padding-left: 20px;
+.radio-notes-field::placeholder {
+    color: rgba(42, 36, 24, 0.35);
+    font-style: italic;
 }
 .radio-notebook-empty {
     margin: 0;
@@ -1246,6 +1236,7 @@ body.theme-light .radio-chat-input {
     border-color: rgba(140, 70, 40, 0.45);
     color: #6a3a28;
     background: #ead4b8;
+    min-width: 2.2em;
 }
 body.theme-light .radio-notebook {
     background: linear-gradient(90deg, #6a6458 0, #6a6458 12px, #f7f0de 12px, #f2e9d4 100%);
