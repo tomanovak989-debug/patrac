@@ -285,48 +285,71 @@ function migrateNotebook(raw) {
 
 export function loadNotebook(userId) {
     var key = notebookKey(userId);
-    var current = null;
     try {
         var raw = localStorage.getItem(key);
-        if (raw) current = migrateNotebook(JSON.parse(raw));
+        if (raw) return migrateNotebook(JSON.parse(raw));
     } catch (e) {}
-
-    function stationScore(nb) {
-        if (!nb) return 0;
-        var n = (nb.station && nb.station.length) || 0;
-        var legacy = 0;
-        ['private', 'community', 'global'].forEach(function(t) {
-            if (nb[t] && nb[t].length) legacy += nb[t].length;
-        });
-        return n + legacy;
-    }
-
-    function isOnlyWelcome(nb) {
-        if (!nb || !nb.station || nb.station.length !== 1) return false;
-        var e = nb.station[0];
-        return e && (e.id === 'sys_welcome' || e.from === 'SYSTÉM');
-    }
-
-    var curScore = stationScore(current);
-    /* Prázdný nebo jen uvítací řádek → zkus obnovit bohatší sešit z jiné session. */
-    if (!current || curScore === 0 || isOnlyWelcome(current)) {
-        var recovered = findRichestLocalStorage('patrac_radio_notebook_', function(obj, k) {
-            if (k === key) return 0;
-            return stationScore(migrateNotebook(obj));
-        });
-        if (recovered) {
-            try {
-                var nb = migrateNotebook(JSON.parse(recovered));
-                if (stationScore(nb) > curScore) {
-                    try { localStorage.setItem(key, JSON.stringify(nb)); } catch (e2) {}
-                    return nb;
-                }
-            } catch (e3) {}
-        }
-    }
-
-    if (current) return current;
+    /* Nepůjčovat si sešit jiného profilu — dřív to zkopírovalo cizí ↑
+       a cloud backfill pak přidal tutéž zprávu jako ↓. */
     return { station: [], notes: [], grids: [], pageIndex: { station: 0, notes: 0, grids: 0 } };
+}
+
+/**
+ * Odstraní zdvojené záznamy (↑+↓ stejný text/freq/čas) a seřadí podle času.
+ * Cizí odchozí (dir=out od jiného jména) vyhodí — typicky pozůstatek staré migrace sešitu.
+ */
+export function sanitizeStationNotebook(notebook, opts) {
+    opts = opts || {};
+    var playerName = String(opts.playerName || '').trim().toLowerCase();
+    var userId = String(opts.userId || '').trim();
+    if (!notebook || !Array.isArray(notebook.station)) {
+        return notebook || { station: [], notes: [], grids: [], pageIndex: { station: 0, notes: 0, grids: 0 } };
+    }
+
+    var cleaned = [];
+    for (var i = 0; i < notebook.station.length; i++) {
+        var e = notebook.station[i];
+        if (!e) continue;
+        if (e.dir === 'out' && playerName) {
+            var from = String(e.from || '').trim().toLowerCase();
+            var ownOut = from === playerName || from === 'ty' || from === 'já' || from === 'ja';
+            if (userId && e.senderId && String(e.senderId).trim() === userId) ownOut = true;
+            if (!ownOut && e.id !== 'sys_welcome') continue;
+        }
+        cleaned.push(e);
+    }
+
+    cleaned.sort(function(a, b) { return (a.ts || 0) - (b.ts || 0); });
+
+    var out = [];
+    var seenFp = {};
+    for (var j = 0; j < cleaned.length; j++) {
+        var row = cleaned[j];
+        var fp = stationEntryFingerprint(row);
+        if (fp && seenFp[fp]) {
+            /* Preferuj odchozí před příchozím echo. */
+            var prevIdx = seenFp[fp];
+            if (out[prevIdx].dir !== 'out' && row.dir === 'out') {
+                out[prevIdx] = row;
+            }
+            continue;
+        }
+        if (fp) seenFp[fp] = out.length;
+        out.push(row);
+    }
+
+    notebook.station = out;
+    return notebook;
+}
+
+function stationEntryFingerprint(entry) {
+    if (!entry) return '';
+    var text = String(entry.text || '').trim().toLowerCase();
+    if (!text || text.indexOf('≈≈') === 0 || text === '[šum]') return '';
+    var freq = normalizeFrequency(entry.frequency);
+    var tsBucket = Math.round((Number(entry.ts) || 0) / 5000); /* 5s okno */
+    var who = String(entry.from || entry.senderName || '').trim().toLowerCase();
+    return [freq, tsBucket, who, text].join('|');
 }
 
 export function saveNotebook(userId, notebook) {
@@ -597,6 +620,7 @@ export function createOutgoingEntry(text, ctx, state) {
         dir: 'out',
         text: text,
         from: ctx.playerName || 'Ty',
+        senderId: ctx.userId || '',
         frequency: freq,
         encryptionKey: state.encryptionKey || '',
         channelId: frequencyChannelId(freq),
@@ -619,6 +643,7 @@ export function createIncomingEntry(payload, ctx) {
         dir: 'in',
         text: payload.text || '',
         from: payload.senderName || payload.from || 'Neznámý',
+        senderId: payload.senderId || '',
         frequency: freq,
         encryptionKey: payload.encryptionKey || '',
         channelId: payload.channelId || frequencyChannelId(freq),

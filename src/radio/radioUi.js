@@ -7,6 +7,7 @@ import {
     loadNotebook,
     saveNotebook,
     appendNotebookEntry,
+    sanitizeStationNotebook,
     buildDisplayLines,
     applyPreset,
     upsertPreset,
@@ -385,14 +386,47 @@ function hasRecentOutgoingEcho(payload) {
     if (!text) return false;
     var freq = normalizeFrequency(payload.frequency);
     var ts = Number(payload.timestamp) || Date.now();
+    var sid = normalizeUserId(payload.senderId);
+    var from = String(payload.senderName || '').trim().toLowerCase();
+    var me = normalizeUserId(getCtx().userId);
+    var myName = String(getCtx().playerName || '').trim().toLowerCase();
     var list = notebook.station;
     for (var i = 0; i < list.length; i++) {
         var e = list[i];
         if (!e || e.dir !== 'out') continue;
         if (normalizeFrequency(e.frequency) !== freq) continue;
         if (String(e.text || '').trim() !== text) continue;
-        if (Math.abs((e.ts || 0) - ts) <= 45000) return true;
+        if (Math.abs((e.ts || 0) - ts) > 45000 && !(e.cloudId && payload.id && e.cloudId === payload.id)) {
+            continue;
+        }
+        /* Jen vlastní odchozí — ne cizí ↑ omylem v sešitu. */
+        var own = (me && normalizeUserId(e.senderId) === me) ||
+            (myName && String(e.from || '').trim().toLowerCase() === myName) ||
+            (sid && me && sid === me) ||
+            (from && myName && from === myName);
+        if (own) return true;
         if (e.cloudId && payload.id && e.cloudId === payload.id) return true;
+    }
+    return false;
+}
+
+function hasContentDuplicate(payload) {
+    if (!notebook || !notebook.station) return false;
+    var text = String(payload.text || '').trim().toLowerCase();
+    if (!text) return false;
+    var freq = normalizeFrequency(payload.frequency);
+    var ts = Number(payload.timestamp) || Date.now();
+    var who = String(payload.senderName || '').trim().toLowerCase();
+    var list = notebook.station;
+    for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (!e) continue;
+        if (normalizeFrequency(e.frequency) !== freq) continue;
+        if (String(e.text || '').trim().toLowerCase() !== text) continue;
+        if (Math.abs((e.ts || 0) - ts) > 8000) continue;
+        var eWho = String(e.from || '').trim().toLowerCase();
+        if (who && eWho && who !== eWho) continue;
+        return true;
     }
     return false;
 }
@@ -442,6 +476,10 @@ function ingestIncomingPayload(payload) {
         return;
     }
     if (hasRecentOutgoingEcho(payload)) {
+        seenMessageIds[payload.id] = true;
+        return;
+    }
+    if (hasContentDuplicate(payload)) {
         seenMessageIds[payload.id] = true;
         return;
     }
@@ -774,6 +812,11 @@ export function initRadioCommsSystem(options) {
     var c = getCtx();
     state = loadRadioState(c.userId, c);
     notebook = loadNotebook(c.userId);
+    notebook = sanitizeStationNotebook(notebook, {
+        userId: c.userId,
+        playerName: c.playerName
+    });
+    saveNotebook(c.userId, notebook);
     seenMessageIds = {};
     if (notebook && notebook.station) {
         for (var i = 0; i < notebook.station.length; i++) {
