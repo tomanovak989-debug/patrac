@@ -43,6 +43,9 @@ function saveDefinitions(list) {
     if (typeof window.syncCommunityQuestsToCloud === 'function') {
         window.syncCommunityQuestsToCloud();
     }
+    if (typeof window.patracRefreshQuestLine === 'function') {
+        try { window.patracRefreshQuestLine(); } catch (e2) {}
+    }
     return list;
 }
 
@@ -403,7 +406,12 @@ function asStringSafe(v) {
 function renderList() {
     var box = el('qdef-list');
     var countEl = el('qdef-count');
-    if (!box) return;
+    if (!box) {
+        if (typeof window.patracRefreshQuestLine === 'function') {
+            try { window.patracRefreshQuestLine(); } catch (e) {}
+        }
+        return;
+    }
     var defs = loadDefinitions();
     var filtered = defs.filter(function(d) {
         if (listFilter === 'main') return d.type === QUEST_TYPE_MAIN;
@@ -647,10 +655,23 @@ export function refreshQuestAdminUi() {
         if (found) writeForm(found);
         else resetForm();
     }
+    if (typeof window.patracRefreshQuestLine === 'function') {
+        try { window.patracRefreshQuestLine(); } catch (e) {}
+    }
 }
 
 export function initQuestAdminUi() {
     bindUi();
+    window.patracOpenQuestDefinition = function(id) {
+        openDefinition(id);
+    };
+    window.patracNewQuestDefinition = function() {
+        resetForm();
+        renderList();
+    };
+    window.patracActivateQuestDefinition = function(id) {
+        activateDefinition(id);
+    };
     refreshQuestAdminUi();
 }
 

@@ -3009,6 +3009,13 @@ function switchMainTab(tab, element) {
         c.style.display = 'block';
         document.getElementById('content-shelter').style.display = (tab === 'shelter') ? 'block' : 'none';
         document.getElementById('content-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';
+        var qline = document.getElementById('content-questline');
+        if (qline) {
+            qline.style.display = (tab === 'questline' && isOperatorMode) ? 'block' : 'none';
+            if (tab === 'questline' && typeof window.patracRefreshQuestLine === 'function') {
+                try { window.patracRefreshQuestLine(); } catch (eQl) {}
+            }
+        }
         document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
         if (tab === 'clan') {
             updateRadioDisplayHud();
@@ -3678,6 +3685,12 @@ function initQuestAdminAsync() {
         mod.initQuestAdminUi();
         window.patracRefreshQuestAdmin = mod.refreshQuestAdminUi;
         window.patracGetQuestDefinitions = mod.getQuestDefinitions;
+        return patracImport('quests/questLineBoard.js');
+    }).then(function(board) {
+        if (!board) return;
+        board.initQuestLineBoard();
+        window.patracRefreshQuestLine = board.refreshQuestLineBoard;
+        board.refreshQuestLineBoard();
     }).catch(function(err) {
         console.warn('[questAdmin]', err);
     });

@@ -235,6 +235,69 @@ body.admin-mode .operator-shelter-section { display: block; }
 body.admin-mode .operator-clan-section { display: block; }
 .admin-only-section { display: none !important; }
 body.admin-mode .admin-only-section { display: block !important; }
+.admin-only-tab { display: none !important; }
+body.admin-mode .admin-only-tab { display: flex !important; }
+
+.qline-panel { padding-bottom: 24px; }
+.qline-intro {
+    font-size: var(--text-sm); color: var(--muted-fg); margin: 0 0 10px 0;
+}
+.qline-toolbar {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+}
+.qline-btn { font-size: var(--text-xs); padding: 6px 10px; }
+.qline-axis-block { margin-bottom: 16px; }
+.qline-axis-label {
+    font-size: var(--text-xs); letter-spacing: 0.08em;
+    color: var(--accent-gold); margin-bottom: 8px; font-weight: bold;
+}
+.qline-axis {
+    display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px;
+    padding: 10px; border: 1px dashed rgba(255, 85, 0, 0.35);
+    background: rgba(12, 8, 6, 0.45); min-height: 80px;
+}
+.qline-axis-main { border-color: rgba(255, 204, 0, 0.4); }
+.qline-axis-side { border-color: rgba(0, 150, 255, 0.35); }
+.qline-arrow {
+    display: flex; align-items: center; color: var(--accent-gold);
+    font-size: 18px; padding: 0 2px; opacity: 0.8;
+}
+.qline-empty {
+    margin: 0; font-size: var(--text-sm); color: var(--muted-fg);
+}
+.qline-card {
+    width: 200px; max-width: 100%;
+    padding: 10px; cursor: pointer;
+    border: 1px solid rgba(255, 85, 0, 0.4);
+    background: rgba(24, 14, 8, 0.85);
+    display: flex; flex-direction: column; gap: 4px;
+}
+.qline-card:hover, .qline-card:focus {
+    border-color: var(--accent-gold); outline: none;
+}
+.qline-card-main { border-color: rgba(255, 204, 0, 0.45); }
+.qline-card-side { border-color: rgba(0, 150, 255, 0.4); }
+.qline-card-type {
+    font-size: 9px; letter-spacing: 0.1em; color: var(--accent-gold);
+}
+.qline-card-side .qline-card-type { color: var(--xp-blue); }
+.qline-card-title {
+    margin: 0; font-size: var(--text-sm); color: var(--text-green);
+}
+.qline-card-id {
+    font-size: var(--text-xxs); color: var(--muted-fg);
+}
+.qline-card-desc {
+    margin: 4px 0 0; font-size: var(--text-xxs); color: var(--faint-fg);
+    line-height: 1.35; flex: 1;
+}
+.qline-card-meta {
+    display: flex; flex-direction: column; gap: 2px;
+    font-size: 9px; color: var(--muted-fg); margin-top: 4px;
+}
+.qline-card-actions {
+    display: flex; gap: 4px; margin-top: 6px;
+}
 
 .qdef-toolbar {
     display: flex; align-items: center; justify-content: space-between;
