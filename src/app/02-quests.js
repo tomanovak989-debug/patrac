@@ -2517,6 +2517,7 @@ function applyUserPosition(position) {
         map._gpsCenteredOnce = true;
     }
     patracRefreshFogOfWar();
+    if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
 }
 
 function onGpsError(err) {

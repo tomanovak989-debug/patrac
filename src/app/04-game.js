@@ -3694,10 +3694,7 @@ function initRadioCommsAsync() {
                     isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
                     return { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
                 }
-                var lat = parseFloat(localStorage.getItem('point_roxy_lat'));
-                var lng = parseFloat(localStorage.getItem('point_roxy_lng'));
-                if (!isFinite(lat) || !isFinite(lng)) return null;
-                return { lat: lat, lng: lng };
+                return null;
             },
             isLocalOnly: function() { return isOperatorLocalOnlySession(); }
         });

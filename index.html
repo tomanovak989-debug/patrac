@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260722e36" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e47" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -343,6 +343,7 @@
             </div>
             <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
+            <label><input type="checkbox" id="map-filter-radio-range" checked onchange="patracToggleRadioRange(this.checked)"> Rádiový dosah</label>
             <div id="map-fog-admin-controls">
                 <p class="fog-admin-heading">Mlha války — operátor</p>
                 <label><input type="checkbox" id="map-fog-enabled" checked onchange="patracToggleFogEnabled(this.checked)"> Mlha zapnutá</label>
@@ -584,6 +585,7 @@
                         <div class="radio-display-screen" id="radio-display-screen">
                             <div class="radio-display-status">
                                 <span id="radio-display-channel">KOMUNITNÍ</span>
+                                <button type="button" class="radio-display-node" id="radio-display-node" title="Přepnout uzel: BÁZE / NOSIČ">BÁZE</button>
                                 <span id="radio-display-signal">○ STBY</span>
                             </div>
                             <div class="radio-display-main" id="radio-display-main">
@@ -778,14 +780,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e46';
+        window.PATRAC_BUILD = '20260723e47';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260722e36"></script>
-    <script src="src/app/02-quests.js?v=20260722e36"></script>
-    <script src="src/app/03-map.js?v=20260722e36"></script>
-    <script src="src/app/04-game.js?v=20260722e36"></script>
+    <script src="src/app/01-globals.js?v=20260723e47"></script>
+    <script src="src/app/02-quests.js?v=20260723e47"></script>
+    <script src="src/app/03-map.js?v=20260723e47"></script>
+    <script src="src/app/04-game.js?v=20260723e47"></script>
 </body>
 </html>

@@ -57,6 +57,12 @@ import {
     renderGridPageHtml,
     copyGridLineText
 } from './radioGrids.js';
+import {
+    KIND_HANDSET,
+    NODE_KIND_LABELS,
+    resolveActiveRadioNode,
+    cycleRadioKind
+} from './radioNodes.js';
 
 var ctx = {};
 var state = null;
@@ -189,30 +195,48 @@ function getPlayerLatLng() {
             return ctx.getPlayerLatLng();
         } catch (e) {}
     }
-    return getShelterLatLng();
+    return null;
+}
+
+function radioNodeDeps(userId) {
+    return {
+        userId: userId || (ctx.getUserId ? ctx.getUserId() : ''),
+        getShelterLatLng: getShelterLatLng,
+        getPlayerLatLng: getPlayerLatLng
+    };
 }
 
 /**
- * Pozice rádia teď = útočiště profilu (TX i RX).
- * GPS telefonu až jako handset uzel — jinak při testu profilů na jednom mobilu
- * vždy „vysíláš/přijímáš odtud“, kde fyzicky stojíš.
+ * TX/RX pozice = aktivní rádiový uzel (BÁZE = útočiště, NOSIČ = GPS).
  */
 function getRadioLatLng() {
-    var shelter = getShelterLatLng();
-    if (shelter) return shelter;
-    return getPlayerLatLng();
+    var resolved = resolveActiveRadioNode(radioNodeDeps());
+    if (resolved && resolved.node) {
+        return { lat: resolved.node.lat, lng: resolved.node.lng };
+    }
+    return null;
+}
+
+function notifyRadioRangeLayer() {
+    if (typeof window.patracRefreshRadioRange === 'function') {
+        try { window.patracRefreshRadioRange(); } catch (e) {}
+    }
 }
 
 function getCtx() {
     var radioPos = getRadioLatLng();
+    var userId = ctx.getUserId ? ctx.getUserId() : '';
+    var resolved = resolveActiveRadioNode(radioNodeDeps(userId));
     return {
-        userId: ctx.getUserId ? ctx.getUserId() : '',
+        userId: userId,
         playerName: ctx.getPlayerName ? ctx.getPlayerName() : 'Operativec',
         comCode: ctx.getComCode ? ctx.getComCode() : '',
         comName: ctx.getComName ? ctx.getComName() : '',
         communityRadioKey: ctx.getCommunityRadioKey ? ctx.getCommunityRadioKey() : getCommunityRadioKey(ctx.getComCode && ctx.getComCode(), ctx.getComName && ctx.getComName()),
         originLat: radioPos ? radioPos.lat : null,
-        originLng: radioPos ? radioPos.lng : null
+        originLng: radioPos ? radioPos.lng : null,
+        radioKind: resolved ? resolved.kind : 'shelter',
+        radioKindFallback: !!(resolved && resolved.fallback)
     };
 }
 
@@ -257,6 +281,19 @@ function renderDisplay() {
     if (ch) {
         var scope = classifyChannel(state.frequency, state.encryptionKey, c);
         ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
+    }
+    var nodeEl = el('radio-display-node');
+    if (nodeEl) {
+        var kind = c.radioKind || 'shelter';
+        var label = NODE_KIND_LABELS[kind] || 'BÁZE';
+        if (c.radioKindFallback) label += '*';
+        nodeEl.textContent = label;
+        nodeEl.title = kind === KIND_HANDSET
+            ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
+            : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
+        nodeEl.setAttribute('data-kind', kind);
+        nodeEl.classList.toggle('is-handset', kind === KIND_HANDSET);
+        nodeEl.classList.toggle('is-fallback', !!c.radioKindFallback);
     }
     var buf = el('radio-display-buffer');
     if (buf) {
@@ -785,6 +822,20 @@ async function transmitMessage(text) {
 }
 
 function bindKeypad() {
+    var nodeBtn = el('radio-display-node');
+    if (nodeBtn && !nodeBtn._radioCommsBound) {
+        nodeBtn._radioCommsBound = true;
+        nodeBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var uid = ctx.getUserId ? ctx.getUserId() : '';
+            cycleRadioKind(uid);
+            renderDisplay();
+            refreshSubscriptions();
+            notifyRadioRangeLayer();
+        });
+    }
+
     var input = el('chat-input-field');
     if (input && !input._radioCommsBound) {
         input._radioCommsBound = true;
@@ -1040,6 +1091,7 @@ export function initRadioCommsSystem(options) {
     saveNotebook(c.userId, notebook);
     renderNotebook();
     refreshSubscriptions();
+    notifyRadioRangeLayer();
 }
 
 export function refreshRadioCommsContext() {
@@ -1048,6 +1100,7 @@ export function refreshRadioCommsContext() {
     state = loadRadioState(c.userId, c);
     renderDisplay();
     refreshSubscriptions();
+    notifyRadioRangeLayer();
 }
 
 export function stopRadioComms() {

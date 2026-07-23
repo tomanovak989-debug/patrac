@@ -48,6 +48,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initFogOfWarModule();
+        initRadioRangeModule();
         bindMapZoomControls();
         return;
     }
@@ -93,6 +94,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initFogOfWarModule();
+        initRadioRangeModule();
         bindMapZoomControls();
     } catch(e) {
         console.error('initMap', e);
@@ -353,6 +355,43 @@ function initMgrsGridModule() {
         syncMgrsGridWithRuler(rulerOn);
         if (typeof patracUpdateMgrsReadout === 'function') patracUpdateMgrsReadout();
     }).catch(function(err) { console.warn('[mgrsGrid]', err); });
+}
+
+function getRadioRangeDeps() {
+    return {
+        userId: localStorage.getItem('patrac_session') || '',
+        getShelterLatLng: function() {
+            var lat = parseFloat(localStorage.getItem('point_roxy_lat'));
+            var lng = parseFloat(localStorage.getItem('point_roxy_lng'));
+            if (!isFinite(lat) || !isFinite(lng)) return null;
+            return { lat: lat, lng: lng };
+        },
+        getPlayerLatLng: function() {
+            if (lastUserPosition && isFinite(lastUserPosition.lat) && isFinite(lastUserPosition.lng)) {
+                return { lat: lastUserPosition.lat, lng: lastUserPosition.lng };
+            }
+            return null;
+        }
+    };
+}
+
+function initRadioRangeModule() {
+    if (radioRangeMod) {
+        radioRangeMod.initRadioRangeLayer(map, getRadioRangeDeps());
+        return;
+    }
+    patracImport('map/radioRangeLayer.js').then(function(mod) {
+        radioRangeMod = mod;
+        mod.initRadioRangeLayer(map, getRadioRangeDeps());
+        window.patracRefreshRadioRange = function() {
+            if (!radioRangeMod) return;
+            radioRangeMod.updateRadioRangeDeps(getRadioRangeDeps());
+        };
+        window.patracToggleRadioRange = function(on) {
+            if (!radioRangeMod) return;
+            radioRangeMod.setRadioRangeVisible(!!on);
+        };
+    }).catch(function(err) { console.warn('[radioRange]', err); });
 }
 
 window.patracToggleMgrsGrid = function(on) {
@@ -1695,6 +1734,7 @@ function reloadAllMapPoints() {
     }
     if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
     patracRefreshFogOfWar();
+    if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
 }
 
 /** Obnoví vrstvy mapy po init (pořadí: mlha < body < MGRS). */
