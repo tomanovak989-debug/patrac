@@ -411,10 +411,12 @@ body.admin-mode .operator-clan-section { display: block; }
     border-bottom: 1px solid var(--hud-border);
     text-shadow: var(--text-glow);
     position: relative;
-    z-index: 20;
+    /* Nad kartami / mapovými panely (až ~1010), pod lightboxem (100000). */
+    z-index: 50000;
 }
 .hud-top-brand {
     display: flex; align-items: center; gap: 8px; position: relative;
+    z-index: 50001;
 }
 .hud-menu-btn {
     background: none; border: 1px solid rgba(74, 246, 38, 0.35);
@@ -430,7 +432,7 @@ body.admin-mode .operator-clan-section { display: block; }
     display: none; position: absolute; top: calc(100% + 6px); left: 0;
     min-width: 180px; background: var(--overlay-bg);
     border: 1px solid var(--hud-border); box-shadow: var(--neon-glow);
-    z-index: 30; padding: 6px 0;
+    z-index: 50002; padding: 6px 0;
 }
 .hud-menu-dropdown.open { display: block; }
 .hud-menu-user {

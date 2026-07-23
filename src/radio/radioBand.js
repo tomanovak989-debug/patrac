@@ -90,7 +90,9 @@ export function stepFrequency(mhz, steps) {
 }
 
 /**
- * Mapuje identifikátor (comCode) na platný kanál v pásmu na mřížce 0.025.
+ * Mapuje identifikátor (comCode) na platný kanál.
+ * Stabilní vzorec v pásmu 462.xxx (stejný jako dřív), jen snap na 0.025 —
+ * ať se po updatu nepřeskočí frekvence komunity.
  */
 export function channelFromCode(code, fallbackMHz) {
     var raw = String(code || '').trim().toUpperCase();
@@ -100,18 +102,25 @@ export function channelFromCode(code, fallbackMHz) {
         for (i = 0; i < raw.length; i++) {
             n = ((n * 31) + raw.charCodeAt(i)) >>> 0;
         }
-    } else if (fallbackMHz != null && isFinite(fallbackMHz)) {
-        return normalizeFrequency(fallbackMHz);
-    } else {
-        return normalizeFrequency(435);
+        var legacy = '462.' + String((n % 999) + 1).padStart(3, '0');
+        return normalizeFrequency(legacy);
     }
-    var stepKhz = Math.round(TUNE_STEP_MHZ * 1000);
-    var minKhz = Math.round(BAND_MIN_MHZ * 1000);
-    var maxKhz = Math.round(BAND_MAX_MHZ * 1000);
-    var slots = Math.floor((maxKhz - minKhz) / stepKhz) + 1;
-    var idx = n % slots;
-    var khz = minKhz + idx * stepKhz;
-    return formatFrequency(khz / 1000);
+    if (fallbackMHz != null && isFinite(fallbackMHz)) {
+        return normalizeFrequency(fallbackMHz);
+    }
+    return normalizeFrequency(435);
+}
+
+/** Migrace uložené frekvence po změně pásma (např. stará 121.500). */
+export function migrateStoredFrequency(value, fallback) {
+    var s = String(value == null ? '' : value).trim().replace(',', '.');
+    if (!s) return fallback || normalizeFrequency(435);
+    if (s === '121.500' || /^121\.5/.test(s)) return EMERGENCY_FREQUENCY;
+    var n = parseFrequencyMHz(s);
+    if (!isFinite(n)) return fallback || normalizeFrequency(435);
+    if (n >= BAND_MIN_MHZ && n <= BAND_MAX_MHZ) return normalizeFrequency(s);
+    /* Mimo nové pásmo — nouzová místo tichého clampu na 400.000 */
+    return EMERGENCY_FREQUENCY;
 }
 
 /**

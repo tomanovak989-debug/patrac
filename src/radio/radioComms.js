@@ -15,6 +15,7 @@ import {
     stepFrequency,
     channelFromCode,
     frequencyChannelId,
+    migrateStoredFrequency,
     buildDefaultDialPresets,
     findDialIndex,
     parseFrequencyMHz
@@ -33,6 +34,7 @@ export {
     stepFrequency,
     channelFromCode,
     frequencyChannelId,
+    migrateStoredFrequency,
     buildDefaultDialPresets,
     findDialIndex
 };
@@ -134,24 +136,119 @@ function notebookKey(userId) {
     return 'patrac_radio_notebook_' + (userId || 'local');
 }
 
+/** Doplní dial presety, ale nepřepíše uloženou frekvenci / heslo / uživatelské sloty. */
+function upgradePresets(savedPresets, basePresets) {
+    var bySlot = {};
+    var i;
+    var list = [];
+    if (Array.isArray(savedPresets)) {
+        for (i = 0; i < savedPresets.length; i++) {
+            if (savedPresets[i] && savedPresets[i].slot != null) {
+                bySlot[savedPresets[i].slot] = savedPresets[i];
+            }
+        }
+    }
+    for (i = 0; i < basePresets.length; i++) {
+        var b = basePresets[i];
+        var prev = bySlot[b.slot];
+        if (prev && prev.frequency) {
+            list.push({
+                slot: b.slot,
+                label: prev.label || b.label,
+                frequency: migrateStoredFrequency(prev.frequency, b.frequency),
+                encryptionKey: prev.encryptionKey != null ? prev.encryptionKey : b.encryptionKey,
+                scope: prev.scope || b.scope,
+                dial: true
+            });
+            delete bySlot[b.slot];
+        } else {
+            list.push(Object.assign({}, b));
+        }
+    }
+    /* Vlastní sloty mimo dial necháme */
+    Object.keys(bySlot).forEach(function(slot) {
+        var p = bySlot[slot];
+        if (!p || !p.frequency) return;
+        list.push({
+            slot: Number(slot) || p.slot,
+            label: p.label || ('PRE ' + slot),
+            frequency: migrateStoredFrequency(p.frequency, p.frequency),
+            encryptionKey: p.encryptionKey || '',
+            scope: p.scope || 'private',
+            dial: !!p.dial
+        });
+    });
+    list.sort(function(a, b) { return (a.slot || 0) - (b.slot || 0); });
+    return list;
+}
+
+function findRichestLocalStorage(prefix, scoreFn) {
+    var bestRaw = null;
+    var bestScore = -1;
+    try {
+        for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k || k.indexOf(prefix) !== 0) continue;
+            var raw = localStorage.getItem(k);
+            if (!raw) continue;
+            var score = 0;
+            try { score = scoreFn(JSON.parse(raw), k); } catch (e) { continue; }
+            if (score > bestScore) {
+                bestScore = score;
+                bestRaw = raw;
+            }
+        }
+    } catch (e2) {}
+    return bestScore > 0 ? bestRaw : null;
+}
+
 export function loadRadioState(userId, ctx) {
     var key = radioStateKey(userId);
     var base = defaultRadioState(userId, ctx);
+    var raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) {}
+    if (!raw) {
+        raw = findRichestLocalStorage('patrac_radio_state_', function(obj) {
+            if (!obj || typeof obj !== 'object') return 0;
+            var n = (obj.presets && obj.presets.length) || 0;
+            return (obj.frequency ? 10 : 0) + n;
+        });
+    }
+    if (!raw) return base;
+
     try {
-        var raw = localStorage.getItem(key);
-        if (raw) {
-            var parsed = JSON.parse(raw);
-            if (!parsed.presets || parsed.presets.length < 8) parsed.presets = base.presets;
-            if (!parsed.frequency) parsed.frequency = base.frequency;
-            else parsed.frequency = normalizeFrequency(parsed.frequency) || base.frequency;
-            if (parsed.encryptionKey == null) parsed.encryptionKey = base.encryptionKey;
-            if (!parsed.keypadMode) parsed.keypadMode = 'tx';
-            if (!parsed.dialBuffer) parsed.dialBuffer = '';
-            if (parsed.activePresetSlot == null) parsed.activePresetSlot = 1;
-            return parsed;
+        var parsed = JSON.parse(raw);
+        var tunedFreq = parsed.frequency
+            ? migrateStoredFrequency(parsed.frequency, base.frequency)
+            : base.frequency;
+        var tunedKey = parsed.encryptionKey != null ? parsed.encryptionKey : base.encryptionKey;
+
+        /* Dial upgrade: doplnit kanály, ale držet naladění hráče. */
+        if (!parsed.presets || !parsed.presets.length) {
+            parsed.presets = base.presets;
+        } else if (parsed.presets.length < 8) {
+            parsed.presets = upgradePresets(parsed.presets, base.presets);
+            /* Slot 1 (Komunita) ať sedí na aktuální com freq, bez přepsání naladění. */
+            if (parsed.presets[0] && parsed.presets[0].slot === 1) {
+                parsed.presets[0].frequency = base.frequency;
+                parsed.presets[0].encryptionKey = base.encryptionKey;
+            }
         }
-    } catch (e) {}
-    return base;
+
+        parsed.frequency = tunedFreq;
+        parsed.encryptionKey = tunedKey;
+        if (!parsed.keypadMode) parsed.keypadMode = 'tx';
+        if (!parsed.dialBuffer) parsed.dialBuffer = '';
+        /* activePresetSlot jen pokud sedí na aktuální freq — jinak „přímý zápis“. */
+        var di = findDialIndex(parsed.presets, parsed.frequency, parsed.activePresetSlot);
+        if (di >= 0) parsed.activePresetSlot = parsed.presets[di].slot;
+        else parsed.activePresetSlot = null;
+
+        try { localStorage.setItem(key, JSON.stringify(parsed)); } catch (eSave) {}
+        return parsed;
+    } catch (err) {
+        return base;
+    }
 }
 
 export function saveRadioState(userId, state) {
@@ -187,10 +284,48 @@ function migrateNotebook(raw) {
 }
 
 export function loadNotebook(userId) {
+    var key = notebookKey(userId);
+    var current = null;
     try {
-        var raw = localStorage.getItem(notebookKey(userId));
-        if (raw) return migrateNotebook(JSON.parse(raw));
+        var raw = localStorage.getItem(key);
+        if (raw) current = migrateNotebook(JSON.parse(raw));
     } catch (e) {}
+
+    function stationScore(nb) {
+        if (!nb) return 0;
+        var n = (nb.station && nb.station.length) || 0;
+        var legacy = 0;
+        ['private', 'community', 'global'].forEach(function(t) {
+            if (nb[t] && nb[t].length) legacy += nb[t].length;
+        });
+        return n + legacy;
+    }
+
+    function isOnlyWelcome(nb) {
+        if (!nb || !nb.station || nb.station.length !== 1) return false;
+        var e = nb.station[0];
+        return e && (e.id === 'sys_welcome' || e.from === 'SYSTÉM');
+    }
+
+    var curScore = stationScore(current);
+    /* Prázdný nebo jen uvítací řádek → zkus obnovit bohatší sešit z jiné session. */
+    if (!current || curScore === 0 || isOnlyWelcome(current)) {
+        var recovered = findRichestLocalStorage('patrac_radio_notebook_', function(obj, k) {
+            if (k === key) return 0;
+            return stationScore(migrateNotebook(obj));
+        });
+        if (recovered) {
+            try {
+                var nb = migrateNotebook(JSON.parse(recovered));
+                if (stationScore(nb) > curScore) {
+                    try { localStorage.setItem(key, JSON.stringify(nb)); } catch (e2) {}
+                    return nb;
+                }
+            } catch (e3) {}
+        }
+    }
+
+    if (current) return current;
     return { station: [], notes: [], grids: [], pageIndex: { station: 0, notes: 0, grids: 0 } };
 }
 
