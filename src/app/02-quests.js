@@ -1557,11 +1557,52 @@ function captureCommunityMapCachePayload(comCode) {
     };
 }
 
+function hasMapCacheCoord(val) {
+    if (val == null || val === '') return false;
+    var n = typeof val === 'number' ? val : parseFloat(val);
+    return typeof n === 'number' && !isNaN(n);
+}
+
+function mergeMapCachePoints(existingPoints, incomingPoints) {
+    var out = {};
+    existingPoints = existingPoints || {};
+    incomingPoints = incomingPoints || {};
+    var keys = {};
+    var k;
+    for (k in existingPoints) {
+        if (Object.prototype.hasOwnProperty.call(existingPoints, k)) keys[k] = true;
+    }
+    for (k in incomingPoints) {
+        if (Object.prototype.hasOwnProperty.call(incomingPoints, k)) keys[k] = true;
+    }
+    for (k in keys) {
+        if (!Object.prototype.hasOwnProperty.call(keys, k)) continue;
+        var left = existingPoints[k] || {};
+        var right = incomingPoints[k] || {};
+        var lat = hasMapCacheCoord(right.lat) ? right.lat : (hasMapCacheCoord(left.lat) ? left.lat : null);
+        var lng = hasMapCacheCoord(right.lng) ? right.lng : (hasMapCacheCoord(left.lng) ? left.lng : null);
+        if (hasMapCacheCoord(lat) && hasMapCacheCoord(lng)) {
+            out[k] = { lat: String(lat), lng: String(lng) };
+        }
+    }
+    return out;
+}
+
 function snapshotCommunityMapCache(comCode, payload) {
     payload = payload || captureCommunityMapCachePayload(comCode);
     if (!payload) return null;
     comCode = String(payload.comCode || comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
     if (!comCode) return payload;
+    // Nikdy nepřepisuj existující body v cache prázdným snapshotem (po clear session apod.).
+    try {
+        var prevRaw = localStorage.getItem(getCommunityMapCacheKey(comCode));
+        if (prevRaw) {
+            var prev = JSON.parse(prevRaw);
+            if (prev && typeof prev === 'object') {
+                payload.points = mergeMapCachePoints(prev.points, payload.points);
+            }
+        }
+    } catch (eMergePts) {}
     var stored = stripMapCachePayloadForStorage(payload);
     if (!safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(stored))) {
         var minimal = {
@@ -1684,7 +1725,9 @@ function collectCommunityQuestsFromMapPayload(payload) {
     };
 }
 
-function restoreCommunityMapCache(comCode) {
+function restoreCommunityMapCache(comCode, options) {
+    options = options || {};
+    var fillOnly = options.fillOnly === true;
     comCode = String(comCode || '').trim().toUpperCase();
     if (!comCode) return false;
     var raw = localStorage.getItem(getCommunityMapCacheKey(comCode));
@@ -1697,25 +1740,51 @@ function restoreCommunityMapCache(comCode) {
         var qid;
         for (qid in points) {
             if (!Object.prototype.hasOwnProperty.call(points, qid)) continue;
-            if (points[qid].lat) localStorage.setItem('point_' + qid + '_lat', points[qid].lat);
-            if (points[qid].lng) localStorage.setItem('point_' + qid + '_lng', points[qid].lng);
+            var latVal = points[qid] && points[qid].lat;
+            var lngVal = points[qid] && points[qid].lng;
+            if (!hasMapCacheCoord(latVal) || !hasMapCacheCoord(lngVal)) continue;
+            if (fillOnly && hasStoredQuestCoords(qid)) continue;
+            localStorage.setItem('point_' + qid + '_lat', String(latVal));
+            localStorage.setItem('point_' + qid + '_lng', String(lngVal));
         }
 
         var meta = data.storyPosMeta || {};
         for (qid in meta) {
             if (!Object.prototype.hasOwnProperty.call(meta, qid)) continue;
             if (meta[qid].note) localStorage.setItem('story_pos_note_' + qid, meta[qid].note);
-            else try { localStorage.removeItem('story_pos_note_' + qid); } catch (e) {}
+            else if (!fillOnly) {
+                try { localStorage.removeItem('story_pos_note_' + qid); } catch (e) {}
+            }
             if (meta[qid].img) localStorage.setItem('story_pos_img_' + qid, meta[qid].img);
-            else try { localStorage.removeItem('story_pos_img_' + qid); } catch (e) {}
+            else if (!fillOnly) {
+                try { localStorage.removeItem('story_pos_img_' + qid); } catch (e) {}
+            }
         }
 
-        if (Array.isArray(data.freePois)) safeLocalStorageSet('map_free_pois', JSON.stringify(data.freePois));
-        if (Array.isArray(data.customQuests)) safeLocalStorageSet('custom_quests_list', JSON.stringify(data.customQuests));
-        if (Array.isArray(data.randomQuests)) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
-        if (Array.isArray(data.dismissed)) safeLocalStorageSet('dismissed_quests', JSON.stringify(data.dismissed));
-        if (data.reqOverrides) safeLocalStorageSet('quest_req_overrides', JSON.stringify(data.reqOverrides));
-        if (data.launched) setCommunityLaunchedQuests(data.launched);
+        if (!fillOnly) {
+            if (Array.isArray(data.freePois)) safeLocalStorageSet('map_free_pois', JSON.stringify(data.freePois));
+            if (Array.isArray(data.customQuests)) safeLocalStorageSet('custom_quests_list', JSON.stringify(data.customQuests));
+            if (Array.isArray(data.randomQuests)) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
+            if (Array.isArray(data.dismissed)) safeLocalStorageSet('dismissed_quests', JSON.stringify(data.dismissed));
+            if (data.reqOverrides) safeLocalStorageSet('quest_req_overrides', JSON.stringify(data.reqOverrides));
+            if (data.launched) setCommunityLaunchedQuests(data.launched);
+        } else {
+            if (Array.isArray(data.freePois)) {
+                var curPois = getSafeJSON('map_free_pois');
+                if (!curPois.length) safeLocalStorageSet('map_free_pois', JSON.stringify(data.freePois));
+            }
+            if (Array.isArray(data.customQuests)) {
+                var curCustom = getSafeJSON('custom_quests_list');
+                if (!curCustom.length) safeLocalStorageSet('custom_quests_list', JSON.stringify(data.customQuests));
+            }
+            if (Array.isArray(data.randomQuests)) {
+                var curRandom = getRandomQuestsList();
+                if (!curRandom.length) localStorage.setItem('random_quests_list', JSON.stringify(data.randomQuests));
+            }
+            if (data.launched && Object.keys(getCommunityLaunchedQuests()).length === 0) {
+                setCommunityLaunchedQuests(data.launched);
+            }
+        }
         if (fogOfWarMod && fogOfWarMod.applyCommunityFogPrefs) {
             var fogApply = {};
             if (typeof data.fogEnabled === 'boolean') fogApply.fogEnabled = data.fogEnabled;
@@ -1744,7 +1813,10 @@ function flushCommunityMapCacheToCloud(comCode, payload) {
     }).catch(function(err) { console.warn('[cloud] pois flush', err); });
     chain = chain.then(function() {
         return patracImport('services/questService.js').then(function(mod) {
-            return mod.saveCommunityQuestsToCloud(comCode, quests);
+            return mod.fetchCommunityQuestsFromCloud(comCode).then(function(cloud) {
+                var merged = mod.mergeCommunityQuests(cloud || {}, quests);
+                return mod.saveCommunityQuestsToCloud(comCode, merged);
+            });
         });
     }).catch(function(err) { console.warn('[cloud] quests flush', err); });
     return chain;
@@ -2117,9 +2189,13 @@ function syncCommunityQuestsToCloud() {
         if (typeof renderQuestList === 'function') renderQuestList();
         return;
     }
-    var quests = collectCommunityQuestsForCloud();
+    var localQuests = collectCommunityQuestsForCloud();
     patracImport('services/questService.js').then(function(mod) {
-        return mod.saveCommunityQuestsToCloud(comCode, quests);
+        return mod.fetchCommunityQuestsFromCloud(comCode).then(function(cloud) {
+            // Merge dřív než zápis — lokální null (po reload clear) nesmí přepsat cloudové útočiště.
+            var merged = mod.mergeCommunityQuests(cloud || {}, localQuests);
+            return mod.saveCommunityQuestsToCloud(comCode, merged);
+        });
     }).then(function() {
         if (typeof reloadAllMapPoints === 'function') reloadAllMapPoints();
         if (typeof renderQuestList === 'function') renderQuestList();

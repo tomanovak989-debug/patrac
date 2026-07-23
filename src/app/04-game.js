@@ -507,7 +507,9 @@ function patracLogout() {
         console.warn('[auth] logout', err);
     });
     try { localStorage.removeItem('patrac_session'); } catch (e) {}
-    clearGlobalSessionGameCache();
+    // Mapové body patří komunitě — při odhlášení / odchodu z admina je NEmazat,
+    // jinak ruční přihlášení zpět smaže útočiště (a sync pošle null do cloudu).
+    clearGlobalSessionGameCache({ keepMapPoints: true });
     localStorage.setItem('items_community', '[]');
     localStorage.setItem('items_personal', '[]');
 
@@ -632,14 +634,20 @@ function getPatracProfileKey(userId) {
 }
 
 /** Smaže globální herní cache — před přepnutím účtu/komunity. */
-function clearGlobalSessionGameCache() {
+function clearGlobalSessionGameCache(options) {
+    options = options || {};
+    var keepMapPoints = options.keepMapPoints === true;
     var keysToRemove = [];
     for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
         if (!key) continue;
         if (key.indexOf('quest_done_') === 0 ||
-            key.indexOf('unlocked_story_') === 0 ||
-            key.indexOf('point_') === 0 ||
+            key.indexOf('unlocked_story_') === 0) {
+            keysToRemove.push(key);
+            continue;
+        }
+        if (keepMapPoints) continue;
+        if (key.indexOf('point_') === 0 ||
             key.indexOf('story_pos_note_') === 0 ||
             key.indexOf('story_pos_img_') === 0) {
             keysToRemove.push(key);
@@ -649,11 +657,13 @@ function clearGlobalSessionGameCache() {
         try { localStorage.removeItem(keysToRemove[r]); } catch (e) {}
     }
     safeLocalStorageSet('items_community', '[]');
-    safeLocalStorageSet('map_free_pois', '[]');
-    safeLocalStorageSet('custom_quests_list', '[]');
-    safeLocalStorageSet('random_quests_list', '[]');
-    safeLocalStorageSet('dismissed_quests', '[]');
-    safeLocalStorageSet('quest_req_overrides', '{}');
+    if (!keepMapPoints) {
+        safeLocalStorageSet('map_free_pois', '[]');
+        safeLocalStorageSet('custom_quests_list', '[]');
+        safeLocalStorageSet('random_quests_list', '[]');
+        safeLocalStorageSet('dismissed_quests', '[]');
+        safeLocalStorageSet('quest_req_overrides', '{}');
+    }
     safeLocalStorageSet('quest_sections_state', '{}');
 }
 
@@ -686,15 +696,24 @@ function emptyCommunityQuestsForCloud() {
 
 function beginSessionForUser(userId, options) {
     options = options || {};
-    var previousCom = localStorage.getItem('com_code') || '';
+    var previousCom = String(localStorage.getItem('com_code') || '').trim().toUpperCase();
     if (previousCom) snapshotCommunityMapCache(previousCom);
-    clearGlobalSessionGameCache();
+    var accounts = getPatracAccounts();
+    var acc = accounts[userId];
+    var nextCom = String((acc && acc.comCode) || '').trim().toUpperCase();
+    // Stejná komunita (reload / re-login / odchod z admina): nemazat mapové body.
+    var keepMapPoints = !!(previousCom && nextCom && previousCom === nextCom);
+    clearGlobalSessionGameCache({ keepMapPoints: keepMapPoints });
     applyAccountToLocalStorage(userId);
-    var comCode = localStorage.getItem('com_code') || '';
+    var comCode = String(localStorage.getItem('com_code') || '').trim().toUpperCase();
     loadCommunityInventoryFromComCode(comCode);
-    if (!restoreCommunityMapCache(comCode) && previousCom && previousCom !== comCode) {
-        restoreCommunityMapCache(previousCom);
+    if (!keepMapPoints) {
+        if (!restoreCommunityMapCache(comCode) && previousCom && previousCom !== comCode) {
+            restoreCommunityMapCache(previousCom);
+        }
     }
+    // Vždy doplň chybějící body z cache (kryje logout→ruční login i admin→hráč).
+    if (comCode) restoreCommunityMapCache(comCode, { fillOnly: true });
     var profileData = options.profileData || getUserProfileData(userId);
     applyUserProfileDataToSession(userId, profileData);
     var profile = getPlayerProfile();
@@ -1160,9 +1179,11 @@ function patracOperatorLogin() {
                 members: []
             };
         }
-        var previousCom = localStorage.getItem('com_code') || '';
+        var previousCom = String(localStorage.getItem('com_code') || '').trim().toUpperCase();
+        var nextCom = String(comCode || '').trim().toUpperCase();
         if (previousCom) snapshotCommunityMapCache(previousCom);
-        clearGlobalSessionGameCache();
+        var keepMapPoints = !!(previousCom && nextCom && previousCom === nextCom);
+        clearGlobalSessionGameCache({ keepMapPoints: keepMapPoints });
         isOperatorMode = true;
         operatorComCode = comCode;
         currentlyEditingPlayerId = null;
@@ -1173,7 +1194,8 @@ function patracOperatorLogin() {
         try { localStorage.removeItem('patrac_session'); } catch (e) {}
         localStorage.setItem('items_personal', '[]');
         sanitizeCommunityMembers(comCode);
-        restoreCommunityMapCache(comCode);
+        if (keepMapPoints) restoreCommunityMapCache(comCode, { fillOnly: true });
+        else restoreCommunityMapCache(comCode);
         launchGame();
     }).catch(function(err) {
         if (submitBtn) submitBtn.disabled = false;
@@ -1469,7 +1491,8 @@ function saveOperatorEdits() {
 
 function patracExitOperatorKeepIdentity() {
     if (!isOperatorMode) return;
-    snapshotCommunityMapCache(localStorage.getItem('com_code') || operatorComCode || '');
+    var comCode = localStorage.getItem('com_code') || operatorComCode || '';
+    snapshotCommunityMapCache(comCode);
     var userId = currentlyEditingPlayerId || localStorage.getItem('patrac_session');
     if (!userId) {
         alert('Nejdřív v záložce Útočiště převez identitu hráče (PŘEVZÍT IDENTITU).');
@@ -1492,6 +1515,9 @@ function patracExitOperatorKeepIdentity() {
     document.body.classList.remove('admin-editing-player');
 
     applyAccountToLocalStorage(userId);
+    // Doplň mapové body z cache (admin clear / jiný účet je nesměl smazat).
+    var playerCom = String(localStorage.getItem('com_code') || comCode || '').trim().toUpperCase();
+    if (playerCom) restoreCommunityMapCache(playerCom, { fillOnly: true });
     var storedProfile = loadUserProfileDataFromStorage(userId);
     applyUserProfileDataToSession(userId, storedProfile);
     reconcileCommunityInventory(localStorage.getItem('com_code') || '');
@@ -1512,6 +1538,7 @@ function patracExitOperatorKeepIdentity() {
     loadCustomCraftedItems();
     updateHudMenuUser();
     updateRadioDisplayHud();
+    try { reloadAllMapPoints(); } catch (eReload) {}
     var editBtn = document.getElementById('btn-toggle-profile-edit');
     if (editBtn) editBtn.style.display = 'block';
 }
@@ -1633,6 +1660,7 @@ function initCloudSyncAsync() {
             return { ok: false };
         });
         chain = chain.then(function() {
+            try { restoreCommunityMapCache(comCode, { fillOnly: true }); } catch (eFill) {}
             snapshotCommunityMapCache(comCode);
         });
     }
