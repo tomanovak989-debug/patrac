@@ -26,12 +26,15 @@ import {
     NOTEBOOK_TAB_LABELS,
     NOTEBOOK_LINES_PER_PAGE,
     NOTEBOOK_CHARS_PER_LINE,
+    NOTEBOOK_MAX_PAGES,
     CHANNEL_SCOPE_LABELS,
     getNotebookPageCount,
     expandPlainNotebookLines,
     getStationVisualPageCount,
     getStationVisualPageLines,
-    getStationVisualPageIndexForEntry
+    getStationVisualPageIndexForEntry,
+    removeLastStationPage,
+    trimStationToMaxPages
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
 import {
@@ -57,6 +60,53 @@ var flipTimer = null;
 function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
     if (!Array.isArray(notebook.grids)) notebook.grids = [];
+}
+
+/**
+ * Počet řádků / znaků podle reálné velikosti listu (vyplní celý papír).
+ */
+function getNotebookLayout() {
+    var sheet = el('radio-notebook-sheet');
+    var box = el('radio-notebook-lines');
+    var fallback = {
+        linesPerPage: NOTEBOOK_LINES_PER_PAGE,
+        charsPerLine: NOTEBOOK_CHARS_PER_LINE
+    };
+    if (!sheet || !box) return fallback;
+
+    var cs = window.getComputedStyle(box);
+    var linePx = parseFloat(cs.lineHeight) || 18;
+    if (!isFinite(linePx) || linePx < 8) linePx = 18;
+    var padTop = parseFloat(cs.paddingTop) || 0;
+    var padBottom = parseFloat(cs.paddingBottom) || 0;
+    var usableH = Math.max(0, box.clientHeight - padTop - padBottom);
+    var lines = Math.floor(usableH / linePx);
+    if (lines < 8) lines = NOTEBOOK_LINES_PER_PAGE;
+    if (lines > 40) lines = 40;
+
+    var padLeft = parseFloat(cs.paddingLeft) || 0;
+    var padRight = parseFloat(cs.paddingRight) || 0;
+    var usableW = Math.max(40, box.clientWidth - padLeft - padRight);
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:' + cs.font;
+    probe.textContent = '0000000000';
+    document.body.appendChild(probe);
+    var tenW = probe.getBoundingClientRect().width || 60;
+    document.body.removeChild(probe);
+    var charW = tenW / 10;
+    var chars = Math.floor(usableW / Math.max(charW, 4));
+    if (chars < 24) chars = NOTEBOOK_CHARS_PER_LINE;
+    if (chars > 90) chars = 90;
+
+    sheet.style.setProperty('--nb-line', linePx + 'px');
+    sheet.style.setProperty('--nb-lines', String(lines));
+
+    return { linesPerPage: lines, charsPerLine: chars };
+}
+
+function stationPageMetrics() {
+    var layout = getNotebookLayout();
+    return layout;
 }
 
 function getCurrentPageIndex() {
@@ -199,30 +249,35 @@ function renderNotebook(options) {
     var pageLabel = el('radio-notebook-page-label');
     var prevBtn = el('radio-notebook-prev');
     var nextBtn = el('radio-notebook-next');
+    var tearBtn = el('radio-notebook-tear');
     if (!box) return;
 
     ensureNotebookMeta();
+    var layout = stationPageMetrics();
+    var linesPerPage = layout.linesPerPage;
+    var charsPerLine = layout.charsPerLine;
     var pageIdx = getCurrentPageIndex();
 
     if (activeNotebookTab === 'grids') {
-        var gridCount = getGridPageCount(NOTEBOOK_LINES_PER_PAGE);
+        var gridCount = getGridPageCount(linesPerPage);
         if (pageIdx >= gridCount) {
             pageIdx = gridCount - 1;
             setCurrentPageIndex(pageIdx);
         }
-        var gridPage = getGridPage(pageIdx, NOTEBOOK_LINES_PER_PAGE);
+        var gridPage = getGridPage(pageIdx, linesPerPage);
         box.innerHTML = renderGridPageHtml(gridPage);
         bindGridCopyButtons(box);
         if (pageNum) pageNum.textContent = String(pageIdx + 1);
         if (pageLabel) pageLabel.textContent = (gridPage.title || 'Gridy') + ' · ' + (pageIdx + 1) + '/' + gridCount;
         if (prevBtn) prevBtn.disabled = pageIdx <= 0;
         if (nextBtn) nextBtn.disabled = pageIdx >= gridCount - 1;
+        if (tearBtn) tearBtn.style.display = 'none';
         return;
     }
 
     var pageCount = activeNotebookTab === 'station'
-        ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
-        : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE);
+        ? getStationVisualPageCount(notebook, linesPerPage, charsPerLine)
+        : getNotebookPageCount(notebook, activeNotebookTab, linesPerPage);
 
     if (pageIdx >= pageCount) {
         pageIdx = pageCount - 1;
@@ -234,7 +289,7 @@ function renderNotebook(options) {
         if (!items.length) {
             box.innerHTML = '<p class="radio-notebook-empty">Poznámky — zatím prázdné.<br>Rychlé poznámky přibydou v další verzi.</p>';
         } else {
-            var visualLines = expandPlainNotebookLines(items, NOTEBOOK_CHARS_PER_LINE);
+            var visualLines = expandPlainNotebookLines(items, charsPerLine);
             var itemsHtml = '';
             for (var n = 0; n < visualLines.length; n++) {
                 itemsHtml += '<div class="radio-notebook-line">' + visualLines[n] + '</div>';
@@ -245,12 +300,13 @@ function renderNotebook(options) {
         if (pageLabel) pageLabel.textContent = NOTEBOOK_TAB_LABELS.notes || 'Poznámky';
         if (prevBtn) prevBtn.disabled = true;
         if (nextBtn) nextBtn.disabled = true;
+        if (tearBtn) tearBtn.style.display = 'none';
         return;
     }
 
     if (activeNotebookTab !== 'station') return;
 
-    var list = getStationVisualPageLines(notebook, pageIdx, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE);
+    var list = getStationVisualPageLines(notebook, pageIdx, linesPerPage, charsPerLine);
     if (!list.length && pageIdx === 0) {
         box.innerHTML = '<p class="radio-notebook-empty">↓ příchozí · ↑ odchozí<br>Nalaď frekvenci (PT = bez šifry OK), pak vysílej.</p>';
     } else {
@@ -268,6 +324,13 @@ function renderNotebook(options) {
     if (pageLabel) pageLabel.textContent = 'List ' + (pageIdx + 1) + ' / ' + pageCount;
     if (prevBtn) prevBtn.disabled = pageIdx <= 0;
     if (nextBtn) nextBtn.disabled = pageIdx >= pageCount - 1;
+    if (tearBtn) {
+        tearBtn.style.display = '';
+        var hasTearable = (notebook.station || []).some(function(e) {
+            return e && e.id !== 'sys_welcome';
+        });
+        tearBtn.disabled = !hasTearable;
+    }
 }
 
 function bindGridCopyButtons(box) {
@@ -296,11 +359,12 @@ function bindGridCopyButtons(box) {
 
 function goNotebookPage(delta) {
     if (activeNotebookTab === 'notes') return;
+    var layout = stationPageMetrics();
     var pageCount = activeNotebookTab === 'grids'
-        ? getGridPageCount(NOTEBOOK_LINES_PER_PAGE)
+        ? getGridPageCount(layout.linesPerPage)
         : (activeNotebookTab === 'station'
-            ? getStationVisualPageCount(notebook, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE)
-            : getNotebookPageCount(notebook, activeNotebookTab, NOTEBOOK_LINES_PER_PAGE));
+            ? getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine)
+            : getNotebookPageCount(notebook, activeNotebookTab, layout.linesPerPage));
     var next = getCurrentPageIndex() + delta;
     if (next < 0 || next >= pageCount) return;
     /* Nejdřív odklopit aktuální list, teprve pak vyměnit obsah. */
@@ -309,6 +373,23 @@ function goNotebookPage(delta) {
         persist();
         renderNotebook();
     }, delta);
+}
+
+function tearLastStationPage() {
+    if (activeNotebookTab !== 'station') return;
+    var layout = stationPageMetrics();
+    var pages = getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
+    var msg = pages <= 1
+        ? 'Smazat všechny záznamy na staničním listu?'
+        : 'Vytrhnout poslední list (list ' + pages + ')? Záznamy na něm se smažou.';
+    if (!confirm(msg)) return;
+    var result = removeLastStationPage(notebook, layout.linesPerPage, layout.charsPerLine);
+    notebook = result.notebook;
+    trimStationToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+    var newCount = getStationVisualPageCount(notebook, layout.linesPerPage, layout.charsPerLine);
+    if (getCurrentPageIndex() >= newCount) setCurrentPageIndex(Math.max(0, newCount - 1));
+    persist();
+    renderNotebook();
 }
 
 function bindNotebookSwipe() {
@@ -448,12 +529,17 @@ function recordEntry(entry) {
     if (entry.id) seenMessageIds[entry.id] = true;
     if (entry.cloudId) seenMessageIds[entry.cloudId] = true;
 
+    var layout = stationPageMetrics();
     var list = notebook.station || [];
     var entryIndex = list.length;
     appendNotebookEntry(notebook, 'station', entry);
+    trimStationToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+    /* Po trimu může entryIndex klesnout — najdi znovu. */
+    entryIndex = (notebook.station || []).indexOf(entry);
+    if (entryIndex < 0) entryIndex = (notebook.station || []).length - 1;
     persist();
 
-    var pageForEntry = getStationVisualPageIndexForEntry(notebook, entryIndex, NOTEBOOK_LINES_PER_PAGE, NOTEBOOK_CHARS_PER_LINE);
+    var pageForEntry = getStationVisualPageIndexForEntry(notebook, entryIndex, layout.linesPerPage, layout.charsPerLine);
     var onStationTab = activeNotebookTab === 'station';
 
     if (onStationTab) {
@@ -776,6 +862,21 @@ function bindKeypad() {
         nextPage._radioCommsBound = true;
         nextPage.addEventListener('click', function() { goNotebookPage(1); });
     }
+    var tearPage = el('radio-notebook-tear');
+    if (tearPage && !tearPage._radioCommsBound) {
+        tearPage._radioCommsBound = true;
+        tearPage.addEventListener('click', function() { tearLastStationPage(); });
+    }
+    if (!window._patracNotebookResizeBound) {
+        window._patracNotebookResizeBound = true;
+        var resizeTimer = null;
+        window.addEventListener('resize', function() {
+            if (resizeTimer) clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                if (notebook) renderNotebook();
+            }, 180);
+        });
+    }
     bindNotebookSwipe();
     bindDisplayDialSwipe();
 }
@@ -844,6 +945,9 @@ export function initRadioCommsSystem(options) {
     bindKeypad();
     syncNotebookTabs();
     renderDisplay();
+    var layout = stationPageMetrics();
+    trimStationToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+    saveNotebook(c.userId, notebook);
     renderNotebook();
     refreshSubscriptions();
 }

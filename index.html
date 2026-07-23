@@ -640,6 +640,7 @@
                         <button type="button" id="radio-notebook-prev" title="Předchozí list">◀</button>
                         <span id="radio-notebook-page-label">List 1</span>
                         <button type="button" id="radio-notebook-next" title="Další list">▶</button>
+                        <button type="button" id="radio-notebook-tear" title="Vytrhnout poslední list">⌫ list</button>
                     </div>
                 </div>
             </div>
@@ -777,7 +778,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e42';
+        window.PATRAC_BUILD = '20260723e43';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

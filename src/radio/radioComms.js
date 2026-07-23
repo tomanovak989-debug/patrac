@@ -46,10 +46,12 @@ export const NOTEBOOK_TAB_LABELS = {
     grids: 'Gridy'
 };
 
-/** Počet řádků na jeden A4 list sešitu. */
+/** Výchozí / fallback počet řádků na list (přepíše se měřením listu). */
 export const NOTEBOOK_LINES_PER_PAGE = 16;
-/** Odhad znaků na jeden řádek (Patrick Hand, užší sešit). */
+/** Výchozí / fallback znaků na řádek. */
 export const NOTEBOOK_CHARS_PER_LINE = 58;
+/** Automaticky držet jen posledních N listů staničníku (varianta C). */
+export const NOTEBOOK_MAX_PAGES = 10;
 
 export const CHANNEL_SCOPE_LABELS = {
     global: 'GLOB',
@@ -501,6 +503,73 @@ export function getStationVisualPageIndexForEntry(notebook, entryIndex, linesPer
         }
     }
     return getStationVisualPageCount(notebook, linesPerPage, charsPerLine) - 1;
+}
+
+/**
+ * Varianta A: „vytrhnout“ poslední list — smaže záznamy, které na něm začínají.
+ * @returns {{ removed: number, notebook: object }}
+ */
+export function removeLastStationPage(notebook, linesPerPage, charsPerLine) {
+    notebook = notebook || { station: [] };
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    var station = notebook.station || [];
+    if (!station.length) return { removed: 0, notebook: notebook };
+
+    var all = expandStationEntriesToVisualLines(station, charsPerLine);
+    var pageCount = Math.max(1, Math.ceil(all.length / linesPerPage));
+    if (pageCount <= 1) {
+        /* Jediný list — smaž vše kromě uvítání. */
+        var keptWelcome = [];
+        var removedSingle = 0;
+        for (var s = 0; s < station.length; s++) {
+            if (station[s] && station[s].id === 'sys_welcome') keptWelcome.push(station[s]);
+            else removedSingle++;
+        }
+        notebook.station = keptWelcome;
+        return { removed: removedSingle, notebook: notebook };
+    }
+
+    var startLine = (pageCount - 1) * linesPerPage;
+    var drop = {};
+    for (var i = startLine; i < all.length; i++) {
+        if (all[i] && all[i].isFirst) drop[all[i].entryIndex] = true;
+    }
+    var next = [];
+    var removed = 0;
+    for (var j = 0; j < station.length; j++) {
+        if (drop[j]) {
+            removed++;
+            continue;
+        }
+        next.push(station[j]);
+    }
+    notebook.station = next;
+    return { removed: removed, notebook: notebook };
+}
+
+/**
+ * Varianta C: držet jen posledních maxPages listů (maže nejstarší záznamy).
+ */
+export function trimStationToMaxPages(notebook, maxPages, linesPerPage, charsPerLine) {
+    notebook = notebook || { station: [] };
+    maxPages = maxPages || NOTEBOOK_MAX_PAGES;
+    linesPerPage = linesPerPage || NOTEBOOK_LINES_PER_PAGE;
+    charsPerLine = charsPerLine || NOTEBOOK_CHARS_PER_LINE;
+    if (!notebook.station) notebook.station = [];
+
+    var guard = 0;
+    while (guard++ < 2000) {
+        var pages = getStationVisualPageCount(notebook, linesPerPage, charsPerLine);
+        if (pages <= maxPages) break;
+        if (!notebook.station.length) break;
+        var idx = 0;
+        if (notebook.station[0] && notebook.station[0].id === 'sys_welcome' && notebook.station.length > 1) {
+            idx = 1;
+        }
+        notebook.station.splice(idx, 1);
+    }
+    return notebook;
 }
 
 export function buildDisplayLines(state, ctx) {

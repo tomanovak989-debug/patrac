@@ -1212,6 +1212,12 @@ body.theme-light .radio-chat-input {
     border-radius: 3px;
 }
 .radio-notebook-nav button:disabled { opacity: 0.35; cursor: default; }
+#radio-notebook-tear {
+    margin-left: 6px;
+    border-color: rgba(140, 70, 40, 0.45);
+    color: #6a3a28;
+    background: #ead4b8;
+}
 body.theme-light .radio-notebook {
     background: linear-gradient(90deg, #6a6458 0, #6a6458 12px, #f7f0de 12px, #f2e9d4 100%);
 }
