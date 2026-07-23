@@ -28,9 +28,10 @@ Dva režimy:
 | Vzdálenost | Stav | Staničník |
 |------------|------|-----------|
 | ≤ 5 km | clear | plný plaintext |
-| > 5 … ≤ 15 km | weak | ořezaný text |
-| > 15 … ≤ 50 km | noise | jen šum (později Repeater) |
-| > 50 km | none | ticho / NO CARRIER |
+| > 5 … ≤ 7.5 km | weak | ořezaný text / chyby |
+| > 7.5 … ≤ 10 km | fragment | útržky zprávy |
+| > 10 … ≤ 12.5 km | noise | jen šum / anomálie |
+| > 12.5 km | none | ticho / žádný příjem |
 
 ---
 

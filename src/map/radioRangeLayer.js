@@ -1,5 +1,5 @@
 /**
- * Mapová vrstva rádiového dosahu — kruhy 5 / 15 / 50 km.
+ * Mapová vrstva rádiového dosahu — kruhy 5 / 7.5 / 10 / 12.5 km.
  */
 import { RANGE_KM } from '../radio/radioPropagation.js';
 import { nodesForRangeDisplay } from '../radio/radioNodes.js';
@@ -37,11 +37,11 @@ function clearCircles() {
 }
 
 function bandStyle(bandIndex, role) {
-    /* 0 = 5 km, 1 = 15 km, 2 = 50 km */
+    /* 0 = 5, 1 = 7.5, 2 = 10, 3 = 12.5 km */
     var isBase = role === 'base';
-    var weights = [2.4, 1.6, 1.1];
-    var opacities = [0.85, 0.5, 0.28];
-    var fills = [0.06, 0.03, 0.01];
+    var weights = [2.4, 1.8, 1.4, 1.0];
+    var opacities = [0.85, 0.55, 0.38, 0.22];
+    var fills = [0.06, 0.035, 0.02, 0.008];
     var color = isBase ? '#ff3355' : '#ff0033';
     return {
         color: color,
@@ -97,7 +97,12 @@ export function refreshRadioRangeLayer() {
     if (!_visible) return;
 
     var entries = nodesForRangeDisplay(_deps);
-    var radii = [RANGE_KM.CLEAR_MAX, RANGE_KM.WEAK_MAX, RANGE_KM.NOISE_MAX];
+    var radii = [
+        RANGE_KM.CLEAR_MAX,
+        RANGE_KM.WEAK_MAX,
+        RANGE_KM.FRAGMENT_MAX,
+        RANGE_KM.NOISE_MAX
+    ];
     for (var e = 0; e < entries.length; e++) {
         var entry = entries[e];
         var node = entry && entry.node;

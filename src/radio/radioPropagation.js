@@ -3,22 +3,25 @@
  * (útočiště odesílatele ↔ pozice hráče / příjemce).
  *
  * Prahy:
- *   ≤ 5 km   → clear   (plný plaintext)
- *   ≤ 15 km  → weak    (slabý / ořezaný text)
- *   ≤ 50 km  → noise    (šum / anomálie bez obsahu)
- *   > 50 km  → none    (mimo dosah)
+ *   ≤ 5 km     → clear     (plný plaintext)
+ *   ≤ 7.5 km   → weak      (ořezaný text / vypadávající znaky)
+ *   ≤ 10 km    → fragment  (chyby, sem tam útržky zprávy)
+ *   ≤ 12.5 km  → noise     (šum / anomálie bez obsahu)
+ *   > 12.5 km  → none      (mimo dosah, žádný příjem)
  */
 
 export var SIGNAL_CLEAR = 'clear';
 export var SIGNAL_WEAK = 'weak';
+export var SIGNAL_FRAGMENT = 'fragment';
 export var SIGNAL_NOISE = 'noise';
 export var SIGNAL_NONE = 'none';
 
 /** Horní meze pásem v km (včetně). */
 export var RANGE_KM = {
     CLEAR_MAX: 5,
-    WEAK_MAX: 15,
-    NOISE_MAX: 50
+    WEAK_MAX: 7.5,
+    FRAGMENT_MAX: 10,
+    NOISE_MAX: 12.5
 };
 
 var EARTH_RADIUS_KM = 6371;
@@ -73,6 +76,7 @@ export function evaluateRadioReception(origin, receiver) {
     var quality;
     if (km <= RANGE_KM.CLEAR_MAX) quality = SIGNAL_CLEAR;
     else if (km <= RANGE_KM.WEAK_MAX) quality = SIGNAL_WEAK;
+    else if (km <= RANGE_KM.FRAGMENT_MAX) quality = SIGNAL_FRAGMENT;
     else if (km <= RANGE_KM.NOISE_MAX) quality = SIGNAL_NOISE;
     else quality = SIGNAL_NONE;
 
@@ -93,9 +97,13 @@ function hashSeed(str) {
     return h >>> 0;
 }
 
+function nextRnd(rnd) {
+    return (Math.imul(rnd, 1664525) + 1013904223) >>> 0;
+}
+
 /**
- * Slabý signál: vypadávající písmena (stabilní vůči stejnému seedu).
- * Čím blíž k 15 km, tím víc výpadků.
+ * Slabý signál (5–7.5 km): vypadávající písmena.
+ * Čím blíž k 7.5 km, tím víc výpadků (~20–55 %).
  */
 export function garbleRadioText(text, distanceKm, seed) {
     var raw = String(text || '');
@@ -104,7 +112,6 @@ export function garbleRadioText(text, distanceKm, seed) {
     var t = span > 0
         ? Math.min(1, Math.max(0, (Number(distanceKm) - RANGE_KM.CLEAR_MAX) / span))
         : 0.5;
-    /* Podíl znaků k „vypadnutí“ ~ 20–55 %. */
     var dropRate = 0.2 + t * 0.35;
     var rnd = hashSeed(seed || raw);
     var out = '';
@@ -114,11 +121,61 @@ export function garbleRadioText(text, distanceKm, seed) {
             out += ch;
             continue;
         }
-        rnd = (Math.imul(rnd, 1664525) + 1013904223) >>> 0;
+        rnd = nextRnd(rnd);
         if ((rnd % 1000) / 1000 < dropRate) out += '·';
         else out += ch;
     }
     return out;
+}
+
+/**
+ * Útržky (7.5–10 km): sem tam krátké čitelné fragmenty, zbytek chyby/mezery.
+ */
+export function fragmentRadioText(text, distanceKm, seed) {
+    var raw = String(text || '');
+    if (!raw) return '';
+    var span = RANGE_KM.FRAGMENT_MAX - RANGE_KM.WEAK_MAX;
+    var t = span > 0
+        ? Math.min(1, Math.max(0, (Number(distanceKm) - RANGE_KM.WEAK_MAX) / span))
+        : 0.5;
+    /* Podíl zachovaných útržků klesá s vzdáleností (~35 % → ~12 %). */
+    var keepChance = 0.35 - t * 0.23;
+    var rnd = hashSeed('frag:' + (seed || raw));
+    var out = '';
+    var i = 0;
+    while (i < raw.length) {
+        var ch = raw.charAt(i);
+        if (/\s/.test(ch)) {
+            out += ' ';
+            i++;
+            continue;
+        }
+        rnd = nextRnd(rnd);
+        if ((rnd % 1000) / 1000 < keepChance) {
+            rnd = nextRnd(rnd);
+            var run = 2 + (rnd % 4); /* 2–5 znaků */
+            var kept = 0;
+            while (i < raw.length && kept < run) {
+                var c = raw.charAt(i);
+                if (/\s/.test(c)) break;
+                out += c;
+                i++;
+                kept++;
+            }
+            out += '…';
+        } else {
+            out += '·';
+            i++;
+            rnd = nextRnd(rnd);
+            var skip = 1 + (rnd % 3);
+            while (skip > 0 && i < raw.length && !/\s/.test(raw.charAt(i))) {
+                out += '·';
+                i++;
+                skip--;
+            }
+        }
+    }
+    return out.replace(/\s+/g, ' ').replace(/·{4,}/g, '···').trim();
 }
 
 export function noisePlaceholder(frequency) {
@@ -150,6 +207,13 @@ export function applyReceptionToMessage(plainText, reception, opts) {
         return {
             text: garbleRadioText(plainText, km, seed),
             signalQuality: SIGNAL_WEAK,
+            distanceKm: km
+        };
+    }
+    if (quality === SIGNAL_FRAGMENT) {
+        return {
+            text: fragmentRadioText(plainText, km, seed),
+            signalQuality: SIGNAL_FRAGMENT,
             distanceKm: km
         };
     }

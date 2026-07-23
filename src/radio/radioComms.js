@@ -400,6 +400,7 @@ export function formatNotebookLine(entry) {
     var freq = entry.frequency ? (' · ' + entry.frequency) : '';
     var sig = '';
     if (entry.dir === 'in' && entry.signalQuality === 'weak') sig = ' [slabý]';
+    else if (entry.dir === 'in' && entry.signalQuality === 'fragment') sig = ' [útržky]';
     else if (entry.dir === 'in' && entry.signalQuality === 'noise') sig = ' [šum]';
     return arrow + ' ' + formatTime(entry.ts) + '  ' + who + ': ' + entry.text + freq + sig;
 }
