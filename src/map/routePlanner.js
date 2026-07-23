@@ -360,9 +360,32 @@ function renderRouteOnMap() {
     setTotalText('Σ ' + fmtDist(totalMeters()));
 }
 
+function currentSessionUserId() {
+    try { return String(localStorage.getItem('patrac_session') || '').trim(); } catch (e) { return ''; }
+}
+
+function routesStorageKey() {
+    var uid = currentSessionUserId();
+    return uid ? ('patrac_topo_routes_' + uid) : 'patrac_topo_routes';
+}
+
+function routePlannerStateKey() {
+    var uid = currentSessionUserId();
+    return uid ? ('patrac_route_planner_state_' + uid) : 'patrac_route_planner_state';
+}
+
 function loadRoutes() {
     try {
-        return JSON.parse(localStorage.getItem('patrac_topo_routes') || '[]');
+        var key = routesStorageKey();
+        var raw = localStorage.getItem(key);
+        if (!raw && key !== 'patrac_topo_routes') {
+            /* Jednorázová migrace ze starého globálního klíče (sdíleného mezi profily). */
+            raw = localStorage.getItem('patrac_topo_routes');
+            if (raw) {
+                try { localStorage.setItem(key, raw); } catch (eMig) {}
+            }
+        }
+        return JSON.parse(raw || '[]');
     } catch (e) {
         return [];
     }
@@ -390,7 +413,7 @@ function saveRoute() {
     }
     if (!found) routes.push(entry);
     try {
-        localStorage.setItem('patrac_topo_routes', JSON.stringify(routes));
+        localStorage.setItem(routesStorageKey(), JSON.stringify(routes));
     } catch (e) {}
     state.activeRouteId = id;
     persistState();
@@ -433,7 +456,7 @@ function refreshRouteSelect() {
 
 function persistState() {
     try {
-        localStorage.setItem('patrac_route_planner_state', JSON.stringify({
+        localStorage.setItem(routePlannerStateKey(), JSON.stringify({
             startLocked: state.startLocked,
             targetLocked: state.targetLocked,
             start: state.start,
@@ -447,7 +470,14 @@ function persistState() {
 
 function loadState() {
     try {
-        var raw = localStorage.getItem('patrac_route_planner_state');
+        var key = routePlannerStateKey();
+        var raw = localStorage.getItem(key);
+        if (!raw && key !== 'patrac_route_planner_state') {
+            raw = localStorage.getItem('patrac_route_planner_state');
+            if (raw) {
+                try { localStorage.setItem(key, raw); } catch (eMig) {}
+            }
+        }
         if (!raw) return;
         var data = JSON.parse(raw);
         state.startLocked = !!data.startLocked;

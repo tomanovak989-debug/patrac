@@ -132,7 +132,13 @@ function routeVertexList(route) {
 }
 
 function collectRouteBlocks() {
-    var routes = safeJson('patrac_topo_routes', []);
+    var uid = '';
+    try { uid = String(localStorage.getItem('patrac_session') || '').trim(); } catch (e) {}
+    var key = uid ? ('patrac_topo_routes_' + uid) : 'patrac_topo_routes';
+    var routes = safeJson(key, []);
+    if ((!routes || !routes.length) && key !== 'patrac_topo_routes') {
+        routes = safeJson('patrac_topo_routes', []);
+    }
     var blocks = [];
     for (var i = 0; i < routes.length; i++) {
         var r = routes[i];

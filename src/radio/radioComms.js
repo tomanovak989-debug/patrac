@@ -207,13 +207,7 @@ export function loadRadioState(userId, ctx) {
     var base = defaultRadioState(userId, ctx);
     var raw = null;
     try { raw = localStorage.getItem(key); } catch (e) {}
-    if (!raw) {
-        raw = findRichestLocalStorage('patrac_radio_state_', function(obj) {
-            if (!obj || typeof obj !== 'object') return 0;
-            var n = (obj.presets && obj.presets.length) || 0;
-            return (obj.frequency ? 10 : 0) + n;
-        });
-    }
+    /* Bez půjčování state jiného profilu (stejná chyba jako u staničníku). */
     if (!raw) return base;
 
     try {

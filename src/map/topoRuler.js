@@ -821,9 +821,18 @@ function updateRulerWidgetPosition() {
     renderBearingOnMap();
 }
 
+function currentSessionUserId() {
+    try { return String(localStorage.getItem('patrac_session') || '').trim(); } catch (e) { return ''; }
+}
+
+function rulerStateKey() {
+    var uid = currentSessionUserId();
+    return uid ? ('patrac_topo_ruler_state_' + uid) : 'patrac_topo_ruler_state';
+}
+
 function persistState() {
     try {
-        localStorage.setItem('patrac_topo_ruler_state', JSON.stringify({
+        localStorage.setItem(rulerStateKey(), JSON.stringify({
             positionLocked: state.positionLocked,
             anchor: state.anchor,
             bearingDeg: state.bearingDeg,
@@ -853,7 +862,14 @@ function sanitizeScreenPos() {
 
 function loadState() {
     try {
-        var raw = localStorage.getItem('patrac_topo_ruler_state');
+        var key = rulerStateKey();
+        var raw = localStorage.getItem(key);
+        if (!raw && key !== 'patrac_topo_ruler_state') {
+            raw = localStorage.getItem('patrac_topo_ruler_state');
+            if (raw) {
+                try { localStorage.setItem(key, raw); } catch (eMig) {}
+            }
+        }
         if (!raw) return;
         var data = JSON.parse(raw);
         if (data.anchor) state.anchor = data.anchor;
