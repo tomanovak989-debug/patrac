@@ -367,10 +367,42 @@ function persist() {
     saveNotebook(getCtx().userId, notebook);
 }
 
+function normalizeUserId(id) {
+    return String(id || '').trim();
+}
+
+function isOwnRadioSender(payload, c) {
+    var me = normalizeUserId(c && c.userId);
+    var sid = normalizeUserId(payload && payload.senderId);
+    if (me && sid && me === sid) return true;
+    return false;
+}
+
+/** Echo vlastní TX: cloud id ≠ local_ id, takže by se zápis zduplikoval jako ↓. */
+function hasRecentOutgoingEcho(payload) {
+    if (!notebook || !notebook.station) return false;
+    var text = String(payload.text || '').trim();
+    if (!text) return false;
+    var freq = normalizeFrequency(payload.frequency);
+    var ts = Number(payload.timestamp) || Date.now();
+    var list = notebook.station;
+    for (var i = 0; i < list.length; i++) {
+        var e = list[i];
+        if (!e || e.dir !== 'out') continue;
+        if (normalizeFrequency(e.frequency) !== freq) continue;
+        if (String(e.text || '').trim() !== text) continue;
+        if (Math.abs((e.ts || 0) - ts) <= 45000) return true;
+        if (e.cloudId && payload.id && e.cloudId === payload.id) return true;
+    }
+    return false;
+}
+
 function notebookHasId(id) {
     if (!id || !notebook || !notebook.station) return false;
     for (var i = 0; i < notebook.station.length; i++) {
-        if (notebook.station[i] && notebook.station[i].id === id) return true;
+        var e = notebook.station[i];
+        if (!e) continue;
+        if (e.id === id || e.cloudId === id) return true;
     }
     return false;
 }
@@ -378,7 +410,9 @@ function notebookHasId(id) {
 function recordEntry(entry) {
     if (!entry) return;
     if (entry.id && (seenMessageIds[entry.id] || notebookHasId(entry.id))) return;
+    if (entry.cloudId && (seenMessageIds[entry.cloudId] || notebookHasId(entry.cloudId))) return;
     if (entry.id) seenMessageIds[entry.id] = true;
+    if (entry.cloudId) seenMessageIds[entry.cloudId] = true;
 
     var list = notebook.station || [];
     var entryIndex = list.length;
@@ -403,7 +437,14 @@ function recordEntry(entry) {
 function ingestIncomingPayload(payload) {
     var c = getCtx();
     if (!payload || !payload.id) return;
-    if (payload.senderId && payload.senderId === c.userId) return;
+    if (isOwnRadioSender(payload, c)) {
+        seenMessageIds[payload.id] = true;
+        return;
+    }
+    if (hasRecentOutgoingEcho(payload)) {
+        seenMessageIds[payload.id] = true;
+        return;
+    }
     if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
         seenMessageIds[payload.id] = true;
         return;
@@ -506,7 +547,7 @@ async function transmitMessage(text) {
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
 
     try {
-        await sendRadioTransmission({
+        var sent = await sendRadioTransmission({
             channelId: entry.channelId,
             frequency: entry.frequency,
             encryptionKey: entry.encryptionKey,
@@ -519,6 +560,12 @@ async function transmitMessage(text) {
             originLat: c.originLat,
             originLng: c.originLng
         });
+        /* Cloud id hned do seen — jinak snapshot zapíše tutéž TX ještě jako ↓. */
+        if (sent && sent.id) {
+            seenMessageIds[sent.id] = true;
+            entry.cloudId = sent.id;
+            persist();
+        }
     } catch (err) {
         console.warn('[radioUi] send', err);
     }
@@ -731,7 +778,9 @@ export function initRadioCommsSystem(options) {
     if (notebook && notebook.station) {
         for (var i = 0; i < notebook.station.length; i++) {
             var e = notebook.station[i];
-            if (e && e.id) seenMessageIds[e.id] = true;
+            if (!e) continue;
+            if (e.id) seenMessageIds[e.id] = true;
+            if (e.cloudId) seenMessageIds[e.cloudId] = true;
         }
     }
 
