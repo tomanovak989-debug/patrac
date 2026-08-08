@@ -1,15 +1,38 @@
 /**
- * SECTOR-TECH — scroll (2 kroky) a dotykové overlay nad fotkou vysílačky.
+ * SECTOR-TECH — 2-krokový scroll + kalibrace overlay (800×800 PNG, scale 2.85).
+ *
+ * Snap 0: anténa + knoflíky + celý displej
+ * Snap 1: celý displej + klávesnice (scroll mírně nad spodek obrázku)
  */
 function el(id) {
     return document.getElementById(id);
 }
 
+/** Podíl výšky stage (0–1) — kalibrace k sector-tech-front.png */
+var LAYOUT = {
+    displayTop: 0.185,
+    displayBottom: 0.445,
+    keypadTop: 0.48
+};
+
+var snapBottomPx = 0;
+
+function measureStage(scroll) {
+    var stage = scroll.querySelector('.sector-tech-stage');
+    if (!stage) return null;
+    var stageH = stage.offsetHeight;
+    var viewH = scroll.clientHeight;
+    var max = Math.max(0, stageH - viewH);
+    var margin = Math.max(8, viewH * 0.015);
+    snapBottomPx = Math.max(0, Math.min(max, stageH * LAYOUT.displayTop - margin));
+    return { stageH: stageH, viewH: viewH, max: max };
+}
+
 function snapScrollToNearestStep(scroll) {
-    var max = scroll.scrollHeight - scroll.clientHeight;
-    if (max <= 4) return;
-    var mid = max * 0.5;
-    var target = scroll.scrollTop < mid ? 0 : max;
+    var m = measureStage(scroll);
+    if (!m || m.max <= 4) return;
+    var mid = (snapBottomPx || m.max * 0.5) * 0.5;
+    var target = scroll.scrollTop < mid ? 0 : snapBottomPx;
     if (Math.abs(scroll.scrollTop - target) > 6) {
         scroll.scrollTo({ top: target, behavior: 'smooth' });
     }
@@ -20,16 +43,24 @@ export function initSectorTechShell() {
     if (!scroll || scroll._sectorBound) return;
     scroll._sectorBound = true;
 
-    var topBtn = el('sector-scroll-top');
-    var botBtn = el('sector-scroll-bottom');
-    if (topBtn) {
-        topBtn.addEventListener('click', function() {
-            scroll.scrollTo({ top: 0, behavior: 'smooth' });
-        });
+    function remeasure() {
+        measureStage(scroll);
     }
-    if (botBtn) {
-        botBtn.addEventListener('click', function() {
-            scroll.scrollTo({ top: scroll.scrollHeight - scroll.clientHeight, behavior: 'smooth' });
+    remeasure();
+
+    var img = el('sector-tech-img');
+    if (img && !img.complete) {
+        img.addEventListener('load', remeasure);
+    }
+
+    if (!window._patracSectorResizeBound) {
+        window._patracSectorResizeBound = true;
+        var rt;
+        window.addEventListener('resize', function() {
+            if (rt) clearTimeout(rt);
+            rt = setTimeout(function() {
+                if (scroll) measureStage(scroll);
+            }, 120);
         });
     }
 
@@ -41,6 +72,12 @@ export function initSectorTechShell() {
         }, 140);
     }, { passive: true });
 
-    /* Výchozí pohled: anténa + displej (krok 1) */
     scroll.scrollTop = 0;
+}
+
+export function scrollSectorTechTo(step) {
+    var scroll = el('sector-tech-scroll');
+    if (!scroll) return;
+    measureStage(scroll);
+    scroll.scrollTo({ top: step === 1 ? snapBottomPx : 0, behavior: 'smooth' });
 }
