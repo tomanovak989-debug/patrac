@@ -2977,6 +2977,10 @@ function initDataKartaAsync() {
 function switchMainTab(tab, element) {
     var m = document.getElementById('map');
     var c = document.getElementById('hud-center-tabs');
+    if (c) {
+        if (tab === 'clan') c.classList.add('hud-radio-fullwidth');
+        else c.classList.remove('hud-radio-fullwidth');
+    }
 
     var btns = document.querySelectorAll('.bottom-action-bar button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');

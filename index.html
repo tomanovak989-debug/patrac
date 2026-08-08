@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e57" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e58" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -585,13 +585,14 @@
                     <div class="sector-tech-scroll" id="sector-tech-scroll">
                         <div class="sector-tech-scroll-start" aria-hidden="true"></div>
                         <div class="sector-tech-device">
+                            <div class="sector-tech-stage">
                             <img
                                 class="sector-tech-img"
                                 id="sector-tech-img"
                                 src="src/assets/radio/sector-tech-front.png"
                                 alt="SECTOR-TECH vysílačka"
                                 width="800"
-                                height="1840"
+                                height="800"
                                 decoding="async"
                             />
                             <div class="sector-tech-screen" id="radio-display-screen">
@@ -632,6 +633,7 @@
                                 <button type="button" class="sector-hit radio-key" data-key="*" aria-label="Hvězdička"></button>
                                 <button type="button" class="sector-hit radio-key" data-key="0" aria-label="0"></button>
                                 <button type="button" class="sector-hit radio-key" data-key="#" aria-label="Mřížka"></button>
+                            </div>
                             </div>
                         </div>
                         <div class="sector-tech-scroll-end" aria-hidden="true"></div>
@@ -923,14 +925,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e57';
+        window.PATRAC_BUILD = '20260723e58';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e57"></script>
-    <script src="src/app/02-quests.js?v=20260723e57"></script>
-    <script src="src/app/03-map.js?v=20260723e57"></script>
-    <script src="src/app/04-game.js?v=20260723e57"></script>
+    <script src="src/app/01-globals.js?v=20260723e58"></script>
+    <script src="src/app/02-quests.js?v=20260723e58"></script>
+    <script src="src/app/03-map.js?v=20260723e58"></script>
+    <script src="src/app/04-game.js?v=20260723e58"></script>
 </body>
 </html>
