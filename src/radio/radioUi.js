@@ -57,7 +57,7 @@ import {
     renderGridPageHtml,
     copyGridLineText
 } from './radioGrids.js';
-import { initSectorTechShell } from './radioSectorShell.js';
+import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import {
     KIND_HANDSET,
     NODE_KIND_LABELS,
@@ -1100,6 +1100,7 @@ export function initRadioCommsSystem(options) {
 
     bindKeypad();
     initSectorTechShell();
+    window.patracRefreshSectorTech = refreshSectorTechLayout;
     syncNotebookTabs();
     renderDisplay();
     var layout = stationPageMetrics();

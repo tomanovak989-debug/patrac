@@ -1242,6 +1242,9 @@ function updateAdminBar() {
     if (typeof window.patracRefreshQuestAdmin === 'function') {
         try { window.patracRefreshQuestAdmin(); } catch (eQ) {}
     }
+    if (typeof window.patracRefreshSectorTech === 'function') {
+        try { window.patracRefreshSectorTech(); } catch (eR) {}
+    }
 }
 
 function renderOperatorMemberList() {
@@ -3023,6 +3026,11 @@ function switchMainTab(tab, element) {
         document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
         if (tab === 'clan') {
             updateRadioDisplayHud();
+            if (typeof window.patracRefreshSectorTech === 'function') {
+                setTimeout(function() {
+                    try { window.patracRefreshSectorTech(); } catch (eSt) {}
+                }, 80);
+            }
         }
         document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
         document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
