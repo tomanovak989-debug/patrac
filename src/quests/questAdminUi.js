@@ -10,7 +10,8 @@ import {
     normalizeQuestDefinitionList,
     suggestQuestIdFromName,
     definitionToRuntimeQuest,
-    findQuestDefinitionById
+    findQuestDefinitionById,
+    ensureDefaultQuestDefinitions
 } from './questDefinition.js';
 
 var STORAGE_KEY = 'quest_definitions_list';
@@ -25,9 +26,7 @@ function el(id) {
 
 function loadDefinitions() {
     try {
-        var raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return [];
-        return normalizeQuestDefinitionList(JSON.parse(raw));
+        return ensureDefaultQuestDefinitions();
     } catch (e) {
         return [];
     }

@@ -303,6 +303,8 @@ body.admin-mode .admin-only-tab { display: flex !important; }
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px; margin-bottom: 8px; font-size: var(--text-sm);
 }
+.qdef-filter-label { color: var(--muted-fg); font-size: var(--text-xs); letter-spacing: 0.06em; }
+.qdef-list { margin-bottom: 14px; }
 .qdef-toolbar select {
     margin-left: 6px; font-family: inherit; font-size: var(--text-sm);
     background: rgba(0,0,0,0.35); color: inherit; border: 1px solid rgba(255,85,0,0.4);

@@ -26,6 +26,111 @@ export var OBJECTIVE_LABELS = {
 /** Předvolby min. dosahu podle matice rádia (km). */
 export var RADIO_RANGE_PRESETS_KM = [5, 7.5, 10, 12.5];
 
+/** Výchozí Main story linka — synchronní s gameQuests v 02-quests.js */
+export var DEFAULT_STORY_QUEST_DEFINITIONS = [
+    {
+        id: 'roxy',
+        name: 'Nastav si útočiště',
+        type: QUEST_TYPE_MAIN,
+        char: 'Roxy',
+        mapLabel: 'Útočiště',
+        trigger: { prerequisiteQuestId: null, minRadioRangeKm: null, signalId: null, signalFrequency: null },
+        content: {
+            description: 'Dojdi fyzicky na bezpečné místo a ulož tam souřadnice Útočiště.',
+            objectiveType: OBJECTIVE_LOCATION,
+            objectiveText: 'Zaměř GPS útočiště',
+            dispatchText: '',
+            applySignalGarble: true
+        },
+        geo: { mapPointId: 'roxy', radiusM: 80, timeLimitHours: 2 }
+    },
+    {
+        id: 'sef',
+        name: 'Najdi zdroj vody',
+        type: QUEST_TYPE_MAIN,
+        char: 'Šéf',
+        mapLabel: 'Zdroj vody',
+        trigger: { prerequisiteQuestId: 'roxy', minRadioRangeKm: null, signalId: null, signalFrequency: null },
+        content: {
+            description: 'Bez vody nepřežijeme. Najdi potok nebo studánku a zaměř polohu.',
+            objectiveType: OBJECTIVE_LOCATION,
+            objectiveText: 'Zaměř zdroj vody',
+            dispatchText: '',
+            applySignalGarble: true
+        },
+        geo: { mapPointId: 'sef', radiusM: 80, timeLimitHours: 4 }
+    },
+    {
+        id: 'herbert',
+        name: 'Lesní shromaždiště',
+        type: QUEST_TYPE_MAIN,
+        char: 'Herbert',
+        mapLabel: 'Lesní sklad',
+        trigger: { prerequisiteQuestId: 'sef', minRadioRangeKm: null, signalId: null, signalFrequency: null },
+        content: {
+            description: 'Vyhledej kryté prostranství vhodné pro ukládání zdravotnických zásob.',
+            objectiveType: OBJECTIVE_LOCATION,
+            objectiveText: 'Zaměř lesní sklad',
+            dispatchText: '',
+            applySignalGarble: true
+        },
+        geo: { mapPointId: 'herbert', radiusM: 80, timeLimitHours: 16 }
+    },
+    {
+        id: 'ino',
+        name: 'Najdi cvičiště',
+        type: QUEST_TYPE_MAIN,
+        char: 'Ino',
+        mapLabel: 'Cvičiště',
+        trigger: { prerequisiteQuestId: 'herbert', minRadioRangeKm: null, signalId: null, signalFrequency: null },
+        content: {
+            description: 'Musíme najít rovnou lesní mýtinu vhodnou pro fyzický trénink.',
+            objectiveType: OBJECTIVE_LOCATION,
+            objectiveText: 'Zaměř cvičiště',
+            dispatchText: '',
+            applySignalGarble: true
+        },
+        geo: { mapPointId: 'ino', radiusM: 80, timeLimitHours: 3 }
+    },
+    {
+        id: 'adam',
+        name: 'Najdi rozhlednu',
+        type: QUEST_TYPE_MAIN,
+        char: 'Adam',
+        mapLabel: 'Rozhledna',
+        trigger: { prerequisiteQuestId: 'ino', minRadioRangeKm: null, signalId: null, signalFrequency: null },
+        content: {
+            description: 'Dojdi přímo k patě nejbližší vyhlídky a zapiš ji jako pozorovací bod.',
+            objectiveType: OBJECTIVE_LOCATION,
+            objectiveText: 'Zaměř rozhlednu',
+            dispatchText: '',
+            applySignalGarble: true
+        },
+        geo: { mapPointId: 'adam', radiusM: 80, timeLimitHours: 12 }
+    }
+];
+
+/**
+ * Na první načtení doplní výchozí story linku, pokud katalog definic chybí nebo je prázdný.
+ */
+export function ensureDefaultQuestDefinitions() {
+    var existing = [];
+    try {
+        var raw = localStorage.getItem('quest_definitions_list');
+        if (raw) {
+            existing = normalizeQuestDefinitionList(JSON.parse(raw));
+            if (existing.length) return existing;
+        }
+    } catch (e) {}
+    var seeded = normalizeQuestDefinitionList(DEFAULT_STORY_QUEST_DEFINITIONS.map(function(d) {
+        return Object.assign({}, d, { createdAt: Date.now(), updatedAt: Date.now() });
+    }));
+    try {
+        localStorage.setItem('quest_definitions_list', JSON.stringify(seeded));
+    } catch (e2) {}
+    return seeded;
+}
+
 function asString(v) {
     return v == null ? '' : String(v).trim();
 }
