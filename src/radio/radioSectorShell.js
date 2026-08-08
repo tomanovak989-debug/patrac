@@ -12,7 +12,7 @@ var LAYOUT = {
 };
 
 var SCALE_KEY = 'patrac_sector_scale';
-var DEFAULT_SCALE = 2.8;
+var DEFAULT_SCALE = 2.75;
 var SCALE_MIN = 1.85;
 var SCALE_MAX = 4.5;
 
@@ -97,6 +97,13 @@ function bindScaleControl() {
 
 var GRID_SRC = 800;
 var GRID_STEP = 50;
+var GRID_MINOR = 25;
+
+function gridLabel(parts, cls, x, y, text, anchor) {
+    parts.push(
+        '<text x="' + x + '" y="' + y + '" text-anchor="' + (anchor || 'middle') + '" class="' + cls + '">' + text + '</text>'
+    );
+}
 
 function getStageSourceMetrics(stage) {
     var img = stage.querySelector('.sector-tech-img');
@@ -126,33 +133,100 @@ function rebuildCalGrid(stage) {
         return;
     }
     var metrics = getStageSourceMetrics(stage);
-    var src = Math.max(metrics.srcW, metrics.srcH);
-    svg.setAttribute('viewBox', '0 0 ' + metrics.srcW + ' ' + metrics.srcH);
+    var srcW = metrics.srcW;
+    var srcH = metrics.srcH;
+    svg.setAttribute('viewBox', '0 0 ' + srcW + ' ' + srcH);
     svg.style.display = 'block';
 
     var parts = [];
-    var x;
-    for (x = 0; x <= src; x += GRID_STEP) {
-        var major = x % 100 === 0;
-        parts.push(
-            '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + src + '" ' +
-            'stroke="' + (major ? 'rgba(0,229,255,0.5)' : 'rgba(255,255,255,0.14)') + '" ' +
-            'stroke-width="' + (major ? '1.4' : '0.7') + '"/>'
-        );
-        if (major) {
-            parts.push('<text x="' + x + '" y="16" text-anchor="middle" class="sector-grid-label">' + x + '</text>');
-            if (x > 0) {
-                parts.push('<text x="12" y="' + (x + 4) + '" class="sector-grid-label-y">' + x + '</text>');
-            }
+    var n;
+    var major;
+    var labelOff = 14;
+
+    for (n = 0; n <= srcW; n += GRID_MINOR) {
+        major = n % GRID_STEP === 0;
+        if (!major) {
+            parts.push(
+                '<line x1="' + n + '" y1="0" x2="' + n + '" y2="' + srcH + '" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>'
+            );
         }
     }
-    parts.push('<line x1="0" y1="0" x2="' + src + '" y2="0" stroke="#00e5ff" stroke-width="2.5"/>');
-    parts.push('<line x1="0" y1="0" x2="0" y2="' + src + '" stroke="#ffe600" stroke-width="2.5"/>');
-    parts.push('<text x="' + (src - 18) + '" y="28" class="sector-grid-axis-x">X</text>');
-    parts.push('<text x="18" y="' + (src - 10) + '" class="sector-grid-axis-y">Y</text>');
-    parts.push('<text x="6" y="14" class="sector-grid-origin">0</text>');
-    parts.push('<text x="' + (src - 52) + '" y="' + (src - 10) + '" class="sector-grid-meta">' + src + 'px</text>');
+    for (n = 0; n <= srcH; n += GRID_MINOR) {
+        major = n % GRID_STEP === 0;
+        if (!major) {
+            parts.push(
+                '<line x1="0" y1="' + n + '" x2="' + srcW + '" y2="' + n + '" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>'
+            );
+        }
+    }
+
+    for (n = 0; n <= srcW; n += GRID_STEP) {
+        major = n % 100 === 0;
+        parts.push(
+            '<line x1="' + n + '" y1="0" x2="' + n + '" y2="' + srcH + '" ' +
+            'stroke="' + (major ? 'rgba(0,229,255,0.55)' : 'rgba(0,229,255,0.22)') + '" ' +
+            'stroke-width="' + (major ? '1.6' : '1') + '"/>'
+        );
+        gridLabel(parts, major ? 'sector-grid-label' : 'sector-grid-label-minor', n, labelOff, String(n));
+        gridLabel(parts, major ? 'sector-grid-label' : 'sector-grid-label-minor', n, srcH - 4, String(n));
+    }
+    for (n = 0; n <= srcH; n += GRID_STEP) {
+        major = n % 100 === 0;
+        parts.push(
+            '<line x1="0" y1="' + n + '" x2="' + srcW + '" y2="' + n + '" ' +
+            'stroke="' + (major ? 'rgba(255,230,0,0.55)' : 'rgba(255,230,0,0.22)') + '" ' +
+            'stroke-width="' + (major ? '1.6' : '1') + '"/>'
+        );
+        gridLabel(parts, major ? 'sector-grid-label-y' : 'sector-grid-label-y-minor', 22, n + 4, String(n), 'start');
+        gridLabel(parts, major ? 'sector-grid-label-y' : 'sector-grid-label-y-minor', srcW - 4, n + 4, String(n), 'end');
+    }
+
+    parts.push('<line x1="0" y1="0" x2="' + srcW + '" y2="0" stroke="#00e5ff" stroke-width="2.5"/>');
+    parts.push('<line x1="0" y1="0" x2="0" y2="' + srcH + '" stroke="#ffe600" stroke-width="2.5"/>');
+    gridLabel(parts, 'sector-grid-axis-x', srcW - 16, 28, 'X', 'end');
+    gridLabel(parts, 'sector-grid-axis-y', 18, srcH - 8, 'Y', 'start');
+    gridLabel(parts, 'sector-grid-origin', 6, labelOff, '0', 'start');
+    gridLabel(parts, 'sector-grid-meta', srcW - 6, srcH - 8, srcW + '×' + srcH, 'end');
     svg.innerHTML = parts.join('');
+}
+
+function updateViewportRulers(scroll) {
+    var wrap = el('sector-cal-rulers');
+    if (!wrap) return;
+    if (!isCalibrateMode()) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'block';
+    var rulerX = el('sector-cal-ruler-x');
+    var rulerY = el('sector-cal-ruler-y');
+    var stage = scroll.querySelector('.sector-tech-stage');
+    if (!stage || !rulerX || !rulerY) return;
+
+    var metrics = getStageSourceMetrics(stage);
+    var stageRect = stage.getBoundingClientRect();
+    var scrollRect = scroll.getBoundingClientRect();
+    var viewW = scroll.clientWidth;
+    var viewH = scroll.clientHeight;
+    var scrollTop = scroll.scrollTop;
+    var xParts = [];
+    var yParts = [];
+    var n;
+    var px;
+    var py;
+
+    for (n = 0; n <= metrics.srcW; n += GRID_STEP) {
+        px = stageRect.left + (n / metrics.srcW) * metrics.stageW - scrollRect.left;
+        if (px < -36 || px > viewW + 36) continue;
+        xParts.push('<span class="sector-ruler-tick' + (n % 100 === 0 ? ' major' : '') + '" style="left:' + px + 'px">' + n + '</span>');
+    }
+    for (n = 0; n <= metrics.srcH; n += GRID_STEP) {
+        py = (n / metrics.srcH) * metrics.stageH - scrollTop;
+        if (py < -18 || py > viewH + 18) continue;
+        yParts.push('<span class="sector-ruler-tick-y' + (n % 100 === 0 ? ' major' : '') + '" style="top:' + py + 'px">' + n + '</span>');
+    }
+    rulerX.innerHTML = xParts.join('');
+    rulerY.innerHTML = yParts.join('');
 }
 
 function updateCalibrationLabels() {
@@ -165,6 +239,9 @@ function updateCalibrationLabels() {
     if (bar) bar.style.display = on ? 'flex' : 'none';
 
     rebuildCalGrid(stage);
+
+    var scroll = el('sector-tech-scroll');
+    if (scroll) updateViewportRulers(scroll);
 
     var stageRect = stage.getBoundingClientRect();
     var metrics = getStageSourceMetrics(stage);
@@ -268,10 +345,13 @@ export function initSectorTechShell() {
         obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     }
 
-    /* Mimo kalibraci: po scrollu vrať na pracovní pohled (displej + klávesnice) */
+    /* Scroll: kalibrace = pravítka; jinak snap na pracovní pohled */
     var snapTimer = null;
     scroll.addEventListener('scroll', function() {
-        if (isCalibrateMode()) return;
+        if (isCalibrateMode()) {
+            updateViewportRulers(scroll);
+            return;
+        }
         if (snapTimer) clearTimeout(snapTimer);
         snapTimer = setTimeout(function() {
             applyWorkView(scroll, true, false);

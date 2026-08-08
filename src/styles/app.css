@@ -1096,6 +1096,69 @@ body.sector-calibrate-on .sector-cal-grid {
     fill: #ffe600;
     font: bold 18px 'IBM Plex Mono', monospace;
 }
+.sector-cal-grid .sector-grid-label-minor {
+    fill: rgba(0, 229, 255, 0.75);
+    font: 600 10px 'IBM Plex Mono', monospace;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.9);
+    stroke-width: 3px;
+}
+.sector-cal-grid .sector-grid-label-y-minor {
+    fill: rgba(255, 230, 0, 0.8);
+    font: 600 10px 'IBM Plex Mono', monospace;
+    paint-order: stroke;
+    stroke: rgba(0, 0, 0, 0.9);
+    stroke-width: 3px;
+}
+.sector-cal-rulers {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+}
+body.sector-calibrate-on .sector-cal-rulers {
+    display: block;
+}
+.sector-cal-ruler-x {
+    position: absolute;
+    top: 0;
+    left: 36px;
+    right: 0;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.72);
+    border-bottom: 1px solid rgba(0, 229, 255, 0.55);
+    overflow: visible;
+}
+.sector-cal-ruler-y {
+    position: absolute;
+    top: 20px;
+    left: 0;
+    bottom: 0;
+    width: 36px;
+    background: rgba(0, 0, 0, 0.72);
+    border-right: 1px solid rgba(255, 230, 0, 0.55);
+    overflow: visible;
+}
+.sector-ruler-tick,
+.sector-ruler-tick-y {
+    position: absolute;
+    font: 600 9px/1 'IBM Plex Mono', monospace;
+    color: #00e5ff;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    text-shadow: 0 0 4px #000, 0 0 2px #000;
+}
+.sector-ruler-tick-y {
+    left: 4px;
+    transform: none;
+    color: #ffe600;
+}
+.sector-ruler-tick.major,
+.sector-ruler-tick-y.major {
+    font-size: 10px;
+    font-weight: 700;
+}
 .sector-cal-grid .sector-grid-origin,
 .sector-cal-grid .sector-grid-meta {
     fill: #fff;

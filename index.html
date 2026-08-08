@@ -583,10 +583,14 @@
             <div class="sector-tech-shell" id="radio-device-shell">
                 <div class="sector-scale-bar admin-only-section" id="sector-scale-bar" aria-label="Velikost fotky vysílačky">
                     <label for="sector-scale-slider">Zoom fotky</label>
-                    <input type="range" id="sector-scale-slider" min="1.85" max="4.5" step="0.05" value="2.8">
-                    <span id="sector-scale-value">2.80×</span>
+                    <input type="range" id="sector-scale-slider" min="1.85" max="4.5" step="0.05" value="2.75">
+                    <span id="sector-scale-value">2.75×</span>
                 </div>
                 <div class="sector-tech-viewport" id="sector-tech-viewport">
+                    <div class="sector-cal-rulers" id="sector-cal-rulers" aria-hidden="true">
+                        <div class="sector-cal-ruler sector-cal-ruler-x" id="sector-cal-ruler-x"></div>
+                        <div class="sector-cal-ruler sector-cal-ruler-y" id="sector-cal-ruler-y"></div>
+                    </div>
                     <div class="sector-tech-scroll" id="sector-tech-scroll">
                         <div class="sector-tech-scroll-start" aria-hidden="true"></div>
                         <div class="sector-tech-device">
@@ -932,7 +936,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e65';
+        window.PATRAC_BUILD = '20260723e66';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
