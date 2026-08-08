@@ -918,55 +918,170 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 .chat-msg-box { flex: 1; padding: 10px; overflow-y: auto; font-size: var(--text-md); line-height: var(--panel-line-height); font-weight: var(--font-weight-normal); }
 
-/* Vysílačka — ovládací prvky bez fotky (prototyp) */
-.radio-device-shell {
-    --radio-pea: #8fb84a;
-    --radio-pea-deep: #6e9435;
-    --radio-pea-hi: #b4d66e;
-    --radio-key-face: #7a7a7a;
-    --radio-key-face-hi: #949494;
-    --radio-key-face-lo: #5c5c5c;
-    --radio-key-edge: #2e2e2e;
+/* SECTOR-TECH — fotka na celou šířku, 2-krokový scroll, dotykové overlay */
+.panel-content-inner--radio {
+    max-width: none;
     width: 100%;
-    max-width: 340px;
-    margin: 0 auto 14px;
-    padding: 14px 12px 16px;
-    border: none;
-    border-radius: 26px;
-    background:
-        radial-gradient(120% 80% at 20% 8%, rgba(255, 255, 255, 0.28), transparent 42%),
-        linear-gradient(165deg, var(--radio-pea-hi) 0%, var(--radio-pea) 42%, var(--radio-pea-deep) 100%);
-    box-shadow:
-        inset 0 2px 3px rgba(255, 255, 255, 0.4),
-        inset 0 -4px 10px rgba(0, 0, 0, 0.22),
-        0 10px 22px rgba(0, 0, 0, 0.28),
-        0 0 0 2px rgba(40, 55, 18, 0.35);
+    padding-left: 0;
+    padding-right: 0;
 }
-.radio-device-overlays {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.radio-notebook-wrap {
+    padding: 0 10px 12px;
+    max-width: 420px;
+    margin: 0 auto;
 }
-.radio-display-zone { width: 100%; }
-.radio-display-screen {
+.sector-tech-shell {
     width: 100%;
-    min-height: 92px;
+    max-width: 100%;
+    margin: 0 0 10px;
+    padding: 0;
+    background: #0a0a0a;
+}
+.sector-tech-viewport {
+    width: 100%;
+    position: relative;
+}
+.sector-tech-scroll {
+    width: 100%;
+    height: min(calc(100dvh - 210px), 68vh);
+    min-height: 280px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    background: #0a0a0a;
+}
+.sector-tech-scroll-start { scroll-snap-align: start; height: 0; }
+.sector-tech-scroll-end { scroll-snap-align: end; height: 0; }
+.sector-tech-device {
+    position: relative;
+    width: 100%;
+    line-height: 0;
+}
+.sector-tech-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+.sector-tech-screen {
+    position: absolute;
+    left: 18.5%;
+    top: 19.2%;
+    width: 63%;
+    height: 28.5%;
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    padding: 10px 12px;
+    padding: 6% 5%;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: clamp(8px, 2.6vw, 11px);
+    line-height: 1.3;
+    color: #78ff66;
+    background: rgba(8, 12, 6, 0.92);
+    border-radius: 2px;
+    pointer-events: auto;
+}
+body.theme-light .sector-tech-screen {
+    color: #142010;
+    background: rgba(210, 220, 190, 0.94);
+}
+.sector-tech-hits {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+.sector-hit {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    border-radius: 8px;
+}
+.sector-hit:active {
+    background: rgba(120, 255, 102, 0.12);
+}
+body.admin-mode .sector-hit {
+    outline: 1px dashed rgba(120, 255, 102, 0.35);
+    outline-offset: -1px;
+}
+#radio-key-mode { left: 3%; top: 1%; width: 20%; height: 10%; }
+#radio-key-pre-up { left: 34.5%; top: 0.5%; width: 11%; height: 11%; }
+#radio-key-vol-up { left: 47%; top: 0.5%; width: 11%; height: 11%; }
+.sector-tech-hits [data-key="p1"] { left: 6%; top: 52%; width: 16%; height: 7%; }
+.sector-tech-hits [data-key="p2"] { left: 78%; top: 52%; width: 16%; height: 7%; }
+.sector-tech-hits [data-key="up"] { left: 41%; top: 54%; width: 18%; height: 6.5%; }
+.sector-tech-hits [data-key="left"] { left: 24%; top: 61%; width: 16%; height: 6.5%; }
+.sector-tech-hits [data-key="right"] { left: 60%; top: 61%; width: 16%; height: 6.5%; }
+.sector-tech-hits [data-key="down"] { left: 41%; top: 68%; width: 18%; height: 6.5%; }
+#radio-key-ent { left: 6%; top: 61%; width: 16%; height: 7.5%; }
+#radio-key-clr { left: 78%; top: 61%; width: 16%; height: 7.5%; }
+.sector-tech-hits [data-key="1"] { left: 7%; top: 75%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="2"] { left: 36.5%; top: 75%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="3"] { left: 66%; top: 75%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="4"] { left: 7%; top: 81.2%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="5"] { left: 36.5%; top: 81.2%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="6"] { left: 66%; top: 81.2%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="7"] { left: 7%; top: 87.4%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="8"] { left: 36.5%; top: 87.4%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="9"] { left: 66%; top: 87.4%; width: 27%; height: 5.8%; }
+.sector-tech-hits [data-key="*"] { left: 7%; top: 93.5%; width: 27%; height: 5.5%; }
+.sector-tech-hits [data-key="0"] { left: 36.5%; top: 93.5%; width: 27%; height: 5.5%; }
+.sector-tech-hits [data-key="#"] { left: 66%; top: 93.5%; width: 27%; height: 5.5%; }
+.sector-tech-scroll-nav {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 6px 10px 8px;
+    background: linear-gradient(180deg, rgba(10,10,10,0.95), rgba(10,10,10,1));
+}
+.sector-scroll-btn {
+    flex: 1;
+    max-width: 160px;
+    font-family: inherit;
+    font-size: var(--text-xxs);
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    padding: 6px 8px;
+    border: 1px solid rgba(120, 255, 102, 0.35);
+    background: rgba(20, 30, 14, 0.85);
+    color: #b8ffb0;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.sector-scroll-btn:active { background: rgba(40, 60, 20, 0.95); }
+.sector-tech-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    left: -9999px;
+}
+
+/* Vysílačka — displej (MIP overlay) */
+.radio-display-zone { width: 100%; }
+.sector-tech-screen,
+.radio-display-screen {
+    width: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     font-family: 'IBM Plex Mono', monospace;
     font-size: var(--text-xs);
     line-height: 1.35;
-    color: #c8e6a0;
-    background: linear-gradient(180deg, #2f3820 0%, #1c2412 100%);
-    border: 2px solid rgba(30, 40, 14, 0.55);
-    border-radius: 14px;
-    box-shadow:
-        inset 0 2px 8px rgba(0, 0, 0, 0.55),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-        0 2px 0 rgba(255, 255, 255, 0.18);
 }
 .radio-display-status {
     display: flex;

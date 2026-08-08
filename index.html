@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e56" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e57" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -576,58 +576,75 @@
             </div><!-- /.panel-content-inner tasks -->
         </div>
 
-        <!-- ZÁLOŽKA RADIO (dříve Komunita) -->
+        <!-- ZÁLOŽKA RADIO (SECTOR-TECH) -->
         <div id="content-clan" style="display:none;">
-            <div class="panel-content-inner">
+            <div class="panel-content-inner panel-content-inner--radio">
 
-            <div class="radio-device-shell" id="radio-device-shell">
-                <div class="radio-device-overlays">
-                    <div class="radio-display-zone" id="radio-display-zone">
-                        <div class="radio-display-screen" id="radio-display-screen">
-                            <div class="radio-display-status">
-                                <span id="radio-display-channel">KOMUNITNÍ</span>
-                                <button type="button" class="radio-display-node" id="radio-display-node" title="Přepnout uzel: BÁZE / NOSIČ">BÁZE</button>
-                                <span id="radio-display-signal">○ STBY</span>
+            <div class="sector-tech-shell" id="radio-device-shell">
+                <div class="sector-tech-viewport" id="sector-tech-viewport">
+                    <div class="sector-tech-scroll" id="sector-tech-scroll">
+                        <div class="sector-tech-scroll-start" aria-hidden="true"></div>
+                        <div class="sector-tech-device">
+                            <img
+                                class="sector-tech-img"
+                                id="sector-tech-img"
+                                src="src/assets/radio/sector-tech-front.png"
+                                alt="SECTOR-TECH vysílačka"
+                                width="800"
+                                height="1840"
+                                decoding="async"
+                            />
+                            <div class="sector-tech-screen" id="radio-display-screen">
+                                <div class="radio-display-status">
+                                    <span id="radio-display-channel">KOMUNITNÍ</span>
+                                    <button type="button" class="radio-display-node sector-hit" id="radio-display-node" title="Přepnout uzel: BÁZE / NOSIČ">BÁZE</button>
+                                    <span id="radio-display-signal">○ STBY</span>
+                                </div>
+                                <div class="radio-display-main" id="radio-display-main">
+                                    <div id="radio-display-freq">462.000 MHz  PT</div>
+                                    <div id="radio-display-key">BEZ ŠIFRY</div>
+                                    <div id="radio-display-buffer"></div>
+                                    <div id="radio-display-preset">—</div>
+                                </div>
+                                <div class="radio-display-sub" id="radio-display-footer">0 KEY · <span id="radio-display-com">—</span></div>
                             </div>
-                            <div class="radio-display-main" id="radio-display-main">
-                                <div id="radio-display-freq">462.000 MHz  PT</div>
-                                <div id="radio-display-key">BEZ ŠIFRY</div>
-                                <div id="radio-display-buffer"></div>
-                                <div id="radio-display-preset">—</div>
+                            <div class="sector-tech-hits" id="radio-keypad-grid" aria-label="Ovládání vysílačky">
+                                <button type="button" class="sector-hit" id="radio-key-mode" aria-label="Režim VOICE / TEXT" title="Režim VOICE / TEXT"></button>
+                                <button type="button" class="sector-hit" id="radio-key-pre-up" aria-label="Předchozí preset" title="Předchozí preset"></button>
+                                <button type="button" class="sector-hit" id="radio-key-vol-up" aria-label="Další preset" title="Další preset"></button>
+                                <button type="button" class="sector-hit" data-key="p1" aria-label="P1" title="P1"></button>
+                                <button type="button" class="sector-hit" data-key="p2" aria-label="P2" title="P2"></button>
+                                <button type="button" class="sector-hit" data-key="up" aria-label="Nahoru" title="Nahoru"></button>
+                                <button type="button" class="sector-hit" data-key="left" aria-label="Vlevo" title="Vlevo"></button>
+                                <button type="button" class="sector-hit" data-key="right" aria-label="Vpravo" title="Vpravo"></button>
+                                <button type="button" class="sector-hit" data-key="down" aria-label="Dolů" title="Dolů"></button>
+                                <button type="button" class="sector-hit" id="radio-key-ent" aria-label="OK" title="OK / Enter"></button>
+                                <button type="button" class="sector-hit" id="radio-key-clr" aria-label="Zpět" title="Zpět / Home"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="1" aria-label="1"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="2" aria-label="2"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="3" aria-label="3"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="4" aria-label="4"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="5" aria-label="5"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="6" aria-label="6"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="7" aria-label="7"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="8" aria-label="8"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="9" aria-label="9"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="*" aria-label="Hvězdička"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="0" aria-label="0"></button>
+                                <button type="button" class="sector-hit radio-key" data-key="#" aria-label="Mřížka"></button>
                             </div>
-                            <div class="radio-display-sub" id="radio-display-footer">0 KEY · <span id="radio-display-com">—</span></div>
                         </div>
+                        <div class="sector-tech-scroll-end" aria-hidden="true"></div>
                     </div>
-                    <div class="radio-keypad-zone" id="radio-keypad-zone">
-                        <div class="radio-keypad-col">
-                            <button type="button" class="radio-key radio-key-fn" id="radio-key-vol-up" title="Další presetový kanál"><span class="radio-key-digit">VOL+</span></button>
-                            <button type="button" class="radio-key radio-key-fn" id="radio-key-mode" title="Režim: frekvence / šifra / TX"><span class="radio-key-digit">MD</span></button>
-                            <button type="button" class="radio-key radio-key-fn" id="radio-key-clr" title="Vymazat / TX režim"><span class="radio-key-digit">CLR</span></button>
-                        </div>
-                        <div class="radio-keypad-center" id="radio-keypad-grid">
-                            <button type="button" class="radio-key radio-key-num" data-key="1"><span class="radio-key-digit">1</span><span class="radio-key-letters">&nbsp;</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="2"><span class="radio-key-digit">2</span><span class="radio-key-letters">abc</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="3"><span class="radio-key-digit">3</span><span class="radio-key-letters">def</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="4"><span class="radio-key-digit">4</span><span class="radio-key-letters">ghi</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="5"><span class="radio-key-digit">5</span><span class="radio-key-letters">jkl</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="6"><span class="radio-key-digit">6</span><span class="radio-key-letters">mno</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="7"><span class="radio-key-digit">7</span><span class="radio-key-letters">pqrs</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="8"><span class="radio-key-digit">8</span><span class="radio-key-letters">tuv</span></button>
-                            <button type="button" class="radio-key radio-key-num" data-key="9"><span class="radio-key-digit">9</span><span class="radio-key-letters">wxyz</span></button>
-                            <div class="radio-keypad-input-row">
-                                <button type="button" class="radio-key radio-key-fn" data-key="prev" title="Předchozí preset"><span class="radio-key-digit">−</span></button>
-                                <input type="text" class="radio-chat-input" id="chat-input-field" placeholder="Hlášení…" autocomplete="off" spellcheck="false">
-                                <button type="button" class="radio-key radio-key-fn" data-key="next" title="Další preset"><span class="radio-key-digit">+</span></button>
-                            </div>
-                        </div>
-                        <div class="radio-keypad-col">
-                            <button type="button" class="radio-key radio-key-fn" id="radio-key-pre-up" title="Další preset"><span class="radio-key-digit">PRE</span></button>
-                            <button type="button" class="radio-key radio-key-fn radio-key-send" id="radio-key-ent" title="Potvrdit / vyslat"><span class="radio-key-digit">ENT</span></button>
-                        </div>
+                    <div class="sector-tech-scroll-nav" aria-label="Posun pohledu vysílačky">
+                        <button type="button" class="sector-scroll-btn" id="sector-scroll-top" title="Anténa a displej">▲ HORNÍ</button>
+                        <button type="button" class="sector-scroll-btn" id="sector-scroll-bottom" title="Klávesnice">▼ SPODNÍ</button>
                     </div>
                 </div>
+                <input type="text" class="sector-tech-hidden-input" id="chat-input-field" autocomplete="off" spellcheck="false" aria-hidden="true" tabindex="-1">
             </div>
 
+            <div class="radio-notebook-wrap">
             <div class="radio-notebook" id="radio-notebook">
                 <div class="radio-notebook-tabs">
                     <button type="button" class="radio-notebook-tab active" data-tab="station">Staniční list</button>
@@ -646,6 +663,7 @@
                         <button type="button" id="radio-notebook-tear" title="Vytrhnout poslední list / smazat poznámky">⌫ list</button>
                     </div>
                 </div>
+            </div>
             </div>
             </div>
         </div>
@@ -905,14 +923,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e56';
+        window.PATRAC_BUILD = '20260723e57';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e56"></script>
-    <script src="src/app/02-quests.js?v=20260723e56"></script>
-    <script src="src/app/03-map.js?v=20260723e56"></script>
-    <script src="src/app/04-game.js?v=20260723e56"></script>
+    <script src="src/app/01-globals.js?v=20260723e57"></script>
+    <script src="src/app/02-quests.js?v=20260723e57"></script>
+    <script src="src/app/03-map.js?v=20260723e57"></script>
+    <script src="src/app/04-game.js?v=20260723e57"></script>
 </body>
 </html>

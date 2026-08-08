@@ -57,6 +57,7 @@ import {
     renderGridPageHtml,
     copyGridLineText
 } from './radioGrids.js';
+import { initSectorTechShell } from './radioSectorShell.js';
 import {
     KIND_HANDSET,
     NODE_KIND_LABELS,
@@ -280,7 +281,8 @@ function renderDisplay() {
     }
     if (ch) {
         var scope = classifyChannel(state.frequency, state.encryptionKey, c);
-        ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
+        var opLabel = state.operatingMode === 'text' ? 'TEXT' : 'VOICE';
+        ch.textContent = (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel;
     }
     var nodeEl = el('radio-display-node');
     if (nodeEl) {
@@ -913,10 +915,8 @@ function bindKeypad() {
     if (modeBtn && !modeBtn._radioCommsBound) {
         modeBtn._radioCommsBound = true;
         modeBtn.addEventListener('click', function() {
-            if (state.keypadMode === 'tx') state.keypadMode = 'freq';
-            else if (state.keypadMode === 'freq') state.keypadMode = 'encrypt';
-            else state.keypadMode = 'tx';
-            state.dialBuffer = '';
+            state.operatingMode = state.operatingMode === 'text' ? 'voice' : 'text';
+            persist();
             renderDisplay();
         });
     }
@@ -945,6 +945,18 @@ function bindKeypad() {
                 }
                 return;
             }
+            if (key === '*') {
+                state.keypadMode = state.keypadMode === 'freq' ? 'tx' : 'freq';
+                state.dialBuffer = '';
+                renderDisplay();
+                return;
+            }
+            if (key === '#') {
+                state.keypadMode = state.keypadMode === 'encrypt' ? 'tx' : 'encrypt';
+                state.dialBuffer = '';
+                renderDisplay();
+                return;
+            }
 
             if (/^[0-9]$/.test(key)) {
                 var slot = parseInt(key, 10);
@@ -958,6 +970,9 @@ function bindKeypad() {
                     return;
                 }
                 if (state.keypadMode === 'encrypt') {
+                    state.dialBuffer = (state.dialBuffer || '') + key;
+                    if (input) input.value = state.dialBuffer;
+                    renderDisplay();
                     return;
                 }
                 if (key === '0') {
@@ -1084,6 +1099,7 @@ export function initRadioCommsSystem(options) {
     }
 
     bindKeypad();
+    initSectorTechShell();
     syncNotebookTabs();
     renderDisplay();
     var layout = stationPageMetrics();

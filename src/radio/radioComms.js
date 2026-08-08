@@ -126,6 +126,7 @@ export function defaultRadioState(userId, ctx) {
         keypadMode: 'tx',
         dialBuffer: '',
         activePresetSlot: 1,
+        operatingMode: 'voice',
         presets: presets
     };
 }
@@ -235,6 +236,7 @@ export function loadRadioState(userId, ctx) {
         parsed.encryptionKey = tunedKey;
         if (!parsed.keypadMode) parsed.keypadMode = 'tx';
         if (!parsed.dialBuffer) parsed.dialBuffer = '';
+        if (!parsed.operatingMode) parsed.operatingMode = 'voice';
         /* activePresetSlot jen pokud sedí na aktuální freq — jinak „přímý zápis“. */
         var di = findDialIndex(parsed.presets, parsed.frequency, parsed.activePresetSlot);
         if (di >= 0) parsed.activePresetSlot = parsed.presets[di].slot;
@@ -718,11 +720,12 @@ export function buildDisplayLines(state, ctx) {
     if (preset) {
         presetLabel = 'DIAL ' + preset.slot + '/' + (state.presets || []).length + ' · ' + (preset.label || 'KANÁL');
     }
+    var op = state.operatingMode === 'text' ? 'TEXT' : 'VOICE';
     return {
         line1: freq + ' MHz  ' + cipher + '  ·  ' + modeLabel,
         line2: key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — otevřený kanál',
         line3: presetLabel,
-        footer: ctx.comCode ? (ctx.comName || ctx.comCode) : 'VOLNÝ KANÁL'
+        footer: (ctx.comCode ? (ctx.comName || ctx.comCode) : 'VOLNÝ KANÁL') + ' · ' + op
     };
 }
 
