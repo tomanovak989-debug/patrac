@@ -136,10 +136,25 @@ function measureStage(scroll) {
     };
 }
 
-function applyWorkView(scroll, smooth) {
+function applyWorkView(scroll, smooth, force) {
     workScrollTopPx = getWorkScrollTop(scroll);
     if (isCalibrateMode()) return;
-    scroll.scrollTo({ top: workScrollTopPx, behavior: smooth ? 'smooth' : 'auto' });
+    var stage = scroll.querySelector('.sector-tech-stage');
+    if (!stage) return;
+    var stageH = stage.offsetHeight;
+    var viewH = scroll.clientHeight;
+    var max = Math.max(workScrollTopPx, stageH - viewH);
+    var t = scroll.scrollTop;
+    if (force || t < workScrollTopPx - 20) {
+        t = workScrollTopPx;
+    } else if (t < workScrollTopPx) {
+        t = workScrollTopPx;
+    } else if (t > max) {
+        t = max;
+    }
+    if (Math.abs(scroll.scrollTop - t) > 3) {
+        scroll.scrollTo({ top: t, behavior: smooth ? 'smooth' : 'auto' });
+    }
 }
 
 function remeasureAll() {
@@ -147,7 +162,7 @@ function remeasureAll() {
     if (!scroll) return;
     measureStage(scroll);
     if (!isCalibrateMode()) {
-        applyWorkView(scroll, false);
+        applyWorkView(scroll, false, true);
     }
 }
 
@@ -189,7 +204,7 @@ export function initSectorTechShell() {
         if (isCalibrateMode()) return;
         if (snapTimer) clearTimeout(snapTimer);
         snapTimer = setTimeout(function() {
-            applyWorkView(scroll, true);
+            applyWorkView(scroll, true, false);
         }, 160);
     }, { passive: true });
 }
@@ -197,7 +212,7 @@ export function initSectorTechShell() {
 export function scrollSectorTechTo() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
-    applyWorkView(scroll, true);
+    applyWorkView(scroll, true, true);
 }
 
 export function refreshSectorTechLayout() {
