@@ -600,6 +600,7 @@
                                 height="800"
                                 decoding="async"
                             />
+                            <svg class="sector-cal-grid" id="sector-cal-grid" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true"></svg>
                             <div class="sector-tech-screen" id="radio-display-screen">
                                 <span class="sector-hit-tag" aria-hidden="true"></span>
                                 <div class="radio-display-status">
@@ -931,7 +932,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e64';
+        window.PATRAC_BUILD = '20260723e65';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

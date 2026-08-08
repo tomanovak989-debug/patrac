@@ -95,6 +95,66 @@ function bindScaleControl() {
     }
 }
 
+var GRID_SRC = 800;
+var GRID_STEP = 50;
+
+function getStageSourceMetrics(stage) {
+    var img = stage.querySelector('.sector-tech-img');
+    var srcW = (img && img.naturalWidth) ? img.naturalWidth : GRID_SRC;
+    var srcH = (img && img.naturalHeight) ? img.naturalHeight : GRID_SRC;
+    var stageW = stage.offsetWidth || 1;
+    var stageH = stage.offsetHeight || 1;
+    return { srcW: srcW, srcH: srcH, stageW: stageW, stageH: stageH };
+}
+
+function stagePxToSource(stageRect, stageMetrics, rect) {
+    var mx = stageMetrics;
+    return {
+        x: Math.round((rect.left - stageRect.left) / mx.stageW * mx.srcW),
+        y: Math.round((rect.top - stageRect.top) / mx.stageH * mx.srcH),
+        w: Math.round(rect.width / mx.stageW * mx.srcW),
+        h: Math.round(rect.height / mx.stageH * mx.srcH)
+    };
+}
+
+function rebuildCalGrid(stage) {
+    var svg = stage.querySelector('.sector-cal-grid');
+    if (!svg) return;
+    if (!isCalibrateMode()) {
+        svg.innerHTML = '';
+        svg.style.display = 'none';
+        return;
+    }
+    var metrics = getStageSourceMetrics(stage);
+    var src = Math.max(metrics.srcW, metrics.srcH);
+    svg.setAttribute('viewBox', '0 0 ' + metrics.srcW + ' ' + metrics.srcH);
+    svg.style.display = 'block';
+
+    var parts = [];
+    var x;
+    for (x = 0; x <= src; x += GRID_STEP) {
+        var major = x % 100 === 0;
+        parts.push(
+            '<line x1="' + x + '" y1="0" x2="' + x + '" y2="' + src + '" ' +
+            'stroke="' + (major ? 'rgba(0,229,255,0.5)' : 'rgba(255,255,255,0.14)') + '" ' +
+            'stroke-width="' + (major ? '1.4' : '0.7') + '"/>'
+        );
+        if (major) {
+            parts.push('<text x="' + x + '" y="16" text-anchor="middle" class="sector-grid-label">' + x + '</text>');
+            if (x > 0) {
+                parts.push('<text x="12" y="' + (x + 4) + '" class="sector-grid-label-y">' + x + '</text>');
+            }
+        }
+    }
+    parts.push('<line x1="0" y1="0" x2="' + src + '" y2="0" stroke="#00e5ff" stroke-width="2.5"/>');
+    parts.push('<line x1="0" y1="0" x2="0" y2="' + src + '" stroke="#ffe600" stroke-width="2.5"/>');
+    parts.push('<text x="' + (src - 18) + '" y="28" class="sector-grid-axis-x">X</text>');
+    parts.push('<text x="18" y="' + (src - 10) + '" class="sector-grid-axis-y">Y</text>');
+    parts.push('<text x="6" y="14" class="sector-grid-origin">0</text>');
+    parts.push('<text x="' + (src - 52) + '" y="' + (src - 10) + '" class="sector-grid-meta">' + src + 'px</text>');
+    svg.innerHTML = parts.join('');
+}
+
 function updateCalibrationLabels() {
     var stage = document.querySelector('.sector-tech-stage');
     if (!stage) return;
@@ -104,15 +164,15 @@ function updateCalibrationLabels() {
     var bar = el('sector-scale-bar');
     if (bar) bar.style.display = on ? 'flex' : 'none';
 
+    rebuildCalGrid(stage);
+
     var stageRect = stage.getBoundingClientRect();
+    var metrics = getStageSourceMetrics(stage);
     var nodes = stage.querySelectorAll('.sector-hit, .sector-tech-screen');
     for (var i = 0; i < nodes.length; i++) {
         var node = nodes[i];
         var r = node.getBoundingClientRect();
-        var x = Math.round(r.left - stageRect.left);
-        var y = Math.round(r.top - stageRect.top);
-        var w = Math.round(r.width);
-        var h = Math.round(r.height);
+        var src = stagePxToSource(stageRect, metrics, r);
         var tag = node.querySelector('.sector-hit-tag');
         if (!tag) {
             tag = document.createElement('span');
@@ -120,7 +180,7 @@ function updateCalibrationLabels() {
             node.appendChild(tag);
         }
         var name = node.id || node.getAttribute('data-key') || 'screen';
-        tag.textContent = name + '  ' + x + ',' + y + '  ' + w + '×' + h + 'px';
+        tag.textContent = name + '  ' + src.x + ',' + src.y + '  ' + src.w + '×' + src.h + 'px';
         tag.style.display = on ? 'block' : 'none';
     }
 }
