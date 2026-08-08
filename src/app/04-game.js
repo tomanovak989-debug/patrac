@@ -2984,6 +2984,7 @@ function switchMainTab(tab, element) {
         if (tab === 'clan') c.classList.add('hud-radio-fullwidth');
         else c.classList.remove('hud-radio-fullwidth');
     }
+    document.body.classList.toggle('radio-tab-active', tab === 'clan');
 
     var btns = document.querySelectorAll('.bottom-action-bar button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
@@ -3012,7 +3013,10 @@ function switchMainTab(tab, element) {
             }
         }, 150);
     } else {
-        if (m) m.classList.add('blur-mode');
+        if (m) {
+            if (tab === 'clan') m.classList.remove('blur-mode');
+            else m.classList.add('blur-mode');
+        }
         c.style.display = 'block';
         document.getElementById('content-shelter').style.display = (tab === 'shelter') ? 'block' : 'none';
         document.getElementById('content-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';

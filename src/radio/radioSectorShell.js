@@ -12,9 +12,9 @@ var LAYOUT = {
 };
 
 var SCALE_KEY = 'patrac_sector_scale';
-var DEFAULT_SCALE = 2.5;
+var DEFAULT_SCALE = 2.8;
 var SCALE_MIN = 1.85;
-var SCALE_MAX = 2.85;
+var SCALE_MAX = 4.5;
 
 var workScrollTopPx = 0;
 
@@ -45,24 +45,34 @@ function isCalibrateMode() {
 function applyScale(scroll) {
     var shell = scroll.closest('.sector-tech-shell');
     if (!shell) return DEFAULT_SCALE;
-    var viewW = window.innerWidth || scroll.clientWidth;
-    var viewH = scroll.clientHeight;
     var user = getUserScale();
-    var maxFit = viewH / (viewW * workRegionFrac());
     var scale = user;
-    if (scale > maxFit) {
-        scale = Math.max(SCALE_MIN, maxFit);
+    /* V běžném režimu jemně omez zoom, aby šla vidět celá klávesnice bez scrollu */
+    if (!isCalibrateMode()) {
+        var viewW = window.innerWidth || scroll.clientWidth;
+        var viewH = scroll.clientHeight;
+        var maxFit = viewH / (viewW * workRegionFrac());
+        if (scale > maxFit) {
+            scale = Math.max(SCALE_MIN, maxFit);
+        }
     }
     shell.style.setProperty('--sector-img-scale', scale.toFixed(3));
-    updateScaleUi(scale);
+    updateScaleUi(scale, user);
     return scale;
 }
 
-function updateScaleUi(scale) {
+function updateScaleUi(applied, requested) {
     var slider = el('sector-scale-slider');
     var label = el('sector-scale-value');
-    if (slider) slider.value = String(scale);
-    if (label) label.textContent = scale.toFixed(2) + '×';
+    if (slider && requested != null) slider.value = String(requested);
+    else if (slider) slider.value = String(applied);
+    if (label) {
+        if (requested != null && Math.abs(requested - applied) > 0.04) {
+            label.textContent = applied.toFixed(2) + '× (' + requested.toFixed(2) + ')';
+        } else {
+            label.textContent = applied.toFixed(2) + '×';
+        }
+    }
 }
 
 function bindScaleControl() {

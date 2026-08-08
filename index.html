@@ -583,8 +583,8 @@
             <div class="sector-tech-shell" id="radio-device-shell">
                 <div class="sector-scale-bar admin-only-section" id="sector-scale-bar" aria-label="Velikost fotky vysílačky">
                     <label for="sector-scale-slider">Zoom fotky</label>
-                    <input type="range" id="sector-scale-slider" min="1.85" max="2.85" step="0.05" value="2.5">
-                    <span id="sector-scale-value">2.50×</span>
+                    <input type="range" id="sector-scale-slider" min="1.85" max="4.5" step="0.05" value="2.8">
+                    <span id="sector-scale-value">2.80×</span>
                 </div>
                 <div class="sector-tech-viewport" id="sector-tech-viewport">
                     <div class="sector-tech-scroll" id="sector-tech-scroll">
@@ -931,7 +931,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e62';
+        window.PATRAC_BUILD = '20260723e63';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
