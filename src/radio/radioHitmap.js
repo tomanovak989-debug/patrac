@@ -21,9 +21,24 @@ function applyRect(el, x, y, w, h) {
     el.style.height = r.height;
 }
 
+/** Font displeje v px — škáluje se s reálnou velikostí panelu (zoom vysílačky). */
+export function applyDisplayTypography() {
+    var screen = document.getElementById('radio-display-screen');
+    if (!screen) return;
+    var w = screen.clientWidth;
+    var h = screen.clientHeight;
+    if (w < 8 || h < 8) return;
+    var byWidth = w * 0.046;
+    var byHeight = h / 6.4;
+    var px = Math.min(byWidth, byHeight);
+    px = Math.max(5, Math.round(px * 10) / 10);
+    screen.style.fontSize = px + 'px';
+}
+
 export function applyRadioHitmap() {
     var screen = document.getElementById('radio-display-screen');
-    applyRect(screen, 323, 333, 154, 207);
+    /* o ~10 px na stranu vůči PNG — využití celé LCD plochy */
+    applyRect(screen, 313, 333, 174, 207);
 
     var dpad = document.getElementById('radio-dpad-zone');
     applyRect(dpad, 361, 568, 77, 64);
@@ -57,4 +72,5 @@ export function applyRadioHitmap() {
             );
         }
     }
+    requestAnimationFrame(applyDisplayTypography);
 }

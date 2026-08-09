@@ -1289,11 +1289,10 @@ body.sector-calibrate-on .sector-cal-rulers {
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    container-type: size;
-    padding: 2% 2.5%;
+    padding: 1px 0;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 11.5cqmin;
-    line-height: 1.12;
+    font-size: 8px;
+    line-height: 1.1;
     color: #78ff66;
     background: #0a0a0a;
     border-radius: 0;
