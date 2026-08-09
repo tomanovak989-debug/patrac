@@ -720,7 +720,7 @@ export function buildDisplayLines(state, ctx) {
     if (preset) {
         presetLabel = 'DIAL ' + preset.slot + '/' + (state.presets || []).length + ' · ' + (preset.label || 'KANÁL');
     }
-    var op = state.operatingMode === 'text' ? 'TEXT' : 'VOICE';
+    var op = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
     return {
         line1: freq + ' MHz  ' + cipher + '  ·  ' + modeLabel,
         line2: key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — otevřený kanál',

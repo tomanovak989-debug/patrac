@@ -630,15 +630,17 @@
                                 <div class="radio-display-sub" id="radio-display-footer">0 KEY · <span id="radio-display-com">—</span></div>
                             </div>
                             <div class="sector-tech-hits" id="radio-keypad-grid" aria-label="Ovládání vysílačky">
-                                <button type="button" class="sector-hit" id="radio-key-mode" aria-label="Režim VOICE / TEXT" title="Režim VOICE / TEXT"></button>
-                                <button type="button" class="sector-hit" id="radio-key-pre-up" aria-label="Předchozí preset" title="Předchozí preset"></button>
-                                <button type="button" class="sector-hit" id="radio-key-vol-up" aria-label="Další preset" title="Další preset"></button>
+                                <button type="button" class="sector-hit" id="radio-key-mode" aria-label="Režim OFF / VOICE / TEXT" title="Režim — přejetí vlevo/vpravo"></button>
+                                <button type="button" class="sector-hit" id="radio-key-preset-dial" aria-label="Presety" title="Presety — přejetí vlevo/vpravo"></button>
+                                <button type="button" class="sector-hit" id="radio-key-main-dial" aria-label="Klíčovadlo" title="Klíčovadlo — podržet a přetáhnout dolů"></button>
                                 <button type="button" class="sector-hit" data-key="p1" aria-label="P1" title="P1"></button>
                                 <button type="button" class="sector-hit" data-key="p2" aria-label="P2" title="P2"></button>
-                                <button type="button" class="sector-hit" data-key="up" aria-label="Nahoru" title="Nahoru"></button>
-                                <button type="button" class="sector-hit" data-key="left" aria-label="Vlevo" title="Vlevo"></button>
-                                <button type="button" class="sector-hit" data-key="right" aria-label="Vpravo" title="Vpravo"></button>
-                                <button type="button" class="sector-hit" data-key="down" aria-label="Dolů" title="Dolů"></button>
+                                <div class="sector-dpad-zone" id="radio-dpad-zone" aria-label="Směrová klávesa">
+                                    <button type="button" class="sector-hit sector-hit-tri sector-hit-tri-up" data-key="up" aria-label="Nahoru" title="Nahoru"></button>
+                                    <button type="button" class="sector-hit sector-hit-tri sector-hit-tri-right" data-key="right" aria-label="Vpravo" title="Vpravo"></button>
+                                    <button type="button" class="sector-hit sector-hit-tri sector-hit-tri-down" data-key="down" aria-label="Dolů" title="Dolů"></button>
+                                    <button type="button" class="sector-hit sector-hit-tri sector-hit-tri-left" data-key="left" aria-label="Vlevo" title="Vlevo"></button>
+                                </div>
                                 <button type="button" class="sector-hit" id="radio-key-ent" aria-label="OK" title="OK / Enter"></button>
                                 <button type="button" class="sector-hit" id="radio-key-clr" aria-label="Zpět" title="Zpět / Home"></button>
                                 <button type="button" class="sector-hit radio-key" data-key="1" aria-label="1"></button>
@@ -945,7 +947,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e68';
+        window.PATRAC_BUILD = '20260723e69';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

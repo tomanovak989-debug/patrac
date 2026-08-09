@@ -12,6 +12,7 @@ import {
     applyPreset,
     upsertPreset,
     cycleDialPreset,
+    adjustFrequency,
     normalizeFrequency,
     normalizeEncryptionKey,
     classifyChannel,
@@ -281,7 +282,7 @@ function renderDisplay() {
     }
     if (ch) {
         var scope = classifyChannel(state.frequency, state.encryptionKey, c);
-        var opLabel = state.operatingMode === 'text' ? 'TEXT' : 'VOICE';
+        var opLabel = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
         ch.textContent = (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel;
     }
     var nodeEl = el('radio-display-node');
@@ -786,6 +787,11 @@ async function transmitMessage(text) {
     text = String(text || '').trim();
     if (!text) return;
 
+    if (state.operatingMode === 'off') {
+        alert('Vysílačka je vypnutá (režim OFF).');
+        return;
+    }
+
     if (!state.frequency) {
         alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');
         return;
@@ -887,39 +893,15 @@ function bindKeypad() {
         });
     }
 
-    var volUp = el('radio-key-vol-up');
-    if (volUp && !volUp._radioCommsBound) {
-        volUp._radioCommsBound = true;
-        volUp.addEventListener('click', function() {
-            if (cycleDialPreset(state, 1)) {
-                persist();
-                renderDisplay();
-                refreshSubscriptions();
-            }
-        });
-    }
-
-    var preUp = el('radio-key-pre-up');
-    if (preUp && !preUp._radioCommsBound) {
-        preUp._radioCommsBound = true;
-        preUp.addEventListener('click', function() {
-            if (cycleDialPreset(state, 1)) {
-                persist();
-                renderDisplay();
-                refreshSubscriptions();
-            }
-        });
-    }
-
     var modeBtn = el('radio-key-mode');
     if (modeBtn && !modeBtn._radioCommsBound) {
         modeBtn._radioCommsBound = true;
         modeBtn.addEventListener('click', function() {
-            state.operatingMode = state.operatingMode === 'text' ? 'voice' : 'text';
-            persist();
-            renderDisplay();
+            cycleOperatingMode(1);
         });
     }
+
+    bindRadioDialGestures();
 
     var grid = el('radio-keypad-grid');
     if (grid && !grid._radioCommsBound) {
@@ -1041,27 +1023,185 @@ function bindDisplayDialSwipe() {
     var screen = el('radio-display-screen');
     if (!screen || screen._dialSwipeBound) return;
     screen._dialSwipeBound = true;
-    var startX = 0;
-    var tracking = false;
-    screen.addEventListener('touchstart', function(e) {
-        if (!e.touches || e.touches.length !== 1) return;
-        startX = e.touches[0].clientX;
-        tracking = true;
-    }, { passive: true });
-    screen.addEventListener('touchend', function(e) {
-        if (!tracking) return;
-        tracking = false;
-        var t = e.changedTouches && e.changedTouches[0];
-        if (!t) return;
-        var dx = t.clientX - startX;
-        if (Math.abs(dx) < 36) return;
-        if (cycleDialPreset(state, dx < 0 ? 1 : -1)) {
+    bindHorizontalSwipe(screen, function() {
+        if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
             refreshSubscriptions();
         }
+    }, function() {
+        if (cycleDialPreset(state, -1)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        }
+    });
+}
+
+var RADIO_OPERATING_MODES = ['off', 'voice', 'text'];
+
+function cycleOperatingMode(direction) {
+    var cur = state.operatingMode || 'voice';
+    var idx = RADIO_OPERATING_MODES.indexOf(cur);
+    if (idx < 0) idx = 1;
+    var dir = direction < 0 ? -1 : 1;
+    idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
+    state.operatingMode = RADIO_OPERATING_MODES[idx];
+    persist();
+    renderDisplay();
+}
+
+function bindHorizontalSwipe(node, onSwipeLeft, onSwipeRight, minDx) {
+    if (!node || node._horizSwipeBound) return;
+    node._horizSwipeBound = true;
+    var startX = 0;
+    var tracking = false;
+    var threshold = minDx || 28;
+
+    function finish(clientX) {
+        if (!tracking) return;
+        tracking = false;
+        var dx = clientX - startX;
+        if (Math.abs(dx) < threshold) return;
+        if (dx < 0) {
+            if (onSwipeLeft) onSwipeLeft();
+        } else if (onSwipeRight) {
+            onSwipeRight();
+        }
+    }
+
+    node.addEventListener('touchstart', function(e) {
+        if (!e.touches || e.touches.length !== 1) return;
+        startX = e.touches[0].clientX;
+        tracking = true;
     }, { passive: true });
-    screen.addEventListener('touchcancel', function() { tracking = false; }, { passive: true });
+    node.addEventListener('touchend', function(e) {
+        var t = e.changedTouches && e.changedTouches[0];
+        if (t) finish(t.clientX);
+    }, { passive: true });
+    node.addEventListener('touchcancel', function() { tracking = false; }, { passive: true });
+    node.addEventListener('pointerdown', function(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        startX = e.clientX;
+        tracking = true;
+    });
+    node.addEventListener('pointerup', function(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        finish(e.clientX);
+    });
+    node.addEventListener('pointercancel', function() { tracking = false; });
+}
+
+function bindHoldVerticalSwipe(node, onSwipeDown, onSwipeUp, opts) {
+    if (!node || node._holdVertBound) return;
+    node._holdVertBound = true;
+    opts = opts || {};
+    var holdMs = opts.holdMs || 180;
+    var minDy = opts.minDy || 28;
+    var startX = 0;
+    var startY = 0;
+    var holdTimer = null;
+    var armed = false;
+    var tracking = false;
+
+    function reset() {
+        tracking = false;
+        armed = false;
+        if (holdTimer) {
+            clearTimeout(holdTimer);
+            holdTimer = null;
+        }
+    }
+
+    function onHoldReady() {
+        holdTimer = null;
+        armed = true;
+    }
+
+    function finish(clientY) {
+        if (!tracking || !armed) {
+            reset();
+            return;
+        }
+        var dy = clientY - startY;
+        reset();
+        if (Math.abs(dy) < minDy) return;
+        if (dy > 0) {
+            if (onSwipeDown) onSwipeDown();
+        } else if (onSwipeUp) {
+            onSwipeUp();
+        }
+    }
+
+    node.addEventListener('touchstart', function(e) {
+        if (!e.touches || e.touches.length !== 1) return;
+        reset();
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        tracking = true;
+        holdTimer = setTimeout(onHoldReady, holdMs);
+    }, { passive: true });
+    node.addEventListener('touchmove', function(e) {
+        if (!tracking || !e.touches || !e.touches.length) return;
+        if (Math.abs(e.touches[0].clientX - startX) > 24) reset();
+    }, { passive: true });
+    node.addEventListener('touchend', function(e) {
+        var t = e.changedTouches && e.changedTouches[0];
+        if (t) finish(t.clientY);
+        else reset();
+    }, { passive: true });
+    node.addEventListener('touchcancel', reset, { passive: true });
+    node.addEventListener('pointerdown', function(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        reset();
+        startX = e.clientX;
+        startY = e.clientY;
+        tracking = true;
+        holdTimer = setTimeout(onHoldReady, holdMs);
+    });
+    node.addEventListener('pointermove', function(e) {
+        if (!tracking) return;
+        if (Math.abs(e.clientX - startX) > 24) reset();
+    });
+    node.addEventListener('pointerup', function(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        finish(e.clientY);
+    });
+    node.addEventListener('pointercancel', reset);
+}
+
+function bindRadioDialGestures() {
+    bindHorizontalSwipe(el('radio-key-mode'), function() {
+        cycleOperatingMode(1);
+    }, function() {
+        cycleOperatingMode(-1);
+    });
+
+    bindHorizontalSwipe(el('radio-key-preset-dial'), function() {
+        if (cycleDialPreset(state, 1)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        }
+    }, function() {
+        if (cycleDialPreset(state, -1)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        }
+    });
+
+    bindHoldVerticalSwipe(el('radio-key-main-dial'), function() {
+        adjustFrequency(state, -1);
+        persist();
+        renderDisplay();
+        refreshSubscriptions();
+    }, function() {
+        adjustFrequency(state, 1);
+        persist();
+        renderDisplay();
+        refreshSubscriptions();
+    });
 }
 
 export function initRadioCommsSystem(options) {

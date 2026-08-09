@@ -1254,12 +1254,8 @@ body.sector-calibrate-on .sector-cal-rulers {
     stroke-width: 3px;
 }
 .sector-tech-screen {
-    /* PNG 800×800: displej x 324–425, y 332–540 */
+    /* rozměry nastavuje radioHitmap.js — PNG 800×800 */
     position: absolute;
-    left: 40.5%;
-    top: 41.5%;
-    width: 12.625%;
-    height: 26%;
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
@@ -1298,6 +1294,32 @@ body.theme-light .sector-tech-screen {
 .sector-hit:active {
     background: rgba(120, 255, 102, 0.12);
 }
+.sector-dpad-zone {
+    position: absolute;
+    pointer-events: none;
+}
+.sector-dpad-zone .sector-hit-tri {
+    position: absolute;
+    inset: 0;
+    border-radius: 0;
+    pointer-events: auto;
+}
+.sector-dpad-zone .sector-hit-tri-up {
+    clip-path: polygon(0 0, 100% 0, 50% 50%);
+}
+.sector-dpad-zone .sector-hit-tri-right {
+    clip-path: polygon(100% 0, 100% 100%, 50% 50%);
+}
+.sector-dpad-zone .sector-hit-tri-down {
+    clip-path: polygon(100% 100%, 0 100%, 50% 50%);
+}
+.sector-dpad-zone .sector-hit-tri-left {
+    clip-path: polygon(0 100%, 0 0, 50% 50%);
+}
+body.sector-calibrate-on .sector-dpad-zone {
+    outline: 2px dashed rgba(255, 94, 196, 0.75);
+    outline-offset: -1px;
+}
 /* Kalibrační režim — viditelné obrysy + px souřadnice (admin / sector-calibrate) */
 body.sector-calibrate-on .sector-hit {
     outline: 2px solid #ff5ec4 !important;
@@ -1335,33 +1357,7 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     color: #d6ffb0;
     border-color: rgba(120, 255, 102, 0.65);
 }
-/* Hitboxy — PNG 800×800; klávesa 60×35 px, mezery 7×5 px; kotva klávesa 2 @ 320,640 */
-/* Knoflíky nahoře (nad displejem) */
-#radio-key-mode { left: 31.625%; top: 12%; width: 7.5%; height: 4.375%; }
-#radio-key-pre-up { left: 40%; top: 8%; width: 7.5%; height: 4.375%; }
-#radio-key-vol-up { left: 48.375%; top: 8%; width: 7.5%; height: 4.375%; }
-/* P1 / P2 / D-pad — řádky y=560 a y=600 */
-.sector-tech-hits [data-key="p1"] { left: 31.625%; top: 70%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="p2"] { left: 48.375%; top: 70%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="up"] { left: 40%; top: 70%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="left"] { left: 31.625%; top: 75%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="right"] { left: 48.375%; top: 75%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="down"] { left: 40%; top: 75%; width: 7.5%; height: 4.375%; }
-#radio-key-ent { left: 31.625%; top: 75%; width: 7.5%; height: 4.375%; }
-#radio-key-clr { left: 48.375%; top: 75%; width: 7.5%; height: 4.375%; }
-/* Numerická klávesnice 3×4 */
-.sector-tech-hits [data-key="1"] { left: 31.625%; top: 80%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="2"] { left: 40%; top: 80%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="3"] { left: 48.375%; top: 80%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="4"] { left: 31.625%; top: 85%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="5"] { left: 40%; top: 85%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="6"] { left: 48.375%; top: 85%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="7"] { left: 31.625%; top: 90%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="8"] { left: 40%; top: 90%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="9"] { left: 48.375%; top: 90%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="*"] { left: 31.625%; top: 95%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="0"] { left: 40%; top: 95%; width: 7.5%; height: 4.375%; }
-.sector-tech-hits [data-key="#"] { left: 48.375%; top: 95%; width: 7.5%; height: 4.375%; }
+/* Hitboxy — pixelové souřadnice aplikuje radioHitmap.js */
 .sector-tech-hidden-input {
     position: absolute;
     width: 1px;

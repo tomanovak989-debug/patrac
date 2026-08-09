@@ -1,14 +1,15 @@
 /**
  * SECTOR-TECH — jeden pracovní pohled (displej + klávesnice), zoom slider, kalibrace.
  */
+import { applyRadioHitmap } from './radioHitmap.js';
 function el(id) {
     return document.getElementById(id);
 }
 
 var LAYOUT = {
-    displayTop: 332 / 800,
+    displayTop: 333 / 800,
     displayBottom: 540 / 800,
-    keypadBottom: 795 / 800
+    keypadBottom: 786 / 800
 };
 
 var SCALE_KEY = 'patrac_sector_scale';
@@ -307,7 +308,7 @@ function updateCalibrationLabels() {
 
     var stageRect = stage.getBoundingClientRect();
     var metrics = getStageSourceMetrics(stage);
-    var nodes = stage.querySelectorAll('.sector-hit, .sector-tech-screen');
+    var nodes = stage.querySelectorAll('.sector-hit, .sector-tech-screen, .sector-dpad-zone');
     for (var i = 0; i < nodes.length; i++) {
         var node = nodes[i];
         var r = node.getBoundingClientRect();
@@ -369,6 +370,7 @@ function applyWorkView(scroll, smooth, force) {
 function remeasureAll() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
+    applyRadioHitmap();
     measureStage(scroll);
     if (!isCalibrateMode()) {
         applyWorkView(scroll, false, true);
