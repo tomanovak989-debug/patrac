@@ -1168,11 +1168,12 @@ body.sector-calibrate-on .sector-cal-rulers {
     stroke-width: 3px;
 }
 .sector-tech-screen {
+    /* PNG 800×800: displej x 324–425, y 330–525 */
     position: absolute;
-    left: 22%;
-    top: 27.5%;
-    width: 56%;
-    height: 24%;
+    left: 40.5%;
+    top: 41.25%;
+    width: 12.625%;
+    height: 24.375%;
     box-sizing: border-box;
     overflow: hidden;
     display: flex;
@@ -1244,32 +1245,33 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     color: #d6ffb0;
     border-color: rgba(120, 255, 102, 0.65);
 }
-/* Knoflíky nahoře (nad displejem — mimo pracovní pohled) */
-#radio-key-mode { left: 18%; top: 7%; width: 14%; height: 8%; }
-#radio-key-pre-up { left: 40%; top: 5.5%; width: 9%; height: 9%; }
-#radio-key-vol-up { left: 51%; top: 5.5%; width: 9%; height: 9%; }
-/* P1 / P2 / D-pad / OK / Back */
-.sector-tech-hits [data-key="p1"] { left: 24%; top: 52%; width: 13%; height: 6%; }
-.sector-tech-hits [data-key="p2"] { left: 63%; top: 52%; width: 13%; height: 6%; }
-.sector-tech-hits [data-key="up"] { left: 40%; top: 56%; width: 20%; height: 5.5%; }
-.sector-tech-hits [data-key="left"] { left: 26%; top: 62%; width: 13%; height: 5.5%; }
-.sector-tech-hits [data-key="right"] { left: 61%; top: 62%; width: 13%; height: 5.5%; }
-.sector-tech-hits [data-key="down"] { left: 40%; top: 68%; width: 20%; height: 5.5%; }
-#radio-key-ent { left: 24%; top: 62%; width: 13%; height: 6%; }
-#radio-key-clr { left: 63%; top: 62%; width: 13%; height: 6%; }
-/* Numerická klávesnice 3×4 */
-.sector-tech-hits [data-key="1"] { left: 26%; top: 73%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="2"] { left: 43%; top: 73%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="3"] { left: 60%; top: 73%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="4"] { left: 26%; top: 79%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="5"] { left: 43%; top: 79%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="6"] { left: 60%; top: 79%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="7"] { left: 26%; top: 85%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="8"] { left: 43%; top: 85%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="9"] { left: 60%; top: 85%; width: 14%; height: 5.5%; }
-.sector-tech-hits [data-key="*"] { left: 26%; top: 91%; width: 14%; height: 5.2%; }
-.sector-tech-hits [data-key="0"] { left: 43%; top: 91%; width: 14%; height: 5.2%; }
-.sector-tech-hits [data-key="#"] { left: 60%; top: 91%; width: 14%; height: 5.2%; }
+/* Hitboxy — PNG 800×800; klávesa 110×45 px, mezery 7×5 px; mřížka od klávesy 2 */
+/* Knoflíky nahoře (nad displejem) */
+#radio-key-mode { left: 25.375%; top: 12%; width: 13.75%; height: 5.625%; }
+#radio-key-pre-up { left: 36%; top: 8%; width: 13.75%; height: 5.625%; }
+#radio-key-vol-up { left: 50.625%; top: 8%; width: 13.75%; height: 5.625%; }
+/* P1 / P2 / D-pad — řádky y=530 a y=580 nad numerickou klávesnicí */
+.sector-tech-hits [data-key="p1"] { left: 25.375%; top: 66.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="p2"] { left: 54.625%; top: 66.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="up"] { left: 40%; top: 66.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="left"] { left: 25.375%; top: 72.5%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="right"] { left: 54.625%; top: 72.5%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="down"] { left: 40%; top: 72.5%; width: 13.75%; height: 5.625%; }
+#radio-key-ent { left: 25.375%; top: 72.5%; width: 13.75%; height: 5.625%; }
+#radio-key-clr { left: 54.625%; top: 72.5%; width: 13.75%; height: 5.625%; }
+/* Numerická klávesnice 3×4 — kotva klávesa 2: x 320–430, y 630–675 */
+.sector-tech-hits [data-key="1"] { left: 25.375%; top: 78.75%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="2"] { left: 40%; top: 78.75%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="3"] { left: 54.625%; top: 78.75%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="4"] { left: 25.375%; top: 85%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="5"] { left: 40%; top: 85%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="6"] { left: 54.625%; top: 85%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="7"] { left: 25.375%; top: 91.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="8"] { left: 40%; top: 91.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="9"] { left: 54.625%; top: 91.25%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="*"] { left: 25.375%; top: 97.5%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="0"] { left: 40%; top: 97.5%; width: 13.75%; height: 5.625%; }
+.sector-tech-hits [data-key="#"] { left: 54.625%; top: 97.5%; width: 13.75%; height: 5.625%; }
 .sector-tech-hidden-input {
     position: absolute;
     width: 1px;

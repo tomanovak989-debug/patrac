@@ -6,9 +6,9 @@ function el(id) {
 }
 
 var LAYOUT = {
-    displayTop: 0.275,
-    displayBottom: 0.515,
-    keypadBottom: 0.945
+    displayTop: 330 / 800,
+    displayBottom: 525 / 800,
+    keypadBottom: 825 / 800
 };
 
 var SCALE_KEY = 'patrac_sector_scale';
