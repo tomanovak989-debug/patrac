@@ -585,6 +585,8 @@
                     <label for="sector-scale-slider">Zoom fotky</label>
                     <input type="range" id="sector-scale-slider" min="1.85" max="4.5" step="0.05" value="2.75">
                     <span id="sector-scale-value">2.75×</span>
+                    <button type="button" class="sector-cross-toggle" id="sector-cross-toggle" title="Zapni a klepni na fotku — umístí kříž s X/Y v px">📍 Kříž</button>
+                    <span id="sector-cross-coords" class="sector-cross-coords">—</span>
                 </div>
                 <div class="sector-tech-viewport" id="sector-tech-viewport">
                     <div class="sector-cal-rulers" id="sector-cal-rulers" aria-hidden="true">
@@ -605,6 +607,13 @@
                                 decoding="async"
                             />
                             <svg class="sector-cal-grid" id="sector-cal-grid" viewBox="0 0 800 800" preserveAspectRatio="none" aria-hidden="true"></svg>
+                            <div class="sector-cal-cross" id="sector-cal-cross" aria-hidden="true">
+                                <div class="sector-cal-cross-line sector-cal-cross-line-h"></div>
+                                <div class="sector-cal-cross-line sector-cal-cross-line-v"></div>
+                                <div class="sector-cal-cross-dot"></div>
+                                <div class="sector-cal-cross-readout" id="sector-cal-cross-readout">—</div>
+                            </div>
+                            <div class="sector-cal-tap-layer" id="sector-cal-tap-layer" aria-hidden="true"></div>
                             <div class="sector-tech-screen" id="radio-display-screen">
                                 <span class="sector-hit-tag" aria-hidden="true"></span>
                                 <div class="radio-display-status">
@@ -936,7 +945,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e67';
+        window.PATRAC_BUILD = '20260723e68';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

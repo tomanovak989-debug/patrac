@@ -6,9 +6,9 @@ function el(id) {
 }
 
 var LAYOUT = {
-    displayTop: 330 / 800,
-    displayBottom: 525 / 800,
-    keypadBottom: 825 / 800
+    displayTop: 332 / 800,
+    displayBottom: 540 / 800,
+    keypadBottom: 795 / 800
 };
 
 var SCALE_KEY = 'patrac_sector_scale';
@@ -229,11 +229,73 @@ function updateViewportRulers(scroll) {
     rulerY.innerHTML = yParts.join('');
 }
 
+function clientToSource(stage, clientX, clientY) {
+    var stageRect = stage.getBoundingClientRect();
+    var metrics = getStageSourceMetrics(stage);
+    return {
+        x: Math.round((clientX - stageRect.left) / metrics.stageW * metrics.srcW),
+        y: Math.round((clientY - stageRect.top) / metrics.stageH * metrics.srcH)
+    };
+}
+
+function placeCalCross(stage, srcX, srcY) {
+    var cross = el('sector-cal-cross');
+    var readout = el('sector-cal-cross-readout');
+    var coords = el('sector-cross-coords');
+    if (!cross) return;
+    var metrics = getStageSourceMetrics(stage);
+    srcX = Math.max(0, Math.min(metrics.srcW, srcX));
+    srcY = Math.max(0, Math.min(metrics.srcH, srcY));
+    cross.style.left = (srcX / metrics.srcW * 100) + '%';
+    cross.style.top = (srcY / metrics.srcH * 100) + '%';
+    cross.classList.add('is-placed');
+    var label = 'X:' + srcX + '  Y:' + srcY;
+    if (readout) readout.textContent = label;
+    if (coords) coords.textContent = label;
+}
+
+function setCrossMode(on) {
+    document.body.classList.toggle('sector-cross-mode', !!on);
+    var btn = el('sector-cross-toggle');
+    if (btn) btn.classList.toggle('active', !!on);
+}
+
+function bindCrosshair() {
+    var toggle = el('sector-cross-toggle');
+    var layer = el('sector-cal-tap-layer');
+    var stage = document.querySelector('.sector-tech-stage');
+    if (!toggle || !layer || !stage || toggle._sectorCrossBound) return;
+    toggle._sectorCrossBound = true;
+
+    toggle.addEventListener('click', function() {
+        setCrossMode(!document.body.classList.contains('sector-cross-mode'));
+    });
+
+    function onPlace(clientX, clientY) {
+        if (!isCalibrateMode() || !document.body.classList.contains('sector-cross-mode')) return;
+        var pt = clientToSource(stage, clientX, clientY);
+        placeCalCross(stage, pt.x, pt.y);
+    }
+
+    layer.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPlace(e.clientX, e.clientY);
+    });
+    layer.addEventListener('touchend', function(e) {
+        if (!e.changedTouches || !e.changedTouches.length) return;
+        e.preventDefault();
+        var t = e.changedTouches[0];
+        onPlace(t.clientX, t.clientY);
+    }, { passive: false });
+}
+
 function updateCalibrationLabels() {
     var stage = document.querySelector('.sector-tech-stage');
     if (!stage) return;
     var on = isCalibrateMode();
     document.body.classList.toggle('sector-calibrate-on', on);
+    if (!on) setCrossMode(false);
 
     var bar = el('sector-scale-bar');
     if (bar) bar.style.display = on ? 'flex' : 'none';
@@ -319,6 +381,7 @@ export function initSectorTechShell() {
     scroll._sectorBound = true;
 
     bindScaleControl();
+    bindCrosshair();
     remeasureAll();
 
     var img = el('sector-tech-img');
