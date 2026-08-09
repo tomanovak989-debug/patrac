@@ -997,6 +997,50 @@ body.admin-mode .hud-center-panel.hud-radio-fullwidth {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
     background: transparent;
+    padding-left: 36px;
+    box-sizing: border-box;
+}
+.sector-zoom-rail {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 36px;
+    z-index: 26;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 2px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.62);
+    border-right: 1px solid rgba(120, 255, 102, 0.35);
+    pointer-events: auto;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+.sector-zoom-label {
+    font: 700 7px/1 'IBM Plex Mono', monospace;
+    color: #78ff66;
+    letter-spacing: 0.08em;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+}
+.sector-zoom-rail input[type="range"] {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    width: 24px;
+    height: min(200px, 42vh);
+    margin: 0;
+    accent-color: #78ff66;
+}
+.sector-zoom-rail #sector-scale-value {
+    font: bold 8px 'IBM Plex Mono', monospace;
+    color: #78ff66;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    min-width: 0;
 }
 body:not(.sector-calibrate-on) .sector-tech-scroll {
     overflow-y: auto;
@@ -1024,12 +1068,6 @@ body.sector-calibrate-on .sector-scale-bar {
 }
 .sector-scale-bar label { flex-shrink: 0; letter-spacing: 0.06em; }
 .sector-scale-bar input[type="range"] { flex: 1; min-width: 0; }
-#sector-scale-value {
-    min-width: 3.2em;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: bold;
-    color: #78ff66;
-}
 .sector-cross-toggle {
     flex-shrink: 0;
     background: rgba(30, 12, 24, 0.95);
@@ -1122,8 +1160,33 @@ body.sector-cross-mode .sector-tech-hits {
     height: max(8px, env(safe-area-inset-bottom, 0px));
     flex-shrink: 0;
 }
-.radio-notebook-wrap,
+.radio-notebook-wrap {
+    display: none !important;
+}
 .sector-tech-scroll-nav {
+    display: flex !important;
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    flex-direction: column;
+    gap: 8px;
+    z-index: 24;
+    pointer-events: none;
+}
+.sector-scroll-btn {
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.72);
+    border: 1px solid rgba(120, 255, 102, 0.45);
+    color: #78ff66;
+    font: bold 9px/1.2 'IBM Plex Mono', monospace;
+    padding: 8px 6px;
+    cursor: pointer;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.06em;
+    border-radius: 4px;
+}
+body.sector-calibrate-on .sector-tech-scroll-nav {
     display: none !important;
 }
 .sector-tech-device {
@@ -1290,6 +1353,14 @@ body.theme-light .sector-tech-screen {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     border-radius: 8px;
+}
+.sector-hit-dial {
+    touch-action: none;
+    z-index: 14;
+}
+.sector-hit-dial.sector-dial-armed {
+    background: rgba(120, 255, 102, 0.18) !important;
+    outline: 1px solid rgba(120, 255, 102, 0.55);
 }
 .sector-hit:active {
     background: rgba(120, 255, 102, 0.12);

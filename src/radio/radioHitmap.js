@@ -35,7 +35,7 @@ export function applyRadioHitmap() {
 
     applyRect(document.getElementById('radio-key-mode'), 300, 200, 48, 55);
     applyRect(document.getElementById('radio-key-preset-dial'), 373, 174, 44, 79);
-    applyRect(document.getElementById('radio-key-main-dial'), 524, 310, 26, 228);
+    applyRect(document.getElementById('radio-key-main-dial'), 513, 310, 37, 228);
 
     var cols = [315, 376, 437];
     var rows = [

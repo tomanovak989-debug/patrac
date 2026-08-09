@@ -1055,14 +1055,22 @@ function bindHorizontalSwipe(node, onSwipeLeft, onSwipeRight, minDx) {
     if (!node || node._horizSwipeBound) return;
     node._horizSwipeBound = true;
     var startX = 0;
+    var startY = 0;
     var tracking = false;
-    var threshold = minDx || 28;
+    var threshold = minDx || 22;
+    var pointerId = null;
 
-    function finish(clientX) {
-        if (!tracking) return;
+    function reset() {
         tracking = false;
+        pointerId = null;
+    }
+
+    function finish(clientX, clientY) {
+        if (!tracking) return;
         var dx = clientX - startX;
-        if (Math.abs(dx) < threshold) return;
+        var dy = clientY - startY;
+        reset();
+        if (Math.abs(dx) < threshold || Math.abs(dx) < Math.abs(dy)) return;
         if (dx < 0) {
             if (onSwipeLeft) onSwipeLeft();
         } else if (onSwipeRight) {
@@ -1070,43 +1078,48 @@ function bindHorizontalSwipe(node, onSwipeLeft, onSwipeRight, minDx) {
         }
     }
 
-    node.addEventListener('touchstart', function(e) {
-        if (!e.touches || e.touches.length !== 1) return;
-        startX = e.touches[0].clientX;
-        tracking = true;
-    }, { passive: true });
-    node.addEventListener('touchend', function(e) {
-        var t = e.changedTouches && e.changedTouches[0];
-        if (t) finish(t.clientX);
-    }, { passive: true });
-    node.addEventListener('touchcancel', function() { tracking = false; }, { passive: true });
     node.addEventListener('pointerdown', function(e) {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
         startX = e.clientX;
+        startY = e.clientY;
         tracking = true;
+        pointerId = e.pointerId;
+        try { node.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    node.addEventListener('pointermove', function(e) {
+        if (!tracking || e.pointerId !== pointerId) return;
+        e.preventDefault();
+        e.stopPropagation();
     });
     node.addEventListener('pointerup', function(e) {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        finish(e.clientX);
+        if (!tracking || e.pointerId !== pointerId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        finish(e.clientX, e.clientY);
+        try { node.releasePointerCapture(e.pointerId); } catch (err2) {}
     });
-    node.addEventListener('pointercancel', function() { tracking = false; });
+    node.addEventListener('pointercancel', reset);
 }
 
 function bindHoldVerticalSwipe(node, onSwipeDown, onSwipeUp, opts) {
     if (!node || node._holdVertBound) return;
     node._holdVertBound = true;
     opts = opts || {};
-    var holdMs = opts.holdMs || 180;
-    var minDy = opts.minDy || 28;
+    var holdMs = opts.holdMs || 90;
+    var minDy = opts.minDy || 22;
     var startX = 0;
     var startY = 0;
     var holdTimer = null;
     var armed = false;
     var tracking = false;
+    var pointerId = null;
 
     function reset() {
         tracking = false;
         armed = false;
+        pointerId = null;
         if (holdTimer) {
             clearTimeout(holdTimer);
             holdTimer = null;
@@ -1116,16 +1129,19 @@ function bindHoldVerticalSwipe(node, onSwipeDown, onSwipeUp, opts) {
     function onHoldReady() {
         holdTimer = null;
         armed = true;
+        node.classList.add('sector-dial-armed');
     }
 
-    function finish(clientY) {
+    function finish(clientX, clientY) {
+        node.classList.remove('sector-dial-armed');
         if (!tracking || !armed) {
             reset();
             return;
         }
         var dy = clientY - startY;
+        var dx = clientX - startX;
         reset();
-        if (Math.abs(dy) < minDy) return;
+        if (Math.abs(dy) < minDy || Math.abs(dy) < Math.abs(dx)) return;
         if (dy > 0) {
             if (onSwipeDown) onSwipeDown();
         } else if (onSwipeUp) {
@@ -1133,41 +1149,34 @@ function bindHoldVerticalSwipe(node, onSwipeDown, onSwipeUp, opts) {
         }
     }
 
-    node.addEventListener('touchstart', function(e) {
-        if (!e.touches || e.touches.length !== 1) return;
-        reset();
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        tracking = true;
-        holdTimer = setTimeout(onHoldReady, holdMs);
-    }, { passive: true });
-    node.addEventListener('touchmove', function(e) {
-        if (!tracking || !e.touches || !e.touches.length) return;
-        if (Math.abs(e.touches[0].clientX - startX) > 24) reset();
-    }, { passive: true });
-    node.addEventListener('touchend', function(e) {
-        var t = e.changedTouches && e.changedTouches[0];
-        if (t) finish(t.clientY);
-        else reset();
-    }, { passive: true });
-    node.addEventListener('touchcancel', reset, { passive: true });
     node.addEventListener('pointerdown', function(e) {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        if (e.button !== 0) return;
+        e.preventDefault();
+        e.stopPropagation();
         reset();
         startX = e.clientX;
         startY = e.clientY;
         tracking = true;
+        pointerId = e.pointerId;
         holdTimer = setTimeout(onHoldReady, holdMs);
+        try { node.setPointerCapture(e.pointerId); } catch (err) {}
     });
     node.addEventListener('pointermove', function(e) {
-        if (!tracking) return;
-        if (Math.abs(e.clientX - startX) > 24) reset();
+        if (!tracking || e.pointerId !== pointerId) return;
+        e.preventDefault();
+        e.stopPropagation();
     });
     node.addEventListener('pointerup', function(e) {
-        if (e.pointerType === 'mouse' && e.button !== 0) return;
-        finish(e.clientY);
+        if (!tracking || e.pointerId !== pointerId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        finish(e.clientX, e.clientY);
+        try { node.releasePointerCapture(e.pointerId); } catch (err2) {}
     });
-    node.addEventListener('pointercancel', reset);
+    node.addEventListener('pointercancel', function() {
+        node.classList.remove('sector-dial-armed');
+        reset();
+    });
 }
 
 function bindRadioDialGestures() {
