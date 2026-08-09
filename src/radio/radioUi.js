@@ -359,8 +359,8 @@ function renderDisplay() {
         var menuLines = osView.lines || ['', '', '', ''];
         if (f) f.textContent = menuLines[0] || '';
         if (k) k.textContent = menuLines[1] || '';
-        if (buf) buf.textContent = menuLines[2] || '';
-        if (p) p.textContent = menuLines[3] || '';
+        if (p) p.textContent = menuLines[2] || '';
+        if (buf) buf.textContent = menuLines[3] || '';
         if (ch) ch.textContent = osView.status || 'MENU';
         if (sig) sig.textContent = '';
         if (nodeEl) nodeEl.textContent = '';
