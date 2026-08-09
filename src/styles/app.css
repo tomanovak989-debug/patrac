@@ -1302,6 +1302,30 @@ body.theme-light .sector-tech-screen {
     color: #142010;
     background: #c8c8c8;
 }
+.sector-tech-screen.is-off {
+    background: #050505;
+}
+body.theme-light .sector-tech-screen.is-off {
+    background: #1a1a1a;
+    color: transparent;
+}
+.sector-tech-screen.is-off .radio-display-status,
+.sector-tech-screen.is-off .radio-display-main,
+.sector-tech-screen.is-off .radio-display-sub {
+    visibility: hidden;
+}
+.sector-tech-screen.is-menu .radio-display-node,
+.sector-tech-screen.is-menu #radio-display-signal {
+    visibility: hidden;
+}
+.sector-tech-screen.is-menu #radio-display-freq,
+.sector-tech-screen.is-menu #radio-display-key,
+.sector-tech-screen.is-menu #radio-display-buffer,
+.sector-tech-screen.is-menu #radio-display-preset {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 .sector-tech-hits {
     position: absolute;
     inset: 0;

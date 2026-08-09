@@ -60,6 +60,13 @@ import {
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import {
+    createRadioOsState,
+    resetRadioOs,
+    radioOsHandleInput,
+    buildOsDisplayLines,
+    isRadioOsActive
+} from './radioOs.js';
+import {
     KIND_HANDSET,
     NODE_KIND_LABELS,
     resolveActiveRadioNode,
@@ -68,6 +75,7 @@ import {
 
 var ctx = {};
 var state = null;
+var radioOs = createRadioOsState();
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -262,51 +270,113 @@ function updateInputForMode() {
 
 function renderDisplay() {
     var c = getCtx();
-    var lines = buildDisplayLines(state, c);
+    var screen = el('radio-display-screen');
+    var standbyLines = buildDisplayLines(state, c);
+    var scope = classifyChannel(state.frequency, state.encryptionKey, c);
+    var opLabel = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
+    var dialBuffer = '';
+    if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
+        dialBuffer = state.dialBuffer ? ('▸ ' + state.dialBuffer) : '';
+    }
+
+    var osView = buildOsDisplayLines(radioOs, state.operatingMode, {
+        status: (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel,
+        line1: standbyLines.line1,
+        line2: standbyLines.line2,
+        line3: standbyLines.line3,
+        line4: dialBuffer,
+        footer: standbyLines.footer,
+        buffer: dialBuffer
+    });
+
+    if (screen) {
+        screen.classList.toggle('is-off', osView.mode === 'off');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub');
+    }
+
     var f = el('radio-display-freq');
     var k = el('radio-display-key');
     var p = el('radio-display-preset');
     var foot = el('radio-display-com');
     var sig = el('radio-display-signal');
     var ch = el('radio-display-channel');
-    if (f) f.textContent = lines.line1;
-    if (k) k.textContent = lines.line2;
-    if (p) p.textContent = lines.line3;
-    if (foot) foot.textContent = lines.footer;
-    if (sig) {
-        /* PT (bez šifry) je platný otevřený kanál — ne STBY. */
-        var tuned = !!normalizeFrequency(state.frequency);
-        var pt = !normalizeEncryptionKey(state.encryptionKey || '');
-        sig.textContent = tuned ? (pt ? '● TX/RX PT' : '● TX/RX CT') : '○ STBY';
-        sig.style.color = tuned ? '#8fdc68' : '#888';
-    }
-    if (ch) {
-        var scope = classifyChannel(state.frequency, state.encryptionKey, c);
-        var opLabel = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
-        ch.textContent = (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel;
-    }
     var nodeEl = el('radio-display-node');
-    if (nodeEl) {
-        var kind = c.radioKind || 'shelter';
-        var label = NODE_KIND_LABELS[kind] || 'BÁZE';
-        if (c.radioKindFallback) label += '*';
-        nodeEl.textContent = label;
-        nodeEl.title = kind === KIND_HANDSET
-            ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
-            : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
-        nodeEl.setAttribute('data-kind', kind);
-        nodeEl.classList.toggle('is-handset', kind === KIND_HANDSET);
-        nodeEl.classList.toggle('is-fallback', !!c.radioKindFallback);
-    }
     var buf = el('radio-display-buffer');
-    if (buf) {
-        if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
-            buf.textContent = state.dialBuffer ? ('▸ ' + state.dialBuffer) : '';
-        } else {
-            buf.textContent = '';
+    var footerWrap = el('radio-display-footer');
+
+    if (osView.mode === 'off') {
+        if (f) f.textContent = '';
+        if (k) k.textContent = '';
+        if (p) p.textContent = '';
+        if (buf) buf.textContent = '';
+        if (foot) foot.textContent = '';
+        if (ch) ch.textContent = '';
+        if (sig) sig.textContent = '';
+        if (nodeEl) {
+            nodeEl.textContent = '';
+            nodeEl.style.visibility = 'hidden';
         }
+        if (footerWrap) footerWrap.textContent = '';
+        updateInputForMode();
+        return;
     }
+
+    if (nodeEl) nodeEl.style.visibility = '';
+
+    if (osView.mode === 'standby') {
+        if (f) f.textContent = standbyLines.line1;
+        if (k) k.textContent = standbyLines.line2;
+        if (p) p.textContent = standbyLines.line3;
+        if (buf) buf.textContent = dialBuffer;
+        if (foot) foot.textContent = standbyLines.footer;
+        if (sig) {
+            var tuned = !!normalizeFrequency(state.frequency);
+            var pt = !normalizeEncryptionKey(state.encryptionKey || '');
+            sig.textContent = tuned ? (pt ? '● TX/RX PT' : '● TX/RX CT') : '○ STBY';
+            sig.style.color = tuned ? '#8fdc68' : '#888';
+        }
+        if (ch) ch.textContent = (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel;
+        if (nodeEl) {
+            var kind = c.radioKind || 'shelter';
+            var label = NODE_KIND_LABELS[kind] || 'BÁZE';
+            if (c.radioKindFallback) label += '*';
+            nodeEl.textContent = label;
+            nodeEl.title = kind === KIND_HANDSET
+                ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
+                : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
+            nodeEl.setAttribute('data-kind', kind);
+            nodeEl.classList.toggle('is-handset', kind === KIND_HANDSET);
+            nodeEl.classList.toggle('is-fallback', !!c.radioKindFallback);
+        }
+        if (footerWrap) {
+            if (!footerWrap.querySelector('#radio-display-com')) {
+                footerWrap.innerHTML = '0 KEY · <span id="radio-display-com"></span>';
+                foot = el('radio-display-com');
+            }
+            if (foot) foot.textContent = standbyLines.footer;
+        }
+    } else {
+        var menuLines = osView.lines || ['', '', '', ''];
+        if (f) f.textContent = menuLines[0] || '';
+        if (k) k.textContent = menuLines[1] || '';
+        if (buf) buf.textContent = menuLines[2] || '';
+        if (p) p.textContent = menuLines[3] || '';
+        if (ch) ch.textContent = osView.status || 'MENU';
+        if (sig) sig.textContent = '';
+        if (nodeEl) nodeEl.textContent = '';
+        if (footerWrap) footerWrap.textContent = osView.footer || 'OK · Zpět';
+    }
+
     updateInputForMode();
+}
+
+function handleRadioOsInput(action) {
+    if (state.operatingMode === 'off') return false;
+    if (radioOsHandleInput(radioOs, state.operatingMode, action)) {
+        renderDisplay();
+        return true;
+    }
+    return false;
 }
 
 function renderNotebook(options) {
@@ -836,6 +906,7 @@ function bindKeypad() {
         nodeBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
             var uid = ctx.getUserId ? ctx.getUserId() : '';
             cycleRadioKind(uid);
             renderDisplay();
@@ -870,6 +941,12 @@ function bindKeypad() {
     if (ent && !ent._radioCommsBound) {
         ent._radioCommsBound = true;
         ent.onclick = function() {
+            if (state.operatingMode === 'off') return;
+            if (isRadioOsActive(radioOs)) {
+                handleRadioOsInput('ok');
+                return;
+            }
+            if (handleRadioOsInput('open_menu')) return;
             if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
                 applyDialBuffer();
                 return;
@@ -885,6 +962,8 @@ function bindKeypad() {
     if (clr && !clr._radioCommsBound) {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
+            if (state.operatingMode === 'off') return;
+            if (handleRadioOsInput('back')) return;
             state.dialBuffer = '';
             state.keypadMode = 'tx';
             if (input) input.value = '';
@@ -902,11 +981,15 @@ function bindKeypad() {
     }
 
     bindRadioDialGestures();
+    bindDpadNavigation();
 
     var grid = el('radio-keypad-grid');
     if (grid && !grid._radioCommsBound) {
         grid._radioCommsBound = true;
         grid.addEventListener('click', function(e) {
+            if (state.operatingMode === 'off') return;
+            if (isRadioOsActive(radioOs)) return;
+
             var btn = e.target.closest('.radio-key[data-key]');
             if (!btn) return;
             var key = btn.getAttribute('data-key');
@@ -1019,17 +1102,43 @@ function bindKeypad() {
     bindDisplayDialSwipe();
 }
 
+function bindDpadNavigation() {
+    var dpadKeys = ['up', 'down', 'left', 'right'];
+    for (var i = 0; i < dpadKeys.length; i++) {
+        (function(key) {
+            var btn = document.querySelector('#radio-dpad-zone [data-key="' + key + '"]');
+            if (!btn || btn._radioOsBound) return;
+            btn._radioOsBound = true;
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (state.operatingMode === 'off') return;
+                if (isRadioOsActive(radioOs)) {
+                    if (key === 'left' || key === 'right') return;
+                    handleRadioOsInput(key);
+                    return;
+                }
+                if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
+                    handleRadioOsInput('open_menu');
+                }
+            });
+        })(dpadKeys[i]);
+    }
+}
+
 function bindDisplayDialSwipe() {
     var screen = el('radio-display-screen');
     if (!screen || screen._dialSwipeBound) return;
     screen._dialSwipeBound = true;
     bindHorizontalSwipe(screen, function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
             refreshSubscriptions();
         }
     }, function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         if (cycleDialPreset(state, -1)) {
             persist();
             renderDisplay();
@@ -1047,6 +1156,7 @@ function cycleOperatingMode(direction) {
     var dir = direction < 0 ? -1 : 1;
     idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
     state.operatingMode = RADIO_OPERATING_MODES[idx];
+    resetRadioOs(radioOs);
     persist();
     renderDisplay();
 }
@@ -1187,12 +1297,14 @@ function bindRadioDialGestures() {
     });
 
     bindHorizontalSwipe(el('radio-key-preset-dial'), function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
             refreshSubscriptions();
         }
     }, function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         if (cycleDialPreset(state, -1)) {
             persist();
             renderDisplay();
@@ -1201,11 +1313,13 @@ function bindRadioDialGestures() {
     });
 
     bindHoldVerticalSwipe(el('radio-key-main-dial'), function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         adjustFrequency(state, -1);
         persist();
         renderDisplay();
         refreshSubscriptions();
     }, function() {
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
         adjustFrequency(state, 1);
         persist();
         renderDisplay();
@@ -1248,6 +1362,7 @@ export function initRadioCommsSystem(options) {
     }
 
     bindKeypad();
+    resetRadioOs(radioOs);
     initSectorTechShell();
     window.patracRefreshSectorTech = refreshSectorTechLayout;
     syncNotebookTabs();
