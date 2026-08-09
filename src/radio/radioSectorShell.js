@@ -314,54 +314,18 @@ function updateCalibrationLabels() {
     }
 }
 
-/** Dva snap body: displej nahoře, klávesnice dole. */
-function getSnapScrollTops(scroll) {
+/** Referenční pozice displeje (jen pro debug / measureStage). */
+function getDisplayScrollTop(scroll) {
     var stage = scroll.querySelector('.sector-tech-stage');
-    if (!stage) return [0, 0];
-    var stageH = stage.offsetHeight;
-    var viewH = scroll.clientHeight;
-    var display = Math.max(0, stageH * LAYOUT.displayTop - 6);
-    var keypad = Math.max(0, stageH * LAYOUT.keypadBottom - viewH + 16);
-    if (keypad < display) keypad = display;
-    return [display, keypad];
-}
-
-function snapScrollNearest(scroll, smooth) {
-    if (isCalibrateMode()) return;
-    var snaps = getSnapScrollTops(scroll);
-    var t = scroll.scrollTop;
-    var best = snaps[0];
-    var bestDist = Math.abs(t - snaps[0]);
-    for (var i = 1; i < snaps.length; i++) {
-        var d = Math.abs(t - snaps[i]);
-        if (d < bestDist) {
-            bestDist = d;
-            best = snaps[i];
-        }
-    }
-    if (Math.abs(scroll.scrollTop - best) > 2) {
-        scroll.scrollTo({ top: best, behavior: smooth ? 'smooth' : 'auto' });
-    }
-}
-
-function scrollToSectorView(which, smooth) {
-    var scroll = el('sector-tech-scroll');
-    if (!scroll) return;
-    var snaps = getSnapScrollTops(scroll);
-    var top = which === 'keypad' ? snaps[1] : snaps[0];
-    scroll.scrollTo({ top: top, behavior: smooth ? 'smooth' : 'auto' });
-}
-
-/** @deprecated alias */
-function getWorkScrollTop(scroll) {
-    return getSnapScrollTops(scroll)[0];
+    if (!stage) return 0;
+    return Math.max(0, stage.offsetHeight * LAYOUT.displayTop - 6);
 }
 
 function measureStage(scroll) {
     applyScale(scroll);
     var stage = scroll.querySelector('.sector-tech-stage');
     if (!stage) return null;
-    workScrollTopPx = getSnapScrollTops(scroll)[0];
+    workScrollTopPx = getDisplayScrollTop(scroll);
     updateCalibrationLabels();
     return {
         stageH: stage.offsetHeight,
@@ -370,39 +334,14 @@ function measureStage(scroll) {
     };
 }
 
-function applyWorkView(scroll, smooth, force) {
-    if (isCalibrateMode()) return;
-    if (force) {
-        scrollToSectorView('display', smooth);
-        return;
-    }
-    snapScrollNearest(scroll, smooth);
-}
-
-function bindScrollNav() {
-    var topBtn = el('sector-scroll-top');
-    var bottomBtn = el('sector-scroll-bottom');
-    if (topBtn && !topBtn._sectorBound) {
-        topBtn._sectorBound = true;
-        topBtn.addEventListener('click', function() {
-            scrollToSectorView('display', true);
-        });
-    }
-    if (bottomBtn && !bottomBtn._sectorBound) {
-        bottomBtn._sectorBound = true;
-        bottomBtn.addEventListener('click', function() {
-            scrollToSectorView('keypad', true);
-        });
-    }
-}
-
 function remeasureAll() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
+    var prevScroll = scroll.scrollTop;
     applyRadioHitmap();
     measureStage(scroll);
     if (!isCalibrateMode()) {
-        applyWorkView(scroll, false, true);
+        scroll.scrollTop = prevScroll;
     }
 }
 
@@ -413,7 +352,6 @@ export function initSectorTechShell() {
 
     bindScaleControl();
     bindCrosshair();
-    bindScrollNav();
     remeasureAll();
 
     var img = el('sector-tech-img');
@@ -440,22 +378,14 @@ export function initSectorTechShell() {
         obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     }
 
-    /* Scroll: kalibrace = pravítka; jinak volný scroll + snap na displej/klávesnici */
-    var snapTimer = null;
+    /* Kalibrace: aktualizace pravítek při scrollu */
     scroll.addEventListener('scroll', function() {
-        if (isCalibrateMode()) {
-            updateViewportRulers(scroll);
-            return;
-        }
-        if (snapTimer) clearTimeout(snapTimer);
-        snapTimer = setTimeout(function() {
-            snapScrollNearest(scroll, true);
-        }, 220);
+        if (isCalibrateMode()) updateViewportRulers(scroll);
     }, { passive: true });
 }
 
-export function scrollSectorTechTo(which) {
-    scrollToSectorView(which || 'display', true);
+export function scrollSectorTechTo() {
+    /* volný scroll — nic nenutí */
 }
 
 export function refreshSectorTechLayout() {
