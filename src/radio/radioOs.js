@@ -8,7 +8,7 @@ export var SCREEN_MENU = 'menu';
 export var SCREEN_STUB = 'stub';
 
 var PRESET_SLOTS = 15;
-var MENU_LINES = 4;
+var MENU_LINES = 6;
 
 var VOICE_MENU = [
     { id: 'voice_sms', label: '1 · SMS / PTT', action: 'stub' },
@@ -115,7 +115,7 @@ function menuStatusLabel(os, operatingMode, radioState, draft) {
 }
 
 function buildPresetDetailLines(os, draft) {
-    if (!draft) return ['', '', '', ''];
+    if (!draft) return ['', '', '', '', '', ''];
     var name = draft.label || ('Kanál ' + draft.slot);
     var freq = draft.frequency || '---.---';
     var key = draft.encryptionKey ? draft.encryptionKey : '—';
@@ -124,6 +124,8 @@ function buildPresetDetailLines(os, draft) {
         (f === 0 ? '▶ ' : '  ') + 'NÁZEV  ' + name,
         (f === 1 ? '▶ ' : '  ') + 'F       ' + freq,
         (f === 2 ? '▶ ' : '  ') + 'ŠIFRA   ' + key,
+        '',
+        '',
         ''
     ];
 }
@@ -237,7 +239,14 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         return {
             mode: 'standby',
             status: standby.status,
-            lines: [standby.line1 || '', standby.line2 || '', standby.line3 || '', standby.line4 || ''],
+            lines: [
+                standby.line1 || '',
+                standby.line2 || '',
+                standby.line3 || '',
+                standby.line4 || '',
+                '',
+                ''
+            ],
             footer: standby.footer || '',
             buffer: standby.buffer || ''
         };
@@ -257,7 +266,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         return {
             mode: 'stub',
             status: 'MENU · ' + menuRootLabel(operatingMode),
-            lines: [os.stubTitle || '—', '', '— brzy —', ''],
+            lines: [os.stubTitle || '—', '', '— brzy —', '', '', ''],
             footer: 'OK · Zpět'
         };
     }

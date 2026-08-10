@@ -268,6 +268,33 @@ function el(id) {
     return document.getElementById(id);
 }
 
+var DISPLAY_LINE_IDS = [
+    'radio-display-freq',
+    'radio-display-key',
+    'radio-display-buffer',
+    'radio-display-preset',
+    'radio-display-line5',
+    'radio-display-line6'
+];
+
+function setDisplayTextLines(lines, startIdx) {
+    lines = lines || [];
+    startIdx = startIdx || 0;
+    for (var i = 0; i < DISPLAY_LINE_IDS.length; i++) {
+        var row = el(DISPLAY_LINE_IDS[i]);
+        if (!row) continue;
+        var src = i + startIdx;
+        row.textContent = src < lines.length ? (lines[src] || '') : '';
+    }
+}
+
+function clearExtraDisplayLines() {
+    var l5 = el('radio-display-line5');
+    var l6 = el('radio-display-line6');
+    if (l5) l5.textContent = '';
+    if (l6) l6.textContent = '';
+}
+
 function updateInputForMode() {
     var input = el('chat-input-field');
     if (!input) return;
@@ -423,6 +450,7 @@ function renderDisplay() {
         if (k) k.textContent = '';
         if (buf) buf.textContent = editView.axis || (editView.editType === 'encrypt' ? editView.hint : '');
         if (p) p.textContent = editView.axis ? editView.hint : '';
+        clearExtraDisplayLines();
         if (footerWrap) footerWrap.textContent = editView.footer || 'OK · uložit';
         updateInputForMode();
         return;
@@ -435,10 +463,13 @@ function renderDisplay() {
     }
 
     if (osView.mode === 'off') {
-        if (f) f.textContent = '';
-        if (k) k.textContent = '';
-        if (p) p.textContent = '';
-        if (buf) buf.textContent = '';
+        if (f) {
+            f.className = '';
+            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
+            f.removeAttribute('data-kind');
+            f.removeAttribute('title');
+        }
+        setDisplayTextLines([]);
         if (foot) foot.textContent = '';
         if (ch) ch.textContent = '';
         if (sig) sig.textContent = '';
@@ -473,6 +504,7 @@ function renderDisplay() {
         if (k) k.textContent = standbyLines.line2;
         if (p) p.textContent = standbyLines.line3;
         if (buf) buf.textContent = dialBuffer;
+        clearExtraDisplayLines();
         if (sig) {
             var tuned = !!normalizeFrequency(state.frequency);
             sig.textContent = tuned ? '● TX/RX' : '○ STBY';
@@ -491,31 +523,16 @@ function renderDisplay() {
             if (foot) foot.textContent = standbyLines.footer;
         }
     } else {
-        var menuLines = osView.lines || ['', '', '', ''];
+        var menuLines = osView.lines || ['', '', '', '', '', ''];
         if (f) {
             f.className = '';
             f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
             f.removeAttribute('data-kind');
             f.removeAttribute('title');
-            f.textContent = menuLines[0] || '';
             f.style.fontWeight = '';
             f.style.color = '';
         }
-        if (k) {
-            k.textContent = menuLines[1] || '';
-            k.style.fontWeight = '';
-            k.style.color = '';
-        }
-        if (buf) {
-            buf.textContent = menuLines[2] || '';
-            buf.style.fontWeight = '';
-            buf.style.color = '';
-        }
-        if (p) {
-            p.textContent = menuLines[3] || '';
-            p.style.fontWeight = '';
-            p.style.color = '';
-        }
+        setDisplayTextLines(menuLines);
         if (ch) ch.textContent = osView.status || 'MENU';
         if (sig) {
             sig.textContent = '';

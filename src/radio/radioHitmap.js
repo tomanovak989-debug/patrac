@@ -29,8 +29,8 @@ export function applyDisplayTypography() {
     var h = screen.clientHeight;
     if (w < 8 || h < 8) return;
     var innerW = Math.max(8, w - 10);
-    var byWidth = innerW * 0.046;
-    var byHeight = h / 6.4;
+    var byWidth = innerW * 0.0552;
+    var byHeight = h / 8;
     var px = Math.min(byWidth, byHeight);
     px = Math.max(5, Math.round(px * 10) / 10);
     screen.style.fontSize = px + 'px';

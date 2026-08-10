@@ -1294,11 +1294,12 @@ body.sector-calibrate-on .sector-cal-rulers {
     font-weight: 600;
     font-stretch: semi-condensed;
     font-size: 8px;
-    line-height: 1.1;
+    line-height: 1.12;
     color: #78ff66;
     background: #0a0a0a;
     border-radius: 0;
     pointer-events: auto;
+    height: 100%;
 }
 body.theme-light .sector-tech-screen {
     color: #142010;
@@ -1325,17 +1326,18 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu .radio-display-main,
 .sector-tech-screen.is-stub .radio-display-main,
 .sector-tech-screen.is-preset-detail .radio-display-main {
-    grid-template-rows: repeat(4, auto);
-    align-content: start;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    align-content: stretch;
     gap: 0;
     margin: 0;
-    line-height: 1;
+    line-height: 1.12;
 }
 .sector-tech-screen.is-standby .radio-display-status {
-    flex: 0 0 auto;
-    max-height: 1.15em;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
     overflow: hidden;
-    margin-bottom: 1px;
+    margin-bottom: 0;
 }
 .sector-tech-screen.is-standby .radio-display-node {
     display: none;
@@ -1350,7 +1352,7 @@ body.theme-light .sector-tech-screen.is-off {
     opacity: 0.88;
 }
 .sector-tech-screen.is-standby .radio-display-main {
-    grid-template-rows: 1.15em 1.15em 1.15em minmax(0, 1.15em);
+    grid-template-rows: repeat(6, minmax(0, 1fr));
     margin: 0;
 }
 .sector-tech-screen.is-standby #radio-display-freq {
@@ -1359,12 +1361,12 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
 .sector-tech-screen.is-preset-detail .radio-display-main > div {
-    line-height: 1;
+    line-height: 1.12;
     min-height: 0;
     height: auto;
     padding: 0;
     margin: 0;
-    align-items: flex-start;
+    align-items: center;
     font-weight: 600;
     color: inherit;
 }
@@ -1372,30 +1374,35 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu #radio-display-key,
 .sector-tech-screen.is-menu #radio-display-buffer,
 .sector-tech-screen.is-menu #radio-display-preset,
+.sector-tech-screen.is-menu #radio-display-line5,
+.sector-tech-screen.is-menu #radio-display-line6,
 .sector-tech-screen.is-preset-detail #radio-display-freq,
 .sector-tech-screen.is-preset-detail #radio-display-key,
 .sector-tech-screen.is-preset-detail #radio-display-buffer,
-.sector-tech-screen.is-preset-detail #radio-display-preset {
+.sector-tech-screen.is-preset-detail #radio-display-preset,
+.sector-tech-screen.is-preset-detail #radio-display-line5,
+.sector-tech-screen.is-preset-detail #radio-display-line6 {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: 600;
 }
 .sector-tech-screen.is-field-edit .radio-display-status {
-    flex: 0 0 auto;
-    max-height: 1.1em;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
     overflow: hidden;
 }
 .sector-tech-screen.is-field-edit .radio-display-main {
-    grid-template-rows: minmax(0, 2fr) auto auto auto;
+    grid-template-rows: minmax(0, 2fr) repeat(5, minmax(0, 1fr));
     margin: 0;
-    align-content: start;
+    align-content: stretch;
 }
 .sector-tech-screen.is-field-edit .radio-display-edit-large {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    font-size: 1.85em;
+    font-size: 2.2em;
     font-weight: 600;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -1404,7 +1411,7 @@ body.theme-light .sector-tech-screen.is-off {
     grid-row: 1 / span 2;
 }
 .sector-tech-screen.is-key-edit .radio-display-edit-large {
-    font-size: 2em;
+    font-size: 2.4em;
     text-transform: uppercase;
 }
 .sector-tech-screen.is-field-edit .radio-edit-dec {
@@ -1558,7 +1565,8 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     display: flex;
     justify-content: space-between;
     gap: 2px;
-    flex-shrink: 0;
+    flex: 1 1 0;
+    min-height: 0;
     align-items: center;
     min-width: 0;
     font-size: inherit;
@@ -1594,13 +1602,13 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     opacity: 0.7;
 }
 .radio-display-main {
-    flex: 1;
+    flex: 6 6 0;
     min-height: 0;
     display: grid;
-    grid-template-rows: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(6, minmax(0, 1fr));
     align-content: stretch;
     gap: 0;
-    margin: 1px 0;
+    margin: 0;
     font-size: inherit;
 }
 .radio-display-main > div {
@@ -1612,11 +1620,12 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     white-space: nowrap;
     font-size: inherit;
     font-weight: inherit;
-    line-height: 1.1;
+    line-height: 1.12;
     color: inherit;
 }
 .radio-display-sub {
-    flex-shrink: 0;
+    flex: 1 1 0;
+    min-height: 0;
     font-size: inherit;
     line-height: 1.12;
     opacity: 1;
