@@ -754,6 +754,17 @@ export function upsertPreset(state, slot, data) {
     return state;
 }
 
+export function clearPreset(state, slot) {
+    if (!state.presets) state.presets = [];
+    var next = [];
+    for (var i = 0; i < state.presets.length; i++) {
+        if (state.presets[i].slot !== slot) next.push(state.presets[i]);
+    }
+    state.presets = next;
+    if (state.activePresetSlot === slot) state.activePresetSlot = null;
+    return state;
+}
+
 export function applyPreset(state, slot) {
     var preset = findPreset(state, slot);
     if (!preset) return false;

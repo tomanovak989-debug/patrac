@@ -11,6 +11,7 @@ import {
     buildDisplayLines,
     applyPreset,
     upsertPreset,
+    clearPreset,
     cycleDialPreset,
     adjustFrequency,
     normalizeFrequency,
@@ -292,6 +293,7 @@ function renderDisplay() {
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
         screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub');
+        screen.classList.toggle('is-standby', osView.mode === 'standby');
     }
 
     var f = el('radio-display-freq');
@@ -324,18 +326,18 @@ function renderDisplay() {
     if (nodeEl) nodeEl.style.visibility = '';
 
     if (osView.mode === 'standby') {
-        if (f) f.textContent = standbyLines.line1;
+        var freqVal = normalizeFrequency(state.frequency) || '---.---';
+        var pt = !normalizeEncryptionKey(state.encryptionKey || '');
+        if (f) f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
         if (k) k.textContent = standbyLines.line2;
         if (p) p.textContent = standbyLines.line3;
         if (buf) buf.textContent = dialBuffer;
-        if (foot) foot.textContent = standbyLines.footer;
         if (sig) {
             var tuned = !!normalizeFrequency(state.frequency);
-            var pt = !normalizeEncryptionKey(state.encryptionKey || '');
-            sig.textContent = tuned ? (pt ? '● TX/RX PT' : '● TX/RX CT') : '○ STBY';
+            sig.textContent = tuned ? (pt ? '● TX/RX' : '● TX/RX') : '○ STBY';
             sig.style.color = tuned ? '#8fdc68' : '#888';
         }
-        if (ch) ch.textContent = (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel;
+        if (ch) ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
         if (nodeEl) {
             var kind = c.radioKind || 'shelter';
             var label = NODE_KIND_LABELS[kind] || 'BÁZE';
@@ -357,12 +359,31 @@ function renderDisplay() {
         }
     } else {
         var menuLines = osView.lines || ['', '', '', ''];
-        if (f) f.textContent = menuLines[0] || '';
-        if (k) k.textContent = menuLines[1] || '';
-        if (buf) buf.textContent = menuLines[2] || '';
-        if (p) p.textContent = menuLines[3] || '';
+        if (f) {
+            f.textContent = menuLines[0] || '';
+            f.style.fontWeight = '';
+            f.style.color = '';
+        }
+        if (k) {
+            k.textContent = menuLines[1] || '';
+            k.style.fontWeight = '';
+            k.style.color = '';
+        }
+        if (buf) {
+            buf.textContent = menuLines[2] || '';
+            buf.style.fontWeight = '';
+            buf.style.color = '';
+        }
+        if (p) {
+            p.textContent = menuLines[3] || '';
+            p.style.fontWeight = '';
+            p.style.color = '';
+        }
         if (ch) ch.textContent = osView.status || 'MENU';
-        if (sig) sig.textContent = '';
+        if (sig) {
+            sig.textContent = '';
+            sig.style.color = '';
+        }
         if (nodeEl) nodeEl.textContent = '';
         if (footerWrap) footerWrap.textContent = osView.footer || 'OK · Zpět';
     }
@@ -390,7 +411,23 @@ function handleRadioOsInput(action) {
         return true;
     }
     if (result.effect === 'apply_preset') {
-        if (applyPreset(state, result.slot)) {
+        if (result.slot && applyPreset(state, result.slot)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        } else if (result.slot) {
+            alert('Preset ' + result.slot + ' je prázdný.');
+            renderDisplay();
+        }
+        return true;
+    }
+    if (result.effect === 'preset_edit') {
+        if (result.slot) saveToPresetSlot(result.slot);
+        return true;
+    }
+    if (result.effect === 'preset_reset') {
+        if (result.slot) {
+            clearPreset(state, result.slot);
             persist();
             renderDisplay();
             refreshSubscriptions();

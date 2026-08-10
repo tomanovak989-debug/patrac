@@ -31,6 +31,12 @@ var CHANNELS_SUBMENU = [
     { id: 'beacon', label: 'NOUZOVÝ BEACON', action: 'stub' }
 ];
 
+var PRESET_ACTION_ITEMS = [
+    { id: 'preset_select', label: 'VYBRAT', action: 'apply_preset' },
+    { id: 'preset_edit', label: 'UPRAVIT', action: 'preset_edit' },
+    { id: 'preset_reset', label: 'RESETOVAT', action: 'preset_reset' }
+];
+
 var MENU_LINES = 4;
 
 export function createRadioOsState() {
@@ -38,6 +44,7 @@ export function createRadioOsState() {
         screen: SCREEN_STANDBY,
         menuPath: [],
         focusIndex: 0,
+        selectedSlot: null,
         stubTitle: ''
     };
 }
@@ -47,6 +54,7 @@ export function resetRadioOs(os) {
     os.screen = SCREEN_STANDBY;
     os.menuPath = [];
     os.focusIndex = 0;
+    os.selectedSlot = null;
     os.stubTitle = '';
     return os;
 }
@@ -79,7 +87,7 @@ function buildPresetItems(radioState) {
             id: 'preset_' + slot,
             slot: slot,
             label: label,
-            action: 'apply_preset'
+            action: 'preset_pick'
         });
     }
     return items;
@@ -90,14 +98,19 @@ function getCurrentMenuItems(os, operatingMode, radioState) {
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'channels') return CHANNELS_SUBMENU;
     if (leaf === 'presets') return buildPresetItems(radioState);
+    if (leaf === 'preset_actions') return PRESET_ACTION_ITEMS;
     return getMenuItems(operatingMode);
 }
 
-function menuStatusLabel(os, operatingMode) {
+function menuStatusLabel(os, operatingMode, radioState) {
     if (!os.menuPath.length) return 'MENU · ' + menuRootLabel(operatingMode);
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'channels') return 'KANÁLY · ' + menuRootLabel(operatingMode);
     if (leaf === 'presets') return 'PRESETY · ' + menuRootLabel(operatingMode);
+    if (leaf === 'preset_actions' && os.selectedSlot) {
+        var p = radioState ? findPreset(radioState, os.selectedSlot) : null;
+        return 'P' + os.selectedSlot + (p ? (' · ' + (p.label || 'KANÁL')) : ' · PRÁZDNÝ');
+    }
     return 'MENU · ' + menuRootLabel(operatingMode);
 }
 
@@ -112,6 +125,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         os.screen = SCREEN_MENU;
         os.menuPath = [];
         os.focusIndex = 0;
+        os.selectedSlot = null;
         return { changed: true };
     }
 
@@ -126,8 +140,15 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             return { changed: true };
         }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
+            var leaving = os.menuPath[os.menuPath.length - 1];
+            var prevSlot = os.selectedSlot;
             os.menuPath.pop();
-            os.focusIndex = 0;
+            if (leaving === 'preset_actions') {
+                os.focusIndex = prevSlot ? prevSlot - 1 : 0;
+                os.selectedSlot = null;
+            } else {
+                os.focusIndex = 0;
+            }
             return { changed: true };
         }
         if (os.screen === SCREEN_MENU) {
@@ -160,6 +181,12 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.focusIndex = 0;
                 return { changed: true };
             }
+            if (item.action === 'preset_pick') {
+                os.selectedSlot = item.slot;
+                os.menuPath.push('preset_actions');
+                os.focusIndex = 0;
+                return { changed: true };
+            }
             if (item.action === 'freq_edit') {
                 resetRadioOs(os);
                 return { changed: true, effect: 'freq_edit' };
@@ -169,8 +196,21 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 return { changed: true, effect: 'key_edit' };
             }
             if (item.action === 'apply_preset') {
+                var selectSlot = os.selectedSlot;
                 resetRadioOs(os);
-                return { changed: true, effect: 'apply_preset', slot: item.slot };
+                return { changed: true, effect: 'apply_preset', slot: selectSlot };
+            }
+            if (item.action === 'preset_edit') {
+                var editSlot = os.selectedSlot;
+                resetRadioOs(os);
+                return { changed: true, effect: 'preset_edit', slot: editSlot };
+            }
+            if (item.action === 'preset_reset') {
+                var resetSlot = os.selectedSlot;
+                os.menuPath.pop();
+                os.focusIndex = resetSlot ? resetSlot - 1 : 0;
+                os.selectedSlot = null;
+                return { changed: true, effect: 'preset_reset', slot: resetSlot };
             }
             os.stubTitle = item.label;
             os.screen = SCREEN_STUB;
@@ -243,7 +283,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState) {
 
     return {
         mode: 'menu',
-        status: menuStatusLabel(os, operatingMode),
+        status: menuStatusLabel(os, operatingMode, radioState),
         lines: lines,
         footer: 'OK · Zpět',
         buffer: ''

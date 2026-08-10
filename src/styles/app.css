@@ -1290,7 +1290,9 @@ body.sector-calibrate-on .sector-cal-rulers {
     display: flex;
     flex-direction: column;
     padding: 1px 5px;
-    font-family: 'IBM Plex Mono', monospace;
+    font-family: 'Bahnschrift', 'Segoe UI', 'Roboto Condensed', sans-serif;
+    font-weight: 600;
+    font-stretch: semi-condensed;
     font-size: 8px;
     line-height: 1.1;
     color: #78ff66;
@@ -1318,6 +1320,38 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu #radio-display-signal {
     visibility: hidden;
 }
+.sector-tech-screen.is-standby .radio-display-status {
+    flex: 0 0 auto;
+    max-height: 1.15em;
+    overflow: hidden;
+    margin-bottom: 1px;
+}
+.sector-tech-screen.is-standby .radio-display-main {
+    grid-template-rows: 1.15em 1.15em 1.15em minmax(0, 1.15em);
+    margin: 0;
+}
+.sector-tech-screen.is-standby #radio-display-freq {
+    font-weight: 600;
+}
+.sector-tech-screen.is-menu .radio-display-main,
+.sector-tech-screen.is-stub .radio-display-main {
+    grid-template-rows: repeat(4, auto);
+    align-content: start;
+    gap: 0;
+    margin: 0;
+    line-height: 1;
+}
+.sector-tech-screen.is-menu .radio-display-main > div,
+.sector-tech-screen.is-stub .radio-display-main > div {
+    line-height: 1;
+    min-height: 0;
+    height: auto;
+    padding: 0;
+    margin: 0;
+    align-items: flex-start;
+    font-weight: 600;
+    color: inherit;
+}
 .sector-tech-screen.is-menu #radio-display-freq,
 .sector-tech-screen.is-menu #radio-display-key,
 .sector-tech-screen.is-menu #radio-display-buffer,
@@ -1325,6 +1359,7 @@ body.theme-light .sector-tech-screen.is-off {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-weight: 600;
 }
 .sector-tech-hits {
     position: absolute;
@@ -1496,10 +1531,10 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: inherit;
-    line-height: 1.12;
+    font-weight: inherit;
+    line-height: 1.1;
     color: inherit;
 }
-#radio-display-freq { font-weight: bold; }
 .radio-display-sub {
     flex-shrink: 0;
     font-size: inherit;
