@@ -11,7 +11,6 @@ import {
     buildDisplayLines,
     applyPreset,
     upsertPreset,
-    clearPreset,
     cycleDialPreset,
     adjustFrequency,
     normalizeFrequency,
@@ -65,14 +64,18 @@ import {
     resetRadioOs,
     radioOsHandleInput,
     buildOsDisplayLines,
-    isRadioOsActive
+    isRadioOsActive,
+    createPresetDraft,
+    savePresetDraft
 } from './radioOs.js';
 import {
     createFieldEdit,
     isFieldEditActive,
     buildFieldEditView,
     handleFieldEditInput,
-    commitFieldEdit,
+    handleFieldEditOk,
+    applyFieldEditToState,
+    applyFieldEditToDraft,
     cancelFieldEdit
 } from './radioFieldEdit.js';
 import {
@@ -86,6 +89,7 @@ var ctx = {};
 var state = null;
 var radioOs = createRadioOsState();
 var fieldEditSession = null;
+var presetEditDraft = null;
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -275,7 +279,8 @@ function updateInputForMode() {
 }
 
 function startFieldEdit(type, options) {
-    fieldEditSession = createFieldEdit(type, state, options || {});
+    options = options || {};
+    fieldEditSession = createFieldEdit(type, state, options);
     state.keypadMode = 'tx';
     state.dialBuffer = '';
     var input = el('chat-input-field');
@@ -286,21 +291,21 @@ function startFieldEdit(type, options) {
     renderDisplay();
 }
 
-function startPresetLabelEdit(slot) {
-    startFieldEdit('preset_label', { slot: slot });
-}
-
-function closeFieldEdit(save) {
-    if (save && fieldEditSession) {
-        var c = getCtx();
-        commitFieldEdit(fieldEditSession, state, {
-            scope: classifyChannel(state.frequency, state.encryptionKey, c)
-        });
+function finishFieldEdit(save) {
+    if (!fieldEditSession) return;
+    var c = getCtx();
+    if (save) {
+        if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
+            applyFieldEditToDraft(fieldEditSession, presetEditDraft);
+        } else {
+            applyFieldEditToState(fieldEditSession, state, {
+                scope: classifyChannel(state.frequency, state.encryptionKey, c)
+            });
+        }
         persist();
         refreshSubscriptions();
-    } else {
-        cancelFieldEdit(state);
     }
+    cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
     var input = el('chat-input-field');
     if (input) {
@@ -310,9 +315,46 @@ function closeFieldEdit(save) {
     renderDisplay();
 }
 
-function handleFieldEditAction(action, char) {
+function openPresetFieldEdit(field) {
+    if (!presetEditDraft) return;
+    if (field === 0) {
+        startFieldEdit('text', {
+            text: presetEditDraft.label,
+            returnTo: 'preset_detail',
+            maxLen: 14
+        });
+        if (fieldEditSession) {
+            fieldEditSession.digitMode = true;
+            fieldEditSession.cursor = 0;
+        }
+        return;
+    }
+    if (field === 1) {
+        startFieldEdit('freq', {
+            frequency: presetEditDraft.frequency,
+            returnTo: 'preset_detail'
+        });
+        if (fieldEditSession) {
+            fieldEditSession.digitMode = true;
+            fieldEditSession.cursor = 0;
+        }
+        return;
+    }
+    if (field === 2) {
+        startFieldEdit('encrypt', {
+            encryptionKey: presetEditDraft.encryptionKey,
+            returnTo: 'preset_detail'
+        });
+        if (fieldEditSession) {
+            fieldEditSession.digitMode = true;
+            fieldEditSession.cursor = 0;
+        }
+    }
+}
+
+function handleFieldEditAction(action, char, opts) {
     if (!isFieldEditActive(fieldEditSession)) return false;
-    if (handleFieldEditInput(fieldEditSession, action, char)) {
+    if (handleFieldEditInput(fieldEditSession, action, char, opts || {})) {
         renderDisplay();
         return true;
     }
@@ -338,12 +380,13 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    }, state);
+    }, state, presetEditDraft);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail');
         screen.classList.toggle('is-standby', osView.mode === 'standby');
+        screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail');
     }
 
     var f = el('radio-display-freq');
@@ -357,14 +400,18 @@ function renderDisplay() {
     var footerWrap = el('radio-display-footer');
 
     if (isFieldEditActive(fieldEditSession) && state.operatingMode !== 'off') {
-        var editView = buildFieldEditView(fieldEditSession);
+        var editOpts = {};
+        if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
+            editOpts.status = 'P' + presetEditDraft.slot + ' · PRESET';
+        }
+        var editView = buildFieldEditView(fieldEditSession, editOpts);
         if (screen) {
             screen.classList.toggle('is-off', false);
             screen.classList.toggle('is-menu', false);
             screen.classList.toggle('is-standby', false);
             screen.classList.toggle('is-field-edit', true);
             screen.classList.toggle('is-freq-edit', editView.editType === 'freq');
-            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt' || editView.editType === 'preset_label');
+            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt' || editView.editType === 'text');
         }
         if (ch) ch.textContent = editView.status || '';
         if (sig) { sig.textContent = ''; sig.style.color = ''; }
@@ -409,30 +456,32 @@ function renderDisplay() {
     if (osView.mode === 'standby') {
         var freqVal = normalizeFrequency(state.frequency) || '---.---';
         var pt = !normalizeEncryptionKey(state.encryptionKey || '');
+        var kind = c.radioKind || 'shelter';
+        var nodeLabel = NODE_KIND_LABELS[kind] || 'BÁZE';
+        if (c.radioKindFallback) nodeLabel += '*';
         if (f) {
             f.className = '';
-            f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+            f.textContent = nodeLabel + ' · ' + freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+            f.title = kind === KIND_HANDSET
+                ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
+                : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
+            f.setAttribute('data-kind', kind);
+            f.classList.toggle('radio-display-freq-node', true);
+            f.classList.toggle('is-handset', kind === KIND_HANDSET);
+            f.classList.toggle('is-fallback', !!c.radioKindFallback);
         }
         if (k) k.textContent = standbyLines.line2;
         if (p) p.textContent = standbyLines.line3;
         if (buf) buf.textContent = dialBuffer;
         if (sig) {
             var tuned = !!normalizeFrequency(state.frequency);
-            sig.textContent = tuned ? (pt ? '● TX/RX' : '● TX/RX') : '○ STBY';
+            sig.textContent = tuned ? '● TX/RX' : '○ STBY';
             sig.style.color = tuned ? '#8fdc68' : '#888';
         }
         if (ch) ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
         if (nodeEl) {
-            var kind = c.radioKind || 'shelter';
-            var label = NODE_KIND_LABELS[kind] || 'BÁZE';
-            if (c.radioKindFallback) label += '*';
-            nodeEl.textContent = label;
-            nodeEl.title = kind === KIND_HANDSET
-                ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
-                : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
-            nodeEl.setAttribute('data-kind', kind);
-            nodeEl.classList.toggle('is-handset', kind === KIND_HANDSET);
-            nodeEl.classList.toggle('is-fallback', !!c.radioKindFallback);
+            nodeEl.textContent = '';
+            nodeEl.style.visibility = 'hidden';
         }
         if (footerWrap) {
             if (!footerWrap.querySelector('#radio-display-com')) {
@@ -445,6 +494,9 @@ function renderDisplay() {
         var menuLines = osView.lines || ['', '', '', ''];
         if (f) {
             f.className = '';
+            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
+            f.removeAttribute('data-kind');
+            f.removeAttribute('title');
             f.textContent = menuLines[0] || '';
             f.style.fontWeight = '';
             f.style.color = '';
@@ -478,39 +530,46 @@ function renderDisplay() {
 
 function handleRadioOsInput(action) {
     if (state.operatingMode === 'off') return false;
+
+    if (isFieldEditActive(fieldEditSession)) {
+        if (action === 'ok') {
+            handleFieldEditOk(fieldEditSession);
+            renderDisplay();
+            return true;
+        }
+        if (action === 'back') {
+            finishFieldEdit(true);
+            return true;
+        }
+        return false;
+    }
+
     var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
     if (!result || !result.changed) return false;
 
-    if (result.effect === 'freq_edit') {
-        startFieldEdit('freq');
+    if (result.effect === 'preset_detail_open') {
+        if (result.slot) presetEditDraft = createPresetDraft(result.slot, state);
+        renderDisplay();
         return true;
     }
-    if (result.effect === 'key_edit') {
-        startFieldEdit('encrypt');
-        return true;
-    }
-    if (result.effect === 'apply_preset') {
-        if (result.slot && applyPreset(state, result.slot)) {
+    if (result.effect === 'preset_detail_back') {
+        if (presetEditDraft) {
+            var c = getCtx();
+            savePresetDraft(presetEditDraft, state, {
+                scope: classifyChannel(presetEditDraft.frequency, presetEditDraft.encryptionKey, c)
+            });
             persist();
-            renderDisplay();
-            refreshSubscriptions();
-        } else if (result.slot) {
-            alert('Preset ' + result.slot + ' je prázdný.');
-            renderDisplay();
-        }
-        return true;
-    }
-    if (result.effect === 'preset_edit') {
-        if (result.slot) startPresetLabelEdit(result.slot);
-        return true;
-    }
-    if (result.effect === 'preset_reset') {
-        if (result.slot) {
-            clearPreset(state, result.slot);
-            persist();
-            renderDisplay();
             refreshSubscriptions();
         }
+        presetEditDraft = null;
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'preset_field_edit') {
+        if (!presetEditDraft && result.slot) {
+            presetEditDraft = createPresetDraft(result.slot, state);
+        }
+        openPresetFieldEdit(result.field);
         return true;
     }
 
@@ -1015,6 +1074,82 @@ async function transmitMessage(text) {
     }
 }
 
+function cycleRadioNode() {
+    if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
+    var uid = ctx.getUserId ? ctx.getUserId() : '';
+    cycleRadioKind(uid);
+    renderDisplay();
+    refreshSubscriptions();
+    notifyRadioRangeLayer();
+}
+
+function bindRadioKeyT9() {
+    var grid = el('radio-keypad-grid');
+    if (!grid || grid._radioT9Bound) return;
+    grid._radioT9Bound = true;
+    var holdMs = 1400;
+    var timer = null;
+    var pendingBtn = null;
+    var longFired = false;
+
+    function clearHold() {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        pendingBtn = null;
+    }
+
+    function onHoldFire() {
+        timer = null;
+        if (!pendingBtn || !isFieldEditActive(fieldEditSession)) return;
+        var key = pendingBtn.getAttribute('data-key');
+        if (!/^[0-9]$/.test(key)) return;
+        longFired = true;
+        handleFieldEditAction('char', key, { longPress: true });
+        if (navigator.vibrate) navigator.vibrate(30);
+    }
+
+    grid.addEventListener('pointerdown', function(e) {
+        if (state.operatingMode === 'off' || !isFieldEditActive(fieldEditSession)) return;
+        var btn = e.target.closest('.radio-key[data-key]');
+        if (!btn) return;
+        var key = btn.getAttribute('data-key');
+        if (!/^[0-9]$/.test(key)) return;
+        clearHold();
+        longFired = false;
+        pendingBtn = btn;
+        timer = setTimeout(onHoldFire, holdMs);
+    }, true);
+
+    grid.addEventListener('pointerup', function(e) {
+        if (!pendingBtn) return;
+        var btn = e.target.closest('.radio-key[data-key]') || pendingBtn;
+        if (btn !== pendingBtn) {
+            clearHold();
+            return;
+        }
+        var key = pendingBtn.getAttribute('data-key');
+        clearHold();
+        if (longFired) {
+            longFired = false;
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        if (/^[0-9]$/.test(key) || key === '*' || key === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            handleFieldEditAction('char', key);
+        }
+    }, true);
+
+    grid.addEventListener('pointercancel', clearHold, true);
+    grid.addEventListener('pointerleave', function(e) {
+        if (e.target === pendingBtn) clearHold();
+    }, true);
+}
+
 function bindKeypad() {
     var nodeBtn = el('radio-display-node');
     if (nodeBtn && !nodeBtn._radioCommsBound) {
@@ -1022,12 +1157,18 @@ function bindKeypad() {
         nodeBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
-            var uid = ctx.getUserId ? ctx.getUserId() : '';
-            cycleRadioKind(uid);
-            renderDisplay();
-            refreshSubscriptions();
-            notifyRadioRangeLayer();
+            cycleRadioNode();
+        });
+    }
+
+    var freqRow = el('radio-display-freq');
+    if (freqRow && !freqRow._radioNodeBound) {
+        freqRow._radioNodeBound = true;
+        freqRow.addEventListener('click', function(e) {
+            if (!freqRow.classList.contains('radio-display-freq-node')) return;
+            e.preventDefault();
+            e.stopPropagation();
+            cycleRadioNode();
         });
     }
 
@@ -1043,7 +1184,8 @@ function bindKeypad() {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (isFieldEditActive(fieldEditSession)) {
-                    closeFieldEdit(true);
+                    handleFieldEditOk(fieldEditSession);
+                    renderDisplay();
                 } else {
                     transmitMessage(input.value);
                     input.value = '';
@@ -1058,7 +1200,8 @@ function bindKeypad() {
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
             if (isFieldEditActive(fieldEditSession)) {
-                closeFieldEdit(true);
+                handleFieldEditOk(fieldEditSession);
+                renderDisplay();
                 return;
             }
             if (isRadioOsActive(radioOs)) {
@@ -1079,7 +1222,7 @@ function bindKeypad() {
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
             if (isFieldEditActive(fieldEditSession)) {
-                closeFieldEdit(false);
+                finishFieldEdit(true);
                 return;
             }
             if (handleRadioOsInput('back')) return;
@@ -1101,22 +1244,14 @@ function bindKeypad() {
 
     bindRadioDialGestures();
     bindDpadNavigation();
+    bindRadioKeyT9();
 
     var grid = el('radio-keypad-grid');
     if (grid && !grid._radioCommsBound) {
         grid._radioCommsBound = true;
         grid.addEventListener('click', function(e) {
             if (state.operatingMode === 'off') return;
-
-            if (isFieldEditActive(fieldEditSession)) {
-                var fb = e.target.closest('.radio-key[data-key]');
-                if (!fb) return;
-                var fkey = fb.getAttribute('data-key');
-                if (/^[0-9]$/.test(fkey) || fkey === '*' || fkey === '#') {
-                    handleFieldEditAction('char', fkey);
-                }
-                return;
-            }
+            if (isFieldEditActive(fieldEditSession)) return;
 
             if (isRadioOsActive(radioOs)) return;
 
@@ -1141,11 +1276,11 @@ function bindKeypad() {
                 return;
             }
             if (key === '*') {
-                startFieldEdit('freq');
+                startFieldEdit('freq', { returnTo: 'standby' });
                 return;
             }
             if (key === '#') {
-                startFieldEdit('encrypt');
+                startFieldEdit('encrypt', { returnTo: 'standby' });
                 return;
             }
 
@@ -1272,8 +1407,9 @@ function cycleOperatingMode(direction) {
     idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
     state.operatingMode = RADIO_OPERATING_MODES[idx];
     resetRadioOs(radioOs);
+    presetEditDraft = null;
+    cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
-    cancelFieldEdit(state);
     persist();
     renderDisplay();
 }

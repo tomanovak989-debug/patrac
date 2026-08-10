@@ -1317,14 +1317,37 @@ body.theme-light .sector-tech-screen.is-off {
     visibility: hidden;
 }
 .sector-tech-screen.is-menu .radio-display-node,
-.sector-tech-screen.is-menu #radio-display-signal {
+.sector-tech-screen.is-menu #radio-display-signal,
+.sector-tech-screen.is-preset-detail .radio-display-node,
+.sector-tech-screen.is-preset-detail #radio-display-signal {
     visibility: hidden;
+}
+.sector-tech-screen.is-menu .radio-display-main,
+.sector-tech-screen.is-stub .radio-display-main,
+.sector-tech-screen.is-preset-detail .radio-display-main {
+    grid-template-rows: repeat(4, auto);
+    align-content: start;
+    gap: 0;
+    margin: 0;
+    line-height: 1;
 }
 .sector-tech-screen.is-standby .radio-display-status {
     flex: 0 0 auto;
     max-height: 1.15em;
     overflow: hidden;
     margin-bottom: 1px;
+}
+.sector-tech-screen.is-standby .radio-display-node {
+    display: none;
+}
+#radio-display-freq.radio-display-freq-node {
+    cursor: pointer;
+}
+#radio-display-freq.radio-display-freq-node.is-handset {
+    color: #9fd4ff;
+}
+#radio-display-freq.radio-display-freq-node.is-fallback {
+    opacity: 0.88;
 }
 .sector-tech-screen.is-standby .radio-display-main {
     grid-template-rows: 1.15em 1.15em 1.15em minmax(0, 1.15em);
@@ -1333,16 +1356,9 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-standby #radio-display-freq {
     font-weight: 600;
 }
-.sector-tech-screen.is-menu .radio-display-main,
-.sector-tech-screen.is-stub .radio-display-main {
-    grid-template-rows: repeat(4, auto);
-    align-content: start;
-    gap: 0;
-    margin: 0;
-    line-height: 1;
-}
 .sector-tech-screen.is-menu .radio-display-main > div,
-.sector-tech-screen.is-stub .radio-display-main > div {
+.sector-tech-screen.is-stub .radio-display-main > div,
+.sector-tech-screen.is-preset-detail .radio-display-main > div {
     line-height: 1;
     min-height: 0;
     height: auto;
@@ -1355,7 +1371,11 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu #radio-display-freq,
 .sector-tech-screen.is-menu #radio-display-key,
 .sector-tech-screen.is-menu #radio-display-buffer,
-.sector-tech-screen.is-menu #radio-display-preset {
+.sector-tech-screen.is-menu #radio-display-preset,
+.sector-tech-screen.is-preset-detail #radio-display-freq,
+.sector-tech-screen.is-preset-detail #radio-display-key,
+.sector-tech-screen.is-preset-detail #radio-display-buffer,
+.sector-tech-screen.is-preset-detail #radio-display-preset {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
