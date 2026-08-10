@@ -267,27 +267,35 @@ function el(id) {
 function updateInputForMode() {
     var input = el('chat-input-field');
     if (!input) return;
-    if (state.keypadMode === 'freq') {
-        input.placeholder = 'Nebo zadej frekvenci…';
-        input.value = state.dialBuffer || '';
-    } else if (state.keypadMode === 'encrypt') {
-        input.placeholder = 'Šifrovací heslo (slovo)…';
-        input.value = state.dialBuffer || '';
-    } else {
-        input.placeholder = 'Hlášení…';
+    input.placeholder = 'Hlášení…';
+    if (isFieldEditActive(fieldEditSession)) {
+        input.value = '';
+        input.blur();
     }
 }
 
-function startFieldEdit(type) {
-    fieldEditSession = createFieldEdit(type, state);
-    state.keypadMode = type === 'freq' ? 'freq' : 'encrypt';
+function startFieldEdit(type, options) {
+    fieldEditSession = createFieldEdit(type, state, options || {});
+    state.keypadMode = 'tx';
     state.dialBuffer = '';
+    var input = el('chat-input-field');
+    if (input) {
+        input.value = '';
+        input.blur();
+    }
     renderDisplay();
+}
+
+function startPresetLabelEdit(slot) {
+    startFieldEdit('preset_label', { slot: slot });
 }
 
 function closeFieldEdit(save) {
     if (save && fieldEditSession) {
-        commitFieldEdit(fieldEditSession, state);
+        var c = getCtx();
+        commitFieldEdit(fieldEditSession, state, {
+            scope: classifyChannel(state.frequency, state.encryptionKey, c)
+        });
         persist();
         refreshSubscriptions();
     } else {
@@ -295,7 +303,10 @@ function closeFieldEdit(save) {
     }
     fieldEditSession = null;
     var input = el('chat-input-field');
-    if (input) input.value = '';
+    if (input) {
+        input.value = '';
+        input.blur();
+    }
     renderDisplay();
 }
 
@@ -315,7 +326,7 @@ function renderDisplay() {
     var scope = classifyChannel(state.frequency, state.encryptionKey, c);
     var opLabel = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
     var dialBuffer = '';
-    if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
+    if (!isFieldEditActive(fieldEditSession) && (state.keypadMode === 'freq' || state.keypadMode === 'encrypt')) {
         dialBuffer = state.dialBuffer ? ('▸ ' + state.dialBuffer) : '';
     }
 
@@ -353,7 +364,7 @@ function renderDisplay() {
             screen.classList.toggle('is-standby', false);
             screen.classList.toggle('is-field-edit', true);
             screen.classList.toggle('is-freq-edit', editView.editType === 'freq');
-            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt');
+            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt' || editView.editType === 'preset_label');
         }
         if (ch) ch.textContent = editView.status || '';
         if (sig) { sig.textContent = ''; sig.style.color = ''; }
@@ -490,7 +501,7 @@ function handleRadioOsInput(action) {
         return true;
     }
     if (result.effect === 'preset_edit') {
-        if (result.slot) saveToPresetSlot(result.slot);
+        if (result.slot) startPresetLabelEdit(result.slot);
         return true;
     }
     if (result.effect === 'preset_reset') {
@@ -944,36 +955,13 @@ function refreshSubscriptions() {
     });
 }
 
-function applyDialBuffer() {
-    var input = el('chat-input-field');
-    if (state.keypadMode === 'freq') {
-        var raw = (state.dialBuffer || (input && input.value) || '').trim();
-        if (raw) {
-            state.frequency = normalizeFrequency(raw);
-            state.activePresetSlot = null;
-        }
-    } else if (state.keypadMode === 'encrypt') {
-        var keyRaw = (state.dialBuffer || (input && input.value) || '').trim();
-        if (keyRaw) state.encryptionKey = normalizeEncryptionKey(keyRaw);
-    }
-    state.dialBuffer = '';
-    state.keypadMode = 'tx';
-    if (input) input.value = '';
-    persist();
-    renderDisplay();
-    refreshSubscriptions();
-}
-
 function saveToPresetSlot(slot) {
-    var label = prompt('Název presetu (např. Dvojka s Jardou):', 'Kanál ' + slot);
-    if (label == null) return;
     var c = getCtx();
-    var scope = classifyChannel(state.frequency, state.encryptionKey, c);
     upsertPreset(state, slot, {
-        label: label || ('Preset ' + slot),
+        label: 'Kanál ' + slot,
         frequency: state.frequency,
         encryptionKey: state.encryptionKey,
-        scope: scope
+        scope: classifyChannel(state.frequency, state.encryptionKey, c)
     });
     state.activePresetSlot = slot;
     persist();
@@ -1046,11 +1034,10 @@ function bindKeypad() {
     var input = el('chat-input-field');
     if (input && !input._radioCommsBound) {
         input._radioCommsBound = true;
-        input.addEventListener('input', function() {
-            if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
-                state.dialBuffer = input.value;
-                renderDisplay();
-            }
+        input.setAttribute('inputmode', 'none');
+        input.setAttribute('autocomplete', 'off');
+        input.addEventListener('focus', function() {
+            if (isFieldEditActive(fieldEditSession)) input.blur();
         });
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {

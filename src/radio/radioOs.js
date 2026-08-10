@@ -11,29 +11,21 @@ var PRESET_SLOTS = 15;
 
 var VOICE_MENU = [
     { id: 'voice_kety', label: 'ZÁZNAMNÍK KETŮ', action: 'stub' },
-    { id: 'voice_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:channels' },
+    { id: 'voice_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:presets' },
     { id: 'voice_sagis', label: 'DIAGNOSTIKA TERÉNU', action: 'stub' },
     { id: 'voice_settings', label: 'SYSTÉMOVÉ NASTAVENÍ', action: 'stub' }
 ];
 
 var TEXT_MENU = [
     { id: 'text_messages', label: 'TEXTOVÉ ZPRÁVY', action: 'stub' },
-    { id: 'text_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:channels' },
+    { id: 'text_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:presets' },
     { id: 'text_templates', label: 'RYCHLÉ ŠABLONY / KÓDY', action: 'stub' },
     { id: 'text_settings', label: 'SYSTÉMOVÉ NASTAVENÍ', action: 'stub' }
 ];
 
-var CHANNELS_SUBMENU = [
-    { id: 'presets', label: 'PRESETY 1–15', action: 'submenu:presets' },
-    { id: 'manual_freq', label: 'RUČNÍ FREKVENCE', action: 'freq_edit' },
-    { id: 'manual_key', label: 'RUČNÍ ŠIFRA', action: 'key_edit' },
-    { id: 'autoscan', label: 'AUTOSKEN', action: 'stub' },
-    { id: 'beacon', label: 'NOUZOVÝ BEACON', action: 'stub' }
-];
-
 var PRESET_ACTION_ITEMS = [
     { id: 'preset_select', label: 'VYBRAT', action: 'apply_preset' },
-    { id: 'preset_edit', label: 'UPRAVIT', action: 'preset_edit' },
+    { id: 'preset_edit', label: 'UPRAVIT NÁZEV', action: 'preset_edit' },
     { id: 'preset_reset', label: 'RESETOVAT', action: 'preset_reset' }
 ];
 
@@ -74,30 +66,40 @@ function clampFocus(index, count) {
     return index;
 }
 
-function buildPresetItems(radioState) {
+function presetSlotLabel(slot, radioState) {
+    var p = radioState ? findPreset(radioState, slot) : null;
+    if (p && p.label) return slot + ' ' + p.label;
+    return slot + ' PRÁZDNÝ';
+}
+
+function buildPresetSlotItems(radioState) {
     var items = [];
     var slot;
     for (slot = 1; slot <= PRESET_SLOTS; slot++) {
-        var p = radioState ? findPreset(radioState, slot) : null;
-        var label = slot + ' · PRÁZDNÝ';
-        if (p) {
-            label = slot + ' · ' + (p.label || 'KANÁL') + ' · ' + (p.frequency || '---');
-        }
         items.push({
             id: 'preset_' + slot,
             slot: slot,
-            label: label,
+            label: presetSlotLabel(slot, radioState),
             action: 'preset_pick'
         });
     }
     return items;
 }
 
+/** 15 presetů + ruční frekvence / šifra / autosken / beacon. */
+function buildPresetMenuItems(radioState) {
+    var items = buildPresetSlotItems(radioState);
+    items.push({ id: 'manual_freq', label: 'RUČNÍ FREKVENCE', action: 'freq_edit' });
+    items.push({ id: 'manual_key', label: 'RUČNÍ ŠIFRA', action: 'key_edit' });
+    items.push({ id: 'autoscan', label: 'AUTOSKEN', action: 'stub' });
+    items.push({ id: 'beacon', label: 'NOUZOVÝ BEACON', action: 'stub' });
+    return items;
+}
+
 function getCurrentMenuItems(os, operatingMode, radioState) {
     if (!os.menuPath.length) return getMenuItems(operatingMode);
     var leaf = os.menuPath[os.menuPath.length - 1];
-    if (leaf === 'channels') return CHANNELS_SUBMENU;
-    if (leaf === 'presets') return buildPresetItems(radioState);
+    if (leaf === 'presets') return buildPresetMenuItems(radioState);
     if (leaf === 'preset_actions') return PRESET_ACTION_ITEMS;
     return getMenuItems(operatingMode);
 }
@@ -105,11 +107,9 @@ function getCurrentMenuItems(os, operatingMode, radioState) {
 function menuStatusLabel(os, operatingMode, radioState) {
     if (!os.menuPath.length) return 'MENU · ' + menuRootLabel(operatingMode);
     var leaf = os.menuPath[os.menuPath.length - 1];
-    if (leaf === 'channels') return 'KANÁLY · ' + menuRootLabel(operatingMode);
-    if (leaf === 'presets') return 'PRESETY · ' + menuRootLabel(operatingMode);
+    if (leaf === 'presets') return 'KANÁLY · ' + menuRootLabel(operatingMode);
     if (leaf === 'preset_actions' && os.selectedSlot) {
-        var p = radioState ? findPreset(radioState, os.selectedSlot) : null;
-        return 'P' + os.selectedSlot + (p ? (' · ' + (p.label || 'KANÁL')) : ' · PRÁZDNÝ');
+        return presetSlotLabel(os.selectedSlot, radioState);
     }
     return 'MENU · ' + menuRootLabel(operatingMode);
 }
@@ -171,11 +171,6 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         if (action === 'ok') {
             var item = items[os.focusIndex];
             if (!item) return { changed: false };
-            if (item.action === 'submenu:channels') {
-                os.menuPath.push('channels');
-                os.focusIndex = 0;
-                return { changed: true };
-            }
             if (item.action === 'submenu:presets') {
                 os.menuPath.push('presets');
                 os.focusIndex = 0;

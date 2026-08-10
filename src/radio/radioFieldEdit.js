@@ -1,5 +1,5 @@
 /**
- * Editor ruční frekvence / šifry — osa pásma, velký text, kurzor číslic.
+ * Editor ruční frekvence / šifry / názvu presetu — bez systémové klávesnice.
  */
 import {
     BAND_MIN_MHZ,
@@ -8,17 +8,19 @@ import {
     parseFrequencyMHz,
     stepFrequency
 } from './radioBand.js';
-import { normalizeEncryptionKey } from './radioComms.js';
+import { findPreset, normalizeEncryptionKey, upsertPreset } from './radioComms.js';
 
 var FREQ_DIGITS = 6;
-var ENCRYPT_MAX = 16;
+var TEXT_MAX = 16;
+var LABEL_MAX = 14;
 
 var T9_LETTER = {
     '2': 'a', '3': 'd', '4': 'g', '5': 'j', '6': 'm', '7': 'p', '8': 't', '9': 'w'
 };
 
-export function createFieldEdit(type, radioState) {
+export function createFieldEdit(type, radioState, options) {
     radioState = radioState || {};
+    options = options || {};
     if (type === 'freq') {
         return {
             type: 'freq',
@@ -28,12 +30,24 @@ export function createFieldEdit(type, radioState) {
         };
     }
     if (type === 'encrypt') {
-        var key = normalizeEncryptionKey(radioState.encryptionKey || '');
         return {
             type: 'encrypt',
             digitMode: false,
             cursor: 0,
-            text: key
+            text: normalizeEncryptionKey(radioState.encryptionKey || '')
+        };
+    }
+    if (type === 'preset_label') {
+        var slot = options.slot || 1;
+        var preset = findPreset(radioState, slot);
+        var name = preset ? (preset.label || ('Kanál ' + slot)) : ('Kanál ' + slot);
+        if (name.indexOf('Kanál ') === 0) name = name.slice(6);
+        return {
+            type: 'preset_label',
+            slot: slot,
+            digitMode: false,
+            cursor: 0,
+            text: name
         };
     }
     return null;
@@ -95,14 +109,15 @@ function buildFreqHtml(session) {
     return html;
 }
 
-function buildEncryptHtml(session) {
+function buildTextHtml(session, maxLen) {
     var text = session.text || '';
     if (!text.length) text = '_';
     var html = '';
-    for (var i = 0; i < text.length; i++) {
+    var i;
+    for (i = 0; i < text.length; i++) {
         html += digitSpan(text.charAt(i), session.digitMode && session.cursor === i);
     }
-    if (session.digitMode && session.cursor >= text.length) {
+    if (session.digitMode && session.cursor >= text.length && text.length < maxLen) {
         html += digitSpan('_', true);
     }
     return html;
@@ -117,6 +132,14 @@ function escapeHtml(ch) {
     if (ch === '>') return '&gt;';
     if (ch === '&') return '&amp;';
     return ch;
+}
+
+function isTextSession(session) {
+    return session.type === 'encrypt' || session.type === 'preset_label';
+}
+
+function textMaxLen(session) {
+    return session.type === 'preset_label' ? LABEL_MAX : TEXT_MAX;
 }
 
 export function buildFieldEditView(session) {
@@ -135,15 +158,64 @@ export function buildFieldEditView(session) {
         };
     }
 
+    if (session.type === 'preset_label') {
+        return {
+            mode: 'field_edit',
+            editType: 'preset_label',
+            status: 'P' + session.slot + ' · NÁZEV KANÁLU',
+            keyHtml: buildTextHtml(session, LABEL_MAX),
+            axis: '',
+            hint: session.digitMode ? '←→ kurzor · 2–9 písmo' : '↑↓ úprava názvu',
+            footer: 'OK · uložit'
+        };
+    }
+
     return {
         mode: 'field_edit',
         editType: 'encrypt',
         status: 'NASTAV ŠIFRU',
-        keyHtml: buildEncryptHtml(session),
+        keyHtml: buildTextHtml(session, TEXT_MAX),
         axis: '',
         hint: session.digitMode ? '←→ kurzor · 2–9 písmo' : '↑↓ číslice',
         footer: 'OK · uložit'
     };
+}
+
+function handleTextInput(session, action, char) {
+    var text = session.text || '';
+    var maxLen = textMaxLen(session);
+    if (action === 'left' || action === 'right') {
+        if (!session.digitMode) return false;
+        var maxLenView = Math.max(1, text.length || 1);
+        session.cursor = clampCursor(session.cursor + (action === 'left' ? -1 : 1), maxLenView);
+        return true;
+    }
+    if (action === 'up' || action === 'down') {
+        session.digitMode = true;
+        session.cursor = 0;
+        if (!text.length) session.text = '_';
+        return true;
+    }
+    if (action === 'char' && char != null && session.digitMode) {
+        var encChar = char;
+        if (/^[2-9]$/.test(char) && T9_LETTER[char]) encChar = T9_LETTER[char];
+        if (/^[0-9a-zA-Z*# ]$/.test(encChar) || encChar === ' ') {
+            if (text === '_') text = '';
+            var lower = encChar === ' ' ? ' ' : encChar.toLowerCase();
+            if (session.cursor >= text.length) {
+                text += lower;
+            } else {
+                text = text.slice(0, session.cursor) + lower + text.slice(session.cursor + 1);
+            }
+            if (text.length > maxLen) text = text.slice(0, maxLen);
+            session.text = text;
+            if (session.cursor < maxLen - 1 && session.cursor < text.length) {
+                session.cursor++;
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -151,21 +223,16 @@ export function buildFieldEditView(session) {
  */
 export function handleFieldEditInput(session, action, char) {
     if (!session) return false;
-
-    if (action === 'ok' || action === 'back') {
-        return false;
-    }
+    if (action === 'ok' || action === 'back') return false;
 
     if (session.type === 'freq') {
         if (action === 'left' || action === 'right') {
             if (session.digitMode) {
-                var dir = action === 'left' ? -1 : 1;
-                session.cursor = clampCursor(session.cursor + dir, FREQ_DIGITS);
+                session.cursor = clampCursor(session.cursor + (action === 'left' ? -1 : 1), FREQ_DIGITS);
                 return true;
             }
-            var steps = action === 'left' ? -1 : 1;
             var cur = normalizeFrequency(digitsToMhzString(session.digits)) || '462.000';
-            session.digits = freqToDigits(stepFrequency(cur, steps));
+            session.digits = freqToDigits(stepFrequency(cur, action === 'left' ? -1 : 1));
             return true;
         }
         if (action === 'up' || action === 'down') {
@@ -181,68 +248,53 @@ export function handleFieldEditInput(session, action, char) {
         return false;
     }
 
-    if (session.type === 'encrypt') {
-        var text = session.text || '';
-        if (action === 'left' || action === 'right') {
-            if (!session.digitMode) return false;
-            var maxLen = Math.max(1, text.length || 1);
-            session.cursor = clampCursor(session.cursor + (action === 'left' ? -1 : 1), maxLen);
-            return true;
-        }
-        if (action === 'up' || action === 'down') {
-            session.digitMode = true;
-            session.cursor = 0;
-            if (!text.length) session.text = '_';
-            return true;
-        }
-        if (action === 'char' && char != null && session.digitMode) {
-            var encChar = char;
-            if (/^[2-9]$/.test(char) && T9_LETTER[char]) encChar = T9_LETTER[char];
-            if (/^[0-9a-zA-Z*#]$/.test(encChar)) {
-                if (text === '_') text = '';
-                var lower = encChar.toLowerCase();
-                if (session.cursor >= text.length) {
-                    text += lower;
-                } else {
-                    text = text.slice(0, session.cursor) + lower + text.slice(session.cursor + 1);
-                }
-                if (text.length > ENCRYPT_MAX) text = text.slice(0, ENCRYPT_MAX);
-                session.text = text;
-                if (session.cursor < ENCRYPT_MAX - 1 && session.cursor < text.length) {
-                    session.cursor++;
-                }
-                return true;
-            }
-        }
-        return false;
+    if (isTextSession(session)) {
+        return handleTextInput(session, action, char);
     }
 
     return false;
 }
 
-export function commitFieldEdit(session, radioState) {
+export function commitFieldEdit(session, radioState, ctx) {
     if (!session || !radioState) return false;
+    ctx = ctx || {};
+
     if (session.type === 'freq') {
         var freq = normalizeFrequency(digitsToMhzString(session.digits));
         if (!freq) return false;
         radioState.frequency = freq;
         radioState.activePresetSlot = null;
-        radioState.dialBuffer = '';
         radioState.keypadMode = 'tx';
         return true;
     }
+
     if (session.type === 'encrypt') {
         radioState.encryptionKey = normalizeEncryptionKey((session.text || '').replace(/_/g, ''));
-        radioState.dialBuffer = '';
         radioState.keypadMode = 'tx';
         return true;
     }
+
+    if (session.type === 'preset_label') {
+        var label = (session.text || '').replace(/_/g, '').trim();
+        if (!label) label = 'Kanál ' + session.slot;
+        var existing = findPreset(radioState, session.slot);
+        if (existing) {
+            upsertPreset(radioState, session.slot, { label: label });
+        } else {
+            upsertPreset(radioState, session.slot, {
+                label: label,
+                frequency: radioState.frequency,
+                encryptionKey: radioState.encryptionKey || '',
+                scope: ctx.scope || 'private'
+            });
+        }
+        radioState.keypadMode = 'tx';
+        return true;
+    }
+
     return false;
 }
 
 export function cancelFieldEdit(radioState) {
-    if (radioState) {
-        radioState.dialBuffer = '';
-        radioState.keypadMode = 'tx';
-    }
+    if (radioState) radioState.keypadMode = 'tx';
 }
