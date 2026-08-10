@@ -68,6 +68,14 @@ import {
     isRadioOsActive
 } from './radioOs.js';
 import {
+    createFieldEdit,
+    isFieldEditActive,
+    buildFieldEditView,
+    handleFieldEditInput,
+    commitFieldEdit,
+    cancelFieldEdit
+} from './radioFieldEdit.js';
+import {
     KIND_HANDSET,
     NODE_KIND_LABELS,
     resolveActiveRadioNode,
@@ -77,6 +85,7 @@ import {
 var ctx = {};
 var state = null;
 var radioOs = createRadioOsState();
+var fieldEditSession = null;
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -269,6 +278,36 @@ function updateInputForMode() {
     }
 }
 
+function startFieldEdit(type) {
+    fieldEditSession = createFieldEdit(type, state);
+    state.keypadMode = type === 'freq' ? 'freq' : 'encrypt';
+    state.dialBuffer = '';
+    renderDisplay();
+}
+
+function closeFieldEdit(save) {
+    if (save && fieldEditSession) {
+        commitFieldEdit(fieldEditSession, state);
+        persist();
+        refreshSubscriptions();
+    } else {
+        cancelFieldEdit(state);
+    }
+    fieldEditSession = null;
+    var input = el('chat-input-field');
+    if (input) input.value = '';
+    renderDisplay();
+}
+
+function handleFieldEditAction(action, char) {
+    if (!isFieldEditActive(fieldEditSession)) return false;
+    if (handleFieldEditInput(fieldEditSession, action, char)) {
+        renderDisplay();
+        return true;
+    }
+    return false;
+}
+
 function renderDisplay() {
     var c = getCtx();
     var screen = el('radio-display-screen');
@@ -306,6 +345,37 @@ function renderDisplay() {
     var buf = el('radio-display-buffer');
     var footerWrap = el('radio-display-footer');
 
+    if (isFieldEditActive(fieldEditSession) && state.operatingMode !== 'off') {
+        var editView = buildFieldEditView(fieldEditSession);
+        if (screen) {
+            screen.classList.toggle('is-off', false);
+            screen.classList.toggle('is-menu', false);
+            screen.classList.toggle('is-standby', false);
+            screen.classList.toggle('is-field-edit', true);
+            screen.classList.toggle('is-freq-edit', editView.editType === 'freq');
+            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt');
+        }
+        if (ch) ch.textContent = editView.status || '';
+        if (sig) { sig.textContent = ''; sig.style.color = ''; }
+        if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
+        if (f) {
+            f.innerHTML = editView.freqHtml || editView.keyHtml || '';
+            f.className = 'radio-display-edit-large';
+        }
+        if (k) k.textContent = '';
+        if (buf) buf.textContent = editView.axis || (editView.editType === 'encrypt' ? editView.hint : '');
+        if (p) p.textContent = editView.axis ? editView.hint : '';
+        if (footerWrap) footerWrap.textContent = editView.footer || 'OK · uložit';
+        updateInputForMode();
+        return;
+    }
+
+    if (screen) {
+        screen.classList.toggle('is-field-edit', false);
+        screen.classList.toggle('is-freq-edit', false);
+        screen.classList.toggle('is-key-edit', false);
+    }
+
     if (osView.mode === 'off') {
         if (f) f.textContent = '';
         if (k) k.textContent = '';
@@ -328,7 +398,10 @@ function renderDisplay() {
     if (osView.mode === 'standby') {
         var freqVal = normalizeFrequency(state.frequency) || '---.---';
         var pt = !normalizeEncryptionKey(state.encryptionKey || '');
-        if (f) f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+        if (f) {
+            f.className = '';
+            f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+        }
         if (k) k.textContent = standbyLines.line2;
         if (p) p.textContent = standbyLines.line3;
         if (buf) buf.textContent = dialBuffer;
@@ -360,6 +433,7 @@ function renderDisplay() {
     } else {
         var menuLines = osView.lines || ['', '', '', ''];
         if (f) {
+            f.className = '';
             f.textContent = menuLines[0] || '';
             f.style.fontWeight = '';
             f.style.color = '';
@@ -397,17 +471,11 @@ function handleRadioOsInput(action) {
     if (!result || !result.changed) return false;
 
     if (result.effect === 'freq_edit') {
-        state.keypadMode = 'freq';
-        state.dialBuffer = '';
-        persist();
-        renderDisplay();
+        startFieldEdit('freq');
         return true;
     }
     if (result.effect === 'key_edit') {
-        state.keypadMode = 'encrypt';
-        state.dialBuffer = '';
-        persist();
-        renderDisplay();
+        startFieldEdit('encrypt');
         return true;
     }
     if (result.effect === 'apply_preset') {
@@ -966,7 +1034,7 @@ function bindKeypad() {
         nodeBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+            if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
             var uid = ctx.getUserId ? ctx.getUserId() : '';
             cycleRadioKind(uid);
             renderDisplay();
@@ -987,8 +1055,8 @@ function bindKeypad() {
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
-                    applyDialBuffer();
+                if (isFieldEditActive(fieldEditSession)) {
+                    closeFieldEdit(true);
                 } else {
                     transmitMessage(input.value);
                     input.value = '';
@@ -1002,15 +1070,15 @@ function bindKeypad() {
         ent._radioCommsBound = true;
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
+            if (isFieldEditActive(fieldEditSession)) {
+                closeFieldEdit(true);
+                return;
+            }
             if (isRadioOsActive(radioOs)) {
                 handleRadioOsInput('ok');
                 return;
             }
             if (handleRadioOsInput('open_menu')) return;
-            if (state.keypadMode === 'freq' || state.keypadMode === 'encrypt') {
-                applyDialBuffer();
-                return;
-            }
             if (input) {
                 transmitMessage(input.value);
                 input.value = '';
@@ -1023,6 +1091,10 @@ function bindKeypad() {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
+            if (isFieldEditActive(fieldEditSession)) {
+                closeFieldEdit(false);
+                return;
+            }
             if (handleRadioOsInput('back')) return;
             state.dialBuffer = '';
             state.keypadMode = 'tx';
@@ -1048,6 +1120,17 @@ function bindKeypad() {
         grid._radioCommsBound = true;
         grid.addEventListener('click', function(e) {
             if (state.operatingMode === 'off') return;
+
+            if (isFieldEditActive(fieldEditSession)) {
+                var fb = e.target.closest('.radio-key[data-key]');
+                if (!fb) return;
+                var fkey = fb.getAttribute('data-key');
+                if (/^[0-9]$/.test(fkey) || fkey === '*' || fkey === '#') {
+                    handleFieldEditAction('char', fkey);
+                }
+                return;
+            }
+
             if (isRadioOsActive(radioOs)) return;
 
             var btn = e.target.closest('.radio-key[data-key]');
@@ -1071,35 +1154,16 @@ function bindKeypad() {
                 return;
             }
             if (key === '*') {
-                state.keypadMode = state.keypadMode === 'freq' ? 'tx' : 'freq';
-                state.dialBuffer = '';
-                renderDisplay();
+                startFieldEdit('freq');
                 return;
             }
             if (key === '#') {
-                state.keypadMode = state.keypadMode === 'encrypt' ? 'tx' : 'encrypt';
-                state.dialBuffer = '';
-                renderDisplay();
+                startFieldEdit('encrypt');
                 return;
             }
 
             if (/^[0-9]$/.test(key)) {
                 var slot = parseInt(key, 10);
-                if (state.keypadMode === 'freq') {
-                    state.dialBuffer = (state.dialBuffer || '') + key;
-                    if (state.dialBuffer.length === 3 && state.dialBuffer.indexOf('.') === -1) {
-                        state.dialBuffer += '.';
-                    }
-                    if (input) input.value = state.dialBuffer;
-                    renderDisplay();
-                    return;
-                }
-                if (state.keypadMode === 'encrypt') {
-                    state.dialBuffer = (state.dialBuffer || '') + key;
-                    if (input) input.value = state.dialBuffer;
-                    renderDisplay();
-                    return;
-                }
                 if (key === '0') {
                     saveToPresetSlot(state.activePresetSlot || 1);
                     return;
@@ -1173,6 +1237,10 @@ function bindDpadNavigation() {
                 e.preventDefault();
                 e.stopPropagation();
                 if (state.operatingMode === 'off') return;
+                if (isFieldEditActive(fieldEditSession)) {
+                    handleFieldEditAction(key);
+                    return;
+                }
                 if (isRadioOsActive(radioOs)) {
                     if (key === 'left' || key === 'right') return;
                     handleRadioOsInput(key);
@@ -1191,14 +1259,14 @@ function bindDisplayDialSwipe() {
     if (!screen || screen._dialSwipeBound) return;
     screen._dialSwipeBound = true;
     bindHorizontalSwipe(screen, function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
             refreshSubscriptions();
         }
     }, function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         if (cycleDialPreset(state, -1)) {
             persist();
             renderDisplay();
@@ -1217,6 +1285,8 @@ function cycleOperatingMode(direction) {
     idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
     state.operatingMode = RADIO_OPERATING_MODES[idx];
     resetRadioOs(radioOs);
+    fieldEditSession = null;
+    cancelFieldEdit(state);
     persist();
     renderDisplay();
 }
@@ -1357,14 +1427,14 @@ function bindRadioDialGestures() {
     });
 
     bindHorizontalSwipe(el('radio-key-preset-dial'), function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
             refreshSubscriptions();
         }
     }, function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         if (cycleDialPreset(state, -1)) {
             persist();
             renderDisplay();
@@ -1373,13 +1443,13 @@ function bindRadioDialGestures() {
     });
 
     bindHoldVerticalSwipe(el('radio-key-main-dial'), function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         adjustFrequency(state, -1);
         persist();
         renderDisplay();
         refreshSubscriptions();
     }, function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs)) return;
+        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
         adjustFrequency(state, 1);
         persist();
         renderDisplay();

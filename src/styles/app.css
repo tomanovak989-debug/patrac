@@ -1361,6 +1361,66 @@ body.theme-light .sector-tech-screen.is-off {
     text-overflow: ellipsis;
     font-weight: 600;
 }
+.sector-tech-screen.is-field-edit .radio-display-status {
+    flex: 0 0 auto;
+    max-height: 1.1em;
+    overflow: hidden;
+}
+.sector-tech-screen.is-field-edit .radio-display-main {
+    grid-template-rows: minmax(0, 2fr) auto auto auto;
+    margin: 0;
+    align-content: start;
+}
+.sector-tech-screen.is-field-edit .radio-display-edit-large {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    font-size: 1.85em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    grid-row: 1 / span 2;
+}
+.sector-tech-screen.is-key-edit .radio-display-edit-large {
+    font-size: 2em;
+    text-transform: uppercase;
+}
+.sector-tech-screen.is-field-edit .radio-edit-dec {
+    opacity: 0.85;
+    padding: 0 1px;
+}
+.sector-tech-screen.is-field-edit .radio-edit-unit {
+    font-size: 0.55em;
+    opacity: 0.9;
+    margin-left: 2px;
+}
+.sector-tech-screen.is-field-edit .radio-edit-char {
+    display: inline-block;
+    min-width: 0.55em;
+    text-align: center;
+}
+.sector-tech-screen.is-field-edit .radio-edit-blink {
+    animation: radio-edit-blink 0.55s step-end infinite;
+    background: rgba(120, 255, 102, 0.22);
+    border-radius: 1px;
+}
+@keyframes radio-edit-blink {
+    50% { opacity: 0.2; background: transparent; }
+}
+.sector-tech-screen.is-field-edit #radio-display-buffer {
+    font-size: 0.82em;
+    opacity: 0.92;
+    letter-spacing: -0.02em;
+}
+.sector-tech-screen.is-field-edit #radio-display-preset {
+    font-size: 0.78em;
+    opacity: 0.85;
+}
+.sector-tech-screen.is-field-edit .radio-display-sub {
+    font-size: 0.82em;
+}
 .sector-tech-hits {
     position: absolute;
     inset: 0;
