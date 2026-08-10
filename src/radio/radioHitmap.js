@@ -28,7 +28,8 @@ export function applyDisplayTypography() {
     var w = screen.clientWidth;
     var h = screen.clientHeight;
     if (w < 8 || h < 8) return;
-    var byWidth = w * 0.046;
+    var innerW = Math.max(8, w - 10);
+    var byWidth = innerW * 0.046;
     var byHeight = h / 6.4;
     var px = Math.min(byWidth, byHeight);
     px = Math.max(5, Math.round(px * 10) / 10);
@@ -37,8 +38,7 @@ export function applyDisplayTypography() {
 
 export function applyRadioHitmap() {
     var screen = document.getElementById('radio-display-screen');
-    /* o ~10 px na stranu vůči PNG — využití celé LCD plochy */
-    applyRect(screen, 313, 333, 174, 207);
+    applyRect(screen, 323, 333, 154, 207);
 
     var dpad = document.getElementById('radio-dpad-zone');
     applyRect(dpad, 361, 568, 77, 64);

@@ -287,7 +287,7 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    });
+    }, state);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
@@ -359,8 +359,8 @@ function renderDisplay() {
         var menuLines = osView.lines || ['', '', '', ''];
         if (f) f.textContent = menuLines[0] || '';
         if (k) k.textContent = menuLines[1] || '';
-        if (p) p.textContent = menuLines[2] || '';
-        if (buf) buf.textContent = menuLines[3] || '';
+        if (buf) buf.textContent = menuLines[2] || '';
+        if (p) p.textContent = menuLines[3] || '';
         if (ch) ch.textContent = osView.status || 'MENU';
         if (sig) sig.textContent = '';
         if (nodeEl) nodeEl.textContent = '';
@@ -372,11 +372,34 @@ function renderDisplay() {
 
 function handleRadioOsInput(action) {
     if (state.operatingMode === 'off') return false;
-    if (radioOsHandleInput(radioOs, state.operatingMode, action)) {
+    var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
+    if (!result || !result.changed) return false;
+
+    if (result.effect === 'freq_edit') {
+        state.keypadMode = 'freq';
+        state.dialBuffer = '';
+        persist();
         renderDisplay();
         return true;
     }
-    return false;
+    if (result.effect === 'key_edit') {
+        state.keypadMode = 'encrypt';
+        state.dialBuffer = '';
+        persist();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'apply_preset') {
+        if (applyPreset(state, result.slot)) {
+            persist();
+            renderDisplay();
+            refreshSubscriptions();
+        }
+        return true;
+    }
+
+    renderDisplay();
+    return true;
 }
 
 function renderNotebook(options) {

@@ -1,24 +1,34 @@
 /**
  * OS vysílačky SECTOR-TECH — navigace displejem a menu podle režimu provozu.
- * OS-0: STANDBY, kořen menu VOICE/TEXT, stub podmenu.
  */
+import { findPreset } from './radioComms.js';
 
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
 export var SCREEN_STUB = 'stub';
 
+var PRESET_SLOTS = 15;
+
 var VOICE_MENU = [
-    { id: 'voice_kety', label: 'ZÁZNAMNÍK KETŮ' },
-    { id: 'voice_channels', label: 'KANÁLY · AUTOSKEN · BEACON' },
-    { id: 'voice_sagis', label: 'DIAGNOSTIKA TERÉNU' },
-    { id: 'voice_settings', label: 'SYSTÉMOVÉ NASTAVENÍ' }
+    { id: 'voice_kety', label: 'ZÁZNAMNÍK KETŮ', action: 'stub' },
+    { id: 'voice_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:channels' },
+    { id: 'voice_sagis', label: 'DIAGNOSTIKA TERÉNU', action: 'stub' },
+    { id: 'voice_settings', label: 'SYSTÉMOVÉ NASTAVENÍ', action: 'stub' }
 ];
 
 var TEXT_MENU = [
-    { id: 'text_messages', label: 'TEXTOVÉ ZPRÁVY' },
-    { id: 'text_channels', label: 'KANÁLY · AUTOSKEN · BEACON' },
-    { id: 'text_templates', label: 'RYCHLÉ ŠABLONY / KÓDY' },
-    { id: 'text_settings', label: 'SYSTÉMOVÉ NASTAVENÍ' }
+    { id: 'text_messages', label: 'TEXTOVÉ ZPRÁVY', action: 'stub' },
+    { id: 'text_channels', label: 'KANÁLY · AUTOSKEN · BEACON', action: 'submenu:channels' },
+    { id: 'text_templates', label: 'RYCHLÉ ŠABLONY / KÓDY', action: 'stub' },
+    { id: 'text_settings', label: 'SYSTÉMOVÉ NASTAVENÍ', action: 'stub' }
+];
+
+var CHANNELS_SUBMENU = [
+    { id: 'presets', label: 'PRESETY 1–15', action: 'submenu:presets' },
+    { id: 'manual_freq', label: 'RUČNÍ FREKVENCE', action: 'freq_edit' },
+    { id: 'manual_key', label: 'RUČNÍ ŠIFRA', action: 'key_edit' },
+    { id: 'autoscan', label: 'AUTOSKEN', action: 'stub' },
+    { id: 'beacon', label: 'NOUZOVÝ BEACON', action: 'stub' }
 ];
 
 var MENU_LINES = 4;
@@ -26,7 +36,7 @@ var MENU_LINES = 4;
 export function createRadioOsState() {
     return {
         screen: SCREEN_STANDBY,
-        menuRoot: 'voice',
+        menuPath: [],
         focusIndex: 0,
         stubTitle: ''
     };
@@ -35,6 +45,7 @@ export function createRadioOsState() {
 export function resetRadioOs(os) {
     if (!os) return createRadioOsState();
     os.screen = SCREEN_STANDBY;
+    os.menuPath = [];
     os.focusIndex = 0;
     os.stubTitle = '';
     return os;
@@ -55,72 +66,126 @@ function clampFocus(index, count) {
     return index;
 }
 
+function buildPresetItems(radioState) {
+    var items = [];
+    var slot;
+    for (slot = 1; slot <= PRESET_SLOTS; slot++) {
+        var p = radioState ? findPreset(radioState, slot) : null;
+        var label = slot + ' · PRÁZDNÝ';
+        if (p) {
+            label = slot + ' · ' + (p.label || 'KANÁL') + ' · ' + (p.frequency || '---');
+        }
+        items.push({
+            id: 'preset_' + slot,
+            slot: slot,
+            label: label,
+            action: 'apply_preset'
+        });
+    }
+    return items;
+}
+
+function getCurrentMenuItems(os, operatingMode, radioState) {
+    if (!os.menuPath.length) return getMenuItems(operatingMode);
+    var leaf = os.menuPath[os.menuPath.length - 1];
+    if (leaf === 'channels') return CHANNELS_SUBMENU;
+    if (leaf === 'presets') return buildPresetItems(radioState);
+    return getMenuItems(operatingMode);
+}
+
+function menuStatusLabel(os, operatingMode) {
+    if (!os.menuPath.length) return 'MENU · ' + menuRootLabel(operatingMode);
+    var leaf = os.menuPath[os.menuPath.length - 1];
+    if (leaf === 'channels') return 'KANÁLY · ' + menuRootLabel(operatingMode);
+    if (leaf === 'presets') return 'PRESETY · ' + menuRootLabel(operatingMode);
+    return 'MENU · ' + menuRootLabel(operatingMode);
+}
+
 /**
- * @returns {boolean} true pokud došlo ke změně stavu
+ * @returns {{ changed: boolean, effect?: string, slot?: number }}
  */
-export function radioOsHandleInput(os, operatingMode, action) {
-    if (!os || operatingMode === 'off') return false;
+export function radioOsHandleInput(os, operatingMode, action, radioState) {
+    if (!os || operatingMode === 'off') return { changed: false };
 
     if (action === 'open_menu') {
-        if (os.screen !== SCREEN_STANDBY) return false;
+        if (os.screen !== SCREEN_STANDBY) return { changed: false };
         os.screen = SCREEN_MENU;
-        os.menuRoot = operatingMode === 'text' ? 'text' : 'voice';
+        os.menuPath = [];
         os.focusIndex = 0;
-        return true;
+        return { changed: true };
     }
 
     if (os.screen === SCREEN_STANDBY) {
-        return false;
+        return { changed: false };
     }
 
     if (action === 'back') {
         if (os.screen === SCREEN_STUB) {
             os.screen = SCREEN_MENU;
             os.stubTitle = '';
-            return true;
+            return { changed: true };
+        }
+        if (os.screen === SCREEN_MENU && os.menuPath.length) {
+            os.menuPath.pop();
+            os.focusIndex = 0;
+            return { changed: true };
         }
         if (os.screen === SCREEN_MENU) {
             resetRadioOs(os);
-            return true;
+            return { changed: true };
         }
-        return false;
+        return { changed: false };
     }
 
     if (os.screen === SCREEN_MENU) {
-        var items = getMenuItems(operatingMode);
+        var items = getCurrentMenuItems(os, operatingMode, radioState);
         if (action === 'up') {
             os.focusIndex = clampFocus(os.focusIndex - 1, items.length);
-            return true;
+            return { changed: true };
         }
         if (action === 'down') {
             os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
-            return true;
+            return { changed: true };
         }
         if (action === 'ok') {
             var item = items[os.focusIndex];
-            if (!item) return false;
+            if (!item) return { changed: false };
+            if (item.action === 'submenu:channels') {
+                os.menuPath.push('channels');
+                os.focusIndex = 0;
+                return { changed: true };
+            }
+            if (item.action === 'submenu:presets') {
+                os.menuPath.push('presets');
+                os.focusIndex = 0;
+                return { changed: true };
+            }
+            if (item.action === 'freq_edit') {
+                resetRadioOs(os);
+                return { changed: true, effect: 'freq_edit' };
+            }
+            if (item.action === 'key_edit') {
+                resetRadioOs(os);
+                return { changed: true, effect: 'key_edit' };
+            }
+            if (item.action === 'apply_preset') {
+                resetRadioOs(os);
+                return { changed: true, effect: 'apply_preset', slot: item.slot };
+            }
             os.stubTitle = item.label;
             os.screen = SCREEN_STUB;
-            return true;
+            return { changed: true };
         }
-        /* ← → zatím bez akce v seznamech (OS-0) */
-        return false;
+        return { changed: false };
     }
 
-    if (os.screen === SCREEN_STUB) {
-        if (action === 'ok' || action === 'up' || action === 'down') {
-            return false;
-        }
-    }
-
-    return false;
+    return { changed: false };
 }
 
 /**
- * Vykreslí obsah displeje podle OS stavu.
  * @returns {{ mode: string, status?: string, lines?: string[], footer?: string }}
  */
-export function buildOsDisplayLines(os, operatingMode, standby) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState) {
     standby = standby || {};
 
     if (operatingMode === 'off') {
@@ -156,7 +221,7 @@ export function buildOsDisplayLines(os, operatingMode, standby) {
         };
     }
 
-    var items = getMenuItems(operatingMode);
+    var items = getCurrentMenuItems(os, operatingMode, radioState);
     var lines = [];
     var start = 0;
     if (os.focusIndex >= MENU_LINES) {
@@ -178,7 +243,7 @@ export function buildOsDisplayLines(os, operatingMode, standby) {
 
     return {
         mode: 'menu',
-        status: 'MENU · ' + menuRootLabel(operatingMode),
+        status: menuStatusLabel(os, operatingMode),
         lines: lines,
         footer: 'OK · Zpět',
         buffer: ''
