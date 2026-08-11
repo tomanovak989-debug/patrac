@@ -1624,6 +1624,7 @@ function bindRadioDialGestures() {
         }
     }, function() {
         if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
+        radioKeyFeedback('dial');
         if (cycleDialPreset(state, -1)) {
             persist();
             renderDisplay();
