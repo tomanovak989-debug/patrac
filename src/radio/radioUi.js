@@ -60,7 +60,7 @@ import {
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import { applyDisplayTypography } from './radioHitmap.js';
-import { radioKeyFeedback } from './radioFeedback.js';
+import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback } from './radioFeedback.js';
 import {
     createRadioOsState,
     resetRadioOs,
@@ -1044,6 +1044,7 @@ function ingestIncomingPayload(payload) {
         distanceKm: applied.distanceKm
     }), c);
     recordEntry(entry);
+    radioIncomingFeedback(applied.signalQuality);
 }
 
 function refreshSubscriptions() {
@@ -1083,9 +1084,11 @@ async function transmitMessage(text) {
     }
 
     var c = getCtx();
+    radioTxStart();
     var entry = createOutgoingEntry(text, c, state);
     recordEntry(entry);
     renderNotebook();
+    radioTxEnd();
 
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
 
@@ -1684,6 +1687,7 @@ export function initRadioCommsSystem(options) {
     }
 
     bindKeypad();
+    initRadioFeedback();
     resetRadioOs(radioOs);
     initSectorTechShell();
     window.patracRefreshSectorTech = refreshSectorTechLayout;
