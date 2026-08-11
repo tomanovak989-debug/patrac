@@ -16,7 +16,7 @@ var VOICE_MENU = [
     { id: 'voice_autoscan', label: '3 · AUTOSKEN', action: 'stub' },
     { id: 'voice_beacon', label: '4 · BEACON', action: 'stub' },
     { id: 'voice_templates', label: '5 · ŠABLONY', action: 'stub' },
-    { id: 'voice_settings', label: '6 · NASTAVENÍ', action: 'stub' }
+    { id: 'voice_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
 ];
 
 var TEXT_MENU = [
@@ -25,8 +25,15 @@ var TEXT_MENU = [
     { id: 'text_autoscan', label: '3 · AUTOSKEN', action: 'stub' },
     { id: 'text_beacon', label: '4 · BEACON', action: 'stub' },
     { id: 'text_templates', label: '5 · ŠABLONY', action: 'stub' },
-    { id: 'text_settings', label: '6 · NASTAVENÍ', action: 'stub' }
+    { id: 'text_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
 ];
+
+var SETTINGS_MENU = [
+    { id: 'settings_sounds', label: 'ZVUKY', action: 'submenu:sounds' }
+];
+
+var SOUND_FIELDS = ['key', 'ring', 'message'];
+var SOUND_LABELS = { key: 'KLÁVESY', ring: 'ZVONĚNÍ', message: 'ZPRÁVA' };
 
 export function createRadioOsState() {
     return {
@@ -35,6 +42,7 @@ export function createRadioOsState() {
         focusIndex: 0,
         selectedSlot: null,
         presetFieldFocus: 0,
+        soundFieldFocus: 0,
         stubTitle: ''
     };
 }
@@ -46,6 +54,7 @@ export function resetRadioOs(os) {
     os.focusIndex = 0;
     os.selectedSlot = null;
     os.presetFieldFocus = 0;
+    os.soundFieldFocus = 0;
     os.stubTitle = '';
     return os;
 }
@@ -99,10 +108,49 @@ function buildPresetSlotItems(radioState) {
     return items;
 }
 
+function getSoundPrefs(radioState) {
+    var p = radioState && radioState.soundPrefs ? radioState.soundPrefs : {};
+    return {
+        key: clampSoundVariant(p.key),
+        ring: clampSoundVariant(p.ring),
+        message: clampSoundVariant(p.message)
+    };
+}
+
+function clampSoundVariant(n) {
+    n = parseInt(n, 10);
+    if (!isFinite(n) || n < 1) return 1;
+    if (n > 3) return 3;
+    return n;
+}
+
+function cycleSoundPref(radioState, field, delta) {
+    if (!radioState) return;
+    if (!radioState.soundPrefs) radioState.soundPrefs = getSoundPrefs(radioState);
+    var cur = clampSoundVariant(radioState.soundPrefs[field]);
+    cur = cur + delta;
+    if (cur < 1) cur = 3;
+    if (cur > 3) cur = 1;
+    radioState.soundPrefs[field] = cur;
+}
+
+function buildSoundSettingsLines(os, radioState) {
+    var prefs = getSoundPrefs(radioState);
+    var lines = [];
+    var i;
+    for (i = 0; i < SOUND_FIELDS.length; i++) {
+        var field = SOUND_FIELDS[i];
+        lines.push(SOUND_LABELS[field] + '   ' + prefs[field]);
+    }
+    while (lines.length < 6) lines.push('');
+    return lines;
+}
+
 function getCurrentMenuItems(os, operatingMode, radioState) {
     if (!os.menuPath.length) return getMenuItems(operatingMode);
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return buildPresetSlotItems(radioState);
+    if (leaf === 'settings') return SETTINGS_MENU;
     return getMenuItems(operatingMode);
 }
 
@@ -111,6 +159,8 @@ function menuStatusLabel(os, operatingMode, radioState, draft) {
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return 'PRESETY · ' + menuRootLabel(operatingMode);
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
+    if (leaf === 'settings') return 'NASTAVENÍ · ' + menuRootLabel(operatingMode);
+    if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
     return 'MENU · ' + menuRootLabel(operatingMode);
 }
 
@@ -161,6 +211,12 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.selectedSlot = null;
             return { changed: true, effect: 'preset_detail_back' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
+            os.menuPath.pop();
+            os.soundFieldFocus = 0;
+            os.focusIndex = 0;
+            return { changed: true, effect: 'sound_prefs_back' };
+        }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
             var prevSlot = os.selectedSlot;
             os.menuPath.pop();
@@ -175,12 +231,30 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         return { changed: false };
     }
 
+    if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
+        if (action === 'up') {
+            os.soundFieldFocus = clampFocus(os.soundFieldFocus - 1, SOUND_FIELDS.length);
+            return { changed: true };
+        }
+        if (action === 'down') {
+            os.soundFieldFocus = clampFocus(os.soundFieldFocus + 1, SOUND_FIELDS.length);
+            return { changed: true };
+        }
+        if (action === 'left' || action === 'right') {
+            var dir = action === 'left' ? -1 : 1;
+            var fld = SOUND_FIELDS[os.soundFieldFocus];
+            cycleSoundPref(radioState, fld, dir);
+            return { changed: true, effect: 'sound_preview', field: fld };
+        }
+        return { changed: false };
+    }
+
     if (os.menuPath[os.menuPath.length - 1] === 'detail') {
-        if (action === 'up' || action === 'left') {
+        if (action === 'up') {
             os.presetFieldFocus = clampFocus(os.presetFieldFocus - 1, 3);
             return { changed: true };
         }
-        if (action === 'down' || action === 'right') {
+        if (action === 'down') {
             os.presetFieldFocus = clampFocus(os.presetFieldFocus + 1, 3);
             return { changed: true };
         }
@@ -219,6 +293,16 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             if (item.action === 'submenu:presets') {
                 os.menuPath.push('presets');
                 os.focusIndex = 0;
+                return { changed: true };
+            }
+            if (item.action === 'submenu:settings') {
+                os.menuPath.push('settings');
+                os.focusIndex = 0;
+                return { changed: true };
+            }
+            if (item.action === 'submenu:sounds') {
+                os.menuPath.push('sounds');
+                os.soundFieldFocus = 0;
                 return { changed: true };
             }
             if (item.action === 'preset_detail') {
@@ -266,6 +350,17 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
             lines: buildPresetDetailLines(os, draft),
             focusLine: os.presetFieldFocus,
             footer: 'OK · OK · Zpět',
+            buffer: ''
+        };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
+        return {
+            mode: 'sound_settings',
+            status: menuStatusLabel(os, operatingMode, radioState, draft),
+            lines: buildSoundSettingsLines(os, radioState),
+            focusLine: os.soundFieldFocus,
+            footer: '←→ varianta · Zpět',
             buffer: ''
         };
     }

@@ -24,8 +24,7 @@ var T9_GROUPS = {
     '6': 'mno',
     '7': 'pqrs',
     '8': 'tuv',
-    '9': 'wxyz',
-    '0': ' '
+    '9': 'wxyz'
 };
 
 export function createFieldEdit(type, radioState, options) {
@@ -133,23 +132,24 @@ function insertTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
     var lower = ch === ' ' ? ' ' : String(ch).toLowerCase();
-    if (session.cursor >= text.length) {
-        text += lower;
-    } else {
-        text = text.slice(0, session.cursor) + lower + text.slice(session.cursor + 1);
-    }
+    var pos = Math.min(session.cursor, text.length);
+    text = text.slice(0, pos) + lower + text.slice(pos);
     if (text.length > maxLen) text = text.slice(0, maxLen);
     session.text = text;
+    session.cursor = Math.min(pos + 1, text.length);
 }
 
 function replaceTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
     var lower = ch === ' ' ? ' ' : String(ch).toLowerCase();
-    var pos = Math.max(0, session.cursor);
-    if (!text.length) text = lower;
-    else if (pos >= text.length) text += lower;
-    else text = text.slice(0, pos) + lower + text.slice(pos + 1);
+    var pos = Math.max(0, Math.min(session.cursor, text.length - 1));
+    if (!text.length) {
+        text = lower;
+        session.cursor = 1;
+    } else {
+        text = text.slice(0, pos) + lower + text.slice(pos + 1);
+    }
     if (text.length > maxLen) text = text.slice(0, maxLen);
     session.text = text;
 }
@@ -160,7 +160,6 @@ function applyT9Tap(session, key) {
     if (group.length === 1) {
         finalizeT9Session(session);
         insertTextChar(session, group);
-        session.cursor = Math.min(session.cursor + 1, textMaxLen(session));
         return true;
     }
     if (session.t9Key === key) {
@@ -171,6 +170,7 @@ function applyT9Tap(session, key) {
         session.t9Key = key;
         session.t9Index = 0;
         insertTextChar(session, group.charAt(0));
+        session.cursor = Math.max(0, session.cursor - 1);
     }
     scheduleT9Advance(session);
     return true;
@@ -217,20 +217,26 @@ function buildFreqHtml(session) {
 
 function buildTextHtml(session) {
     var text = normalizeTextValue(session.text);
-    if (!text.length) text = '_';
+    var maxLen = textMaxLen(session);
     var html = '';
     var i;
-    for (i = 0; i < text.length; i++) {
-        html += digitSpan(text.charAt(i), session.digitMode && session.cursor === i);
+    if (!text.length && session.digitMode) {
+        return digitSpan('_', true, true);
     }
-    if (session.digitMode && session.cursor >= text.length && text.length < textMaxLen(session)) {
-        html += digitSpan('_', true);
+    for (i = 0; i < text.length; i++) {
+        html += digitSpan(text.charAt(i), session.digitMode && session.cursor === i, true);
+    }
+    if (session.digitMode && session.cursor >= text.length && text.length < maxLen) {
+        html += digitSpan('_', true, true);
     }
     return html;
 }
 
-function digitSpan(ch, blink) {
-    return '<span class="radio-edit-char' + (blink ? ' radio-edit-blink' : '') + '">' + escapeHtml(ch) + '</span>';
+function digitSpan(ch, active, underline) {
+    var cls = 'radio-edit-char';
+    if (active && underline) cls += ' radio-edit-cursor';
+    else if (active) cls += ' radio-edit-blink';
+    return '<span class="' + cls + '">' + escapeHtml(ch) + '</span>';
 }
 
 function escapeHtml(ch) {
@@ -264,7 +270,7 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? 'T9 · Zpět maže' : 'OK spustí kurzor',
+        hint: session.digitMode ? 'T9 · 0 posun · Zpět maže' : 'OK spustí kurzor',
         footer: 'OK · Zpět maže'
     };
 }
@@ -301,8 +307,12 @@ export function handleFieldEditInput(session, action, char, opts) {
         if (action === 'left' || action === 'right') {
             if (!session.digitMode) return false;
             finalizeT9Session(session);
-            var maxLenView = Math.max(1, text.length || 1);
-            session.cursor = clampCursor(session.cursor + (action === 'left' ? -1 : 1), maxLenView);
+            var maxPos = text.length;
+            session.cursor = clampCursor(
+                session.cursor + (action === 'left' ? -1 : 1),
+                Math.max(1, maxPos + 1)
+            );
+            if (session.cursor > maxPos) session.cursor = maxPos;
             return true;
         }
         if (action === 'up' || action === 'down') {
@@ -312,6 +322,16 @@ export function handleFieldEditInput(session, action, char, opts) {
             return true;
         }
         if (action === 'char' && char != null && session.digitMode) {
+            if (char === '0') {
+                finalizeT9Session(session);
+                if (opts.longPress) {
+                    insertTextChar(session, '0');
+                    return true;
+                }
+                var len = normalizeTextValue(session.text).length;
+                session.cursor = Math.min(session.cursor + 1, len);
+                return true;
+            }
             if (opts.longPress && /^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
             if (char === '*') {
                 finalizeT9Session(session);
@@ -338,14 +358,7 @@ function deleteTextChar(session) {
     var text = normalizeTextValue(session.text);
     if (!text.length) return false;
     var pos = session.cursor;
-    if (pos <= 0) {
-        if (text.length > 0) {
-            session.text = text.slice(1);
-            session.cursor = 0;
-            return true;
-        }
-        return false;
-    }
+    if (pos <= 0) return false;
     session.text = text.slice(0, pos - 1) + text.slice(pos);
     session.cursor = pos - 1;
     return true;

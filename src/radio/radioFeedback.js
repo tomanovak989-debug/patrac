@@ -7,17 +7,12 @@ import {
     SIGNAL_FRAGMENT,
     SIGNAL_NOISE
 } from './radioPropagation.js';
+import { normalizeSoundPrefs } from './radioComms.js';
 
 var SFX_BASE = '/src/assets/radio/sfx/';
 var _pool = {};
-var _keyIdx = 0;
-var _msgIdx = 0;
-var _ringIdx = 0;
+var _prefs = { key: 1, ring: 1, message: 1 };
 var _unlocked = false;
-
-var KEY_SFX = ['key-1.mp3', 'key-2.mp3', 'key-3.mp3'];
-var MESSAGE_SFX = ['message-1.mp3', 'message-2.mp3', 'message-3.mp3'];
-var RING_SFX = ['ring-1.mp3', 'ring-2.mp3', 'ring-3.mp3'];
 
 function haptic(kind) {
     var pulse = kind === 'ok' ? 26 : (kind === 'back' ? 20 : 16);
@@ -26,10 +21,21 @@ function haptic(kind) {
     }
 }
 
+function sfxName(prefix, variant) {
+    return prefix + '-' + clampSoundVariant(variant) + '.mp3';
+}
+
+function clampSoundVariant(n) {
+    n = parseInt(n, 10);
+    if (!isFinite(n) || n < 1) return 1;
+    if (n > 3) return 3;
+    return n;
+}
+
 function unlockAudio() {
     if (_unlocked) return;
     _unlocked = true;
-    playSfx('key-2.mp3', { volume: 0.001 });
+    playSfx(sfxName('key', _prefs.key), { volume: 0.001 });
 }
 
 function playSfx(file, opts) {
@@ -47,16 +53,29 @@ function playSfx(file, opts) {
     }
 }
 
-function nextFrom(list, idx) {
-    var file = list[idx % list.length];
-    return { file: file, next: (idx + 1) % list.length };
+export function setRadioSoundPrefs(prefs) {
+    _prefs = normalizeSoundPrefs(prefs);
 }
 
-export function initRadioFeedback() {
-    var all = KEY_SFX.concat(MESSAGE_SFX, RING_SFX, [
-        'dial.mp3', 'ptt-start.mp3', 'ptt-end.mp3',
-        'signal-hill.mp3', 'signal-range.mp3'
-    ]);
+export function getRadioSoundPrefs() {
+    return normalizeSoundPrefs(_prefs);
+}
+
+export function previewSoundPref(kind, variant) {
+    unlockAudio();
+    if (kind === 'key') playSfx(sfxName('key', variant));
+    else if (kind === 'ring') playSfx(sfxName('ring', variant));
+    else if (kind === 'message') playSfx(sfxName('message', variant));
+}
+
+export function initRadioFeedback(prefs) {
+    setRadioSoundPrefs(prefs);
+    var all = [];
+    var p;
+    for (p = 1; p <= 3; p++) {
+        all.push(sfxName('key', p), sfxName('ring', p), sfxName('message', p));
+    }
+    all.push('dial.mp3', 'ptt-start.mp3', 'ptt-end.mp3', 'signal-hill.mp3', 'signal-range.mp3');
     for (var i = 0; i < all.length; i++) {
         if (!_pool[all[i]]) {
             var a = new Audio(SFX_BASE + all[i]);
@@ -74,9 +93,7 @@ export function radioKeyFeedback(kind) {
         playSfx('dial.mp3');
         return;
     }
-    var pick = nextFrom(KEY_SFX, _keyIdx);
-    _keyIdx = pick.next;
-    playSfx(pick.file);
+    playSfx(sfxName('key', _prefs.key));
 }
 
 export function radioTxStart() {
@@ -100,13 +117,9 @@ export function radioIncomingFeedback(signalQuality) {
         return;
     }
     if (signalQuality === SIGNAL_CLEAR || signalQuality === SIGNAL_WEAK) {
-        var ringPick = nextFrom(RING_SFX, _ringIdx);
-        _ringIdx = ringPick.next;
-        playSfx(ringPick.file, { volume: signalQuality === SIGNAL_WEAK ? 0.65 : 0.88 });
+        playSfx(sfxName('ring', _prefs.ring), { volume: signalQuality === SIGNAL_WEAK ? 0.65 : 0.88 });
         setTimeout(function() {
-            var msgPick = nextFrom(MESSAGE_SFX, _msgIdx);
-            _msgIdx = msgPick.next;
-            playSfx(msgPick.file, { volume: signalQuality === SIGNAL_WEAK ? 0.72 : 0.9 });
+            playSfx(sfxName('message', _prefs.message), { volume: signalQuality === SIGNAL_WEAK ? 0.72 : 0.9 });
         }, signalQuality === SIGNAL_WEAK ? 220 : 180);
     }
 }

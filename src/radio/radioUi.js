@@ -60,7 +60,7 @@ import {
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import { applyDisplayTypography } from './radioHitmap.js';
-import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback } from './radioFeedback.js';
+import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref } from './radioFeedback.js';
 import {
     createRadioOsState,
     resetRadioOs,
@@ -428,9 +428,9 @@ function renderDisplay() {
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
         screen.classList.toggle('is-standby', osView.mode === 'standby');
-        screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail');
+        screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
     }
 
     var f = el('radio-display-freq');
@@ -610,6 +610,21 @@ function handleRadioOsInput(action) {
             presetEditDraft = createPresetDraft(result.slot, state);
         }
         openPresetFieldEdit(result.field);
+        return true;
+    }
+    if (result.effect === 'sound_preview') {
+        if (state.soundPrefs && result.field) {
+            previewSoundPref(result.field, state.soundPrefs[result.field]);
+            setRadioSoundPrefs(state.soundPrefs);
+        }
+        persist();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'sound_prefs_back') {
+        setRadioSoundPrefs(state.soundPrefs);
+        persist();
+        renderDisplay();
         return true;
     }
 
@@ -1398,35 +1413,30 @@ function bindKeypad() {
 }
 
 function bindDpadNavigation() {
-    var dpadKeys = ['up', 'down', 'left', 'right'];
-    for (var i = 0; i < dpadKeys.length; i++) {
-        (function(key) {
-            var btn = document.querySelector('#radio-dpad-zone [data-key="' + key + '"]');
-            if (!btn || btn._radioOsBound) return;
-            btn._radioOsBound = true;
-            btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (state.operatingMode === 'off') return;
-                if (isFieldEditActive(fieldEditSession)) {
-                    if (key === 'left' || key === 'right' || key === 'up' || key === 'down') {
-                        radioKeyFeedback('key');
-                        handleFieldEditAction(key);
-                    }
-                    return;
-                }
-                if (isRadioOsActive(radioOs)) {
-                    radioKeyFeedback('key');
-                    handleRadioOsInput(key);
-                    return;
-                }
-                if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
-                    radioKeyFeedback('key');
-                    handleRadioOsInput('open_menu');
-                }
-            });
-        })(dpadKeys[i]);
-    }
+    var zone = el('radio-dpad-zone');
+    if (!zone || zone._radioOsBound) return;
+    zone._radioOsBound = true;
+    zone.addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-key]');
+        if (!btn) return;
+        var key = btn.getAttribute('data-key');
+        if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right') return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (state.operatingMode === 'off') return;
+        if (isFieldEditActive(fieldEditSession)) {
+            radioKeyFeedback('key');
+            handleFieldEditAction(key);
+            return;
+        }
+        if (isRadioOsActive(radioOs)) {
+            radioKeyFeedback('key');
+            handleRadioOsInput(key);
+            return;
+        }
+        radioKeyFeedback('key');
+        handleRadioOsInput('open_menu');
+    });
 }
 
 function bindDisplayDialSwipe() {
@@ -1687,7 +1697,8 @@ export function initRadioCommsSystem(options) {
     }
 
     bindKeypad();
-    initRadioFeedback();
+    initRadioFeedback(state && state.soundPrefs ? state.soundPrefs : null);
+    setRadioSoundPrefs(state && state.soundPrefs ? state.soundPrefs : null);
     resetRadioOs(radioOs);
     initSectorTechShell();
     window.patracRefreshSectorTech = refreshSectorTechLayout;

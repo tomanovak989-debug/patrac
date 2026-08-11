@@ -127,6 +127,7 @@ export function defaultRadioState(userId, ctx) {
         dialBuffer: '',
         activePresetSlot: 1,
         operatingMode: 'voice',
+        soundPrefs: { key: 1, ring: 1, message: 1 },
         presets: presets
     };
 }
@@ -205,6 +206,22 @@ function findRichestLocalStorage(prefix, scoreFn) {
     return bestScore > 0 ? bestRaw : null;
 }
 
+function clampSoundVariant(n) {
+    n = parseInt(n, 10);
+    if (!isFinite(n) || n < 1) return 1;
+    if (n > 3) return 3;
+    return n;
+}
+
+export function normalizeSoundPrefs(prefs) {
+    prefs = prefs || {};
+    return {
+        key: clampSoundVariant(prefs.key),
+        ring: clampSoundVariant(prefs.ring),
+        message: clampSoundVariant(prefs.message)
+    };
+}
+
 export function loadRadioState(userId, ctx) {
     var key = radioStateKey(userId);
     var base = defaultRadioState(userId, ctx);
@@ -237,6 +254,13 @@ export function loadRadioState(userId, ctx) {
         if (!parsed.keypadMode) parsed.keypadMode = 'tx';
         if (!parsed.dialBuffer) parsed.dialBuffer = '';
         if (!parsed.operatingMode) parsed.operatingMode = 'voice';
+        if (!parsed.soundPrefs || typeof parsed.soundPrefs !== 'object') {
+            parsed.soundPrefs = { key: 1, ring: 1, message: 1 };
+        } else {
+            parsed.soundPrefs.key = clampSoundVariant(parsed.soundPrefs.key);
+            parsed.soundPrefs.ring = clampSoundVariant(parsed.soundPrefs.ring);
+            parsed.soundPrefs.message = clampSoundVariant(parsed.soundPrefs.message);
+        }
         /* activePresetSlot jen pokud sedí na aktuální freq — jinak „přímý zápis“. */
         var di = findDialIndex(parsed.presets, parsed.frequency, parsed.activePresetSlot);
         if (di >= 0) parsed.activePresetSlot = parsed.presets[di].slot;

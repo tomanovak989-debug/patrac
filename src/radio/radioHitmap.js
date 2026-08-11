@@ -29,14 +29,17 @@ export function applyDisplayTypography() {
     var h = screen.clientHeight;
     if (w < 8 || h < 8) return;
     var innerW = Math.max(8, w - 10);
-    var byWidth = innerW * 0.072;
-    var byHeight = (h / 8) * 0.82;
-    var px = Math.min(byWidth, byHeight);
-    px = Math.max(8, Math.round(px * 10) / 10);
+    var px = Math.min(innerW / 10.5, (h / 8) * 0.9);
+    px = Math.max(9, Math.round(px * 10) / 10);
     screen.style.fontSize = px + 'px';
-    screen.style.fontFamily = "'Bahnschrift', 'Segoe UI', 'Roboto Condensed', sans-serif";
+    screen.style.fontFamily = "'Roboto Condensed', 'Bahnschrift', 'Segoe UI', sans-serif";
     screen.style.fontWeight = '600';
-    screen.style.fontStretch = 'semi-condensed';
+    var nodes = screen.querySelectorAll('.radio-display-status, .radio-display-main, .radio-display-main > div, .radio-display-sub');
+    for (var i = 0; i < nodes.length; i++) {
+        nodes[i].style.fontFamily = "'Roboto Condensed', 'Bahnschrift', 'Segoe UI', sans-serif";
+        nodes[i].style.fontSize = 'inherit';
+        nodes[i].style.fontWeight = '600';
+    }
 }
 
 export function applyRadioHitmap() {
