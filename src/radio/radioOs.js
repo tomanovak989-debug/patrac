@@ -119,11 +119,10 @@ function buildPresetDetailLines(os, draft) {
     var name = draft.label || ('Kanál ' + draft.slot);
     var freq = draft.frequency || '---.---';
     var key = draft.encryptionKey ? draft.encryptionKey : '—';
-    var f = os.presetFieldFocus;
     return [
-        (f === 0 ? '▶ ' : '  ') + 'NÁZEV  ' + name,
-        (f === 1 ? '▶ ' : '  ') + 'F       ' + freq,
-        (f === 2 ? '▶ ' : '  ') + 'ŠIFRA   ' + key,
+        'NÁZEV  ' + name,
+        'F       ' + freq,
+        'ŠIFRA   ' + key,
         '',
         '',
         ''
@@ -177,11 +176,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail') {
-        if (action === 'up') {
+        if (action === 'up' || action === 'left') {
             os.presetFieldFocus = clampFocus(os.presetFieldFocus - 1, 3);
             return { changed: true };
         }
-        if (action === 'down') {
+        if (action === 'down' || action === 'right') {
             os.presetFieldFocus = clampFocus(os.presetFieldFocus + 1, 3);
             return { changed: true };
         }
@@ -203,6 +202,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             return { changed: true };
         }
         if (action === 'down') {
+            os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
+            return { changed: true };
+        }
+        if (action === 'left') {
+            os.focusIndex = clampFocus(os.focusIndex - 1, items.length);
+            return { changed: true };
+        }
+        if (action === 'right') {
             os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
             return { changed: true };
         }
@@ -257,7 +264,8 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
             mode: 'preset_detail',
             status: menuStatusLabel(os, operatingMode, radioState, draft),
             lines: buildPresetDetailLines(os, draft),
-            footer: 'OK · edit · Zpět',
+            focusLine: os.presetFieldFocus,
+            footer: 'OK · OK · Zpět',
             buffer: ''
         };
     }
@@ -283,7 +291,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
             lines.push('');
             continue;
         }
-        var prefix = idx === os.focusIndex ? '▶ ' : '  ';
+        var prefix = '';
         lines.push(prefix + items[idx].label);
     }
 
@@ -291,6 +299,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         mode: 'menu',
         status: menuStatusLabel(os, operatingMode, radioState, draft),
         lines: lines,
+        focusLine: os.focusIndex - start,
         footer: 'OK · Zpět',
         buffer: ''
     };

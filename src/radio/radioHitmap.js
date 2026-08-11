@@ -29,16 +29,19 @@ export function applyDisplayTypography() {
     var h = screen.clientHeight;
     if (w < 8 || h < 8) return;
     var innerW = Math.max(8, w - 10);
-    var byWidth = innerW * 0.0552;
-    var byHeight = h / 8;
+    var byWidth = innerW * 0.072;
+    var byHeight = (h / 8) * 0.82;
     var px = Math.min(byWidth, byHeight);
-    px = Math.max(5, Math.round(px * 10) / 10);
+    px = Math.max(8, Math.round(px * 10) / 10);
     screen.style.fontSize = px + 'px';
+    screen.style.fontFamily = "'Bahnschrift', 'Segoe UI', 'Roboto Condensed', sans-serif";
+    screen.style.fontWeight = '600';
+    screen.style.fontStretch = 'semi-condensed';
 }
 
 export function applyRadioHitmap() {
     var screen = document.getElementById('radio-display-screen');
-    applyRect(screen, 323, 333, 154, 207);
+    applyRect(screen, 321, 332, 156, 208);
 
     var dpad = document.getElementById('radio-dpad-zone');
     applyRect(dpad, 361, 568, 77, 64);

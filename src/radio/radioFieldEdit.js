@@ -35,6 +35,7 @@ export function createFieldEdit(type, radioState, options) {
         digitMode: false,
         cursor: 0,
         returnTo: options.returnTo || 'standby',
+        okExitPending: false,
         t9Key: null,
         t9Index: 0,
         t9Timer: null
@@ -251,8 +252,8 @@ export function buildFieldEditView(session, options) {
             status: options.status || 'NASTAV FREKVENCI',
             freqHtml: buildFreqHtml(session),
             axis: buildFreqAxis(mhz),
-            hint: session.digitMode ? '←→ kurzor · OK vypne kurzor' : '←→ jemně · ↑↓ číslice',
-            footer: 'OK · Zpět'
+            hint: session.digitMode ? '←→ kurzor · Zpět maže' : '←→ jemně · OK číslice',
+            footer: 'OK · Zpět maže'
         };
     }
 
@@ -263,8 +264,8 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? 'T9 · dlouhý = číslo' : '↑↓ nebo OK',
-        footer: 'OK · Zpět'
+        hint: session.digitMode ? 'T9 · Zpět maže' : 'OK spustí kurzor',
+        footer: 'OK · Zpět maže'
     };
 }
 
@@ -332,17 +333,65 @@ export function handleFieldEditInput(session, action, char, opts) {
     return false;
 }
 
-/** OK: přepne kurzor — ukončení jen tlačítkem Zpět. */
+function deleteTextChar(session) {
+    finalizeT9Session(session);
+    var text = normalizeTextValue(session.text);
+    if (!text.length) return false;
+    var pos = session.cursor;
+    if (pos <= 0) {
+        if (text.length > 0) {
+            session.text = text.slice(1);
+            session.cursor = 0;
+            return true;
+        }
+        return false;
+    }
+    session.text = text.slice(0, pos - 1) + text.slice(pos);
+    session.cursor = pos - 1;
+    return true;
+}
+
+/** Zpět během editace = backspace (ne ukončení). */
+export function handleFieldEditBack(session) {
+    if (!session) return false;
+    if (session.type === 'freq') {
+        if (!session.digitMode) return false;
+        if (session.cursor > 0) {
+            session.cursor--;
+        }
+        session.digits[session.cursor] = '0';
+        return true;
+    }
+    if (isTextType(session)) {
+        return deleteTextChar(session);
+    }
+    return false;
+}
+
+/** OK: kurzor vyp/zap, pak ukončení dílčí editace. */
 export function handleFieldEditOk(session) {
     if (!session) return null;
     finalizeT9Session(session);
     if (session.digitMode) {
         session.digitMode = false;
+        session.okExitPending = true;
         return 'cursor_off';
     }
-    session.digitMode = true;
-    session.cursor = 0;
-    return 'cursor_on';
+    if (session.okExitPending) {
+        session.okExitPending = false;
+        return 'done';
+    }
+    if (session.type === 'freq') {
+        session.digitMode = true;
+        session.cursor = session.cursor || 0;
+        return 'cursor_on';
+    }
+    if (isTextType(session)) {
+        session.digitMode = true;
+        session.cursor = 0;
+        return 'cursor_on';
+    }
+    return 'done';
 }
 
 export function readFieldEditValues(session) {

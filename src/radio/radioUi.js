@@ -59,6 +59,8 @@ import {
     copyGridLineText
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
+import { applyDisplayTypography } from './radioHitmap.js';
+import { radioKeyFeedback } from './radioFeedback.js';
 import {
     createRadioOsState,
     resetRadioOs,
@@ -74,6 +76,7 @@ import {
     buildFieldEditView,
     handleFieldEditInput,
     handleFieldEditOk,
+    handleFieldEditBack,
     applyFieldEditToState,
     applyFieldEditToDraft,
     cancelFieldEdit
@@ -277,14 +280,25 @@ var DISPLAY_LINE_IDS = [
     'radio-display-line6'
 ];
 
-function setDisplayTextLines(lines, startIdx) {
+function setDisplayTextLines(lines) {
+    setDisplayMenuLines(lines, -1);
+}
+
+function setDisplayMenuLines(lines, focusLine) {
     lines = lines || [];
-    startIdx = startIdx || 0;
+    focusLine = focusLine == null ? -1 : focusLine;
     for (var i = 0; i < DISPLAY_LINE_IDS.length; i++) {
         var row = el(DISPLAY_LINE_IDS[i]);
         if (!row) continue;
-        var src = i + startIdx;
-        row.textContent = src < lines.length ? (lines[src] || '') : '';
+        row.textContent = i < lines.length ? (lines[i] || '') : '';
+        row.classList.toggle('radio-display-row-focus', i === focusLine);
+    }
+}
+
+function clearDisplayRowFocus() {
+    for (var i = 0; i < DISPLAY_LINE_IDS.length; i++) {
+        var row = el(DISPLAY_LINE_IDS[i]);
+        if (row) row.classList.remove('radio-display-row-focus');
     }
 }
 
@@ -352,6 +366,7 @@ function openPresetFieldEdit(field) {
         });
         if (fieldEditSession) {
             fieldEditSession.digitMode = true;
+            fieldEditSession.okExitPending = false;
             fieldEditSession.cursor = 0;
         }
         return;
@@ -363,6 +378,7 @@ function openPresetFieldEdit(field) {
         });
         if (fieldEditSession) {
             fieldEditSession.digitMode = true;
+            fieldEditSession.okExitPending = false;
             fieldEditSession.cursor = 0;
         }
         return;
@@ -374,6 +390,7 @@ function openPresetFieldEdit(field) {
         });
         if (fieldEditSession) {
             fieldEditSession.digitMode = true;
+            fieldEditSession.okExitPending = false;
             fieldEditSession.cursor = 0;
         }
     }
@@ -470,6 +487,7 @@ function renderDisplay() {
             f.removeAttribute('title');
         }
         setDisplayTextLines([]);
+        clearDisplayRowFocus();
         if (foot) foot.textContent = '';
         if (ch) ch.textContent = '';
         if (sig) sig.textContent = '';
@@ -505,6 +523,7 @@ function renderDisplay() {
         if (p) p.textContent = standbyLines.line3;
         if (buf) buf.textContent = dialBuffer;
         clearExtraDisplayLines();
+        clearDisplayRowFocus();
         if (sig) {
             var tuned = !!normalizeFrequency(state.frequency);
             sig.textContent = tuned ? '● TX/RX' : '○ STBY';
@@ -532,7 +551,7 @@ function renderDisplay() {
             f.style.fontWeight = '';
             f.style.color = '';
         }
-        setDisplayTextLines(menuLines);
+        setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine);
         if (ch) ch.textContent = osView.status || 'MENU';
         if (sig) {
             sig.textContent = '';
@@ -543,6 +562,7 @@ function renderDisplay() {
     }
 
     updateInputForMode();
+    requestAnimationFrame(applyDisplayTypography);
 }
 
 function handleRadioOsInput(action) {
@@ -550,12 +570,15 @@ function handleRadioOsInput(action) {
 
     if (isFieldEditActive(fieldEditSession)) {
         if (action === 'ok') {
-            handleFieldEditOk(fieldEditSession);
-            renderDisplay();
+            radioKeyFeedback('ok');
+            var okResult = handleFieldEditOk(fieldEditSession);
+            if (okResult === 'done') finishFieldEdit(true);
+            else renderDisplay();
             return true;
         }
         if (action === 'back') {
-            finishFieldEdit(true);
+            radioKeyFeedback('back');
+            if (handleFieldEditBack(fieldEditSession)) renderDisplay();
             return true;
         }
         return false;
@@ -1157,6 +1180,7 @@ function bindRadioKeyT9() {
         if (/^[0-9]$/.test(key) || key === '*' || key === '#') {
             e.preventDefault();
             e.stopPropagation();
+            radioKeyFeedback('key');
             handleFieldEditAction('char', key);
         }
     }, true);
@@ -1216,9 +1240,11 @@ function bindKeypad() {
         ent._radioCommsBound = true;
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
+            radioKeyFeedback('ok');
             if (isFieldEditActive(fieldEditSession)) {
-                handleFieldEditOk(fieldEditSession);
-                renderDisplay();
+                var okResult = handleFieldEditOk(fieldEditSession);
+                if (okResult === 'done') finishFieldEdit(true);
+                else renderDisplay();
                 return;
             }
             if (isRadioOsActive(radioOs)) {
@@ -1238,8 +1264,9 @@ function bindKeypad() {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
+            radioKeyFeedback('back');
             if (isFieldEditActive(fieldEditSession)) {
-                finishFieldEdit(true);
+                if (handleFieldEditBack(fieldEditSession)) renderDisplay();
                 return;
             }
             if (handleRadioOsInput('back')) return;
@@ -1262,6 +1289,7 @@ function bindKeypad() {
     bindRadioDialGestures();
     bindDpadNavigation();
     bindRadioKeyT9();
+    bindSectorHitFeedback();
 
     var grid = el('radio-keypad-grid');
     if (grid && !grid._radioCommsBound) {
@@ -1274,6 +1302,7 @@ function bindKeypad() {
 
             var btn = e.target.closest('.radio-key[data-key]');
             if (!btn) return;
+            radioKeyFeedback('key');
             var key = btn.getAttribute('data-key');
 
             if (key === 'prev') {
@@ -1377,15 +1406,19 @@ function bindDpadNavigation() {
                 e.stopPropagation();
                 if (state.operatingMode === 'off') return;
                 if (isFieldEditActive(fieldEditSession)) {
-                    handleFieldEditAction(key);
+                    if (key === 'left' || key === 'right' || key === 'up' || key === 'down') {
+                        radioKeyFeedback('key');
+                        handleFieldEditAction(key);
+                    }
                     return;
                 }
                 if (isRadioOsActive(radioOs)) {
-                    if (key === 'left' || key === 'right') return;
+                    radioKeyFeedback('key');
                     handleRadioOsInput(key);
                     return;
                 }
                 if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
+                    radioKeyFeedback('key');
                     handleRadioOsInput('open_menu');
                 }
             });
@@ -1559,15 +1592,31 @@ function bindHoldVerticalSwipe(node, onSwipeDown, onSwipeUp, opts) {
     });
 }
 
+function bindSectorHitFeedback() {
+    var root = el('radio-keypad-grid');
+    if (!root || root._sectorHitFb) return;
+    root._sectorHitFb = true;
+    root.addEventListener('pointerdown', function(e) {
+        if (state.operatingMode === 'off') return;
+        if (isFieldEditActive(fieldEditSession)) return;
+        var hit = e.target.closest('.sector-hit');
+        if (!hit || hit.closest('.radio-key[data-key]')) return;
+        radioKeyFeedback('key');
+    }, true);
+}
+
 function bindRadioDialGestures() {
     bindHorizontalSwipe(el('radio-key-mode'), function() {
+        radioKeyFeedback('dial');
         cycleOperatingMode(1);
     }, function() {
+        radioKeyFeedback('dial');
         cycleOperatingMode(-1);
     });
 
     bindHorizontalSwipe(el('radio-key-preset-dial'), function() {
         if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
+        radioKeyFeedback('dial');
         if (cycleDialPreset(state, 1)) {
             persist();
             renderDisplay();
@@ -1584,12 +1633,14 @@ function bindRadioDialGestures() {
 
     bindHoldVerticalSwipe(el('radio-key-main-dial'), function() {
         if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
+        radioKeyFeedback('dial');
         adjustFrequency(state, -1);
         persist();
         renderDisplay();
         refreshSubscriptions();
     }, function() {
         if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
+        radioKeyFeedback('dial');
         adjustFrequency(state, 1);
         persist();
         renderDisplay();

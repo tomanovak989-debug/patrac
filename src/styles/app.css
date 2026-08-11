@@ -1622,6 +1622,17 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     font-weight: inherit;
     line-height: 1.12;
     color: inherit;
+    box-sizing: border-box;
+    padding: 0 2px;
+}
+.radio-display-main > div.radio-display-row-focus {
+    background: rgba(120, 255, 102, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(120, 255, 102, 0.38);
+    border-radius: 1px;
+}
+body.theme-light .radio-display-main > div.radio-display-row-focus {
+    background: rgba(20, 40, 16, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(20, 40, 16, 0.28);
 }
 .radio-display-sub {
     flex: 1 1 0;
