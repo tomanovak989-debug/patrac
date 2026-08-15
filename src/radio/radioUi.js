@@ -50,7 +50,8 @@ import {
     evaluateRadioReception,
     applyReceptionToMessage,
     noisePlaceholder,
-    SIGNAL_NOISE
+    SIGNAL_NOISE,
+    SIGNAL_CLEAR
 } from './radioPropagation.js';
 import {
     getGridPageCount,
@@ -71,6 +72,25 @@ import {
     savePresetDraft
 } from './radioOs.js';
 import {
+    createAutoscanState,
+    startAutoscan,
+    advanceAutoscan,
+    stopAutoscan,
+    lockAutoscan,
+    isAutoscanActivity,
+    getAutoscanStep,
+    AUTOSCAN_DWELL_MS,
+    SCAN_IDLE,
+    SCAN_RUNNING,
+    SCAN_LOCKED
+} from './radioAutoscan.js';
+import {
+    createSmsState,
+    buildSmsItems,
+    isSmsComposeFocus,
+    clampSmsFocus
+} from './radioMessages.js';
+import {
     createFieldEdit,
     isFieldEditActive,
     buildFieldEditView,
@@ -79,7 +99,9 @@ import {
     handleFieldEditBack,
     applyFieldEditToState,
     applyFieldEditToDraft,
-    cancelFieldEdit
+    cancelFieldEdit,
+    readFieldEditValues,
+    finalizeT9Session
 } from './radioFieldEdit.js';
 import {
     KIND_HANDSET,
@@ -94,6 +116,9 @@ var radioOs = createRadioOsState();
 var fieldEditSession = null;
 var fieldEditKeyLongFired = false;
 var presetEditDraft = null;
+var autoscanSession = null;
+var autoscanTimer = null;
+var smsSession = null;
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -339,7 +364,7 @@ function finishFieldEdit(save) {
     if (save) {
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             applyFieldEditToDraft(fieldEditSession, presetEditDraft);
-        } else {
+        } else if (fieldEditSession.returnTo !== 'sms') {
             applyFieldEditToState(fieldEditSession, state, {
                 scope: classifyChannel(state.frequency, state.encryptionKey, c)
             });
@@ -425,11 +450,11 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    }, state, presetEditDraft);
+    }, state, presetEditDraft, autoscanSession, smsSession, notebook);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'sms');
         screen.classList.toggle('is-standby', osView.mode === 'standby');
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
     }
@@ -448,8 +473,14 @@ function renderDisplay() {
         var editOpts = {};
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             editOpts.status = 'P' + presetEditDraft.slot + ' · PRESET';
+        } else if (fieldEditSession.returnTo === 'sms') {
+            editOpts.status = (state.operatingMode === 'text' ? 'NOVÁ ZPRÁVA' : 'NOVÁ SMS') + ' · TX';
         }
         var editView = buildFieldEditView(fieldEditSession, editOpts);
+        if (fieldEditSession.returnTo === 'sms') {
+            editView.footer = state.operatingMode === 'text' ? 'OK = ODESLAT · Zpět' : 'OK = TX · Zpět';
+            editView.hint = 'T9 · max 64 znaků';
+        }
         if (screen) {
             screen.classList.toggle('is-off', false);
             screen.classList.toggle('is-menu', false);
@@ -563,10 +594,164 @@ function renderDisplay() {
         }
         if (nodeEl) nodeEl.textContent = '';
         if (footerWrap) footerWrap.textContent = osView.footer || 'OK · Zpět';
+        if (buf && osView.buffer) buf.textContent = osView.buffer;
+        else if (buf && osView.mode !== 'sms') buf.textContent = '';
     }
 
     updateInputForMode();
     requestAnimationFrame(applyDisplayTypography);
+}
+
+function stopAutoscanTimer() {
+    if (autoscanTimer) {
+        clearInterval(autoscanTimer);
+        autoscanTimer = null;
+    }
+}
+
+function ensureAutoscanSession() {
+    if (!autoscanSession) autoscanSession = createAutoscanState();
+    return autoscanSession;
+}
+
+function haltAutoscan(restore) {
+    stopAutoscanTimer();
+    if (autoscanSession) {
+        stopAutoscan(autoscanSession, state, restore);
+    }
+}
+
+function tickAutoscanStep() {
+    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) {
+        stopAutoscanTimer();
+        return;
+    }
+    advanceAutoscan(autoscanSession, state);
+    persist();
+    refreshSubscriptions();
+    renderDisplay();
+}
+
+function startAutoscanTimer() {
+    stopAutoscanTimer();
+    autoscanTimer = setInterval(tickAutoscanStep, AUTOSCAN_DWELL_MS);
+}
+
+function handleAutoscanActivity(payload) {
+    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) return false;
+    if (!isAutoscanActivity(autoscanSession, payload)) return false;
+    autoscanSession.activitySeen = true;
+    var step = getAutoscanStep(autoscanSession);
+    var label = (payload.senderName || payload.from || step.label || '').slice(0, 16);
+    lockAutoscan(autoscanSession, label);
+    stopAutoscanTimer();
+    persist();
+    refreshSubscriptions();
+    renderDisplay();
+    radioIncomingFeedback(payload.signalQuality || SIGNAL_CLEAR);
+    return true;
+}
+
+function handleAutoscanOk() {
+    var session = ensureAutoscanSession();
+    if (session.status === SCAN_IDLE) {
+        if (!startAutoscan(session, state)) {
+            renderDisplay();
+            return true;
+        }
+        persist();
+        refreshSubscriptions();
+        startAutoscanTimer();
+        renderDisplay();
+        return true;
+    }
+    if (session.status === SCAN_RUNNING) {
+        session.status = SCAN_LOCKED;
+        stopAutoscanTimer();
+        renderDisplay();
+        return true;
+    }
+    if (session.status === SCAN_LOCKED) {
+        haltAutoscan(false);
+        resetRadioOs(radioOs);
+        persist();
+        refreshSubscriptions();
+        renderDisplay();
+        return true;
+    }
+    return false;
+}
+
+function handleAutoscanClose() {
+    var restore = autoscanSession && autoscanSession.status === SCAN_RUNNING;
+    haltAutoscan(restore);
+    autoscanSession = createAutoscanState();
+    persist();
+    refreshSubscriptions();
+    renderDisplay();
+}
+
+function ensureSmsSession() {
+    if (!smsSession) smsSession = createSmsState();
+    return smsSession;
+}
+
+function isSmsMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'sms');
+}
+
+function openSmsCompose() {
+    startFieldEdit('text', {
+        text: '',
+        returnTo: 'sms',
+        maxLen: 64
+    });
+    if (fieldEditSession) {
+        fieldEditSession.digitMode = true;
+        fieldEditSession.okExitPending = false;
+        fieldEditSession.cursor = 0;
+    }
+}
+
+function finishSmsCompose() {
+    if (!fieldEditSession || fieldEditSession.returnTo !== 'sms') return;
+    finalizeT9Session(fieldEditSession);
+    var vals = readFieldEditValues(fieldEditSession);
+    var text = vals && vals.text ? String(vals.text).trim() : '';
+    cancelFieldEdit(fieldEditSession);
+    fieldEditSession = null;
+    if (text) transmitMessage(text);
+    renderDisplay();
+    renderNotebook();
+}
+
+function handleSmsUp() {
+    var session = ensureSmsSession();
+    clampSmsFocus(session, notebook);
+    session.focusIndex = Math.max(0, session.focusIndex - 1);
+    renderDisplay();
+}
+
+function handleSmsDown() {
+    var session = ensureSmsSession();
+    var items = buildSmsItems(notebook);
+    if (!items.length) return;
+    session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
+    renderDisplay();
+}
+
+function handleSmsOk() {
+    var session = ensureSmsSession();
+    if (isSmsComposeFocus(session, notebook)) {
+        openSmsCompose();
+        return;
+    }
+    openSmsCompose();
+}
+
+function handleSmsClose() {
+    smsSession = createSmsState();
+    renderDisplay();
 }
 
 function handleFieldEditBackAction() {
@@ -585,12 +770,22 @@ function handleRadioOsInput(action) {
 
     if (isFieldEditActive(fieldEditSession)) {
         if (action === 'ok') {
+            if (fieldEditSession.returnTo === 'sms') {
+                finishSmsCompose();
+                return true;
+            }
             var okResult = handleFieldEditOk(fieldEditSession);
             if (okResult === 'done') finishFieldEdit(true);
             else renderDisplay();
             return true;
         }
         if (action === 'back') {
+            if (fieldEditSession.returnTo === 'sms') {
+                cancelFieldEdit(fieldEditSession);
+                fieldEditSession = null;
+                renderDisplay();
+                return true;
+            }
             return handleFieldEditBackAction();
         }
         return false;
@@ -637,6 +832,41 @@ function handleRadioOsInput(action) {
         setRadioSoundPrefs(state.soundPrefs);
         persist();
         renderDisplay();
+        return true;
+    }
+    if (result.effect === 'autoscan_open') {
+        ensureAutoscanSession();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'autoscan_close') {
+        handleAutoscanClose();
+        return true;
+    }
+    if (result.effect === 'autoscan_ok') {
+        handleAutoscanOk();
+        return true;
+    }
+    if (result.effect === 'sms_open') {
+        ensureSmsSession();
+        smsSession.focusIndex = Math.max(0, buildSmsItems(notebook).length - 1);
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'sms_close') {
+        handleSmsClose();
+        return true;
+    }
+    if (result.effect === 'sms_up') {
+        handleSmsUp();
+        return true;
+    }
+    if (result.effect === 'sms_down') {
+        handleSmsDown();
+        return true;
+    }
+    if (result.effect === 'sms_ok') {
+        handleSmsOk();
         return true;
     }
 
@@ -1015,6 +1245,7 @@ function recordEntry(entry) {
             renderNotebook();
         }
     }
+    if (isSmsMenuOpen()) renderDisplay();
 }
 
 function ingestIncomingPayload(payload) {
@@ -1024,6 +1255,7 @@ function ingestIncomingPayload(payload) {
         seenMessageIds[payload.id] = true;
         return;
     }
+    if (handleAutoscanActivity(payload)) return;
     if (hasRecentOutgoingEcho(payload)) {
         seenMessageIds[payload.id] = true;
         return;
@@ -1287,6 +1519,10 @@ function bindKeypad() {
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
             if (isFieldEditActive(fieldEditSession)) {
+                if (fieldEditSession.returnTo === 'sms') {
+                    finishSmsCompose();
+                    return;
+                }
                 var okResult = handleFieldEditOk(fieldEditSession);
                 if (okResult === 'done') finishFieldEdit(true);
                 else renderDisplay();
@@ -1310,6 +1546,12 @@ function bindKeypad() {
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
             if (isFieldEditActive(fieldEditSession)) {
+                if (fieldEditSession.returnTo === 'sms') {
+                    cancelFieldEdit(fieldEditSession);
+                    fieldEditSession = null;
+                    renderDisplay();
+                    return;
+                }
                 handleFieldEditBackAction();
                 return;
             }
@@ -1499,6 +1741,8 @@ function bindDisplayDialSwipe() {
 var RADIO_OPERATING_MODES = ['off', 'voice', 'text'];
 
 function cycleOperatingMode(direction) {
+    haltAutoscan(true);
+    autoscanSession = null;
     var cur = state.operatingMode || 'voice';
     var idx = RADIO_OPERATING_MODES.indexOf(cur);
     if (idx < 0) idx = 1;
@@ -1739,6 +1983,8 @@ export function refreshRadioCommsContext() {
 }
 
 export function stopRadioComms() {
+    haltAutoscan(true);
+    autoscanSession = null;
     stopRadioSubscriptions();
 }
 

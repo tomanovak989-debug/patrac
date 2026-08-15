@@ -2,6 +2,8 @@
  * OS vysílačky SECTOR-TECH — menu podle režimu VOICE / TEXT.
  */
 import { findPreset, upsertPreset, clearPreset } from './radioComms.js';
+import { buildAutoscanOsView } from './radioAutoscan.js';
+import { buildSmsOsView } from './radioMessages.js';
 
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
@@ -11,18 +13,18 @@ var PRESET_SLOTS = 15;
 var MENU_LINES = 6;
 
 var VOICE_MENU = [
-    { id: 'voice_sms', label: '1 · SMS / PTT', action: 'stub' },
+    { id: 'voice_sms', label: '1 · SMS / PTT', action: 'screen:sms' },
     { id: 'voice_presets', label: '2 · PRESETY', action: 'submenu:presets' },
-    { id: 'voice_autoscan', label: '3 · AUTOSKEN', action: 'stub' },
+    { id: 'voice_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
     { id: 'voice_beacon', label: '4 · BEACON', action: 'stub' },
     { id: 'voice_templates', label: '5 · ŠABLONY', action: 'stub' },
     { id: 'voice_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
 ];
 
 var TEXT_MENU = [
-    { id: 'text_sms', label: '1 · SMS / ZPRÁVY', action: 'stub' },
+    { id: 'text_sms', label: '1 · SMS / ZPRÁVY', action: 'screen:sms' },
     { id: 'text_presets', label: '2 · PRESETY', action: 'submenu:presets' },
-    { id: 'text_autoscan', label: '3 · AUTOSKEN', action: 'stub' },
+    { id: 'text_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
     { id: 'text_beacon', label: '4 · BEACON', action: 'stub' },
     { id: 'text_templates', label: '5 · ŠABLONY', action: 'stub' },
     { id: 'text_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
@@ -161,6 +163,8 @@ function menuStatusLabel(os, operatingMode, radioState, draft) {
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
     if (leaf === 'settings') return 'NASTAVENÍ · ' + menuRootLabel(operatingMode);
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
+    if (leaf === 'autoscan') return 'AUTOSKEN · ' + menuRootLabel(operatingMode);
+    if (leaf === 'sms') return (operatingMode === 'text' ? 'ZPRÁVY' : 'SMS / PTT') + ' · ' + menuRootLabel(operatingMode);
     return 'MENU · ' + menuRootLabel(operatingMode);
 }
 
@@ -217,6 +221,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.focusIndex = 0;
             return { changed: true, effect: 'sound_prefs_back' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'autoscan_close' };
+        }
+        if (os.menuPath[os.menuPath.length - 1] === 'sms') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'sms_close' };
+        }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
             var prevSlot = os.selectedSlot;
             os.menuPath.pop();
@@ -228,6 +240,20 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             resetRadioOs(os);
             return { changed: true };
         }
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
+        if (action === 'ok') return { changed: true, effect: 'autoscan_ok' };
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'sms') {
+        if (action === 'up') return { changed: true, effect: 'sms_up' };
+        if (action === 'down') return { changed: true, effect: 'sms_down' };
+        if (action === 'ok') return { changed: true, effect: 'sms_ok' };
+        if (action === 'left') return { changed: true, effect: 'sms_up' };
+        if (action === 'right') return { changed: true, effect: 'sms_down' };
         return { changed: false };
     }
 
@@ -305,6 +331,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.soundFieldFocus = 0;
                 return { changed: true };
             }
+            if (item.action === 'screen:autoscan') {
+                os.menuPath.push('autoscan');
+                return { changed: true, effect: 'autoscan_open' };
+            }
+            if (item.action === 'screen:sms') {
+                os.menuPath.push('sms');
+                return { changed: true, effect: 'sms_open' };
+            }
             if (item.action === 'preset_detail') {
                 os.selectedSlot = item.slot;
                 os.menuPath.push('detail');
@@ -321,7 +355,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, smsSession, notebook) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -363,6 +397,14 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
             footer: '←→ varianta · Zpět',
             buffer: ''
         };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
+        return buildAutoscanOsView(os, operatingMode, autoscanSession, radioState);
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'sms') {
+        return buildSmsOsView(os, operatingMode, smsSession, notebook, radioState);
     }
 
     if (os.screen === SCREEN_STUB) {

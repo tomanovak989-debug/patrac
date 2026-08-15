@@ -58,7 +58,13 @@ TX → radio_freq/{f_400025}/messages
 5. [x] Stejná freq + PT/stejné heslo → text; cizí heslo → šum
 6. [x] Presety / přímý zápis
 
-### F2 — Autoscan (další)
+### F2 — Autoscan (MVP hotovo)
+- Menu AUTOSKEN — cyklus presetových kanálů, zachycení aktivity, zamčení
+- [ ] Band-scan (krok 0.025 MHz po pásmu)
+
+### F2b — SMS / ZPRÁVY (MVP hotovo)
+- Seznam zpráv ze staničníku, nová zpráva T9, OK = TX
+
 ### F3 — Šifra a luštění
 ### F4 — Receivery / Repeater
 ### F5 — Živý staničník + mise
@@ -71,4 +77,5 @@ TX → radio_freq/{f_400025}/messages
 - [x] Pásmo + dial
 - [x] Freq-first Firestore
 - [ ] Nasadit `firestore.rules` (`radio_freq`)
-- [ ] F2 Autoscan
+- [x] F2 Autoscan MVP (presety)
+- [x] SMS / ZPRÁVY v menu vysílačky
