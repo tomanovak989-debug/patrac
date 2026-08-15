@@ -17,13 +17,15 @@ var _buffers = {};
 var _keyVoice = null;
 var _dialVoice = null;
 var _miscVoice = null;
+var _loading = {};
+var _lastPlayAt = {};
 
 /** Ořez ticha na začátku samply (s). */
 var SFX_TRIM = {
-    'key-1.mp3': 0.055,
-    'key-2.mp3': 0.032,
-    'key-3.mp3': 0.042,
-    'dial.mp3': 0.035,
+    'key-1.mp3': 0.078,
+    'key-2.mp3': 0.048,
+    'key-3.mp3': 0.058,
+    'dial.mp3': 0.048,
     'message-1.mp3': 0.012,
     'message-2.mp3': 0.010,
     'message-3.mp3': 0.015,
@@ -73,7 +75,8 @@ function stopVoice(voice) {
 
 function loadBuffer(file) {
     if (_buffers[file]) return Promise.resolve(_buffers[file]);
-    return fetch(SFX_BASE + file)
+    if (_loading[file]) return _loading[file];
+    _loading[file] = fetch(SFX_BASE + file)
         .then(function(r) { return r.arrayBuffer(); })
         .then(function(buf) {
             var ctx = getCtx();
@@ -84,11 +87,23 @@ function loadBuffer(file) {
             if (decoded) _buffers[file] = decoded;
             return decoded;
         })
-        .catch(function() { return null; });
+        .catch(function() { return null; })
+        .finally(function() { delete _loading[file]; });
+    return _loading[file];
+}
+
+function shouldSkipPlay(file, channel) {
+    var stamp = channel + ':' + file;
+    var now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (_lastPlayAt[stamp] && now - _lastPlayAt[stamp] < 100) return true;
+    _lastPlayAt[stamp] = now;
+    return false;
 }
 
 function playDecoded(file, opts) {
     opts = opts || {};
+    var channel = opts.channel || 'misc';
+    if (shouldSkipPlay(file, channel)) return null;
     var decoded = _buffers[file];
     var ctx = getCtx();
     if (!decoded || !ctx) return null;
@@ -97,7 +112,6 @@ function playDecoded(file, opts) {
     }
     var trim = SFX_TRIM[file] || 0;
     var duration = Math.max(0.01, decoded.duration - trim);
-    var channel = opts.channel || 'misc';
     if (channel === 'key') {
         stopVoice(_keyVoice);
         _keyVoice = null;
@@ -114,7 +128,8 @@ function playDecoded(file, opts) {
     gain.gain.value = opts.volume != null ? opts.volume : 0.88;
     source.connect(gain);
     gain.connect(ctx.destination);
-    source.start(0, trim, duration);
+    var when = ctx.currentTime;
+    source.start(when, trim, duration);
     var voice = { source: source, gain: gain };
     if (channel === 'key') _keyVoice = voice;
     else if (channel === 'dial') _dialVoice = voice;
@@ -127,8 +142,8 @@ function playSfx(file, opts) {
         playDecoded(file, opts);
         return;
     }
-    loadBuffer(file).then(function() {
-        playDecoded(file, opts);
+    loadBuffer(file).then(function(decoded) {
+        if (decoded) playDecoded(file, opts);
     });
 }
 

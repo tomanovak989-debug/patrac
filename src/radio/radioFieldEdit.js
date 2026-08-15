@@ -372,11 +372,11 @@ function deleteTextChar(session) {
     return true;
 }
 
-/** Zpět během editace = backspace (ne ukončení). */
+/** Zpět během editace = backspace; po OK (kurzor vyp) = návrat do menu. */
 export function handleFieldEditBack(session) {
     if (!session) return false;
+    if (!session.digitMode) return 'exit';
     if (session.type === 'freq') {
-        if (!session.digitMode) return false;
         if (session.cursor > 0) {
             session.cursor--;
         }
