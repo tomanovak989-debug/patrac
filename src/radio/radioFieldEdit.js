@@ -170,7 +170,6 @@ function applyT9Tap(session, key) {
         session.t9Key = key;
         session.t9Index = 0;
         insertTextChar(session, group.charAt(0));
-        session.cursor = Math.max(0, session.cursor - 1);
     }
     scheduleT9Advance(session);
     return true;
@@ -185,7 +184,6 @@ function applyLiteralDigit(session, key) {
     }
     if (isTextType(session) && session.digitMode) {
         insertTextChar(session, key);
-        session.cursor = Math.min(session.cursor + 1, textMaxLen(session));
         return true;
     }
     return false;
@@ -295,7 +293,11 @@ export function handleFieldEditInput(session, action, char, opts) {
             session.cursor = 0;
             return true;
         }
-        if (action === 'char' && char != null && session.digitMode) {
+        if (action === 'char' && char != null) {
+            if (!session.digitMode) {
+                session.digitMode = true;
+                session.cursor = session.cursor || 0;
+            }
             if (opts.longPress) return applyLiteralDigit(session, char);
             if (/^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
         }
@@ -305,7 +307,9 @@ export function handleFieldEditInput(session, action, char, opts) {
     if (isTextType(session)) {
         var text = normalizeTextValue(session.text);
         if (action === 'left' || action === 'right') {
-            if (!session.digitMode) return false;
+            if (!session.digitMode) {
+                session.digitMode = true;
+            }
             finalizeT9Session(session);
             var maxPos = text.length;
             session.cursor = clampCursor(
@@ -321,7 +325,11 @@ export function handleFieldEditInput(session, action, char, opts) {
             if (!text.length) session.text = '';
             return true;
         }
-        if (action === 'char' && char != null && session.digitMode) {
+        if (action === 'char' && char != null) {
+            if (!session.digitMode) {
+                session.digitMode = true;
+                session.cursor = Math.min(session.cursor, text.length);
+            }
             if (char === '0') {
                 finalizeT9Session(session);
                 if (opts.longPress) {
