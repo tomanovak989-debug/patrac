@@ -35,12 +35,15 @@ export async function sendRadioTransmission(payload) {
         text: String(payload.text || '').trim(),
         timestamp: payload.timestamp || Date.now()
     };
+    if (payload.messageType) docPayload.messageType = payload.messageType;
+    if (payload.pttAudio) docPayload.pttAudio = payload.pttAudio;
+    if (payload.pttMime) docPayload.pttMime = payload.pttMime;
     if (payload.originLat != null && payload.originLng != null &&
         isFinite(Number(payload.originLat)) && isFinite(Number(payload.originLng))) {
         docPayload.originLat = Number(payload.originLat);
         docPayload.originLng = Number(payload.originLng);
     }
-    if (!docPayload.text) throw new Error('Prázdná zpráva.');
+    if (!docPayload.text && !docPayload.pttAudio) throw new Error('Prázdná zpráva.');
 
     var col = collection(getDb(), 'radio_freq', channelId, 'messages');
     var ref = await addDoc(col, docPayload);
@@ -59,6 +62,9 @@ function mapDocToPayload(docSnap, fallbackFreq, channelId) {
         senderId: data.senderId,
         senderName: data.senderName,
         text: data.text,
+        messageType: data.messageType,
+        pttAudio: data.pttAudio,
+        pttMime: data.pttMime,
         timestamp: data.timestamp,
         originLat: data.originLat,
         originLng: data.originLng

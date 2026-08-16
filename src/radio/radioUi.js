@@ -16,6 +16,7 @@ import {
     normalizeFrequency,
     normalizeEncryptionKey,
     classifyChannel,
+    normalizeOperatingMode,
     collectTunedFrequencies,
     createOutgoingEntry,
     createIncomingEntry,
@@ -85,11 +86,27 @@ import {
     SCAN_LOCKED
 } from './radioAutoscan.js';
 import {
-    createSmsState,
-    buildSmsItems,
-    isSmsComposeFocus,
-    clampSmsFocus
+    createCommsState,
+    clampCommsFocus,
+    getFocusedCommsAction,
+    commsBackScreen,
+    COMMS_HUB,
+    COMMS_INBOX,
+    COMMS_OUTBOX,
+    COMMS_NEW_TYPE,
+    COMMS_COMPOSE_TEXT,
+    COMMS_COMPOSE_PTT
 } from './radioMessages.js';
+import {
+    createPttSession,
+    startPttRecording,
+    stopPttRecording,
+    cancelPttRecording,
+    playPttAudio,
+    formatPttNotebookText,
+    PTT_MAX_MS,
+    isPttSupported
+} from './radioPtt.js';
 import {
     createFieldEdit,
     isFieldEditActive,
@@ -118,7 +135,9 @@ var fieldEditKeyLongFired = false;
 var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
-var smsSession = null;
+var commsSession = null;
+var pttSession = createPttSession();
+var pttMaxTimer = null;
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -364,7 +383,7 @@ function finishFieldEdit(save) {
     if (save) {
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             applyFieldEditToDraft(fieldEditSession, presetEditDraft);
-        } else if (fieldEditSession.returnTo !== 'sms') {
+        } else if (fieldEditSession.returnTo !== 'comms') {
             applyFieldEditToState(fieldEditSession, state, {
                 scope: classifyChannel(state.frequency, state.encryptionKey, c)
             });
@@ -436,7 +455,7 @@ function renderDisplay() {
     var screen = el('radio-display-screen');
     var standbyLines = buildDisplayLines(state, c);
     var scope = classifyChannel(state.frequency, state.encryptionKey, c);
-    var opLabel = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
+    var opLabel = state.operatingMode === 'off' ? 'OFF' : 'ON';
     var dialBuffer = '';
     if (!isFieldEditActive(fieldEditSession) && (state.keypadMode === 'freq' || state.keypadMode === 'encrypt')) {
         dialBuffer = state.dialBuffer ? ('▸ ' + state.dialBuffer) : '';
@@ -450,11 +469,11 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    }, state, presetEditDraft, autoscanSession, smsSession, notebook);
+    }, state, presetEditDraft, autoscanSession, commsSession, notebook);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'sms');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms');
         screen.classList.toggle('is-standby', osView.mode === 'standby');
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
     }
@@ -473,12 +492,12 @@ function renderDisplay() {
         var editOpts = {};
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             editOpts.status = 'P' + presetEditDraft.slot + ' · PRESET';
-        } else if (fieldEditSession.returnTo === 'sms') {
-            editOpts.status = (state.operatingMode === 'text' ? 'NOVÁ ZPRÁVA' : 'NOVÁ SMS') + ' · TX';
+        } else if (fieldEditSession.returnTo === 'comms') {
+            editOpts.status = 'NOVÁ SMS · TX';
         }
         var editView = buildFieldEditView(fieldEditSession, editOpts);
-        if (fieldEditSession.returnTo === 'sms') {
-            editView.footer = state.operatingMode === 'text' ? 'OK = ODESLAT · Zpět' : 'OK = TX · Zpět';
+        if (fieldEditSession.returnTo === 'comms') {
+            editView.footer = 'OK = TX · Zpět';
             editView.hint = 'T9 · max 64 znaků';
         }
         if (screen) {
@@ -594,8 +613,6 @@ function renderDisplay() {
         }
         if (nodeEl) nodeEl.textContent = '';
         if (footerWrap) footerWrap.textContent = osView.footer || 'OK · Zpět';
-        if (buf && osView.buffer) buf.textContent = osView.buffer;
-        else if (buf && osView.mode !== 'sms') buf.textContent = '';
     }
 
     updateInputForMode();
@@ -691,19 +708,30 @@ function handleAutoscanClose() {
     renderDisplay();
 }
 
-function ensureSmsSession() {
-    if (!smsSession) smsSession = createSmsState();
-    return smsSession;
+function ensureCommsSession() {
+    if (!commsSession) commsSession = createCommsState();
+    return commsSession;
 }
 
-function isSmsMenuOpen() {
-    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'sms');
+function isCommsMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'comms');
 }
 
-function openSmsCompose() {
+function isCommsPttCompose() {
+    return isCommsMenuOpen() && commsSession && commsSession.screen === COMMS_COMPOSE_PTT;
+}
+
+function clearPttMaxTimer() {
+    if (pttMaxTimer) {
+        clearTimeout(pttMaxTimer);
+        pttMaxTimer = null;
+    }
+}
+
+function openCommsCompose() {
     startFieldEdit('text', {
         text: '',
-        returnTo: 'sms',
+        returnTo: 'comms',
         maxLen: 64
     });
     if (fieldEditSession) {
@@ -713,8 +741,8 @@ function openSmsCompose() {
     }
 }
 
-function finishSmsCompose() {
-    if (!fieldEditSession || fieldEditSession.returnTo !== 'sms') return;
+function finishCommsCompose() {
+    if (!fieldEditSession || fieldEditSession.returnTo !== 'comms') return;
     finalizeT9Session(fieldEditSession);
     var vals = readFieldEditValues(fieldEditSession);
     var text = vals && vals.text ? String(vals.text).trim() : '';
@@ -725,32 +753,141 @@ function finishSmsCompose() {
     renderNotebook();
 }
 
-function handleSmsUp() {
-    var session = ensureSmsSession();
-    clampSmsFocus(session, notebook);
+async function finishPttRecording() {
+    var session = ensureCommsSession();
+    session.pttActive = false;
+    clearPttMaxTimer();
+    radioTxEnd();
+    var result = await stopPttRecording(pttSession);
+    pttSession = createPttSession();
+    renderDisplay();
+    if (result && result.base64) {
+        await transmitPtt(result);
+    }
+}
+
+function startPttHold() {
+    if (!isCommsPttCompose() || pttSession.active) return;
+    var session = ensureCommsSession();
+    startPttRecording(pttSession).then(function(ok) {
+        if (!ok) {
+            alert('Mikrofon není dostupný — PTT vyžaduje přístup k mikrofonu.');
+            return;
+        }
+        session.pttActive = true;
+        radioTxStart();
+        renderDisplay();
+        clearPttMaxTimer();
+        pttMaxTimer = setTimeout(function() {
+            finishPttRecording();
+        }, PTT_MAX_MS);
+    }).catch(function() {
+        alert('Mikrofon není dostupný.');
+    });
+}
+
+function cancelPttHold() {
+    if (!pttSession.active) return;
+    var session = ensureCommsSession();
+    session.pttActive = false;
+    clearPttMaxTimer();
+    cancelPttRecording(pttSession);
+    pttSession = createPttSession();
+    radioTxEnd();
+    renderDisplay();
+}
+
+function handleCommsUp() {
+    var session = ensureCommsSession();
+    if (session.screen === COMMS_COMPOSE_TEXT || session.screen === COMMS_COMPOSE_PTT) return;
+    clampCommsFocus(session, notebook);
     session.focusIndex = Math.max(0, session.focusIndex - 1);
     renderDisplay();
 }
 
-function handleSmsDown() {
-    var session = ensureSmsSession();
-    var items = buildSmsItems(notebook);
+function handleCommsDown() {
+    var session = ensureCommsSession();
+    if (session.screen === COMMS_COMPOSE_TEXT || session.screen === COMMS_COMPOSE_PTT) return;
+    var items = clampCommsFocus(session, notebook);
     if (!items.length) return;
     session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
     renderDisplay();
 }
 
-function handleSmsOk() {
-    var session = ensureSmsSession();
-    if (isSmsComposeFocus(session, notebook)) {
-        openSmsCompose();
+function handleCommsOk() {
+    var session = ensureCommsSession();
+    var action = getFocusedCommsAction(session, notebook);
+
+    if (session.screen === COMMS_HUB) {
+        if (!action || action.type !== 'action') return;
+        if (action.id === 'new') {
+            session.screen = COMMS_NEW_TYPE;
+            session.focusIndex = 0;
+        } else if (action.id === 'inbox') {
+            session.screen = COMMS_INBOX;
+            session.focusIndex = 0;
+        } else if (action.id === 'outbox') {
+            session.screen = COMMS_OUTBOX;
+            session.focusIndex = 0;
+        }
+        renderDisplay();
         return;
     }
-    openSmsCompose();
+
+    if (session.screen === COMMS_NEW_TYPE) {
+        if (!action || action.disabled) return;
+        if (action.id === 'sms') {
+            session.screen = COMMS_COMPOSE_TEXT;
+            openCommsCompose();
+            return;
+        }
+        if (action.id === 'ptt') {
+            if (!isPttSupported()) {
+                alert('PTT není v tomto prohlížeči podporováno.');
+                return;
+            }
+            session.screen = COMMS_COMPOSE_PTT;
+            session.focusIndex = 0;
+            renderDisplay();
+        }
+        return;
+    }
+
+    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
+        if (action && action.type === 'msg' && action.entry) {
+            if (action.entry.pttAudio) {
+                playPttAudio(action.entry.pttAudio, action.entry.pttMime);
+            }
+        }
+        return;
+    }
 }
 
-function handleSmsClose() {
-    smsSession = createSmsState();
+function handleCommsBack() {
+    if (isCommsPttCompose() && pttSession.active) {
+        cancelPttHold();
+        return;
+    }
+    if (fieldEditSession && fieldEditSession.returnTo === 'comms') {
+        cancelFieldEdit(fieldEditSession);
+        fieldEditSession = null;
+    }
+    var session = ensureCommsSession();
+    var next = commsBackScreen(session);
+    if (next === 'exit') {
+        radioOs.menuPath.pop();
+        commsSession = createCommsState();
+    } else {
+        session.screen = next;
+        session.focusIndex = 0;
+        session.pttActive = false;
+    }
+    renderDisplay();
+}
+
+function handleCommsClose() {
+    cancelPttHold();
+    commsSession = createCommsState();
     renderDisplay();
 }
 
@@ -770,8 +907,8 @@ function handleRadioOsInput(action) {
 
     if (isFieldEditActive(fieldEditSession)) {
         if (action === 'ok') {
-            if (fieldEditSession.returnTo === 'sms') {
-                finishSmsCompose();
+            if (fieldEditSession.returnTo === 'comms') {
+                finishCommsCompose();
                 return true;
             }
             var okResult = handleFieldEditOk(fieldEditSession);
@@ -780,7 +917,7 @@ function handleRadioOsInput(action) {
             return true;
         }
         if (action === 'back') {
-            if (fieldEditSession.returnTo === 'sms') {
+            if (fieldEditSession.returnTo === 'comms') {
                 cancelFieldEdit(fieldEditSession);
                 fieldEditSession = null;
                 renderDisplay();
@@ -847,26 +984,31 @@ function handleRadioOsInput(action) {
         handleAutoscanOk();
         return true;
     }
-    if (result.effect === 'sms_open') {
-        ensureSmsSession();
-        smsSession.focusIndex = Math.max(0, buildSmsItems(notebook).length - 1);
+    if (result.effect === 'comms_open') {
+        ensureCommsSession();
+        commsSession.screen = COMMS_HUB;
+        commsSession.focusIndex = 0;
         renderDisplay();
         return true;
     }
-    if (result.effect === 'sms_close') {
-        handleSmsClose();
+    if (result.effect === 'comms_back') {
+        handleCommsBack();
         return true;
     }
-    if (result.effect === 'sms_up') {
-        handleSmsUp();
+    if (result.effect === 'comms_close') {
+        handleCommsClose();
         return true;
     }
-    if (result.effect === 'sms_down') {
-        handleSmsDown();
+    if (result.effect === 'comms_up') {
+        handleCommsUp();
         return true;
     }
-    if (result.effect === 'sms_ok') {
-        handleSmsOk();
+    if (result.effect === 'comms_down') {
+        handleCommsDown();
+        return true;
+    }
+    if (result.effect === 'comms_ok') {
+        handleCommsOk();
         return true;
     }
 
@@ -1245,7 +1387,7 @@ function recordEntry(entry) {
             renderNotebook();
         }
     }
-    if (isSmsMenuOpen()) renderDisplay();
+    if (isCommsMenuOpen()) renderDisplay();
 }
 
 function ingestIncomingPayload(payload) {
@@ -1303,6 +1445,9 @@ function ingestIncomingPayload(payload) {
         distanceKm: applied.distanceKm
     }), c);
     recordEntry(entry);
+    if (canRead && payload.messageType === 'ptt' && payload.pttAudio) {
+        playPttAudio(payload.pttAudio, payload.pttMime);
+    }
     radioIncomingFeedback(applied.signalQuality);
 }
 
@@ -1328,9 +1473,10 @@ function saveToPresetSlot(slot) {
     refreshSubscriptions();
 }
 
-async function transmitMessage(text) {
+async function transmitMessage(text, extras) {
     text = String(text || '').trim();
-    if (!text) return;
+    extras = extras || {};
+    if (!text && !extras.pttAudio) return;
 
     if (state.operatingMode === 'off') {
         alert('Vysílačka je vypnutá (režim OFF).');
@@ -1343,11 +1489,11 @@ async function transmitMessage(text) {
     }
 
     var c = getCtx();
-    radioTxStart();
-    var entry = createOutgoingEntry(text, c, state);
+    if (!extras.skipTxFx) radioTxStart();
+    var entry = createOutgoingEntry(text, c, state, extras);
     recordEntry(entry);
     renderNotebook();
-    radioTxEnd();
+    if (!extras.skipTxFx) radioTxEnd();
 
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
 
@@ -1361,11 +1507,13 @@ async function transmitMessage(text) {
             senderId: c.userId,
             senderName: c.playerName,
             text: text,
+            messageType: extras.messageType,
+            pttAudio: extras.pttAudio,
+            pttMime: extras.pttMime,
             timestamp: entry.ts,
             originLat: c.originLat,
             originLng: c.originLng
         });
-        /* Cloud id hned do seen — jinak snapshot zapíše tutéž TX ještě jako ↓. */
         if (sent && sent.id) {
             seenMessageIds[sent.id] = true;
             entry.cloudId = sent.id;
@@ -1374,6 +1522,17 @@ async function transmitMessage(text) {
     } catch (err) {
         console.warn('[radioUi] send', err);
     }
+}
+
+async function transmitPtt(result) {
+    if (!result || !result.base64) return;
+    var text = formatPttNotebookText(result.durationMs);
+    await transmitMessage(text, {
+        messageType: 'ptt',
+        pttAudio: result.base64,
+        pttMime: result.mime,
+        skipTxFx: true
+    });
 }
 
 function cycleRadioNode() {
@@ -1516,11 +1675,28 @@ function bindKeypad() {
     var ent = el('radio-key-ent');
     if (ent && !ent._radioCommsBound) {
         ent._radioCommsBound = true;
+        ent.addEventListener('pointerdown', function(e) {
+            if (state.operatingMode === 'off' || e.button !== 0) return;
+            if (isCommsPttCompose()) {
+                e.preventDefault();
+                startPttHold();
+            }
+        }, true);
+        ent.addEventListener('pointerup', function(e) {
+            if (isCommsPttCompose() && pttSession.active) {
+                e.preventDefault();
+                finishPttRecording();
+            }
+        }, true);
+        ent.addEventListener('pointercancel', function() {
+            if (isCommsPttCompose()) cancelPttHold();
+        }, true);
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
+            if (isCommsPttCompose()) return;
             if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.returnTo === 'sms') {
-                    finishSmsCompose();
+                if (fieldEditSession.returnTo === 'comms') {
+                    finishCommsCompose();
                     return;
                 }
                 var okResult = handleFieldEditOk(fieldEditSession);
@@ -1545,8 +1721,12 @@ function bindKeypad() {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
+            if (isCommsPttCompose() && pttSession.active) {
+                cancelPttHold();
+                return;
+            }
             if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.returnTo === 'sms') {
+                if (fieldEditSession.returnTo === 'comms') {
                     cancelFieldEdit(fieldEditSession);
                     fieldEditSession = null;
                     renderDisplay();
@@ -1738,12 +1918,13 @@ function bindDisplayDialSwipe() {
     });
 }
 
-var RADIO_OPERATING_MODES = ['off', 'voice', 'text'];
+var RADIO_OPERATING_MODES = ['off', 'on'];
 
 function cycleOperatingMode(direction) {
     haltAutoscan(true);
     autoscanSession = null;
-    var cur = state.operatingMode || 'voice';
+    cancelPttHold();
+    var cur = normalizeOperatingMode(state.operatingMode);
     var idx = RADIO_OPERATING_MODES.indexOf(cur);
     if (idx < 0) idx = 1;
     var dir = direction < 0 ? -1 : 1;
@@ -1985,6 +2166,8 @@ export function refreshRadioCommsContext() {
 export function stopRadioComms() {
     haltAutoscan(true);
     autoscanSession = null;
+    cancelPttHold();
+    clearPttMaxTimer();
     stopRadioSubscriptions();
 }
 

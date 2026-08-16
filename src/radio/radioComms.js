@@ -63,6 +63,13 @@ export function normalizeEncryptionKey(value) {
     return String(value || '').trim().toLowerCase();
 }
 
+export function normalizeOperatingMode(mode) {
+    if (mode === 'off') return 'off';
+    if (mode === 'on') return 'on';
+    if (mode === 'voice' || mode === 'text') return 'on';
+    return 'on';
+}
+
 export function hashChannelId(frequency, encryptionKey) {
     var raw = normalizeFrequency(frequency) + '|' + normalizeEncryptionKey(encryptionKey);
     var h = 5381;
@@ -126,7 +133,7 @@ export function defaultRadioState(userId, ctx) {
         keypadMode: 'tx',
         dialBuffer: '',
         activePresetSlot: 1,
-        operatingMode: 'voice',
+        operatingMode: 'on',
         soundPrefs: { key: 1, ring: 1, message: 1 },
         presets: presets
     };
@@ -253,7 +260,7 @@ export function loadRadioState(userId, ctx) {
         parsed.encryptionKey = tunedKey;
         if (!parsed.keypadMode) parsed.keypadMode = 'tx';
         if (!parsed.dialBuffer) parsed.dialBuffer = '';
-        if (!parsed.operatingMode) parsed.operatingMode = 'voice';
+        parsed.operatingMode = normalizeOperatingMode(parsed.operatingMode);
         if (!parsed.soundPrefs || typeof parsed.soundPrefs !== 'object') {
             parsed.soundPrefs = { key: 1, ring: 1, message: 1 };
         } else {
@@ -744,7 +751,7 @@ export function buildDisplayLines(state, ctx) {
     if (preset) {
         presetLabel = 'DIAL ' + preset.slot + '/' + (state.presets || []).length + ' · ' + (preset.label || 'KANÁL');
     }
-    var op = state.operatingMode === 'text' ? 'TEXT' : (state.operatingMode === 'off' ? 'OFF' : 'VOICE');
+    var op = state.operatingMode === 'off' ? 'OFF' : 'ON';
     return {
         line1: freq + ' MHz  ' + cipher + '  ·  ' + modeLabel,
         line2: key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — otevřený kanál',
@@ -842,7 +849,8 @@ export function collectKnownChannelIds(state, ctx) {
     return collectTunedFrequencies(state).map(frequencyChannelId);
 }
 
-export function createOutgoingEntry(text, ctx, state) {
+export function createOutgoingEntry(text, ctx, state, extras) {
+    extras = extras || {};
     var tab = classifyChannel(state.frequency, state.encryptionKey, ctx);
     var freq = normalizeFrequency(state.frequency);
     var entry = {
@@ -858,6 +866,9 @@ export function createOutgoingEntry(text, ctx, state) {
         comCode: ctx.comCode || '',
         ts: Date.now()
     };
+    if (extras.messageType) entry.messageType = extras.messageType;
+    if (extras.pttAudio) entry.pttAudio = extras.pttAudio;
+    if (extras.pttMime) entry.pttMime = extras.pttMime;
     if (ctx.originLat != null && ctx.originLng != null) {
         entry.originLat = ctx.originLat;
         entry.originLng = ctx.originLng;
@@ -881,6 +892,9 @@ export function createIncomingEntry(payload, ctx) {
         comCode: payload.comCode || '',
         ts: payload.timestamp || payload.ts || Date.now()
     };
+    if (payload.messageType) entry.messageType = payload.messageType;
+    if (payload.pttAudio) entry.pttAudio = payload.pttAudio;
+    if (payload.pttMime) entry.pttMime = payload.pttMime;
     if (payload.signalQuality) entry.signalQuality = payload.signalQuality;
     if (payload.distanceKm != null) entry.distanceKm = payload.distanceKm;
     if (payload.originLat != null) entry.originLat = payload.originLat;

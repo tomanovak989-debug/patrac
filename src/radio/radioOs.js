@@ -1,9 +1,9 @@
 /**
- * OS vysílačky SECTOR-TECH — menu podle režimu VOICE / TEXT.
+ * OS vysílačky SECTOR-TECH — jednotné menu (SMS + PTT).
  */
 import { findPreset, upsertPreset, clearPreset } from './radioComms.js';
 import { buildAutoscanOsView } from './radioAutoscan.js';
-import { buildSmsOsView } from './radioMessages.js';
+import { buildCommsOsView } from './radioMessages.js';
 
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
@@ -12,22 +12,13 @@ export var SCREEN_STUB = 'stub';
 var PRESET_SLOTS = 15;
 var MENU_LINES = 6;
 
-var VOICE_MENU = [
-    { id: 'voice_sms', label: '1 · SMS / PTT', action: 'screen:sms' },
-    { id: 'voice_presets', label: '2 · PRESETY', action: 'submenu:presets' },
-    { id: 'voice_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
-    { id: 'voice_beacon', label: '4 · BEACON', action: 'stub' },
-    { id: 'voice_templates', label: '5 · ŠABLONY', action: 'stub' },
-    { id: 'voice_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
-];
-
-var TEXT_MENU = [
-    { id: 'text_sms', label: '1 · SMS / ZPRÁVY', action: 'screen:sms' },
-    { id: 'text_presets', label: '2 · PRESETY', action: 'submenu:presets' },
-    { id: 'text_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
-    { id: 'text_beacon', label: '4 · BEACON', action: 'stub' },
-    { id: 'text_templates', label: '5 · ŠABLONY', action: 'stub' },
-    { id: 'text_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
+var RADIO_MENU = [
+    { id: 'radio_comms', label: '1 · SMS / PTT', action: 'screen:comms' },
+    { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets' },
+    { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
+    { id: 'radio_beacon', label: '4 · BEACON', action: 'stub' },
+    { id: 'radio_templates', label: '5 · ŠABLONY', action: 'stub' },
+    { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
 ];
 
 var SETTINGS_MENU = [
@@ -65,12 +56,8 @@ export function isRadioOsActive(os) {
     return !!(os && os.screen && os.screen !== SCREEN_STANDBY);
 }
 
-export function getMenuItems(operatingMode) {
-    return operatingMode === 'text' ? TEXT_MENU : VOICE_MENU;
-}
-
-function menuRootLabel(operatingMode) {
-    return operatingMode === 'text' ? 'TEXT' : 'VOICE';
+export function getMenuItems() {
+    return RADIO_MENU;
 }
 
 function clampFocus(index, count) {
@@ -148,27 +135,27 @@ function buildSoundSettingsLines(os, radioState) {
     return lines;
 }
 
-function getCurrentMenuItems(os, operatingMode, radioState) {
-    if (!os.menuPath.length) return getMenuItems(operatingMode);
+function getCurrentMenuItems(os, radioState) {
+    if (!os.menuPath.length) return getMenuItems();
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return buildPresetSlotItems(radioState);
     if (leaf === 'settings') return SETTINGS_MENU;
-    return getMenuItems(operatingMode);
+    return getMenuItems();
 }
 
-function menuStatusLabel(os, operatingMode, radioState, draft) {
-    if (!os.menuPath.length) return 'MENU · ' + menuRootLabel(operatingMode);
+function menuStatusLabel(os, radioState, draft) {
+    if (!os.menuPath.length) return 'MENU';
     var leaf = os.menuPath[os.menuPath.length - 1];
-    if (leaf === 'presets') return 'PRESETY · ' + menuRootLabel(operatingMode);
+    if (leaf === 'presets') return 'PRESETY';
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
-    if (leaf === 'settings') return 'NASTAVENÍ · ' + menuRootLabel(operatingMode);
+    if (leaf === 'settings') return 'NASTAVENÍ';
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
-    if (leaf === 'autoscan') return 'AUTOSKEN · ' + menuRootLabel(operatingMode);
-    if (leaf === 'sms') return (operatingMode === 'text' ? 'ZPRÁVY' : 'SMS / PTT') + ' · ' + menuRootLabel(operatingMode);
-    return 'MENU · ' + menuRootLabel(operatingMode);
+    if (leaf === 'autoscan') return 'AUTOSKEN';
+    if (leaf === 'comms') return 'SMS / PTT';
+    return 'MENU';
 }
 
-function buildPresetDetailLines(os, draft) {
+function buildPresetDetailLines(draft) {
     if (!draft) return ['', '', '', '', '', ''];
     var name = draft.label || ('Kanál ' + draft.slot);
     var freq = draft.frequency || '---.---';
@@ -225,9 +212,8 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.menuPath.pop();
             return { changed: true, effect: 'autoscan_close' };
         }
-        if (os.menuPath[os.menuPath.length - 1] === 'sms') {
-            os.menuPath.pop();
-            return { changed: true, effect: 'sms_close' };
+        if (os.menuPath[os.menuPath.length - 1] === 'comms') {
+            return { changed: true, effect: 'comms_back' };
         }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
             var prevSlot = os.selectedSlot;
@@ -248,12 +234,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         return { changed: false };
     }
 
-    if (os.menuPath[os.menuPath.length - 1] === 'sms') {
-        if (action === 'up') return { changed: true, effect: 'sms_up' };
-        if (action === 'down') return { changed: true, effect: 'sms_down' };
-        if (action === 'ok') return { changed: true, effect: 'sms_ok' };
-        if (action === 'left') return { changed: true, effect: 'sms_up' };
-        if (action === 'right') return { changed: true, effect: 'sms_down' };
+    if (os.menuPath[os.menuPath.length - 1] === 'comms') {
+        if (action === 'up' || action === 'left') return { changed: true, effect: 'comms_up' };
+        if (action === 'down' || action === 'right') return { changed: true, effect: 'comms_down' };
+        if (action === 'ok') return { changed: true, effect: 'comms_ok' };
         return { changed: false };
     }
 
@@ -296,20 +280,12 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     }
 
     if (os.screen === SCREEN_MENU) {
-        var items = getCurrentMenuItems(os, operatingMode, radioState);
-        if (action === 'up') {
+        var items = getCurrentMenuItems(os, radioState);
+        if (action === 'up' || action === 'left') {
             os.focusIndex = clampFocus(os.focusIndex - 1, items.length);
             return { changed: true };
         }
-        if (action === 'down') {
-            os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
-            return { changed: true };
-        }
-        if (action === 'left') {
-            os.focusIndex = clampFocus(os.focusIndex - 1, items.length);
-            return { changed: true };
-        }
-        if (action === 'right') {
+        if (action === 'down' || action === 'right') {
             os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
             return { changed: true };
         }
@@ -335,9 +311,9 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.menuPath.push('autoscan');
                 return { changed: true, effect: 'autoscan_open' };
             }
-            if (item.action === 'screen:sms') {
-                os.menuPath.push('sms');
-                return { changed: true, effect: 'sms_open' };
+            if (item.action === 'screen:comms') {
+                os.menuPath.push('comms');
+                return { changed: true, effect: 'comms_open' };
             }
             if (item.action === 'preset_detail') {
                 os.selectedSlot = item.slot;
@@ -355,7 +331,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, smsSession, notebook) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -373,15 +349,15 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
                 ''
             ],
             footer: standby.footer || '',
-            buffer: standby.buffer || ''
+            buffer: ''
         };
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail' && draft) {
         return {
             mode: 'preset_detail',
-            status: menuStatusLabel(os, operatingMode, radioState, draft),
-            lines: buildPresetDetailLines(os, draft),
+            status: menuStatusLabel(os, radioState, draft),
+            lines: buildPresetDetailLines(draft),
             focusLine: os.presetFieldFocus,
             footer: 'OK · OK · Zpět',
             buffer: ''
@@ -391,7 +367,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
         return {
             mode: 'sound_settings',
-            status: menuStatusLabel(os, operatingMode, radioState, draft),
+            status: menuStatusLabel(os, radioState, draft),
             lines: buildSoundSettingsLines(os, radioState),
             focusLine: os.soundFieldFocus,
             footer: '←→ varianta · Zpět',
@@ -400,23 +376,23 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
-        return buildAutoscanOsView(os, operatingMode, autoscanSession, radioState);
+        return buildAutoscanOsView(autoscanSession, radioState);
     }
 
-    if (os.menuPath[os.menuPath.length - 1] === 'sms') {
-        return buildSmsOsView(os, operatingMode, smsSession, notebook, radioState);
+    if (os.menuPath[os.menuPath.length - 1] === 'comms') {
+        return buildCommsOsView(commsSession, notebook, radioState);
     }
 
     if (os.screen === SCREEN_STUB) {
         return {
             mode: 'stub',
-            status: 'MENU · ' + menuRootLabel(operatingMode),
+            status: 'MENU',
             lines: [os.stubTitle || '—', '', '— brzy —', '', '', ''],
             footer: 'OK · Zpět'
         };
     }
 
-    var items = getCurrentMenuItems(os, operatingMode, radioState);
+    var items = getCurrentMenuItems(os, radioState);
     var lines = [];
     var start = 0;
     if (os.focusIndex >= MENU_LINES) start = os.focusIndex - MENU_LINES + 1;
@@ -424,17 +400,12 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     for (var i = 0; i < MENU_LINES; i++) {
         var idx = start + i;
-        if (idx >= items.length) {
-            lines.push('');
-            continue;
-        }
-        var prefix = '';
-        lines.push(prefix + items[idx].label);
+        lines.push(idx < items.length ? items[idx].label : '');
     }
 
     return {
         mode: 'menu',
-        status: menuStatusLabel(os, operatingMode, radioState, draft),
+        status: menuStatusLabel(os, radioState, draft),
         lines: lines,
         focusLine: os.focusIndex - start,
         footer: 'OK · Zpět',
