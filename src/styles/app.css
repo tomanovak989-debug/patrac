@@ -1309,6 +1309,7 @@ body.sector-calibrate-on .sector-cal-rulers {
 }
 .sector-tech-screen {
     /* rozměry nastavuje radioHitmap.js — PNG 800×800 */
+    --radio-display-font: 'Bahnschrift', 'Barlow Semi Condensed', 'Roboto Condensed', 'Segoe UI', sans-serif;
     --radio-phosphor: #33ff66;
     --radio-phosphor-dim: #3d5244;
     --radio-phosphor-glow: rgba(51, 255, 102, 0.6);
@@ -1321,9 +1322,8 @@ body.sector-calibrate-on .sector-cal-rulers {
     display: flex;
     flex-direction: column;
     padding: 1px 5px;
-    font-family: 'Bahnschrift', 'Roboto Condensed', 'Segoe UI', sans-serif !important;
+    font-family: var(--radio-display-font) !important;
     font-weight: 600 !important;
-    font-stretch: semi-condensed;
     letter-spacing: 0.03em;
     font-size: 8px;
     line-height: 1.12;
@@ -1369,10 +1369,11 @@ body.sector-calibrate-on .sector-cal-rulers {
 .sector-tech-screen .radio-display-status,
 .sector-tech-screen .radio-display-main,
 .sector-tech-screen .radio-display-main > div,
-.sector-tech-screen .radio-display-sub {
-    font-family: 'Bahnschrift', 'Roboto Condensed', 'Segoe UI', sans-serif !important;
+.sector-tech-screen .radio-display-sub,
+.sector-tech-screen .radio-display-edit-large,
+.sector-tech-screen .radio-edit-char {
+    font-family: var(--radio-display-font) !important;
     font-weight: 600 !important;
-    font-stretch: semi-condensed;
 }
 body.theme-light .sector-tech-screen {
     --radio-phosphor: #1a2a10;
@@ -1758,8 +1759,8 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     box-shadow: inset 0 0 0 1px rgba(51, 255, 102, 0.38);
     border-radius: 1px;
 }
-.radio-display-main .radio-display-bold {
-    font-weight: 700;
+.radio-display-main > div.radio-display-row-unread {
+    font-weight: 700 !important;
     letter-spacing: 0.02em;
 }
 body.theme-light .radio-display-main > div.radio-display-row-focus {

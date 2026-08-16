@@ -365,13 +365,6 @@ function setDisplayTextLines(lines) {
     setDisplayMenuLines(lines, -1);
 }
 
-function escapeDisplayHtml(text) {
-    return String(text || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-}
-
 function setDisplayMenuLines(lines, focusLine, lineStyles) {
     lines = lines || [];
     focusLine = focusLine == null ? -1 : focusLine;
@@ -380,11 +373,8 @@ function setDisplayMenuLines(lines, focusLine, lineStyles) {
         var row = el(DISPLAY_LINE_IDS[i]);
         if (!row) continue;
         var text = i < lines.length ? (lines[i] || '') : '';
-        if (lineStyles[i]) {
-            row.innerHTML = '<span class="radio-display-bold">' + escapeDisplayHtml(text) + '</span>';
-        } else {
-            row.textContent = text;
-        }
+        row.textContent = text;
+        row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
         row.classList.toggle('radio-display-row-focus', i === focusLine);
     }
 }

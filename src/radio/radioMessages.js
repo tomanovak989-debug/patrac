@@ -78,7 +78,7 @@ function formatEntryLine(entry) {
     var when = formatDateShort(entry.ts);
     var line = when + ' ' + arrow + who + ' ' + text;
     if (line.length > LINE_CHARS) line = line.slice(0, LINE_CHARS - 1) + '…';
-    var bold = entry.dir === 'in' && entry.read === false;
+    var bold = entry.dir === 'in' && entry.read !== true;
     return { text: line, bold: bold };
 }
 
@@ -208,7 +208,10 @@ export function buildCommsOsView(session, notebook, radioState) {
         items = clampCommsFocus(session, notebook);
         for (i = 0; i < DISPLAY_LINES; i++) {
             if (i < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[i]));
-            else lines[i] = lines[i] || '';
+            else {
+                lines.push('');
+                lineStyles.push(false);
+            }
         }
         focusLine = session.focusIndex;
         return {
@@ -265,7 +268,10 @@ export function buildCommsOsView(session, notebook, radioState) {
     for (i = 0; i < DISPLAY_LINES; i++) {
         var idx = start + i;
         if (idx < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[idx]));
-        else lines.push('');
+        else {
+            lines.push('');
+            lineStyles.push(false);
+        }
     }
     focusLine = items.length ? session.focusIndex - start : -1;
 
@@ -324,7 +330,7 @@ export function hubActionFromDigit(digit) {
 
 export function markCommsEntryRead(entry) {
     if (!entry || entry.dir !== 'in') return false;
-    if (entry.read !== false) return false;
+    if (entry.read === true) return false;
     entry.read = true;
     return true;
 }

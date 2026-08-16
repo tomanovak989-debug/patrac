@@ -37,8 +37,7 @@ export function createFieldEdit(type, radioState, options) {
         okExitPending: false,
         t9Key: null,
         t9Index: 0,
-        t9Timer: null,
-        t9Shift: false
+        t9Timer: null
     };
 
     if (type === 'freq') {
@@ -146,22 +145,33 @@ function applyPunctTap(session) {
     return true;
 }
 
-function textEditHint(session) {
-    var shift = session.t9Shift ? 'VELKÁ' : 'malá';
-    return 'T9 · 0=' + shift + ' · # mez · * .,? · Zpět maže';
+function textEditHint() {
+    return 'T9 · 0 vel/mal poslední · # mez · * .,? · Zpět maže';
 }
 
-function applyLetterCase(session, ch) {
+function applyLetterCase(ch) {
     if (ch === ' ') return ' ';
     var s = String(ch);
-    if (session && session.t9Shift) return s.toUpperCase();
-    return s.toLowerCase();
+    if (/^[a-zA-Z]$/.test(s)) return s.toLowerCase();
+    return s;
+}
+
+function toggleLastLetterCase(session) {
+    var text = normalizeTextValue(session.text);
+    if (!text.length) return false;
+    var pos = session.cursor > 0 ? session.cursor - 1 : text.length - 1;
+    var ch = text.charAt(pos);
+    if (!/[a-zA-Z]/.test(ch)) return false;
+    var toggled = ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
+    session.text = text.slice(0, pos) + toggled + text.slice(pos + 1);
+    session.cursor = Math.max(session.cursor, pos + 1);
+    return true;
 }
 
 function insertTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var out = applyLetterCase(session, ch);
+    var out = applyLetterCase(ch);
     var pos = Math.min(session.cursor, text.length);
     text = text.slice(0, pos) + out + text.slice(pos);
     if (text.length > maxLen) text = text.slice(0, maxLen);
@@ -172,7 +182,7 @@ function insertTextChar(session, ch) {
 function replaceTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var out = applyLetterCase(session, ch);
+    var out = applyLetterCase(ch);
     var pos = Math.max(0, Math.min(session.cursor, text.length - 1));
     if (!text.length) {
         text = out;
@@ -298,7 +308,7 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? textEditHint(session) : 'OK spustí kurzor',
+        hint: session.digitMode ? textEditHint() : 'OK spustí kurzor',
         footer: 'OK · Zpět maže'
     };
 }
@@ -377,8 +387,7 @@ export function handleFieldEditInput(session, action, char, opts) {
                     insertTextChar(session, '0');
                     return true;
                 }
-                session.t9Shift = !session.t9Shift;
-                return true;
+                return toggleLastLetterCase(session);
             }
             if (opts.longPress && /^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
             if (char === '*') return applyPunctTap(session);

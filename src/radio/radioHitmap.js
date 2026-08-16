@@ -21,9 +21,6 @@ function applyRect(el, x, y, w, h) {
     el.style.height = r.height;
 }
 
-/** Font displeje vysílačky — Bahnschrift na PC, Roboto Condensed z webu jinde. */
-var RADIO_DISPLAY_FONT = "'Bahnschrift', 'Roboto Condensed', 'Segoe UI', sans-serif";
-
 /** Font displeje v px — škáluje se s reálnou velikostí panelu (zoom vysílačky). */
 export function applyDisplayTypography() {
     var screen = document.getElementById('radio-display-screen');
@@ -35,16 +32,6 @@ export function applyDisplayTypography() {
     var px = Math.min(innerW / 10.5, (h / 8) * 0.9);
     px = Math.max(9, Math.round(px * 10) / 10);
     screen.style.fontSize = px + 'px';
-    screen.style.setProperty('font-family', RADIO_DISPLAY_FONT, 'important');
-    screen.style.setProperty('font-weight', '600', 'important');
-    screen.style.setProperty('font-stretch', 'semi-condensed', 'important');
-    var nodes = screen.querySelectorAll('.radio-display-status, .radio-display-main, .radio-display-main > div, .radio-display-sub, .radio-edit-char, .radio-display-edit-large');
-    for (var i = 0; i < nodes.length; i++) {
-        nodes[i].style.setProperty('font-family', RADIO_DISPLAY_FONT, 'important');
-        nodes[i].style.fontSize = 'inherit';
-        nodes[i].style.setProperty('font-weight', '600', 'important');
-        nodes[i].style.setProperty('font-stretch', 'semi-condensed', 'important');
-    }
 }
 
 export function applyRadioHitmap() {

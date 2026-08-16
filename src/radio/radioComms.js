@@ -915,7 +915,7 @@ export function countUnreadInbox(notebook) {
     for (i = 0; i < entries.length; i++) {
         var e = entries[i];
         if (!e || e.id === 'sys_welcome') continue;
-        if (e.dir === 'in' && e.read === false) n++;
+        if (e.dir === 'in' && e.read !== true) n++;
     }
     return n;
 }
