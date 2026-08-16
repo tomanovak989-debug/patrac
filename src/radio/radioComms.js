@@ -20,6 +20,7 @@ import {
     findDialIndex,
     parseFrequencyMHz
 } from './radioBand.js';
+import { createDefaultQuickKeys, normalizeQuickKeys } from './radioShortcuts.js';
 
 export {
     BAND_MIN_MHZ,
@@ -135,6 +136,7 @@ export function defaultRadioState(userId, ctx) {
         activePresetSlot: 1,
         operatingMode: 'on',
         soundPrefs: { key: 1, ring: 1, message: 1 },
+        quickKeys: createDefaultQuickKeys(),
         presets: presets
     };
 }
@@ -261,6 +263,7 @@ export function loadRadioState(userId, ctx) {
         if (!parsed.keypadMode) parsed.keypadMode = 'tx';
         if (!parsed.dialBuffer) parsed.dialBuffer = '';
         parsed.operatingMode = normalizeOperatingMode(parsed.operatingMode);
+        parsed.quickKeys = normalizeQuickKeys(parsed.quickKeys);
         if (!parsed.soundPrefs || typeof parsed.soundPrefs !== 'object') {
             parsed.soundPrefs = { key: 1, ring: 1, message: 1 };
         } else {
@@ -292,6 +295,7 @@ function migrateNotebook(raw) {
         if (!Array.isArray(raw.notes)) raw.notes = [];
         else raw.notes = normalizeNotesList(raw.notes);
         if (!Array.isArray(raw.grids)) raw.grids = [];
+        if (!Array.isArray(raw.drafts)) raw.drafts = [];
         if (raw.pageIndex.grids == null) raw.pageIndex.grids = 0;
         return raw;
     }
@@ -309,6 +313,7 @@ function migrateNotebook(raw) {
         station: station,
         notes: [],
         grids: [],
+        drafts: [],
         pageIndex: { station: 0, notes: 0, grids: 0 }
     };
 }

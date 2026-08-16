@@ -39,6 +39,7 @@ import {
     trimStationToMaxPages,
     normalizeNoteEntry,
     normalizeNotesList,
+    maskEncryptionKey,
     getNotesVisualPageCount,
     getNotesVisualPageLines,
     getNotesVisualPageIndexForEntry,
@@ -62,7 +63,7 @@ import {
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import { applyDisplayTypography } from './radioHitmap.js';
-import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback } from './radioFeedback.js';
+import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback, radioKeypadPttDown, radioKeypadPttUp } from './radioFeedback.js';
 import {
     createRadioOsState,
     resetRadioOs,
@@ -70,7 +71,9 @@ import {
     buildOsDisplayLines,
     isRadioOsActive,
     createPresetDraft,
-    savePresetDraft
+    savePresetDraft,
+    getFocusedMenuItem,
+    executeMenuDigit
 } from './radioOs.js';
 import {
     createAutoscanState,
@@ -90,13 +93,28 @@ import {
     clampCommsFocus,
     getFocusedCommsAction,
     commsBackScreen,
+    formatChannelTarget,
+    hubActionFromDigit,
     COMMS_HUB,
     COMMS_INBOX,
     COMMS_OUTBOX,
-    COMMS_NEW_TYPE,
-    COMMS_COMPOSE_TEXT,
-    COMMS_COMPOSE_PTT
+    COMMS_DRAFTS,
+    COMMS_COMPOSE,
+    COMMS_CONFIRM,
+    COMMS_DETAIL
 } from './radioMessages.js';
+import {
+    createStandbyUiState,
+    getStandbyField,
+    clampStandbyFocus,
+    buildStandbyDisplay
+} from './radioStandby.js';
+import {
+    bindQuickKey,
+    bindingFromMenuItem,
+    getQuickKeyBinding,
+    QUICK_KEY_IDS
+} from './radioShortcuts.js';
 import {
     createPttSession,
     startPttRecording,
@@ -136,8 +154,12 @@ var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
 var commsSession = null;
+var standbyUi = createStandbyUiState();
 var pttSession = createPttSession();
 var pttMaxTimer = null;
+var shortcutHoldKey = null;
+var shortcutHoldTimer = null;
+var standbyPttActive = false;
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -383,6 +405,24 @@ function finishFieldEdit(save) {
     if (save) {
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             applyFieldEditToDraft(fieldEditSession, presetEditDraft);
+        } else if (fieldEditSession.returnTo === 'comms_target' && commsSession) {
+            var vals = readFieldEditValues(fieldEditSession);
+            if (fieldEditSession.type === 'freq' && vals.frequency) {
+                commsSession.pendingTarget = formatChannelTarget(state, {
+                    frequency: vals.frequency,
+                    presetSlot: null
+                });
+            } else if (fieldEditSession.type === 'encrypt') {
+                commsSession.pendingTarget = formatChannelTarget(state, {
+                    encryptionKey: vals.text || '',
+                    presetSlot: commsSession.pendingTarget ? commsSession.pendingTarget.presetSlot : null
+                });
+            }
+        } else if (fieldEditSession.returnTo === 'standby_manual' || fieldEditSession.returnTo === 'standby') {
+            applyFieldEditToState(fieldEditSession, state, {
+                scope: classifyChannel(state.frequency, state.encryptionKey, c)
+            });
+            state.activePresetSlot = null;
         } else if (fieldEditSession.returnTo !== 'comms') {
             applyFieldEditToState(fieldEditSession, state, {
                 scope: classifyChannel(state.frequency, state.encryptionKey, c)
@@ -393,12 +433,136 @@ function finishFieldEdit(save) {
     }
     cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
+    if (fieldEditSession === null && standbyUi.active && save) {
+        /* zůstat ve výběru F/Š */
+    }
     var input = el('chat-input-field');
     if (input) {
         input.value = '';
         input.blur();
     }
     renderDisplay();
+}
+
+function isStandbyScreen() {
+    return state && state.operatingMode !== 'off' && !isRadioOsActive(radioOs) && !isFieldEditActive(fieldEditSession);
+}
+
+function openStandbyFieldEdit(field) {
+    if (field === 'freq') {
+        startFieldEdit('freq', { frequency: state.frequency, returnTo: 'standby_manual' });
+    } else {
+        startFieldEdit('encrypt', { encryptionKey: state.encryptionKey, returnTo: 'standby_manual' });
+    }
+    if (fieldEditSession) {
+        fieldEditSession.digitMode = true;
+        fieldEditSession.okExitPending = false;
+        fieldEditSession.cursor = 0;
+    }
+}
+
+function handleStandbyInput(action) {
+    if (!isStandbyScreen()) return false;
+    if (action === 'up') {
+        if (!standbyUi.active) {
+            standbyUi.active = true;
+            standbyUi.focusIndex = 0;
+        } else {
+            standbyUi.focusIndex = clampStandbyFocus(standbyUi.focusIndex - 1);
+        }
+        renderDisplay();
+        return true;
+    }
+    if (action === 'down') {
+        if (!standbyUi.active) {
+            standbyUi.active = true;
+            standbyUi.focusIndex = 0;
+        } else {
+            standbyUi.focusIndex = clampStandbyFocus(standbyUi.focusIndex + 1);
+        }
+        renderDisplay();
+        return true;
+    }
+    if (action === 'back') {
+        if (standbyUi.active) {
+            standbyUi.active = false;
+            renderDisplay();
+            return true;
+        }
+        return false;
+    }
+    if (action === 'ok') {
+        if (standbyUi.active) {
+            openStandbyFieldEdit(getStandbyField(standbyUi.focusIndex));
+            return true;
+        }
+        return handleRadioOsInput('open_menu');
+    }
+    return false;
+}
+
+function clearShortcutHold() {
+    shortcutHoldKey = null;
+    if (shortcutHoldTimer) {
+        clearTimeout(shortcutHoldTimer);
+        shortcutHoldTimer = null;
+    }
+}
+
+function bindShortcutFromMenu(keyId) {
+    if (!isRadioOsActive(radioOs) || radioOs.screen !== 'menu') return;
+    var item = getFocusedMenuItem(radioOs, state);
+    var binding = bindingFromMenuItem(item);
+    if (!binding) return;
+    bindQuickKey(state, keyId, binding);
+    persist();
+    renderDisplay();
+}
+
+function executeQuickKey(keyId) {
+    var binding = getQuickKeyBinding(state, keyId);
+    if (!binding || !binding.action) return false;
+    var action = binding.action;
+    if (action === 'autoscan:start') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['autoscan'];
+        ensureAutoscanSession();
+        handleAutoscanOk();
+        return true;
+    }
+    if (action === 'menu:comms') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['comms'];
+        ensureCommsSession();
+        commsSession.screen = COMMS_HUB;
+        renderDisplay();
+        return true;
+    }
+    if (action === 'menu:presets') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['presets'];
+        radioOs.focusIndex = 0;
+        renderDisplay();
+        return true;
+    }
+    if (action.indexOf('preset:') === 0) {
+        var slot = parseInt(action.split(':')[1], 10);
+        if (slot && applyPreset(state, slot)) {
+            persist();
+            refreshSubscriptions();
+            renderDisplay();
+            return true;
+        }
+    }
+    return false;
+}
+
+function ensureNotebookDrafts() {
+    ensureNotebookMeta();
+    if (!Array.isArray(notebook.drafts)) notebook.drafts = [];
 }
 
 function openPresetFieldEdit(field) {
@@ -553,12 +717,31 @@ function renderDisplay() {
 
     if (nodeEl) nodeEl.style.visibility = '';
 
-    if (osView.mode === 'standby') {
+    if (osView.mode === 'standby' || osView.mode === 'standby_tune') {
         var freqVal = normalizeFrequency(state.frequency) || '---.---';
         var pt = !normalizeEncryptionKey(state.encryptionKey || '');
         var kind = c.radioKind || 'shelter';
         var nodeLabel = NODE_KIND_LABELS[kind] || 'BÁZE';
         if (c.radioKindFallback) nodeLabel += '*';
+        if (standbyUi.active) {
+            if (f) {
+                f.className = '';
+                f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
+            }
+            var tuneLines = [
+                freqVal + ' MHz  ' + (pt ? 'PT' : 'CT'),
+                state.encryptionKey ? ('ŠIFRA: ' + maskEncryptionKey(state.encryptionKey)) : 'BEZ ŠIFRY — otevřený kanál',
+                standbyLines.line3,
+                standbyPttActive ? '● PTT NAHRÁVÁM' : '',
+                '',
+                ''
+            ];
+            setDisplayMenuLines(tuneLines, standbyUi.focusIndex);
+            if (ch) ch.textContent = 'RUČNÍ LADĚNÍ';
+            if (footerWrap) footerWrap.textContent = 'OK edit · Zpět';
+            if (sig) sig.textContent = standbyPttActive ? '● TX' : (freqVal ? '● TX/RX' : '○ STBY');
+            return;
+        }
         if (f) {
             f.className = '';
             f.textContent = nodeLabel + ' · ' + freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
@@ -577,7 +760,7 @@ function renderDisplay() {
         clearDisplayRowFocus();
         if (sig) {
             var tuned = !!normalizeFrequency(state.frequency);
-            sig.textContent = tuned ? '● TX/RX' : '○ STBY';
+            sig.textContent = standbyPttActive ? '● TX' : (tuned ? '● TX/RX' : '○ STBY');
             sig.style.color = '';
             sig.classList.toggle('is-tuned', tuned);
             sig.classList.toggle('is-standby', !tuned);
@@ -717,10 +900,6 @@ function isCommsMenuOpen() {
     return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'comms');
 }
 
-function isCommsPttCompose() {
-    return isCommsMenuOpen() && commsSession && commsSession.screen === COMMS_COMPOSE_PTT;
-}
-
 function clearPttMaxTimer() {
     if (pttMaxTimer) {
         clearTimeout(pttMaxTimer);
@@ -728,9 +907,12 @@ function clearPttMaxTimer() {
     }
 }
 
-function openCommsCompose() {
+function openCommsCompose(draftText) {
+    var session = ensureCommsSession();
+    session.screen = COMMS_COMPOSE;
+    session.pendingTarget = session.pendingTarget || formatChannelTarget(state);
     startFieldEdit('text', {
-        text: '',
+        text: draftText || '',
         returnTo: 'comms',
         maxLen: 64
     });
@@ -748,58 +930,93 @@ function finishCommsCompose() {
     var text = vals && vals.text ? String(vals.text).trim() : '';
     cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
-    if (text) transmitMessage(text);
+    var session = ensureCommsSession();
+    session.pendingText = text;
+    if (!text) {
+        renderDisplay();
+        return;
+    }
+    session.screen = COMMS_CONFIRM;
+    session.focusIndex = 0;
     renderDisplay();
-    renderNotebook();
 }
 
-async function finishPttRecording() {
+function saveCommsDraft() {
+    ensureNotebookDrafts();
     var session = ensureCommsSession();
-    session.pttActive = false;
+    if (!session.pendingText) return;
+    notebook.drafts.push({
+        id: 'draft_' + Date.now(),
+        text: session.pendingText,
+        target: session.pendingTarget || formatChannelTarget(state),
+        ts: Date.now()
+    });
+    session.pendingText = '';
+    session.screen = COMMS_HUB;
+    session.focusIndex = 0;
+    persist();
+    renderDisplay();
+}
+
+function openCommsAction(actionId) {
+    var session = ensureCommsSession();
+    if (actionId === 'new_sms') {
+        session.pendingTarget = formatChannelTarget(state);
+        openCommsCompose('');
+        return;
+    }
+    if (actionId === 'inbox') {
+        session.screen = COMMS_INBOX;
+        session.focusIndex = 0;
+    } else if (actionId === 'outbox') {
+        session.screen = COMMS_OUTBOX;
+        session.focusIndex = 0;
+    } else if (actionId === 'drafts') {
+        session.screen = COMMS_DRAFTS;
+        session.focusIndex = 0;
+    }
+    renderDisplay();
+}
+
+async function finishStandbyPtt() {
+    standbyPttActive = false;
     clearPttMaxTimer();
-    radioTxEnd();
+    radioKeypadPttUp();
     var result = await stopPttRecording(pttSession);
     pttSession = createPttSession();
     renderDisplay();
-    if (result && result.base64) {
-        await transmitPtt(result);
-    }
+    if (result && result.base64) await transmitPtt(result);
 }
 
-function startPttHold() {
-    if (!isCommsPttCompose() || pttSession.active) return;
-    var session = ensureCommsSession();
+function startStandbyPtt() {
+    if (state.operatingMode === 'off' || !isStandbyScreen() || pttSession.active) return;
+    if (!isPttSupported()) {
+        alert('Mikrofon není dostupný.');
+        return;
+    }
     startPttRecording(pttSession).then(function(ok) {
-        if (!ok) {
-            alert('Mikrofon není dostupný — PTT vyžaduje přístup k mikrofonu.');
-            return;
-        }
-        session.pttActive = true;
-        radioTxStart();
+        if (!ok) return;
+        standbyPttActive = true;
+        radioKeypadPttDown();
         renderDisplay();
         clearPttMaxTimer();
-        pttMaxTimer = setTimeout(function() {
-            finishPttRecording();
-        }, PTT_MAX_MS);
-    }).catch(function() {
-        alert('Mikrofon není dostupný.');
+        pttMaxTimer = setTimeout(finishStandbyPtt, PTT_MAX_MS);
     });
 }
 
-function cancelPttHold() {
+function cancelStandbyPtt() {
     if (!pttSession.active) return;
-    var session = ensureCommsSession();
-    session.pttActive = false;
+    standbyPttActive = false;
     clearPttMaxTimer();
     cancelPttRecording(pttSession);
     pttSession = createPttSession();
-    radioTxEnd();
+    radioKeypadPttUp();
     renderDisplay();
 }
 
 function handleCommsUp() {
     var session = ensureCommsSession();
-    if (session.screen === COMMS_COMPOSE_TEXT || session.screen === COMMS_COMPOSE_PTT) return;
+    if (session.screen === COMMS_COMPOSE) return;
     clampCommsFocus(session, notebook);
     session.focusIndex = Math.max(0, session.focusIndex - 1);
     renderDisplay();
@@ -807,7 +1024,7 @@ function handleCommsUp() {
 
 function handleCommsDown() {
     var session = ensureCommsSession();
-    if (session.screen === COMMS_COMPOSE_TEXT || session.screen === COMMS_COMPOSE_PTT) return;
+    if (session.screen === COMMS_COMPOSE) return;
     var items = clampCommsFocus(session, notebook);
     if (!items.length) return;
     session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
@@ -820,57 +1037,88 @@ function handleCommsOk() {
 
     if (session.screen === COMMS_HUB) {
         if (!action || action.type !== 'action') return;
-        if (action.id === 'new') {
-            session.screen = COMMS_NEW_TYPE;
-            session.focusIndex = 0;
-        } else if (action.id === 'inbox') {
-            session.screen = COMMS_INBOX;
-            session.focusIndex = 0;
-        } else if (action.id === 'outbox') {
-            session.screen = COMMS_OUTBOX;
-            session.focusIndex = 0;
-        }
-        renderDisplay();
+        openCommsAction(action.id);
         return;
     }
 
-    if (session.screen === COMMS_NEW_TYPE) {
-        if (!action || action.disabled) return;
-        if (action.id === 'sms') {
-            session.screen = COMMS_COMPOSE_TEXT;
-            openCommsCompose();
-            return;
-        }
-        if (action.id === 'ptt') {
-            if (!isPttSupported()) {
-                alert('PTT není v tomto prohlížeči podporováno.');
-                return;
-            }
-            session.screen = COMMS_COMPOSE_PTT;
+    if (session.screen === COMMS_CONFIRM) {
+        if (!action || action.type !== 'action') return;
+        if (action.id === 'send_yes') {
+            transmitMessage(session.pendingText, {
+                frequency: session.pendingTarget && session.pendingTarget.frequency,
+                encryptionKey: session.pendingTarget && session.pendingTarget.encryptionKey
+            });
+            session.pendingText = '';
+            session.screen = COMMS_HUB;
             session.focusIndex = 0;
+            renderDisplay();
+            renderNotebook();
+        } else if (action.id === 'send_later') {
+            saveCommsDraft();
+        } else if (action.id === 'send_no') {
+            session.pendingText = '';
+            session.screen = COMMS_COMPOSE;
+            openCommsCompose('');
+        }
+        return;
+    }
+
+    if (session.screen === COMMS_DRAFTS && action && action.type === 'draft') {
+        session.pendingTarget = action.draft.target || formatChannelTarget(state);
+        session.pendingText = action.draft.text || '';
+        openCommsCompose(action.draft.text || '');
+        return;
+    }
+
+    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
+        if (action && (action.type === 'msg' || action.type === 'draft') && (action.entry || action.draft)) {
+            session.detailEntry = action.entry || action.draft;
+            session.detailReturn = session.screen;
+            session.screen = COMMS_DETAIL;
+            session.focusIndex = 0;
+            session.detailPlaying = false;
             renderDisplay();
         }
         return;
     }
 
-    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
-        if (action && action.type === 'msg' && action.entry) {
-            if (action.entry.pttAudio) {
-                playPttAudio(action.entry.pttAudio, action.entry.pttMime);
+    if (session.screen === COMMS_DETAIL) {
+        if (!action || action.type !== 'action' || !session.detailEntry) return;
+        if (action.id === 'ptt_play') {
+            var entry = session.detailEntry;
+            if (entry.pttAudio) {
+                session.detailPlaying = !session.detailPlaying;
+                if (session.detailPlaying) playPttAudio(entry.pttAudio, entry.pttMime);
             }
+        } else if (action.id === 'save_perm') {
+            session.detailEntry.savedPermanent = true;
+            persist();
+            renderDisplay();
+        } else if (action.id === 'delete') {
+            /* simplified delete from list */
+            session.detailEntry = null;
+            session.screen = session.detailReturn || COMMS_INBOX;
+            renderDisplay();
         }
-        return;
+    }
+
+    if (session.screen === COMMS_COMPOSE && !isFieldEditActive(fieldEditSession)) {
+        openCommsCompose('');
+    }
+}
+
+function handleCommsDigit(digit) {
+    var session = ensureCommsSession();
+    if (session.screen === COMMS_HUB) {
+        var hubId = hubActionFromDigit(digit);
+        if (hubId) openCommsAction(hubId);
     }
 }
 
 function handleCommsBack() {
-    if (isCommsPttCompose() && pttSession.active) {
-        cancelPttHold();
-        return;
-    }
     if (fieldEditSession && fieldEditSession.returnTo === 'comms') {
-        cancelFieldEdit(fieldEditSession);
-        fieldEditSession = null;
+        handleFieldEditBackAction();
+        return;
     }
     var session = ensureCommsSession();
     var next = commsBackScreen(session);
@@ -880,13 +1128,12 @@ function handleCommsBack() {
     } else {
         session.screen = next;
         session.focusIndex = 0;
-        session.pttActive = false;
     }
     renderDisplay();
 }
 
 function handleCommsClose() {
-    cancelPttHold();
+    cancelStandbyPtt();
     commsSession = createCommsState();
     renderDisplay();
 }
@@ -918,10 +1165,10 @@ function handleRadioOsInput(action) {
         }
         if (action === 'back') {
             if (fieldEditSession.returnTo === 'comms') {
-                cancelFieldEdit(fieldEditSession);
-                fieldEditSession = null;
-                renderDisplay();
-                return true;
+                return handleFieldEditBackAction();
+            }
+            if (fieldEditSession.returnTo === 'standby_manual') {
+                return handleFieldEditBackAction();
             }
             return handleFieldEditBackAction();
         }
@@ -1416,7 +1663,14 @@ function ingestIncomingPayload(payload) {
         : null;
     var receiver = getRadioLatLng();
     var reception = evaluateRadioReception(origin, receiver);
-    if (!reception.receivable) return;
+    if (!reception.receivable) {
+        reception = {
+            quality: SIGNAL_NOISE,
+            distanceKm: reception.distanceKm,
+            receivable: true,
+            reason: 'cloud_fallback'
+        };
+    }
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var myKey = normalizeEncryptionKey(state.encryptionKey || '');
@@ -1483,14 +1737,20 @@ async function transmitMessage(text, extras) {
         return;
     }
 
-    if (!state.frequency) {
+    var txFreq = extras.frequency != null ? extras.frequency : state.frequency;
+    var txKey = extras.encryptionKey != null ? extras.encryptionKey : state.encryptionKey;
+    if (!txFreq) {
         alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');
         return;
     }
 
     var c = getCtx();
+    var txState = Object.assign({}, state, {
+        frequency: txFreq,
+        encryptionKey: txKey || ''
+    });
     if (!extras.skipTxFx) radioTxStart();
-    var entry = createOutgoingEntry(text, c, state, extras);
+    var entry = createOutgoingEntry(text, c, txState, extras);
     recordEntry(entry);
     renderNotebook();
     if (!extras.skipTxFx) radioTxEnd();
@@ -1542,6 +1802,28 @@ function cycleRadioNode() {
     renderDisplay();
     refreshSubscriptions();
     notifyRadioRangeLayer();
+}
+
+function bindShortcutHold() {
+    var grid = el('radio-keypad-grid');
+    if (!grid || grid._shortcutHoldBound) return;
+    grid._shortcutHoldBound = true;
+    grid.addEventListener('pointerdown', function(e) {
+        if (state.operatingMode === 'off' || !isRadioOsActive(radioOs)) return;
+        var btn = e.target.closest('[data-key]');
+        if (!btn) return;
+        var key = btn.getAttribute('data-key');
+        if (key !== 'p1' && key !== 'p2' && !/^[1-9]$/.test(key)) return;
+        clearShortcutHold();
+        shortcutHoldKey = key;
+        shortcutHoldTimer = setTimeout(function() {
+            bindShortcutFromMenu(shortcutHoldKey);
+            clearShortcutHold();
+            if (navigator.vibrate) navigator.vibrate(40);
+        }, 3000);
+    }, true);
+    grid.addEventListener('pointerup', clearShortcutHold, true);
+    grid.addEventListener('pointercancel', clearShortcutHold, true);
 }
 
 function bindRadioKeyT9() {
@@ -1610,8 +1892,11 @@ function bindKeypadPointerFeedback() {
             radioKeyFeedback('back');
             return;
         }
-        if (e.target.closest('#radio-key-mode, #radio-key-preset-dial, #radio-key-main-dial')) {
+        if (e.target.closest('#radio-key-mode, #radio-key-preset-dial')) {
             radioDialFeedback();
+            return;
+        }
+        if (e.target.closest('#radio-key-main-dial')) {
             return;
         }
         var dpadBtn = e.target.closest('#radio-dpad-zone [data-key]');
@@ -1675,25 +1960,8 @@ function bindKeypad() {
     var ent = el('radio-key-ent');
     if (ent && !ent._radioCommsBound) {
         ent._radioCommsBound = true;
-        ent.addEventListener('pointerdown', function(e) {
-            if (state.operatingMode === 'off' || e.button !== 0) return;
-            if (isCommsPttCompose()) {
-                e.preventDefault();
-                startPttHold();
-            }
-        }, true);
-        ent.addEventListener('pointerup', function(e) {
-            if (isCommsPttCompose() && pttSession.active) {
-                e.preventDefault();
-                finishPttRecording();
-            }
-        }, true);
-        ent.addEventListener('pointercancel', function() {
-            if (isCommsPttCompose()) cancelPttHold();
-        }, true);
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
-            if (isCommsPttCompose()) return;
             if (isFieldEditActive(fieldEditSession)) {
                 if (fieldEditSession.returnTo === 'comms') {
                     finishCommsCompose();
@@ -1704,14 +1972,17 @@ function bindKeypad() {
                 else renderDisplay();
                 return;
             }
+            if (standbyUi.active) {
+                openStandbyFieldEdit(getStandbyField(standbyUi.focusIndex));
+                return;
+            }
             if (isRadioOsActive(radioOs)) {
                 handleRadioOsInput('ok');
                 return;
             }
-            if (handleRadioOsInput('open_menu')) return;
-            if (input) {
-                transmitMessage(input.value);
-                input.value = '';
+            if (isStandbyScreen()) {
+                handleStandbyInput('ok');
+                return;
             }
         };
     }
@@ -1721,18 +1992,21 @@ function bindKeypad() {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
             if (state.operatingMode === 'off') return;
-            if (isCommsPttCompose() && pttSession.active) {
-                cancelPttHold();
+            if (standbyPttActive) {
+                cancelStandbyPtt();
                 return;
             }
             if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.returnTo === 'comms') {
-                    cancelFieldEdit(fieldEditSession);
-                    fieldEditSession = null;
-                    renderDisplay();
+                if (fieldEditSession.returnTo === 'comms' || fieldEditSession.returnTo === 'standby_manual') {
+                    handleFieldEditBackAction();
                     return;
                 }
                 handleFieldEditBackAction();
+                return;
+            }
+            if (standbyUi.active) {
+                standbyUi.active = false;
+                renderDisplay();
                 return;
             }
             if (handleRadioOsInput('back')) return;
@@ -1742,6 +2016,24 @@ function bindKeypad() {
             persist();
             renderDisplay();
         });
+    }
+
+    var mainDial = el('radio-key-main-dial');
+    if (mainDial && !mainDial._pttBound) {
+        mainDial._pttBound = true;
+        mainDial.addEventListener('pointerdown', function(e) {
+            if (state.operatingMode === 'off' || e.button !== 0) return;
+            if (!isStandbyScreen()) return;
+            e.preventDefault();
+            startStandbyPtt();
+        }, true);
+        mainDial.addEventListener('pointerup', function(e) {
+            if (standbyPttActive || pttSession.active) {
+                e.preventDefault();
+                finishStandbyPtt();
+            }
+        }, true);
+        mainDial.addEventListener('pointercancel', cancelStandbyPtt, true);
     }
 
     var modeBtn = el('radio-key-mode');
@@ -1755,6 +2047,7 @@ function bindKeypad() {
     bindRadioDialGestures();
     bindDpadNavigation();
     bindRadioKeyT9();
+    bindShortcutHold();
     bindKeypadPointerFeedback();
 
     var grid = el('radio-keypad-grid');
@@ -1778,55 +2071,45 @@ function bindKeypad() {
                 return;
             }
 
-            if (isRadioOsActive(radioOs)) return;
+            var quickBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
+            if (quickBtn) {
+                var qkey = quickBtn.getAttribute('data-key');
+                if (qkey === 'p1' || qkey === 'p2' || /^[1-9]$/.test(qkey)) {
+                    if (isStandbyScreen()) {
+                        if (executeQuickKey(qkey)) return;
+                    }
+                }
+            }
+
+            if (isRadioOsActive(radioOs)) {
+                var menuBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
+                if (menuBtn) {
+                    var mkey = menuBtn.getAttribute('data-key');
+                    if (/^[0-9]$/.test(mkey)) {
+                        var digitResult = executeMenuDigit(radioOs, state, mkey);
+                        if (digitResult && digitResult.changed) {
+                            if (digitResult.effect === 'preset_detail_open') {
+                                if (digitResult.slot) presetEditDraft = createPresetDraft(digitResult.slot, state);
+                            }
+                            renderDisplay();
+                            return;
+                        }
+                        if (isCommsMenuOpen()) {
+                            handleCommsDigit(mkey);
+                            return;
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (!isStandbyScreen()) return;
 
             var btn = e.target.closest('.radio-key[data-key]');
             if (!btn) return;
             var key = btn.getAttribute('data-key');
-
-            if (key === 'prev') {
-                if (cycleDialPreset(state, -1)) {
-                    persist();
-                    renderDisplay();
-                    refreshSubscriptions();
-                }
-                return;
-            }
-            if (key === 'next') {
-                if (cycleDialPreset(state, 1)) {
-                    persist();
-                    renderDisplay();
-                    refreshSubscriptions();
-                }
-                return;
-            }
-            if (key === '*') {
-                startFieldEdit('freq', { returnTo: 'standby' });
-                return;
-            }
-            if (key === '#') {
-                startFieldEdit('encrypt', { returnTo: 'standby' });
-                return;
-            }
-
-            if (/^[0-9]$/.test(key)) {
-                var slot = parseInt(key, 10);
-                if (key === '0') {
-                    saveToPresetSlot(state.activePresetSlot || 1);
-                    return;
-                }
-                if (e.shiftKey) {
-                    saveToPresetSlot(slot);
-                    return;
-                }
-                if (applyPreset(state, slot)) {
-                    persist();
-                    renderDisplay();
-                    refreshSubscriptions();
-                } else {
-                    alert('Preset ' + slot + ' je prázdný. Nalaď kanál a ulož Shift+' + slot + '.');
-                }
-                return;
+            if (/^[1-9]$/.test(key)) {
+                if (executeQuickKey(key)) return;
             }
         });
     }
@@ -1889,11 +2172,19 @@ function bindDpadNavigation() {
             handleFieldEditAction(key);
             return;
         }
+        if (isStandbyScreen()) {
+            if (key === 'left' || key === 'right') {
+                if (key === 'right') handleStandbyInput('ok');
+                else handleStandbyInput('back');
+            } else {
+                handleStandbyInput(key);
+            }
+            return;
+        }
         if (isRadioOsActive(radioOs)) {
             handleRadioOsInput(key);
             return;
         }
-        handleRadioOsInput('open_menu');
     });
 }
 
@@ -1923,7 +2214,8 @@ var RADIO_OPERATING_MODES = ['off', 'on'];
 function cycleOperatingMode(direction) {
     haltAutoscan(true);
     autoscanSession = null;
-    cancelPttHold();
+    cancelStandbyPtt();
+    standbyUi = createStandbyUiState();
     var cur = normalizeOperatingMode(state.operatingMode);
     var idx = RADIO_OPERATING_MODES.indexOf(cur);
     if (idx < 0) idx = 1;
@@ -2089,19 +2381,6 @@ function bindRadioDialGestures() {
         }
     });
 
-    bindHoldVerticalSwipe(el('radio-key-main-dial'), function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
-        adjustFrequency(state, -1);
-        persist();
-        renderDisplay();
-        refreshSubscriptions();
-    }, function() {
-        if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
-        adjustFrequency(state, 1);
-        persist();
-        renderDisplay();
-        refreshSubscriptions();
-    });
 }
 
 export function initRadioCommsSystem(options) {
@@ -2166,7 +2445,7 @@ export function refreshRadioCommsContext() {
 export function stopRadioComms() {
     haltAutoscan(true);
     autoscanSession = null;
-    cancelPttHold();
+    cancelStandbyPtt();
     clearPttMaxTimer();
     stopRadioSubscriptions();
 }

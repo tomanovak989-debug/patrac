@@ -4,6 +4,7 @@
 import { findPreset, upsertPreset, clearPreset } from './radioComms.js';
 import { buildAutoscanOsView } from './radioAutoscan.js';
 import { buildCommsOsView } from './radioMessages.js';
+import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
 
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
@@ -13,16 +14,17 @@ var PRESET_SLOTS = 15;
 var MENU_LINES = 6;
 
 var RADIO_MENU = [
-    { id: 'radio_comms', label: '1 · SMS / PTT', action: 'screen:comms' },
-    { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets' },
-    { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan' },
-    { id: 'radio_beacon', label: '4 · BEACON', action: 'stub' },
-    { id: 'radio_templates', label: '5 · ŠABLONY', action: 'stub' },
-    { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings' }
+    { id: 'radio_comms', label: '1 · SMS / PTT', action: 'screen:comms', shortcutAction: 'menu:comms' },
+    { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
+    { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
+    { id: 'radio_beacon', label: '4 · BEACON', action: 'stub', shortcutAction: 'stub:beacon' },
+    { id: 'radio_templates', label: '5 · ŠABLONY', action: 'stub', shortcutAction: 'stub:templates' },
+    { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
 ];
 
 var SETTINGS_MENU = [
-    { id: 'settings_sounds', label: 'ZVUKY', action: 'submenu:sounds' }
+    { id: 'settings_sounds', label: 'ZVUKY', action: 'submenu:sounds' },
+    { id: 'settings_quickkeys', label: 'RYCHLÉ VOLBY', action: 'submenu:quickkeys' }
 ];
 
 var SOUND_FIELDS = ['key', 'ring', 'message'];
@@ -91,7 +93,8 @@ function buildPresetSlotItems(radioState) {
             id: 'preset_' + slot,
             slot: slot,
             label: presetSlotLabel(slot, radioState),
-            action: 'preset_detail'
+            action: 'preset_detail',
+            shortcutAction: 'preset:' + slot
         });
     }
     return items;
@@ -150,9 +153,71 @@ function menuStatusLabel(os, radioState, draft) {
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
     if (leaf === 'settings') return 'NASTAVENÍ';
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
+    if (leaf === 'quickkeys') return 'RYCHLÉ VOLBY';
     if (leaf === 'autoscan') return 'AUTOSKEN';
     if (leaf === 'comms') return 'SMS / PTT';
     return 'MENU';
+}
+
+function buildQuickKeysHelpLines(radioState) {
+    radioState = radioState || {};
+    var keys = radioState.quickKeys || {};
+    var lines = [
+        'Podrž P1/P2/1–9',
+        'na položce menu 3 s',
+        '',
+        '',
+        '',
+        ''
+    ];
+    var ids = ['p1', 'p2', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+    var row = 2;
+    var i;
+    for (i = 0; i < ids.length && row < 6; i++) {
+        var b = keys[ids[i]];
+        if (!b) continue;
+        lines[row] = ids[i].toUpperCase() + '→' + String(b.label || b.action).slice(0, 14);
+        row++;
+    }
+    return lines;
+}
+
+function decorateItemLabel(item, radioState) {
+    if (!item) return '';
+    var key = findQuickKeyForAction(radioState, item.shortcutAction || item.action);
+    return decorateMenuLabel(item.label || '', key);
+}
+
+export function getFocusedMenuItem(os, radioState) {
+    var items = getCurrentMenuItems(os, radioState);
+    return items[os.focusIndex] || null;
+}
+
+/** @returns {{ changed: boolean, effect?: string, slot?: number }} */
+export function executeMenuDigit(os, radioState, digit) {
+    if (!os || !digit) return { changed: false };
+    digit = String(digit);
+    var items = getCurrentMenuItems(os, radioState);
+    var leaf = os.menuPath[os.menuPath.length - 1];
+
+    if (leaf === 'presets') {
+        var slot = parseInt(digit, 10);
+        if (!slot || slot < 1 || slot > 15) return { changed: false };
+        os.selectedSlot = slot;
+        os.menuPath.push('detail');
+        os.presetFieldFocus = 0;
+        os.focusIndex = slot - 1;
+        return { changed: true, effect: 'preset_detail_open', slot: slot };
+    }
+
+    if (!os.menuPath.length) {
+        var idx = parseInt(digit, 10) - 1;
+        if (idx < 0 || idx >= items.length) return { changed: false };
+        os.focusIndex = idx;
+        return radioOsHandleInput(os, radioState.operatingMode || 'on', 'ok', radioState);
+    }
+
+    return { changed: false };
 }
 
 function buildPresetDetailLines(draft) {
@@ -202,6 +267,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.selectedSlot = null;
             return { changed: true, effect: 'preset_detail_back' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'quickkeys') {
+            os.menuPath.pop();
+            os.focusIndex = 0;
+            return { changed: true };
+        }
         if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
             os.menuPath.pop();
             os.soundFieldFocus = 0;
@@ -229,15 +299,20 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         return { changed: false };
     }
 
+    if (action === 'left') {
+        return radioOsHandleInput(os, operatingMode, 'back', radioState);
+    }
+
     if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
-        if (action === 'ok') return { changed: true, effect: 'autoscan_ok' };
+        if (action === 'ok' || action === 'right') return { changed: true, effect: 'autoscan_ok' };
         return { changed: false };
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'comms') {
-        if (action === 'up' || action === 'left') return { changed: true, effect: 'comms_up' };
-        if (action === 'down' || action === 'right') return { changed: true, effect: 'comms_down' };
-        if (action === 'ok') return { changed: true, effect: 'comms_ok' };
+        if (action === 'up') return { changed: true, effect: 'comms_up' };
+        if (action === 'down') return { changed: true, effect: 'comms_down' };
+        if (action === 'left') return { changed: true, effect: 'comms_back' };
+        if (action === 'ok' || action === 'right') return { changed: true, effect: 'comms_ok' };
         return { changed: false };
     }
 
@@ -268,7 +343,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.presetFieldFocus = clampFocus(os.presetFieldFocus + 1, 3);
             return { changed: true };
         }
-        if (action === 'ok') {
+        if (action === 'ok' || action === 'right') {
             return {
                 changed: true,
                 effect: 'preset_field_edit',
@@ -280,48 +355,52 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     }
 
     if (os.screen === SCREEN_MENU) {
-        var items = getCurrentMenuItems(os, radioState);
-        if (action === 'up' || action === 'left') {
-            os.focusIndex = clampFocus(os.focusIndex - 1, items.length);
+        var menuItems = getCurrentMenuItems(os, radioState);
+        if (action === 'up') {
+            os.focusIndex = clampFocus(os.focusIndex - 1, menuItems.length);
             return { changed: true };
         }
-        if (action === 'down' || action === 'right') {
-            os.focusIndex = clampFocus(os.focusIndex + 1, items.length);
+        if (action === 'down') {
+            os.focusIndex = clampFocus(os.focusIndex + 1, menuItems.length);
             return { changed: true };
         }
-        if (action === 'ok') {
-            var item = items[os.focusIndex];
-            if (!item) return { changed: false };
-            if (item.action === 'submenu:presets') {
+        if (action === 'ok' || action === 'right') {
+            var pick = menuItems[os.focusIndex];
+            if (!pick) return { changed: false };
+            if (pick.action === 'submenu:presets') {
                 os.menuPath.push('presets');
                 os.focusIndex = 0;
                 return { changed: true };
             }
-            if (item.action === 'submenu:settings') {
+            if (pick.action === 'submenu:settings') {
                 os.menuPath.push('settings');
                 os.focusIndex = 0;
                 return { changed: true };
             }
-            if (item.action === 'submenu:sounds') {
+            if (pick.action === 'submenu:sounds') {
                 os.menuPath.push('sounds');
                 os.soundFieldFocus = 0;
                 return { changed: true };
             }
-            if (item.action === 'screen:autoscan') {
+            if (pick.action === 'submenu:quickkeys') {
+                os.menuPath.push('quickkeys');
+                return { changed: true };
+            }
+            if (pick.action === 'screen:autoscan') {
                 os.menuPath.push('autoscan');
                 return { changed: true, effect: 'autoscan_open' };
             }
-            if (item.action === 'screen:comms') {
+            if (pick.action === 'screen:comms') {
                 os.menuPath.push('comms');
                 return { changed: true, effect: 'comms_open' };
             }
-            if (item.action === 'preset_detail') {
-                os.selectedSlot = item.slot;
+            if (pick.action === 'preset_detail') {
+                os.selectedSlot = pick.slot;
                 os.menuPath.push('detail');
                 os.presetFieldFocus = 0;
-                return { changed: true, effect: 'preset_detail_open', slot: item.slot };
+                return { changed: true, effect: 'preset_detail_open', slot: pick.slot };
             }
-            os.stubTitle = item.label;
+            os.stubTitle = pick.label;
             os.screen = SCREEN_STUB;
             return { changed: true };
         }
@@ -375,6 +454,17 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         };
     }
 
+    if (os.menuPath[os.menuPath.length - 1] === 'quickkeys') {
+        return {
+            mode: 'quickkeys',
+            status: menuStatusLabel(os, radioState, draft),
+            lines: buildQuickKeysHelpLines(radioState),
+            focusLine: -1,
+            footer: 'Zpět',
+            buffer: ''
+        };
+    }
+
     if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
         return buildAutoscanOsView(autoscanSession, radioState);
     }
@@ -400,7 +490,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     for (var i = 0; i < MENU_LINES; i++) {
         var idx = start + i;
-        lines.push(idx < items.length ? items[idx].label : '');
+        lines.push(idx < items.length ? decorateItemLabel(items[idx], radioState) : '');
     }
 
     return {

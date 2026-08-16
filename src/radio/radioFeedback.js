@@ -200,14 +200,22 @@ export function radioDialFeedback() {
     radioKeyFeedback('dial');
 }
 
-export function radioTxStart() {
+export function radioKeypadPttDown() {
     unlockAudio();
-    playSfx('ptt-start.mp3', { channel: 'misc' });
+    playSfx('signal-range.mp3', { channel: 'misc', volume: 0.72 });
+}
+
+export function radioKeypadPttUp() {
+    unlockAudio();
+    playSfx('ptt-end.mp3', { channel: 'misc' });
+}
+
+export function radioTxStart() {
+    radioKeypadPttDown();
 }
 
 export function radioTxEnd() {
-    unlockAudio();
-    playSfx('ptt-end.mp3', { channel: 'misc' });
+    radioKeypadPttUp();
 }
 
 export function radioIncomingFeedback(signalQuality) {
