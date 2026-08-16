@@ -1,11 +1,10 @@
 import { applyI18nToDom, getPatracLanguage } from './i18n.js';
 import { applyGateI18n, updateLanguageButtons } from './components/gate-i18n.js';
-import { updateTextSizeButtons, getTextSize, updateCompassButtons, getCompassVisible, updateFullscreenButtons, syncFullscreenSettingVisibility } from './settings.js';
+import { updateTextSizeButtons, getTextSize, updateCompassButtons, getCompassVisible, updateFullscreenButtons, syncFullscreenSettingVisibility, updateHudLangIcon } from './settings.js';
 
 export function applySettingsMenuI18n() {
-    var menu = document.getElementById('hud-menu-dropdown');
-    if (menu) applyI18nToDom(menu);
     updateLanguageButtons(getPatracLanguage());
+    updateHudLangIcon(getPatracLanguage());
     updateTextSizeButtons(getTextSize());
     updateCompassButtons(getCompassVisible());
     syncFullscreenSettingVisibility();

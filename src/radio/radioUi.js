@@ -45,7 +45,8 @@ import {
     getNotesVisualPageIndexForEntry,
     removeLastNotesPage,
     trimNotesToMaxPages,
-    deleteNoteById
+    deleteNoteById,
+    countUnreadInbox
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
 import {
@@ -73,7 +74,7 @@ import {
     createPresetDraft,
     savePresetDraft,
     getFocusedMenuItem,
-    executeMenuDigit
+    getMenuItems
 } from './radioOs.js';
 import {
     createAutoscanState,
@@ -101,7 +102,8 @@ import {
     COMMS_DRAFTS,
     COMMS_COMPOSE,
     COMMS_CONFIRM,
-    COMMS_DETAIL
+    COMMS_DETAIL,
+    markCommsEntryRead
 } from './radioMessages.js';
 import {
     createStandbyUiState,
@@ -112,9 +114,19 @@ import {
 import {
     bindQuickKey,
     bindingFromMenuItem,
+    bindingFromCommsItem,
+    bindingFromPresetField,
+    bindingFromAutoscan,
     getQuickKeyBinding,
     QUICK_KEY_IDS
 } from './radioShortcuts.js';
+import {
+    createMenuDialState,
+    appendMenuDialDigit,
+    clearMenuDial,
+    menuDialPreview,
+    planMenuDialCommit
+} from './radioMenuDial.js';
 import {
     createPttSession,
     startPttRecording,
@@ -136,7 +148,8 @@ import {
     applyFieldEditToDraft,
     cancelFieldEdit,
     readFieldEditValues,
-    finalizeT9Session
+    finalizeT9Session,
+    insertFieldEditSpace
 } from './radioFieldEdit.js';
 import {
     KIND_HANDSET,
@@ -160,6 +173,7 @@ var pttMaxTimer = null;
 var shortcutHoldKey = null;
 var shortcutHoldTimer = null;
 var standbyPttActive = false;
+var menuDial = createMenuDialState();
 var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
@@ -351,13 +365,26 @@ function setDisplayTextLines(lines) {
     setDisplayMenuLines(lines, -1);
 }
 
-function setDisplayMenuLines(lines, focusLine) {
+function escapeDisplayHtml(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function setDisplayMenuLines(lines, focusLine, lineStyles) {
     lines = lines || [];
     focusLine = focusLine == null ? -1 : focusLine;
+    lineStyles = lineStyles || [];
     for (var i = 0; i < DISPLAY_LINE_IDS.length; i++) {
         var row = el(DISPLAY_LINE_IDS[i]);
         if (!row) continue;
-        row.textContent = i < lines.length ? (lines[i] || '') : '';
+        var text = i < lines.length ? (lines[i] || '') : '';
+        if (lineStyles[i]) {
+            row.innerHTML = '<span class="radio-display-bold">' + escapeDisplayHtml(text) + '</span>';
+        } else {
+            row.textContent = text;
+        }
         row.classList.toggle('radio-display-row-focus', i === focusLine);
     }
 }
@@ -509,14 +536,181 @@ function clearShortcutHold() {
     }
 }
 
+function refreshRadioUnreadBadge() {
+    var badge = el('hud-radio-unread');
+    if (!badge) return;
+    var n = countUnreadInbox(notebook);
+    badge.textContent = String(n);
+    badge.classList.toggle('is-hidden', n <= 0);
+    var radioBtn = el('hud-icon-radio');
+    if (radioBtn) radioBtn.classList.toggle('has-unread', n > 0);
+}
+
+function getBindableShortcutContext() {
+    if (!isRadioOsActive(radioOs)) return null;
+    var leaf = radioOs.menuPath && radioOs.menuPath.length
+        ? radioOs.menuPath[radioOs.menuPath.length - 1]
+        : '';
+
+    if (leaf === 'comms' && commsSession) {
+        return bindingFromCommsItem(getFocusedCommsAction(commsSession, notebook), commsSession);
+    }
+    if (leaf === 'detail' && presetEditDraft) {
+        return bindingFromPresetField(presetEditDraft.slot, radioOs.presetFieldFocus || 0);
+    }
+    if (leaf === 'autoscan') {
+        return bindingFromAutoscan(autoscanSession);
+    }
+    return bindingFromMenuItem(getFocusedMenuItem(radioOs, state));
+}
+
 function bindShortcutFromMenu(keyId) {
-    if (!isRadioOsActive(radioOs) || radioOs.screen !== 'menu') return;
-    var item = getFocusedMenuItem(radioOs, state);
-    var binding = bindingFromMenuItem(item);
+    if (state.operatingMode === 'off' || !isRadioOsActive(radioOs)) return;
+    var binding = getBindableShortcutContext();
     if (!binding) return;
     bindQuickKey(state, keyId, binding);
     persist();
     renderDisplay();
+}
+
+function applyRadioOsEffect(result) {
+    if (!result || !result.changed) return false;
+    if (result.effect === 'preset_detail_open') {
+        if (result.slot) presetEditDraft = createPresetDraft(result.slot, state);
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'preset_detail_back') {
+        if (presetEditDraft) {
+            var c = getCtx();
+            savePresetDraft(presetEditDraft, state, {
+                scope: classifyChannel(presetEditDraft.frequency, presetEditDraft.encryptionKey, c)
+            });
+            persist();
+            refreshSubscriptions();
+        }
+        presetEditDraft = null;
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'preset_field_edit') {
+        if (!presetEditDraft && result.slot) {
+            presetEditDraft = createPresetDraft(result.slot, state);
+        }
+        openPresetFieldEdit(result.field);
+        return true;
+    }
+    if (result.effect === 'sound_preview') {
+        if (state.soundPrefs && result.field) {
+            previewSoundPref(result.field, state.soundPrefs[result.field]);
+            setRadioSoundPrefs(state.soundPrefs);
+        }
+        persist();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'sound_prefs_back') {
+        setRadioSoundPrefs(state.soundPrefs);
+        persist();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'autoscan_open') {
+        ensureAutoscanSession();
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'autoscan_close') {
+        handleAutoscanClose();
+        return true;
+    }
+    if (result.effect === 'autoscan_ok') {
+        handleAutoscanOk();
+        return true;
+    }
+    if (result.effect === 'comms_open') {
+        ensureCommsSession();
+        commsSession.screen = COMMS_HUB;
+        commsSession.focusIndex = 0;
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'comms_back') {
+        handleCommsBack();
+        return true;
+    }
+    if (result.effect === 'comms_close') {
+        handleCommsClose();
+        return true;
+    }
+    if (result.effect === 'comms_up') {
+        handleCommsUp();
+        return true;
+    }
+    if (result.effect === 'comms_down') {
+        handleCommsDown();
+        return true;
+    }
+    if (result.effect === 'comms_ok') {
+        handleCommsOk();
+        return true;
+    }
+    renderDisplay();
+    return true;
+}
+
+function executeMenuDialCommit() {
+    var plan = planMenuDialCommit(menuDial, radioOs);
+    clearMenuDial(menuDial);
+    if (!plan || !plan.steps || !plan.steps.length) {
+        renderDisplay();
+        return;
+    }
+    var steps = plan.steps;
+    var i;
+    for (i = 0; i < steps.length; i++) {
+        var step = steps[i];
+        if (step.type === 'root') {
+            var items = getMenuItems();
+            var idx = step.value - 1;
+            if (idx < 0 || idx >= items.length) break;
+            radioOs.focusIndex = idx;
+            applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
+        } else if (step.type === 'preset_slot') {
+            radioOs.selectedSlot = step.value;
+            if (radioOs.menuPath[radioOs.menuPath.length - 1] !== 'detail') {
+                radioOs.menuPath.push('detail');
+            }
+            radioOs.presetFieldFocus = 0;
+            radioOs.focusIndex = step.value - 1;
+            presetEditDraft = createPresetDraft(step.value, state);
+        } else if (step.type === 'comms_hub') {
+            var hubId = hubActionFromDigit(String(step.value));
+            if (hubId) openCommsAction(hubId);
+        } else if (step.type === 'settings') {
+            var settingsItems = getCurrentSettingsItems();
+            var sidx = step.value - 1;
+            if (sidx >= 0 && sidx < settingsItems.length) {
+                radioOs.focusIndex = sidx;
+                applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
+            }
+        }
+    }
+    renderDisplay();
+}
+
+function getCurrentSettingsItems() {
+    return [
+        { action: 'submenu:sounds' },
+        { action: 'submenu:quickkeys' }
+    ];
+}
+
+function clearMenuDialIfActive() {
+    if (!menuDial || !menuDial.buffer) return false;
+    clearMenuDial(menuDial);
+    renderDisplay();
+    return true;
 }
 
 function executeQuickKey(keyId) {
@@ -556,6 +750,20 @@ function executeQuickKey(keyId) {
             renderDisplay();
             return true;
         }
+    }
+    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['comms'];
+        ensureCommsSession();
+        var map = {
+            'comms:new_sms': 'new_sms',
+            'comms:inbox': 'inbox',
+            'comms:outbox': 'outbox',
+            'comms:drafts': 'drafts'
+        };
+        openCommsAction(map[action]);
+        return true;
     }
     return false;
 }
@@ -787,7 +995,13 @@ function renderDisplay() {
             f.style.fontWeight = '';
             f.style.color = '';
         }
-        setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine);
+        setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
+        var dialPreview = menuDialPreview(menuDial);
+        if (dialPreview && buf) buf.textContent = dialPreview;
+        else if (dialPreview) {
+            var bufRow = el('radio-display-buffer');
+            if (bufRow) bufRow.textContent = dialPreview;
+        }
         if (ch) ch.textContent = osView.status || 'MENU';
         if (sig) {
             sig.textContent = '';
@@ -1072,7 +1286,14 @@ function handleCommsOk() {
 
     if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
         if (action && (action.type === 'msg' || action.type === 'draft') && (action.entry || action.draft)) {
-            session.detailEntry = action.entry || action.draft;
+            var entry = action.entry || action.draft;
+            if (session.screen === COMMS_INBOX && action.entry) {
+                if (markCommsEntryRead(action.entry)) {
+                    persist();
+                    refreshRadioUnreadBadge();
+                }
+            }
+            session.detailEntry = entry;
             session.detailReturn = session.screen;
             session.screen = COMMS_DETAIL;
             session.focusIndex = 0;
@@ -1175,92 +1396,20 @@ function handleRadioOsInput(action) {
         return false;
     }
 
+    if (action === 'open_menu') clearMenuDial(menuDial);
+
+    if (action === 'ok' && menuDial && menuDial.buffer) {
+        executeMenuDialCommit();
+        return true;
+    }
+    if (action === 'back' && clearMenuDialIfActive()) return true;
+
     var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
     if (!result || !result.changed) return false;
 
-    if (result.effect === 'preset_detail_open') {
-        if (result.slot) presetEditDraft = createPresetDraft(result.slot, state);
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'preset_detail_back') {
-        if (presetEditDraft) {
-            var c = getCtx();
-            savePresetDraft(presetEditDraft, state, {
-                scope: classifyChannel(presetEditDraft.frequency, presetEditDraft.encryptionKey, c)
-            });
-            persist();
-            refreshSubscriptions();
-        }
-        presetEditDraft = null;
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'preset_field_edit') {
-        if (!presetEditDraft && result.slot) {
-            presetEditDraft = createPresetDraft(result.slot, state);
-        }
-        openPresetFieldEdit(result.field);
-        return true;
-    }
-    if (result.effect === 'sound_preview') {
-        if (state.soundPrefs && result.field) {
-            previewSoundPref(result.field, state.soundPrefs[result.field]);
-            setRadioSoundPrefs(state.soundPrefs);
-        }
-        persist();
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'sound_prefs_back') {
-        setRadioSoundPrefs(state.soundPrefs);
-        persist();
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'autoscan_open') {
-        ensureAutoscanSession();
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'autoscan_close') {
-        handleAutoscanClose();
-        return true;
-    }
-    if (result.effect === 'autoscan_ok') {
-        handleAutoscanOk();
-        return true;
-    }
-    if (result.effect === 'comms_open') {
-        ensureCommsSession();
-        commsSession.screen = COMMS_HUB;
-        commsSession.focusIndex = 0;
-        renderDisplay();
-        return true;
-    }
-    if (result.effect === 'comms_back') {
-        handleCommsBack();
-        return true;
-    }
-    if (result.effect === 'comms_close') {
-        handleCommsClose();
-        return true;
-    }
-    if (result.effect === 'comms_up') {
-        handleCommsUp();
-        return true;
-    }
-    if (result.effect === 'comms_down') {
-        handleCommsDown();
-        return true;
-    }
-    if (result.effect === 'comms_ok') {
-        handleCommsOk();
-        return true;
-    }
-
-    renderDisplay();
-    return true;
+    var handled = applyRadioOsEffect(result);
+    if (!isRadioOsActive(radioOs)) clearMenuDial(menuDial);
+    return handled;
 }
 
 function renderNotebook(options) {
@@ -1620,6 +1769,10 @@ function recordEntry(entry) {
     entryIndex = (notebook.station || []).indexOf(entry);
     if (entryIndex < 0) entryIndex = (notebook.station || []).length - 1;
     persist();
+
+    if (entry.dir === 'in' && entry.read === false) {
+        refreshRadioUnreadBadge();
+    }
 
     var pageForEntry = getStationVisualPageIndexForEntry(notebook, entryIndex, layout.linesPerPage, layout.charsPerLine);
     var onStationTab = activeNotebookTab === 'station';
@@ -1997,6 +2150,12 @@ function bindKeypad() {
                 return;
             }
             if (isFieldEditActive(fieldEditSession)) {
+                if (fieldEditSession.type === 'text' || fieldEditSession.type === 'encrypt') {
+                    if (insertFieldEditSpace(fieldEditSession)) {
+                        renderDisplay();
+                        return;
+                    }
+                }
                 if (fieldEditSession.returnTo === 'comms' || fieldEditSession.returnTo === 'standby_manual') {
                     handleFieldEditBackAction();
                     return;
@@ -2086,18 +2245,9 @@ function bindKeypad() {
                 if (menuBtn) {
                     var mkey = menuBtn.getAttribute('data-key');
                     if (/^[0-9]$/.test(mkey)) {
-                        var digitResult = executeMenuDigit(radioOs, state, mkey);
-                        if (digitResult && digitResult.changed) {
-                            if (digitResult.effect === 'preset_detail_open') {
-                                if (digitResult.slot) presetEditDraft = createPresetDraft(digitResult.slot, state);
-                            }
-                            renderDisplay();
-                            return;
-                        }
-                        if (isCommsMenuOpen()) {
-                            handleCommsDigit(mkey);
-                            return;
-                        }
+                        appendMenuDialDigit(menuDial, mkey);
+                        renderDisplay();
+                        return;
                     }
                 }
                 return;
@@ -2423,8 +2573,10 @@ export function initRadioCommsSystem(options) {
     resetRadioOs(radioOs);
     initSectorTechShell();
     window.patracRefreshSectorTech = refreshSectorTechLayout;
+    window.patracRefreshRadioUnreadBadge = refreshRadioUnreadBadge;
     syncNotebookTabs();
     renderDisplay();
+    refreshRadioUnreadBadge();
     var layout = stationPageMetrics();
     trimStationToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
     saveNotebook(c.userId, notebook);
@@ -2440,6 +2592,7 @@ export function refreshRadioCommsContext() {
     renderDisplay();
     refreshSubscriptions();
     notifyRadioRangeLayer();
+    refreshRadioUnreadBadge();
 }
 
 export function stopRadioComms() {

@@ -2,6 +2,7 @@
  * Přihlašovací brána — všechny gate panely.
  */
 import { applyI18nToDom, setPatracLanguage, getPatracLanguage } from '../i18n.js';
+import { updateHudLangIcon } from '../settings.js';
 
 var GATE_PANEL_IDS = ['gate-login', 'gate-register', 'gate-recover', 'gate-operator'];
 export async function switchGateLanguage(code) {
@@ -36,6 +37,7 @@ export function updateLanguageButtons(code) {
         var isCs = ids[i].indexOf('-cs') !== -1;
         el.classList.toggle('is-active', (code === 'cs' && isCs) || (code === 'en' && !isCs));
     }
+    updateHudLangIcon(code);
 }
 
 function syncGateSelectOptions() {

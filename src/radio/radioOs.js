@@ -498,7 +498,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         status: menuStatusLabel(os, radioState, draft),
         lines: lines,
         focusLine: os.focusIndex - start,
-        footer: 'OK · Zpět',
+        footer: 'Čísla · OK · Zpět',
         buffer: ''
     };
 }

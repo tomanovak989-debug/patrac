@@ -1,4 +1,5 @@
 /** Velikost textu, kompas a režim zobrazení — localStorage + třídy na body. */
+import { getPatracLanguage } from './i18n.js';
 
 export function getTextSize() {
     return localStorage.getItem('patrac_text_size') || 'default';
@@ -17,13 +18,15 @@ export function applyTextSize(size) {
 }
 
 export function updateTextSizeButtons(size) {
-    var ids = [
+    var icon = document.getElementById('hud-icon-text');
+    if (icon) icon.classList.toggle('is-active', size === 'large');
+    var legacy = [
         ['btn-text-default', size === 'default'],
         ['btn-text-large', size === 'large']
     ];
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i][0]);
-        if (el) el.classList.toggle('is-active', ids[i][1]);
+    for (var i = 0; i < legacy.length; i++) {
+        var el = document.getElementById(legacy[i][0]);
+        if (el) el.classList.toggle('is-active', legacy[i][1]);
     }
 }
 
@@ -41,13 +44,17 @@ export function applyDisplayMode(mode) {
 }
 
 export function updateDisplayModeButtons(mode) {
-    var ids = [
+    var icon = document.getElementById('hud-icon-theme');
+    if (icon) icon.classList.toggle('is-active', mode === 'light');
+    var glyph = document.getElementById('hud-icon-theme-glyph');
+    if (glyph) glyph.textContent = mode === 'light' ? '☀' : '☾';
+    var legacy = [
         ['btn-theme-dark', mode === 'dark'],
         ['btn-theme-light', mode === 'light']
     ];
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i][0]);
-        if (el) el.classList.toggle('is-active', ids[i][1]);
+    for (var i = 0; i < legacy.length; i++) {
+        var el = document.getElementById(legacy[i][0]);
+        if (el) el.classList.toggle('is-active', legacy[i][1]);
     }
 }
 
@@ -64,13 +71,15 @@ export function applyCompassVisible(visible) {
 }
 
 export function updateCompassButtons(visible) {
-    var ids = [
+    var icon = document.getElementById('hud-icon-compass');
+    if (icon) icon.classList.toggle('is-active', visible);
+    var legacy = [
         ['btn-compass-show', visible],
         ['btn-compass-hide', !visible]
     ];
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i][0]);
-        if (el) el.classList.toggle('is-active', ids[i][1]);
+    for (var i = 0; i < legacy.length; i++) {
+        var el = document.getElementById(legacy[i][0]);
+        if (el) el.classList.toggle('is-active', legacy[i][1]);
     }
 }
 
@@ -82,6 +91,7 @@ export function initPatracSettings() {
     bindFullscreenListeners();
     syncFullscreenSettingVisibility();
     updateFullscreenButtons();
+    updateHudLangIcon(getPatracLanguage());
 }
 
 export function setPatracTextSize(size) {
@@ -111,19 +121,47 @@ export function isFullscreenSupported() {
 
 export function updateFullscreenButtons() {
     var active = isBrowserFullscreen();
-    var ids = [
+    var icon = document.getElementById('hud-icon-fullscreen');
+    if (icon) icon.classList.toggle('is-active', active);
+    var legacy = [
         ['btn-fullscreen-on', !active],
         ['btn-fullscreen-off', active]
     ];
-    for (var i = 0; i < ids.length; i++) {
-        var el = document.getElementById(ids[i][0]);
-        if (el) el.classList.toggle('is-active', ids[i][1]);
+    for (var i = 0; i < legacy.length; i++) {
+        var el = document.getElementById(legacy[i][0]);
+        if (el) el.classList.toggle('is-active', legacy[i][1]);
     }
 }
 
 export function syncFullscreenSettingVisibility() {
+    var icon = document.getElementById('hud-icon-fullscreen');
+    if (icon) icon.style.display = isFullscreenSupported() ? '' : 'none';
     var row = document.getElementById('hud-menu-fullscreen-row');
     if (row) row.style.display = isFullscreenSupported() ? '' : 'none';
+}
+
+export function updateHudLangIcon(code) {
+    var glyph = document.getElementById('hud-icon-lang-glyph');
+    var icon = document.getElementById('hud-icon-lang');
+    code = code === 'en' ? 'en' : 'cs';
+    if (glyph) glyph.textContent = code === 'en' ? 'EN' : 'CS';
+    if (icon) icon.classList.toggle('is-active', code === 'en');
+}
+
+export function togglePatracTextSize() {
+    applyTextSize(getTextSize() === 'large' ? 'default' : 'large');
+}
+
+export function togglePatracDisplayMode() {
+    applyDisplayMode(getDisplayMode() === 'light' ? 'dark' : 'light');
+}
+
+export function togglePatracCompassVisible() {
+    applyCompassVisible(!getCompassVisible());
+}
+
+export function togglePatracBrowserFullscreen() {
+    setBrowserFullscreen(!isBrowserFullscreen());
 }
 
 function bindFullscreenListeners() {

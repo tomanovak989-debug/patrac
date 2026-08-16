@@ -70,7 +70,7 @@ function filterDrafts(notebook) {
 }
 
 function formatEntryLine(entry) {
-    if (!entry) return '';
+    if (!entry) return { text: '', bold: false };
     var arrow = entry.dir === 'out' ? '↑' : '↓';
     var who = String(entry.from || '?').slice(0, 5);
     var text = String(entry.text || '').replace(/\s+/g, ' ').trim();
@@ -78,7 +78,25 @@ function formatEntryLine(entry) {
     var when = formatDateShort(entry.ts);
     var line = when + ' ' + arrow + who + ' ' + text;
     if (line.length > LINE_CHARS) line = line.slice(0, LINE_CHARS - 1) + '…';
-    return line;
+    var bold = entry.dir === 'in' && entry.read === false;
+    return { text: line, bold: bold };
+}
+
+function formatItem(item) {
+    if (!item) return { text: '', bold: false };
+    if (item.label) return { text: item.label, bold: false };
+    if (item.type === 'draft') {
+        return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };
+    }
+    if (item.type === 'msg') return formatEntryLine(item.entry);
+    return { text: '', bold: false };
+}
+
+function pushFormattedLine(lines, lineStyles, formatted) {
+    var f = formatted;
+    if (typeof f === 'string') f = { text: f, bold: false };
+    lines.push(f.text || '');
+    lineStyles.push(!!f.bold);
 }
 
 function hubItems() {
@@ -146,19 +164,12 @@ export function clampCommsFocus(session, notebook) {
     return items;
 }
 
-function formatItem(item) {
-    if (!item) return '';
-    if (item.label) return item.label;
-    if (item.type === 'draft') return '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12);
-    if (item.type === 'msg') return formatEntryLine(item.entry);
-    return '';
-}
-
 export function buildCommsOsView(session, notebook, radioState) {
     session = session || createCommsState();
     var target = session.pendingTarget || formatChannelTarget(radioState);
     var items;
     var lines = [];
+    var lineStyles = [];
     var footer;
     var status;
     var focusLine = -1;
@@ -196,13 +207,15 @@ export function buildCommsOsView(session, notebook, radioState) {
         ];
         items = clampCommsFocus(session, notebook);
         for (i = 0; i < DISPLAY_LINES; i++) {
-            lines[i] = i < items.length ? formatItem(items[i]) : (lines[i] || '');
+            if (i < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[i]));
+            else lines[i] = lines[i] || '';
         }
         focusLine = session.focusIndex;
         return {
             mode: 'comms',
             status: 'POTVRzení TX',
             lines: lines,
+            lineStyles: lineStyles,
             focusLine: focusLine,
             footer: 'OK · Zpět',
             buffer: ''
@@ -251,13 +264,14 @@ export function buildCommsOsView(session, notebook, radioState) {
     if (start + DISPLAY_LINES > items.length) start = Math.max(0, items.length - DISPLAY_LINES);
     for (i = 0; i < DISPLAY_LINES; i++) {
         var idx = start + i;
-        lines.push(idx < items.length ? formatItem(items[idx]) : '');
+        if (idx < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[idx]));
+        else lines.push('');
     }
     focusLine = items.length ? session.focusIndex - start : -1;
 
     if (session.screen === COMMS_HUB) {
         status = 'SMS · ' + target.freq;
-        footer = '1–4 rychle · OK · Zpět';
+        footer = 'Čísla · OK · Zpět';
     } else if (session.screen === COMMS_INBOX) {
         status = 'PŘIJATÉ';
         footer = 'OK detail · Zpět';
@@ -276,6 +290,7 @@ export function buildCommsOsView(session, notebook, radioState) {
         mode: 'comms',
         status: status,
         lines: lines,
+        lineStyles: lineStyles,
         focusLine: focusLine,
         footer: footer,
         buffer: ''
@@ -305,4 +320,11 @@ export function hubActionFromDigit(digit) {
     if (digit === '3') return 'outbox';
     if (digit === '4') return 'drafts';
     return null;
+}
+
+export function markCommsEntryRead(entry) {
+    if (!entry || entry.dir !== 'in') return false;
+    if (entry.read !== false) return false;
+    entry.read = true;
+    return true;
 }

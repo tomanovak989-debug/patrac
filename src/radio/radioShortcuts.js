@@ -54,6 +54,38 @@ export function findQuickKeyForAction(state, actionId) {
     return null;
 }
 
+export function bindingFromCommsItem(item, session) {
+    if (!item) return null;
+    if (item.type === 'action') {
+        if (item.id === 'new_sms') return { action: 'comms:new_sms', label: 'NOVÁ SMS' };
+        if (item.id === 'inbox') return { action: 'comms:inbox', label: 'PŘIJATÉ' };
+        if (item.id === 'outbox') return { action: 'comms:outbox', label: 'ODESLANÉ' };
+        if (item.id === 'drafts') return { action: 'comms:drafts', label: 'ROZPRACOVANÉ' };
+        if (item.id === 'send_yes') return { action: 'comms:send', label: 'ODESLAT' };
+    }
+    if (item.type === 'msg' && item.entry) {
+        return { action: 'comms:msg:' + (item.entry.id || ''), label: 'ZPRÁVA' };
+    }
+    return null;
+}
+
+export function bindingFromPresetField(slot, fieldIndex) {
+    if (!slot) return null;
+    var labels = ['NÁZEV', 'FREQ', 'ŠIFRA'];
+    return {
+        action: 'preset_field:' + slot + ':' + fieldIndex,
+        label: 'P' + slot + ' ' + (labels[fieldIndex] || '')
+    };
+}
+
+export function bindingFromAutoscan(session) {
+    if (!session) return null;
+    if (session.status === 'idle' || session.status === 'running') {
+        return { action: 'autoscan:start', label: 'AUTOSKEN' };
+    }
+    return { action: 'autoscan:open', label: 'AUTOSKEN' };
+}
+
 export function bindingFromMenuItem(item) {
     if (!item) return null;
     if (item.shortcutAction) {

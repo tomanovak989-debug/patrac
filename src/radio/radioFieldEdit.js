@@ -37,7 +37,9 @@ export function createFieldEdit(type, radioState, options) {
         okExitPending: false,
         t9Key: null,
         t9Index: 0,
-        t9Timer: null
+        t9Timer: null,
+        t9Shift: false,
+        punctIndex: 0
     };
 
     if (type === 'freq') {
@@ -128,12 +130,21 @@ function scheduleT9Advance(session) {
     }, T9_TIMEOUT_MS);
 }
 
+var PUNCT_CYCLE = ['.', ',', '?'];
+
+function applyLetterCase(session, ch) {
+    if (ch === ' ') return ' ';
+    var s = String(ch);
+    if (session && session.t9Shift) return s.toUpperCase();
+    return s.toLowerCase();
+}
+
 function insertTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var lower = ch === ' ' ? ' ' : String(ch).toLowerCase();
+    var out = applyLetterCase(session, ch);
     var pos = Math.min(session.cursor, text.length);
-    text = text.slice(0, pos) + lower + text.slice(pos);
+    text = text.slice(0, pos) + out + text.slice(pos);
     if (text.length > maxLen) text = text.slice(0, maxLen);
     session.text = text;
     session.cursor = Math.min(pos + 1, text.length);
@@ -142,13 +153,13 @@ function insertTextChar(session, ch) {
 function replaceTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var lower = ch === ' ' ? ' ' : String(ch).toLowerCase();
+    var out = applyLetterCase(session, ch);
     var pos = Math.max(0, Math.min(session.cursor, text.length - 1));
     if (!text.length) {
-        text = lower;
+        text = out;
         session.cursor = 1;
     } else {
-        text = text.slice(0, pos) + lower + text.slice(pos + 1);
+        text = text.slice(0, pos) + out + text.slice(pos + 1);
     }
     if (text.length > maxLen) text = text.slice(0, maxLen);
     session.text = text;
@@ -268,9 +279,20 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? 'T9 · 0 posun · Zpět maže' : 'OK spustí kurzor',
+        hint: session.digitMode ? 'T9 · 0 vel/mal · ✕ mez · * interp · Zpět maže' : 'OK spustí kurzor',
         footer: 'OK · Zpět maže'
     };
+}
+
+export function insertFieldEditSpace(session) {
+    if (!session || !isTextType(session)) return false;
+    if (!session.digitMode) {
+        session.digitMode = true;
+        session.cursor = normalizeTextValue(session.text).length;
+    }
+    finalizeT9Session(session);
+    insertTextChar(session, ' ');
+    return true;
 }
 
 export function handleFieldEditInput(session, action, char, opts) {
@@ -336,21 +358,20 @@ export function handleFieldEditInput(session, action, char, opts) {
                     insertTextChar(session, '0');
                     return true;
                 }
-                var len = normalizeTextValue(session.text).length;
-                session.cursor = Math.min(session.cursor + 1, len);
+                session.t9Shift = !session.t9Shift;
                 return true;
             }
             if (opts.longPress && /^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
             if (char === '*') {
                 finalizeT9Session(session);
-                insertTextChar(session, '*');
-                session.cursor = Math.min(session.cursor + 1, textMaxLen(session));
+                var punct = PUNCT_CYCLE[session.punctIndex % PUNCT_CYCLE.length];
+                session.punctIndex = (session.punctIndex + 1) % PUNCT_CYCLE.length;
+                insertTextChar(session, punct);
                 return true;
             }
             if (char === '#') {
                 finalizeT9Session(session);
                 insertTextChar(session, '#');
-                session.cursor = Math.min(session.cursor + 1, textMaxLen(session));
                 return true;
             }
             if (/^[0-9]$/.test(char)) return applyT9Tap(session, char);

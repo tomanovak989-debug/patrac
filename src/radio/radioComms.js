@@ -895,7 +895,8 @@ export function createIncomingEntry(payload, ctx) {
         channelId: payload.channelId || frequencyChannelId(freq),
         scope: tab,
         comCode: payload.comCode || '',
-        ts: payload.timestamp || payload.ts || Date.now()
+        ts: payload.timestamp || payload.ts || Date.now(),
+        read: false
     };
     if (payload.messageType) entry.messageType = payload.messageType;
     if (payload.pttAudio) entry.pttAudio = payload.pttAudio;
@@ -905,4 +906,16 @@ export function createIncomingEntry(payload, ctx) {
     if (payload.originLat != null) entry.originLat = payload.originLat;
     if (payload.originLng != null) entry.originLng = payload.originLng;
     return entry;
+}
+
+export function countUnreadInbox(notebook) {
+    var entries = (notebook && notebook.station) ? notebook.station : [];
+    var n = 0;
+    var i;
+    for (i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        if (!e || e.id === 'sys_welcome') continue;
+        if (e.dir === 'in' && e.read === false) n++;
+    }
+    return n;
 }

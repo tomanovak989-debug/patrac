@@ -3825,6 +3825,35 @@ window.patracSetBrowserFullscreen = function(on) {
     });
 };
 
+window.patracToggleTextSize = function() {
+    patracImport('settings.js').then(function(mod) { mod.togglePatracTextSize(); });
+};
+window.patracToggleDisplayMode = function() {
+    patracImport('settings.js').then(function(mod) { mod.togglePatracDisplayMode(); });
+};
+window.patracToggleCompassVisible = function() {
+    patracImport('settings.js').then(function(mod) { mod.togglePatracCompassVisible(); });
+};
+window.patracToggleBrowserFullscreen = function() {
+    patracImport('settings.js').then(function(mod) { mod.togglePatracBrowserFullscreen(); });
+};
+window.patracToggleLanguage = function() {
+    patracImport('i18n.js').then(function(i18n) {
+        var next = i18n.getPatracLanguage() === 'en' ? 'cs' : 'en';
+        window.patracSetLanguage(next);
+    });
+};
+window.patracOpenRadioTab = function() {
+    var tabs = document.querySelectorAll('.bottom-action-bar button');
+    for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].textContent && tabs[i].textContent.indexOf('Radio') !== -1) {
+            switchMainTab('clan', tabs[i]);
+            return;
+        }
+    }
+    switchMainTab('clan', null);
+};
+
 window.placeQuestAtGps = placeQuestAtGps;
 window.completeQuestAtLocation = completeQuestAtLocation;
 

@@ -202,7 +202,7 @@ export function radioDialFeedback() {
 
 export function radioKeypadPttDown() {
     unlockAudio();
-    playSfx('signal-range.mp3', { channel: 'misc', volume: 0.72 });
+    playSfx('ptt-start.mp3', { channel: 'misc', volume: 0.82 });
 }
 
 export function radioKeypadPttUp() {
@@ -220,6 +220,7 @@ export function radioTxEnd() {
 
 export function radioIncomingFeedback(signalQuality) {
     unlockAudio();
+    /* Zvuky dle kvality signálu (signal-hill, signal-range, ring/message) zatím vypnuto — kód ponechán pro pozdější použití.
     if (signalQuality === SIGNAL_FRAGMENT) {
         playSfx('signal-hill.mp3', { channel: 'misc' });
         return;
@@ -240,4 +241,6 @@ export function radioIncomingFeedback(signalQuality) {
             });
         }, signalQuality === SIGNAL_WEAK ? 200 : 160);
     }
+    */
+    void signalQuality;
 }
