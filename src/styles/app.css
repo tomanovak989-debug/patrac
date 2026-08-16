@@ -1522,7 +1522,7 @@ body.theme-light .sector-tech-screen.is-off {
     display: flex;
     align-items: center;
     justify-content: flex-start;
-    font-size: 2.2em;
+    font-size: inherit;
     font-weight: 600;
     letter-spacing: 0.04em;
     line-height: 1;
@@ -1533,9 +1533,31 @@ body.theme-light .sector-tech-screen.is-off {
         0 0 5px var(--radio-phosphor-glow),
         0 0 14px var(--radio-phosphor-halo);
 }
+.sector-tech-screen.is-freq-edit .radio-display-edit-large {
+    font-size: 2.2em;
+    align-items: center;
+    line-height: 1;
+    white-space: nowrap;
+}
 .sector-tech-screen.is-key-edit .radio-display-edit-large {
     font-size: 2.4em;
     text-transform: uppercase;
+    white-space: nowrap;
+}
+.sector-tech-screen.is-text-edit .radio-display-main {
+    grid-template-rows: minmax(0, 4fr) repeat(2, minmax(0, 1fr));
+}
+.sector-tech-screen.is-text-edit .radio-display-edit-large {
+    font-size: inherit;
+    text-transform: none;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    align-items: flex-start;
+    line-height: 1.12;
+    letter-spacing: 0.02em;
+    grid-row: 1 / span 4;
+    overflow: hidden;
 }
 .sector-tech-screen.is-field-edit .radio-edit-dec {
     opacity: 0.85;

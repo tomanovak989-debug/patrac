@@ -149,7 +149,8 @@ import {
     cancelFieldEdit,
     readFieldEditValues,
     finalizeT9Session,
-    insertFieldEditSpace
+    insertFieldEditSpace,
+    textEditHint
 } from './radioFieldEdit.js';
 import {
     KIND_HANDSET,
@@ -860,7 +861,7 @@ function renderDisplay() {
         var editView = buildFieldEditView(fieldEditSession, editOpts);
         if (fieldEditSession.returnTo === 'comms') {
             editView.footer = 'OK = TX · Zpět';
-            editView.hint = 'T9 · max 64 znaků';
+            editView.hint = textEditHint();
         }
         if (screen) {
             screen.classList.toggle('is-off', false);
@@ -868,7 +869,8 @@ function renderDisplay() {
             screen.classList.toggle('is-standby', false);
             screen.classList.toggle('is-field-edit', true);
             screen.classList.toggle('is-freq-edit', editView.editType === 'freq');
-            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt' || editView.editType === 'text');
+            screen.classList.toggle('is-key-edit', editView.editType === 'encrypt');
+            screen.classList.toggle('is-text-edit', editView.editType === 'text');
         }
         if (ch) ch.textContent = editView.status || '';
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
@@ -878,7 +880,11 @@ function renderDisplay() {
             f.className = 'radio-display-edit-large';
         }
         if (k) k.textContent = '';
-        if (buf) buf.textContent = editView.axis || (editView.editType === 'encrypt' ? editView.hint : '');
+        if (buf) {
+            if (editView.axis) buf.textContent = editView.axis;
+            else if (editView.editType === 'encrypt' || editView.editType === 'text') buf.textContent = editView.hint || '';
+            else buf.textContent = '';
+        }
         if (p) p.textContent = editView.axis ? editView.hint : '';
         clearExtraDisplayLines();
         if (footerWrap) footerWrap.textContent = editView.footer || 'OK · uložit';
@@ -890,6 +896,7 @@ function renderDisplay() {
         screen.classList.toggle('is-field-edit', false);
         screen.classList.toggle('is-freq-edit', false);
         screen.classList.toggle('is-key-edit', false);
+        screen.classList.toggle('is-text-edit', false);
     }
 
     if (osView.mode === 'off') {
@@ -1987,7 +1994,7 @@ function bindRadioKeyT9() {
 
     grid.addEventListener('pointerdown', function(e) {
         if (state.operatingMode === 'off' || !isFieldEditActive(fieldEditSession)) return;
-        var btn = e.target.closest('.radio-key[data-key]');
+        var btn = e.target.closest('.sector-hit[data-key], .radio-key[data-key]');
         if (!btn) return;
         var key = btn.getAttribute('data-key');
         if (!/^[0-9]$/.test(key) && key !== '*' && key !== '#') return;
@@ -2007,10 +2014,18 @@ function bindRadioKeyT9() {
 
     grid.addEventListener('pointerup', function(e) {
         if (!pendingKey) return;
+        var key = pendingKey;
         if (fieldEditKeyLongFired) {
             e.preventDefault();
             e.stopPropagation();
             fieldEditKeyLongFired = false;
+            clearHold();
+            return;
+        }
+        if (key === '*' || key === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            handleFieldEditAction('char', key);
         }
         clearHold();
     }, true);
@@ -2199,7 +2214,7 @@ function bindKeypad() {
         grid.addEventListener('click', function(e) {
             if (state.operatingMode === 'off') return;
             if (isFieldEditActive(fieldEditSession)) {
-                var editBtn = e.target.closest('.radio-key[data-key]');
+                var editBtn = e.target.closest('.sector-hit[data-key], .radio-key[data-key]');
                 if (editBtn) {
                     var editKey = editBtn.getAttribute('data-key');
                     if (/^[0-9]$/.test(editKey) || editKey === '*' || editKey === '#') {

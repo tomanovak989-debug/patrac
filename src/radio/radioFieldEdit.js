@@ -134,18 +134,39 @@ function applyPunctTap(session) {
     var group = PUNCT_CYCLE;
     if (session.t9Key === '*') {
         session.t9Index = (session.t9Index + 1) % group.length;
-        replaceTextChar(session, group.charAt(session.t9Index));
+        replacePunctChar(session, group.charAt(session.t9Index));
     } else {
         finalizeT9Session(session);
         session.t9Key = '*';
         session.t9Index = 0;
-        insertTextChar(session, group.charAt(0));
+        insertPunctChar(session, group.charAt(0));
     }
     scheduleT9Advance(session);
     return true;
 }
 
-function textEditHint() {
+function insertPunctChar(session, ch) {
+    var text = normalizeTextValue(session.text);
+    var maxLen = textMaxLen(session);
+    var pos = Math.min(session.cursor, text.length);
+    text = text.slice(0, pos) + ch + text.slice(pos);
+    if (text.length > maxLen) text = text.slice(0, maxLen);
+    session.text = text;
+    session.cursor = Math.min(pos + 1, text.length);
+}
+
+function replacePunctChar(session, ch) {
+    var text = normalizeTextValue(session.text);
+    if (!text.length) {
+        insertPunctChar(session, ch);
+        return;
+    }
+    var pos = session.cursor > 0 ? session.cursor - 1 : 0;
+    if (pos >= text.length) pos = text.length - 1;
+    session.text = text.slice(0, pos) + ch + text.slice(pos + 1);
+}
+
+export function textEditHint() {
     return 'T9 · 0 vel/mal poslední · # mez · * .,? · Zpět maže';
 }
 
