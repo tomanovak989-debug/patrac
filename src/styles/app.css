@@ -545,47 +545,24 @@ body.admin-mode .admin-only-tab { display: flex !important; }
     z-index: 50000;
 }
 .hud-top-brand {
-    display: flex; align-items: center; gap: 10px; position: relative;
-    z-index: 50001; min-width: 0;
+    display: flex; align-items: center; gap: 8px; position: relative;
+    z-index: 50001;
 }
-.hud-top-title {
-    letter-spacing: 0.12em; font-weight: 700; white-space: nowrap;
-}
-.hud-top-user {
-    font-size: var(--text-xs); color: var(--dim-fg); letter-spacing: 0.05em;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 28vw;
-}
-.hud-top-icons {
-    display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center;
-}
-.hud-icon-toggle {
+.hud-icon-radio {
     position: relative;
-    width: 28px; height: 28px; padding: 0;
+    width: 28px; height: 26px; padding: 0;
     border: 1px solid rgba(74, 246, 38, 0.35);
     background: rgba(0, 0, 0, 0.25);
-    color: var(--dim-fg);
+    color: var(--text-green);
     cursor: pointer; font-family: inherit;
     display: inline-flex; align-items: center; justify-content: center;
     box-sizing: border-box;
 }
-.hud-icon-toggle .hud-icon-glyph {
-    font-size: 13px; line-height: 1;
-}
-.hud-icon-toggle.is-active {
-    border-color: var(--text-green);
-    color: var(--text-green);
-    box-shadow: var(--neon-glow);
-    background: rgba(74, 246, 38, 0.08);
-}
-.hud-icon-toggle:hover {
-    border-color: var(--text-green);
-    color: var(--text-green);
-}
-.hud-icon-text-glyph { font-weight: 700; }
-#hud-icon-text.is-active .hud-icon-text-glyph { font-size: 15px; }
+.hud-icon-radio .hud-icon-glyph { font-size: 14px; line-height: 1; }
+.hud-icon-radio:hover,
 .hud-icon-radio.has-unread {
     border-color: var(--text-green);
-    color: var(--text-green);
+    box-shadow: var(--neon-glow);
 }
 .hud-radio-badge {
     position: absolute; top: -5px; right: -5px;
@@ -596,8 +573,6 @@ body.admin-mode .admin-only-tab { display: flex !important; }
     box-shadow: 0 0 6px rgba(74, 246, 38, 0.55);
 }
 .hud-radio-badge.is-hidden { display: none; }
-.hud-icon-logout.is-active,
-.hud-icon-logout:hover { color: #ff8844; border-color: rgba(255, 136, 68, 0.65); }
 .hud-menu-btn {
     background: none; border: 1px solid rgba(74, 246, 38, 0.35);
     color: var(--text-green); font-size: var(--text-heading); line-height: 1;
@@ -1346,8 +1321,9 @@ body.sector-calibrate-on .sector-cal-rulers {
     display: flex;
     flex-direction: column;
     padding: 1px 5px;
-    font-family: 'Roboto Condensed', 'Bahnschrift', 'Segoe UI', sans-serif !important;
+    font-family: 'Bahnschrift', 'Roboto Condensed', 'Segoe UI', sans-serif !important;
     font-weight: 600 !important;
+    font-stretch: semi-condensed;
     letter-spacing: 0.03em;
     font-size: 8px;
     line-height: 1.12;
@@ -1394,8 +1370,9 @@ body.sector-calibrate-on .sector-cal-rulers {
 .sector-tech-screen .radio-display-main,
 .sector-tech-screen .radio-display-main > div,
 .sector-tech-screen .radio-display-sub {
-    font-family: 'Roboto Condensed', 'Bahnschrift', 'Segoe UI', sans-serif !important;
+    font-family: 'Bahnschrift', 'Roboto Condensed', 'Segoe UI', sans-serif !important;
     font-weight: 600 !important;
+    font-stretch: semi-condensed;
 }
 body.theme-light .sector-tech-screen {
     --radio-phosphor: #1a2a10;

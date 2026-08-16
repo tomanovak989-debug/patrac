@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&family=Roboto+Condensed:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e93" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e94" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -270,20 +270,52 @@
     <!-- HUD OVERLAY -->
     <div class="hud-element top-status-bar" id="hud-top">
         <div class="hud-top-brand">
-            <span class="hud-top-title">PÁTRAČ</span>
-            <span class="hud-top-user" id="hud-menu-user-id">—</span>
-        </div>
-        <div class="hud-top-icons" id="hud-top-icons">
-            <button type="button" class="hud-icon-toggle" id="hud-icon-text" onclick="patracToggleTextSize()" title="Velikost textu" aria-label="Velikost textu"><span class="hud-icon-glyph hud-icon-text-glyph">A</span></button>
-            <button type="button" class="hud-icon-toggle" id="hud-icon-compass" onclick="patracToggleCompassVisible()" title="Kompas na mapě" aria-label="Kompas"><span class="hud-icon-glyph">🧭</span></button>
-            <button type="button" class="hud-icon-toggle" id="hud-icon-theme" onclick="patracToggleDisplayMode()" title="Den / noc" aria-label="Režim zobrazení"><span class="hud-icon-glyph" id="hud-icon-theme-glyph">☀</span></button>
-            <button type="button" class="hud-icon-toggle" id="hud-icon-lang" onclick="patracToggleLanguage()" title="Jazyk" aria-label="Jazyk"><span class="hud-icon-glyph" id="hud-icon-lang-glyph">CS</span></button>
-            <button type="button" class="hud-icon-toggle hud-icon-radio" id="hud-icon-radio" onclick="patracOpenRadioTab()" title="Vysílačka" aria-label="Vysílačka">
+            <button type="button" class="hud-icon-radio" id="hud-icon-radio" onclick="patracOpenRadioTab()" title="Vysílačka" aria-label="Vysílačka">
                 <span class="hud-icon-glyph">📻</span>
                 <span class="hud-radio-badge is-hidden" id="hud-radio-unread">0</span>
             </button>
-            <button type="button" class="hud-icon-toggle" id="hud-icon-fullscreen" onclick="patracToggleBrowserFullscreen()" title="Celá obrazovka" aria-label="Celá obrazovka"><span class="hud-icon-glyph">⛶</span></button>
-            <button type="button" class="hud-icon-toggle hud-icon-logout" id="hud-icon-logout" onclick="patracLogout()" title="Odhlásit se" aria-label="Odhlásit se"><span class="hud-icon-glyph">⏻</span></button>
+            <button type="button" class="hud-menu-btn" id="btn-hud-menu" onclick="toggleHudMenu(event)" title="Menu" aria-label="Menu">☰</button>
+            <div id="hud-menu-dropdown" class="hud-menu-dropdown">
+                <div class="hud-menu-settings" id="hud-menu-settings">
+                    <div class="hud-menu-settings-title" data-i18n="settings.title">Nastavení</div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.language">Jazyk</span>
+                        <div class="hud-menu-lang">
+                            <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-cs" onclick="patracSetLanguage('cs')">CS</button>
+                            <button type="button" class="hud-menu-lang-btn" id="hud-btn-lang-en" onclick="patracSetLanguage('en')">EN</button>
+                        </div>
+                    </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.textSize">Velikost textu</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-text-default" onclick="patracSetTextSize('default')" data-i18n="settings.textDefault">Standard</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-text-large" onclick="patracSetTextSize('large')" data-i18n="settings.textLarge">Velké</button>
+                        </div>
+                    </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.compass">Kompas na mapě</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-compass-show" onclick="patracSetCompassVisible(true)" data-i18n="settings.compassShow">Zobrazit</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-compass-hide" onclick="patracSetCompassVisible(false)" data-i18n="settings.compassHide">Skrýt</button>
+                        </div>
+                    </div>
+                    <div class="hud-menu-setting-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.displayMode">Režim zobrazení</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-theme-light" onclick="patracSetDisplayMode('light')" data-i18n="settings.displayDay">Den</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-theme-dark" onclick="patracSetDisplayMode('dark')" data-i18n="settings.displayNight">Noc</button>
+                        </div>
+                    </div>
+                    <div class="hud-menu-setting-row" id="hud-menu-fullscreen-row">
+                        <span class="hud-menu-setting-label" data-i18n="settings.fullscreen">Celá obrazovka</span>
+                        <div class="hud-menu-toggle">
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-fullscreen-on" onclick="patracSetBrowserFullscreen(true)" data-i18n="settings.fullscreenOn">Zapnout</button>
+                            <button type="button" class="hud-menu-toggle-btn" id="btn-fullscreen-off" onclick="patracSetBrowserFullscreen(false)" data-i18n="settings.fullscreenOff">Vypnout</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="hud-menu-item" onclick="patracLogout()" data-i18n="settings.logout">⏻ OHLÁSIT SE</button>
+            </div>
         </div>
         <div style="color:var(--text-green)" id="gps-status-text">● DETEKCE GPS SIGNÁLU...</div>
     </div>
@@ -917,7 +949,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e93';
+        window.PATRAC_BUILD = '20260723e94';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

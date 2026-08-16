@@ -38,8 +38,7 @@ export function createFieldEdit(type, radioState, options) {
         t9Key: null,
         t9Index: 0,
         t9Timer: null,
-        t9Shift: false,
-        punctIndex: 0
+        t9Shift: false
     };
 
     if (type === 'freq') {
@@ -53,7 +52,7 @@ export function createFieldEdit(type, radioState, options) {
         var srcKey = options.encryptionKey != null ? options.encryptionKey : radioState.encryptionKey;
         return Object.assign(base, {
             type: 'encrypt',
-            text: normalizeEncryptionKey(srcKey || '')
+            text: String(srcKey || '')
         });
     }
     if (type === 'text') {
@@ -131,6 +130,26 @@ function scheduleT9Advance(session) {
 }
 
 var PUNCT_CYCLE = ['.', ',', '?'];
+
+function applyPunctTap(session) {
+    var group = PUNCT_CYCLE;
+    if (session.t9Key === '*') {
+        session.t9Index = (session.t9Index + 1) % group.length;
+        replaceTextChar(session, group.charAt(session.t9Index));
+    } else {
+        finalizeT9Session(session);
+        session.t9Key = '*';
+        session.t9Index = 0;
+        insertTextChar(session, group.charAt(0));
+    }
+    scheduleT9Advance(session);
+    return true;
+}
+
+function textEditHint(session) {
+    var shift = session.t9Shift ? 'VELKÁ' : 'malá';
+    return 'T9 · 0=' + shift + ' · # mez · * .,? · Zpět maže';
+}
 
 function applyLetterCase(session, ch) {
     if (ch === ' ') return ' ';
@@ -279,7 +298,7 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? 'T9 · 0 vel/mal · ✕ mez · * interp · Zpět maže' : 'OK spustí kurzor',
+        hint: session.digitMode ? textEditHint(session) : 'OK spustí kurzor',
         footer: 'OK · Zpět maže'
     };
 }
@@ -362,16 +381,10 @@ export function handleFieldEditInput(session, action, char, opts) {
                 return true;
             }
             if (opts.longPress && /^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
-            if (char === '*') {
-                finalizeT9Session(session);
-                var punct = PUNCT_CYCLE[session.punctIndex % PUNCT_CYCLE.length];
-                session.punctIndex = (session.punctIndex + 1) % PUNCT_CYCLE.length;
-                insertTextChar(session, punct);
-                return true;
-            }
+            if (char === '*') return applyPunctTap(session);
             if (char === '#') {
                 finalizeT9Session(session);
-                insertTextChar(session, '#');
+                insertTextChar(session, ' ');
                 return true;
             }
             if (/^[0-9]$/.test(char)) return applyT9Tap(session, char);

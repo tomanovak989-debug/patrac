@@ -2150,12 +2150,6 @@ function bindKeypad() {
                 return;
             }
             if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.type === 'text' || fieldEditSession.type === 'encrypt') {
-                    if (insertFieldEditSpace(fieldEditSession)) {
-                        renderDisplay();
-                        return;
-                    }
-                }
                 if (fieldEditSession.returnTo === 'comms' || fieldEditSession.returnTo === 'standby_manual') {
                     handleFieldEditBackAction();
                     return;
