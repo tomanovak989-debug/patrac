@@ -2080,6 +2080,15 @@ function updateMapCrosshair() {
     el.style.display = show ? 'block' : 'none';
 }
 
+function getMapHudTabButton() {
+    var btns = document.querySelectorAll('.bottom-action-bar button');
+    for (var i = 0; i < btns.length; i++) {
+        var onclick = btns[i].getAttribute('onclick') || '';
+        if (onclick.indexOf("'map-only'") !== -1) return btns[i];
+    }
+    return btns.length > 3 ? btns[3] : null;
+}
+
 function openAddPoiPanel() {
     cancelTargeting();
     closeStoryPositionsPanel();
@@ -2097,7 +2106,7 @@ function openAddPoiPanel() {
             : '📍 NOVÝ VOLNÝ BOD (GPS POLOHA)';
     }
     document.getElementById('map-add-poi-bar').style.display = 'block';
-    switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+    switchMainTab('map-only', getMapHudTabButton());
     updateMapCrosshair();
 }
 
@@ -2165,7 +2174,7 @@ function openAddRxPanel() {
             : '📡 NOVÝ RECEIVER (GPS POLOHA)';
     }
     document.getElementById('map-add-rx-bar').style.display = 'block';
-    switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+    switchMainTab('map-only', getMapHudTabButton());
     updateMapCrosshair();
 }
 
@@ -2246,7 +2255,7 @@ function openRxEditor(rxId) {
             : 'Výška se načítá…';
     }
     document.getElementById('map-rx-edit-bar').style.display = 'block';
-    switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+    switchMainTab('map-only', getMapHudTabButton());
 }
 
 function closeRxEditor() {

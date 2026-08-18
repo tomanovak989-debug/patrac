@@ -71,6 +71,7 @@ TX → radio_freq/{f_400025}/messages
 - [x] Zesílení signálu jen na shodném kanálu (freq + šifra)
 - [x] Mesh příjem přes receiver komunity
 - [ ] Nabourání cizích receiverů → odhalení kanálu (F4b)
+- [ ] **Útočiště v dosahu:** receiver kamkoliv rozšíří signál hráče, ale příběhové mise / hlavní úkoly útočiště vyžadují spojení útočiště ↔ síť (hráč nebo RX v dosahu útočiště) — až po dokončení zadávání questů (F5)
 
 ### F3 — Šifra a luštění
 ### F5 — Živý staničník + mise

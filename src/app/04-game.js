@@ -2999,6 +2999,8 @@ function switchMainTab(tab, element) {
     if (activeTargetingQuest && tab !== 'map-only') cancelTargeting();
     if (tab !== 'map-only') {
         closeAddPoiPanel();
+        closeAddRxPanel();
+        closeRxEditor();
         closeStoryPositionsPanel();
         closePoiEditor();
         closeStoryPosEditor();
