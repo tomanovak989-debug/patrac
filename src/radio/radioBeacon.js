@@ -1,29 +1,46 @@
 /**
  * BEACON — opakované vysílání SMS/PTT na celé pásmo 400–470 MHz, vždy PT (bez šifry).
- * SMS: každý puls na všech kanálech (krok 2,5 MHz). PTT: rotace po pásmu každý puls.
- * Příjem: naladěný kanál + autosken (dosahová matice).
+ * SMS: mřížka 1 MHz + komunita + naladěný kanál. PTT: rotace po pásmu každý puls.
  */
-import { normalizeEncryptionKey } from './radioComms.js';
-import { BAND_MIN_MHZ, BAND_MAX_MHZ, normalizeFrequency } from './radioBand.js';
+import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms.js';
+import { BAND_MIN_MHZ, BAND_MAX_MHZ, EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
 import { bandScanStepCount, frequencyAtBandIndex } from './radioAutoscan.js';
 
 export var BEACON_REPEAT_MS = 18000;
-export var BEACON_BURST_STEP_MHZ = 2.5;
+export var BEACON_BURST_STEP_MHZ = 1;
 export var BEACON_HUB = 'hub';
 export var BEACON_CONFIRM = 'confirm';
+export var BEACON_PTT_ARM = 'ptt_arm';
 
 var STORAGE_PREFIX = 'patrac_beacon_active_';
 var _remote = {};
 
-function storageKey(comCode) {
-    return STORAGE_PREFIX + String(comCode || '').trim().toUpperCase();
+function addFreq(set, list, value) {
+    var f = normalizeFrequency(value);
+    if (!f || set[f]) return;
+    set[f] = true;
+    list.push(f);
 }
 
-/** Frekvence pro SMS beacon — celé pásmo po 2,5 MHz (400, 402.5, … 470). */
-export function beaconBroadcastFrequencies() {
+/**
+ * Frekvence pro SMS beacon — 1 MHz mřížka + komunita + nouzová + volitelné extra.
+ * @param {{ comCode?: string, tunedFrequency?: string, extras?: string[] }} opts
+ */
+export function beaconBroadcastFrequencies(opts) {
+    opts = opts || {};
+    var set = {};
     var list = [];
-    for (var mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += BEACON_BURST_STEP_MHZ) {
-        list.push(normalizeFrequency(mhz));
+    var mhz;
+    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += BEACON_BURST_STEP_MHZ) {
+        addFreq(set, list, mhz);
+    }
+    addFreq(set, list, EMERGENCY_FREQUENCY);
+    addFreq(set, list, BAND_MIN_MHZ);
+    if (opts.comCode) addFreq(set, list, communityFrequencyFromCode(opts.comCode));
+    if (opts.tunedFrequency) addFreq(set, list, opts.tunedFrequency);
+    if (opts.extras && opts.extras.length) {
+        var i;
+        for (i = 0; i < opts.extras.length; i++) addFreq(set, list, opts.extras[i]);
     }
     return list;
 }
@@ -38,6 +55,18 @@ export function nextBeaconBroadcastFrequency(beacon) {
     var freq = frequencyAtBandIndex(idx);
     beacon.bandIndex = (idx + 1) % total;
     return freq;
+}
+
+function storageKey(comCode) {
+    return STORAGE_PREFIX + String(comCode || '').trim().toUpperCase();
+}
+
+export function hasActiveRemoteBeacons() {
+    pruneRemoteBeacons();
+    for (var id in _remote) {
+        if (Object.prototype.hasOwnProperty.call(_remote, id)) return true;
+    }
+    return false;
 }
 
 export function createBeaconSession() {
@@ -97,6 +126,7 @@ export function registerRemoteBeacon(payload) {
         updatedAt: payload.timestamp || Date.now(),
         active: true
     };
+    return true;
 }
 
 export function pruneRemoteBeacons(maxAgeMs) {
@@ -140,7 +170,7 @@ export function getMapBeacons(comCode, localBeacon) {
 export function beaconHubItems(localBeacon) {
     var items = [
         { type: 'action', id: 'beacon_sms', label: '1 · SMS BEACON' },
-        { type: 'action', id: 'beacon_ptt', label: '2 · PTT BEACON' }
+        { type: 'action', id: 'beacon_ptt', label: '2 · PTT BEACON (PTT kolečko)' }
     ];
     if (localBeacon && localBeacon.active) {
         items.push({ type: 'action', id: 'beacon_stop', label: '3 · ZASTAVIT BEACON' });
@@ -169,18 +199,57 @@ export function clampBeaconFocus(session, localBeacon) {
     return items;
 }
 
-export function buildBeaconOsView(session, radioState, localBeacon) {
+export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     session = session || createBeaconSession();
+    uiState = uiState || {};
     var lines = [];
     var footer = 'OK · Zpět';
     var status = 'BEACON';
     var focusLine = -1;
 
+    if (uiState.pttRecording) {
+        lines = [
+            'PTT BEACON',
+            '● NAHRÁVÁM…',
+            'Drž PTT kolečko',
+            'Pusť = konec nahrávky',
+            '',
+            ''
+        ];
+        return {
+            mode: 'beacon',
+            status: 'BEACON · PTT TX',
+            lines: lines,
+            focusLine: -1,
+            footer: 'Nahrávám…',
+            buffer: ''
+        };
+    }
+
+    if (session.screen === BEACON_PTT_ARM) {
+        lines = [
+            'PTT BEACON',
+            'Drž střední PTT',
+            'kolečko na klávesnici',
+            'Tón = start hovoru',
+            'Pusť = konec',
+            ''
+        ];
+        return {
+            mode: 'beacon',
+            status: 'BEACON · PTT',
+            lines: lines,
+            focusLine: -1,
+            footer: 'Drž PTT kolečko · Zpět',
+            buffer: ''
+        };
+    }
+
     if (session.screen === BEACON_CONFIRM) {
         var kind = session.pendingType === 'ptt' ? 'PTT' : 'SMS';
         var bandLine = session.pendingType === 'ptt'
             ? 'PT · rotace po pásmu'
-            : 'PT · celé pásmo 400–470';
+            : 'PT · pásmo + komunita';
         lines = [
             'SPUSTIT ' + kind + ' BEACON',
             bandLine,

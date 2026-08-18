@@ -82,7 +82,8 @@ import {
     createPresetDraft,
     savePresetDraft,
     getFocusedMenuItem,
-    getMenuItems
+    getMenuItems,
+    executeMenuDigit
 } from './radioOs.js';
 import {
     createAutoscanState,
@@ -109,10 +110,12 @@ import {
     clampBeaconFocus,
     BEACON_HUB,
     BEACON_CONFIRM,
+    BEACON_PTT_ARM,
     BEACON_REPEAT_MS,
     buildBeaconPayload,
     beaconBroadcastFrequencies,
-    nextBeaconBroadcastFrequency
+    nextBeaconBroadcastFrequency,
+    hasActiveRemoteBeacons
 } from './radioBeacon.js';
 import {
     createCommsState,
@@ -973,7 +976,65 @@ function executeQuickKey(keyId) {
         openCommsAction(map[action]);
         return true;
     }
+    if (action === 'menu:settings') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['settings'];
+        radioOs.focusIndex = 0;
+        renderDisplay();
+        return true;
+    }
+    if (action === 'autoscan:open') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['autoscan'];
+        ensureAutoscanSession();
+        renderDisplay();
+        return true;
+    }
+    if (action.indexOf('stub:') === 0) {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'stub';
+        radioOs.stubTitle = binding.label || 'VOLBA';
+        renderDisplay();
+        return true;
+    }
     return false;
+}
+
+/** Číslice v menu: rychlá volba > okamžitá položka (root) > sekvenční buffer. */
+function handleMenuKeypadDigit(keyId) {
+    if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-5]$/.test(keyId)) {
+        handleCommsDigit(keyId);
+        return;
+    }
+
+    if (isQuickKeyId(keyId)) {
+        var binding = getQuickKeyBinding(state, keyId);
+        if (binding && binding.action) {
+            executeQuickKey(keyId);
+            return;
+        }
+    }
+
+    if (isRadioOsActive(radioOs) && /^[0-9]$/.test(keyId) && !isCommsMenuContext()) {
+        if (!radioOs.menuPath || !radioOs.menuPath.length) {
+            var digitResult = executeMenuDigit(radioOs, state, keyId);
+            if (digitResult && digitResult.changed) {
+                clearMenuDial(menuDial);
+                applyRadioOsEffect(digitResult);
+                renderDisplay();
+                return;
+            }
+        }
+        appendMenuDialDigit(menuDial, keyId);
+        renderDisplay();
+        return;
+    }
+
+    if (isStandbyScreen() && isQuickKeyId(keyId)) {
+        tryExecuteQuickKey(keyId);
+    }
 }
 
 function ensureNotebookDrafts() {
@@ -1049,7 +1110,9 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive);
+    }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive, {
+        pttRecording: !!(beaconPttPending || (pttSession && pttSession.active && isBeaconMenuOpen()))
+    });
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
@@ -1292,7 +1355,19 @@ function tryAutoscanLock(payload) {
         frequency: normalizeFrequency(payload.frequency),
         encryptionKey: normalizeEncryptionKey(payload.encryptionKey || '')
     });
-    if (!reception.receivable || reception.quality === SIGNAL_NONE) return;
+    if (!reception.receivable || reception.quality === SIGNAL_NONE) {
+        /* Bez souřadnic nebo mimo dosah — stejný fallback jako u běžného RX (cloud/test). */
+        if (!origin) {
+            reception = {
+                quality: SIGNAL_WEAK,
+                distanceKm: null,
+                receivable: true,
+                reason: 'no_origin_fallback'
+            };
+        } else {
+            return;
+        }
+    }
 
     var msgFreq = normalizeFrequency(payload.frequency);
     if (!msgFreq) return;
@@ -1337,9 +1412,14 @@ function handleAutoscanOk() {
             return true;
         }
         persist();
-        refreshSubscriptions();
-        startAutoscanTimer();
-        renderDisplay();
+        refreshSubscriptions().then(function() {
+            startAutoscanTimer();
+            renderDisplay();
+        }).catch(function(err) {
+            console.warn('[radioUi] autoscan subscribe', err);
+            startAutoscanTimer();
+            renderDisplay();
+        });
         return true;
     }
     if (session.status === SCAN_RUNNING) {
@@ -1380,9 +1460,15 @@ function ensureBeaconSession() {
     return beaconSession;
 }
 
-function notifyBeaconMap() {
+function getBeaconLatLng() {
+    var player = getPlayerLatLng();
+    if (player) return player;
+    return getShelterLatLng();
+}
+
+function notifyBeaconMap(panToLocal) {
     if (typeof window.patracRefreshBeaconMap === 'function') {
-        try { window.patracRefreshBeaconMap(); } catch (e) {}
+        try { window.patracRefreshBeaconMap(!!panToLocal); } catch (e) {}
     }
 }
 
@@ -1395,19 +1481,28 @@ function stopBeaconRepeatTimer() {
 
 async function transmitBeaconPulse(skipTxFx) {
     if (!beaconActive || !beaconActive.active) return;
+    var c = getCtx();
     var basePayload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
     var freqs = beaconActive.messageType === 'ptt'
         ? [nextBeaconBroadcastFrequency(beaconActive)]
-        : beaconBroadcastFrequencies();
+        : beaconBroadcastFrequencies({
+            comCode: c.comCode || '',
+            tunedFrequency: state.frequency || '',
+            extras: beaconActive.frequency ? [beaconActive.frequency] : []
+        });
+    var sends = [];
     var i;
     for (i = 0; i < freqs.length; i++) {
-        await transmitMessage(beaconActive.text, Object.assign({}, basePayload, {
+        sends.push(transmitMessage(beaconActive.text, Object.assign({}, basePayload, {
             frequency: freqs[i],
             encryptionKey: '',
-            skipNotebook: !!skipTxFx || i > 0
-        }));
+            originLat: beaconActive.lat,
+            originLng: beaconActive.lng,
+            skipNotebook: !!skipTxFx || i > 0,
+            skipTxFx: skipTxFx || i > 0
+        })));
     }
-    var c = getCtx();
+    await Promise.all(sends);
     saveLocalBeacon(c.comCode || '', beaconActive);
 }
 
@@ -1423,14 +1518,15 @@ function startBeaconRepeatTimer() {
 async function startBeacon(opts) {
     opts = opts || {};
     var c = getCtx();
-    if (c.originLat == null || c.originLng == null) {
-        alert('Beacon potřebuje polohu útočiště nebo GPS nosiče (BÁZE / NOSIČ na displeji).');
+    var pos = getBeaconLatLng();
+    if (!pos || !isFinite(pos.lat) || !isFinite(pos.lng)) {
+        alert('Beacon potřebuje GPS (NOSIČ) nebo souřadnice útočiště na mapě.');
         return;
     }
     beaconActive = {
         active: true,
-        lat: c.originLat,
-        lng: c.originLng,
+        lat: pos.lat,
+        lng: pos.lng,
         frequency: normalizeFrequency(state.frequency) || normalizeFrequency(BAND_MIN_MHZ),
         encryptionKey: '',
         messageType: opts.messageType || 'sms',
@@ -1443,9 +1539,10 @@ async function startBeacon(opts) {
         startedAt: Date.now()
     };
     saveLocalBeacon(c.comCode || '', beaconActive);
+    refreshSubscriptions();
     await transmitBeaconPulse(false);
     startBeaconRepeatTimer();
-    notifyBeaconMap();
+    notifyBeaconMap(true);
     renderDisplay();
 }
 
@@ -1454,6 +1551,7 @@ function stopBeacon() {
     var c = getCtx();
     clearLocalBeacon(c.comCode || '');
     beaconActive = null;
+    refreshSubscriptions();
     if (beaconSession) {
         beaconSession.screen = BEACON_HUB;
         beaconSession.focusIndex = 0;
@@ -1511,14 +1609,30 @@ function startBeaconPttRecord() {
         alert('Mikrofon není dostupný.');
         return;
     }
+    if (beaconPttPending || pttSession.active) return;
+    radioKeypadPttDown();
     startPttRecording(pttSession).then(function(ok) {
-        if (!ok) return;
+        if (!ok) {
+            radioKeypadPttUp();
+            return;
+        }
         beaconPttPending = true;
-        radioKeypadPttDown();
         renderDisplay();
         clearPttMaxTimer();
         pttMaxTimer = setTimeout(finishBeaconPttRecord, PTT_MAX_MS);
     });
+}
+
+function cancelBeaconPttRecord() {
+    if (!beaconPttPending && !pttSession.active) return;
+    beaconPttPending = false;
+    clearPttMaxTimer();
+    cancelPttRecording(pttSession);
+    pttSession = createPttSession();
+    radioKeypadPttUp();
+    var session = ensureBeaconSession();
+    if (session.screen === BEACON_PTT_ARM) session.screen = BEACON_HUB;
+    renderDisplay();
 }
 
 async function finishBeaconPttRecord() {
@@ -1592,7 +1706,9 @@ function handleBeaconOk() {
     if (action.id === 'beacon_sms') {
         openBeaconCompose();
     } else if (action.id === 'beacon_ptt') {
-        startBeaconPttRecord();
+        session.pendingType = 'ptt';
+        session.screen = BEACON_PTT_ARM;
+        renderDisplay();
     } else if (action.id === 'beacon_stop') {
         stopBeacon();
     }
@@ -1708,10 +1824,13 @@ function startStandbyPtt() {
         alert('Mikrofon není dostupný.');
         return;
     }
+    radioKeypadPttDown();
     startPttRecording(pttSession).then(function(ok) {
-        if (!ok) return;
+        if (!ok) {
+            radioKeypadPttUp();
+            return;
+        }
         standbyPttActive = true;
-        radioKeypadPttDown();
         renderDisplay();
         clearPttMaxTimer();
         pttMaxTimer = setTimeout(finishStandbyPtt, PTT_MAX_MS);
@@ -1919,12 +2038,21 @@ function handleRadioOsInput(action) {
 
     if (action === 'open_menu') clearMenuDial(menuDial);
 
-    if (isBeaconMenuOpen() && beaconSession && beaconSession.screen === BEACON_CONFIRM && action === 'back') {
-        beaconSession.screen = BEACON_HUB;
-        beaconSession.focusIndex = 0;
-        beaconSession.pendingText = '';
-        renderDisplay();
-        return true;
+    if (isBeaconMenuOpen() && beaconSession && action === 'back') {
+        if (beaconSession.screen === BEACON_CONFIRM) {
+            beaconSession.screen = BEACON_HUB;
+            beaconSession.focusIndex = 0;
+            beaconSession.pendingText = '';
+            renderDisplay();
+            return true;
+        }
+        if (beaconSession.screen === BEACON_PTT_ARM) {
+            cancelBeaconPttRecord();
+            beaconSession.screen = BEACON_HUB;
+            beaconSession.focusIndex = 0;
+            renderDisplay();
+            return true;
+        }
     }
 
     if (action === 'ok' && menuDial && menuDial.buffer) {
@@ -2341,8 +2469,11 @@ function ingestIncomingPayload(payload) {
     }
 
     if (payload.messageType === 'beacon') {
-        registerRemoteBeacon(payload);
-        notifyBeaconMap();
+        var addedRemote = registerRemoteBeacon(payload);
+        if (addedRemote) {
+            refreshSubscriptions();
+        }
+        notifyBeaconMap(false);
         var beaconOrigin = (payload.originLat != null && payload.originLng != null)
             ? { lat: payload.originLat, lng: payload.originLng }
             : null;
@@ -2351,6 +2482,14 @@ function ingestIncomingPayload(payload) {
             encryptionKey: ''
         });
         schedulePathElevationPrefetch(beaconOrigin);
+        if (!beaconReception.receivable || beaconReception.quality === SIGNAL_NONE) {
+            beaconReception = {
+                quality: SIGNAL_WEAK,
+                distanceKm: beaconReception.distanceKm,
+                receivable: true,
+                reason: 'beacon_fallback'
+            };
+        }
         if (beaconReception.receivable) {
             var beaconKey = normalizeEncryptionKey(payload.encryptionKey || '');
             var myBeaconKey = normalizeEncryptionKey(state.encryptionKey || '');
@@ -2415,15 +2554,17 @@ function ingestIncomingPayload(payload) {
 }
 
 function refreshSubscriptions() {
-    if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
+    if (ctx.isLocalOnly && ctx.isLocalOnly()) return Promise.resolve();
     var onMsg = ingestIncomingPayload;
-    if (autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED)) {
-        subscribeRadioBandScan(onMsg).catch(function(err) {
+    var bandListen = !!(autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED))
+        || !!(beaconActive && beaconActive.active)
+        || hasActiveRemoteBeacons();
+    if (bandListen) {
+        return subscribeRadioBandScan(onMsg, { backfillRecentMs: 60000 }).catch(function(err) {
             console.warn('[radioUi] band scan subscribe', err);
         });
-        return;
     }
-    subscribeRadioChannels(collectTunedFrequencies(state), onMsg).catch(function(err) {
+    return subscribeRadioChannels(collectTunedFrequencies(state), onMsg).catch(function(err) {
         console.warn('[radioUi] subscribe', err);
     });
 }
@@ -2493,8 +2634,8 @@ async function transmitMessage(text, extras) {
             presetSlot: entry.presetSlot,
             presetLabel: entry.presetLabel,
             timestamp: entry.ts,
-            originLat: c.originLat,
-            originLng: c.originLng
+            originLat: extras.originLat != null ? extras.originLat : c.originLat,
+            originLng: extras.originLng != null ? extras.originLng : c.originLng
         });
         if (sent && sent.id) {
             seenMessageIds[sent.id] = true;
@@ -2765,17 +2906,35 @@ function bindKeypad() {
         mainDial._pttBound = true;
         mainDial.addEventListener('pointerdown', function(e) {
             if (state.operatingMode === 'off' || e.button !== 0) return;
+            if (isBeaconMenuOpen() && beaconSession &&
+                (beaconSession.screen === BEACON_PTT_ARM || beaconPttPending)) {
+                e.preventDefault();
+                startBeaconPttRecord();
+                return;
+            }
             if (!isStandbyScreen()) return;
             e.preventDefault();
             startStandbyPtt();
         }, true);
         mainDial.addEventListener('pointerup', function(e) {
+            if (beaconPttPending || (pttSession.active && isBeaconMenuOpen())) {
+                e.preventDefault();
+                finishBeaconPttRecord();
+                return;
+            }
             if (standbyPttActive || pttSession.active) {
                 e.preventDefault();
                 finishStandbyPtt();
             }
         }, true);
-        mainDial.addEventListener('pointercancel', cancelStandbyPtt, true);
+        mainDial.addEventListener('pointercancel', function(e) {
+            if (beaconPttPending || (pttSession.active && isBeaconMenuOpen())) {
+                e.preventDefault();
+                cancelBeaconPttRecord();
+                return;
+            }
+            cancelStandbyPtt();
+        }, true);
     }
 
     var modeBtn = el('radio-key-mode');
@@ -2813,38 +2972,16 @@ function bindKeypad() {
                 return;
             }
 
-            var quickBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
-            if (quickBtn) {
-                var qkey = quickBtn.getAttribute('data-key');
-                if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-5]$/.test(qkey)) {
-                    handleCommsDigit(qkey);
+            var menuBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
+            if (menuBtn) {
+                var mkey = menuBtn.getAttribute('data-key');
+                if (/^[0-9]$/.test(mkey) || mkey === 'p1' || mkey === 'p2') {
+                    handleMenuKeypadDigit(mkey);
                     return;
                 }
-                if (isQuickKeyId(qkey) && tryExecuteQuickKey(qkey)) return;
-            }
-
-            if (isRadioOsActive(radioOs)) {
-                var menuBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
-                if (menuBtn) {
-                    var mkey = menuBtn.getAttribute('data-key');
-                    if (/^[0-9]$/.test(mkey)) {
-                        if (isCommsMenuContext()) return;
-                        appendMenuDialDigit(menuDial, mkey);
-                        renderDisplay();
-                        return;
-                    }
-                }
-                return;
             }
 
             if (!isStandbyScreen()) return;
-
-            var btn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
-            if (!btn) return;
-            var key = btn.getAttribute('data-key');
-            if (/^[1-9]$/.test(key)) {
-                tryExecuteQuickKey(key);
-            }
         });
     }
 
@@ -3181,12 +3318,16 @@ export function initRadioCommsSystem(options) {
         return prefetchReceptionElevations();
     };
     refreshBeaconActiveFromStorage();
-    if (beaconActive && beaconActive.active) startBeaconRepeatTimer();
+    if (beaconActive && beaconActive.active) {
+        startBeaconRepeatTimer();
+        refreshSubscriptions();
+    }
     window.patracGetMapBeacons = function() {
         refreshBeaconActiveFromStorage();
         var c = getCtx();
         return getMapBeacons(c.comCode || '', beaconActive);
     };
+    notifyBeaconMap(false);
 }
 
 export function refreshRadioCommsContext() {

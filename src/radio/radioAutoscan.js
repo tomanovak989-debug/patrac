@@ -170,8 +170,8 @@ export function buildAutoscanOsView(session, radioState) {
             'Pásmo ' + BAND_MIN_MHZ + '–' + BAND_MAX_MHZ,
             'Odchyt dle dosahu',
             'Libovolná frekvence v pásmu',
-            'OK = spustit',
-            ''
+            'OK = spustit sken',
+            'Po startu: POSLECH celé pásmo'
         ];
         footer = 'OK · Zpět';
         status = 'AUTOSKEN';

@@ -425,8 +425,8 @@ function initRadioRangeModule() {
 function initBeaconMapModule() {
     patracImport('map/beaconMapLayer.js').then(function(mod) {
         mod.initBeaconMapLayer(map);
-        window.patracRefreshBeaconMap = function() {
-            mod.refreshBeaconMapLayer();
+        window.patracRefreshBeaconMap = function(panToLocal) {
+            mod.refreshBeaconMapLayer(!!panToLocal);
         };
     }).catch(function(err) { console.warn('[beaconMap]', err); });
 }

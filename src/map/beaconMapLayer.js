@@ -6,6 +6,8 @@ var _layer = null;
 var _markers = {};
 var _blinkOn = true;
 var _blinkTimer = null;
+var _pendingRefresh = false;
+var _pendingPanLocal = false;
 
 function clearMarkers() {
     if (!_layer) {
@@ -29,10 +31,32 @@ function beaconIcon(active) {
     });
 }
 
+function panToBeaconList(list, preferLocal) {
+    if (!_map || !list || !list.length) return;
+    var target = null;
+    var i;
+    if (preferLocal) {
+        for (i = 0; i < list.length; i++) {
+            if (list[i] && String(list[i].id || '').indexOf('local_') === 0) {
+                target = list[i];
+                break;
+            }
+        }
+    }
+    if (!target) target = list[0];
+    if (!target || !isFinite(target.lat) || !isFinite(target.lng)) return;
+    try {
+        _map.setView([target.lat, target.lng], Math.max(_map.getZoom() || 14, 14), { animate: true });
+    } catch (e) {}
+}
+
 export function initBeaconMapLayer(map) {
     _map = map || null;
     if (!_map || !window.L) return;
-    if (!_layer) _layer = window.L.layerGroup().addTo(_map);
+    if (!_layer) {
+        _layer = window.L.layerGroup();
+        _layer.addTo(_map);
+    }
     if (!_blinkTimer) {
         _blinkTimer = setInterval(function() {
             _blinkOn = !_blinkOn;
@@ -45,11 +69,21 @@ export function initBeaconMapLayer(map) {
             }
         }, 700);
     }
-    refreshBeaconMapLayer();
+    if (_pendingRefresh) {
+        _pendingRefresh = false;
+        refreshBeaconMapLayer(_pendingPanLocal);
+        _pendingPanLocal = false;
+    } else {
+        refreshBeaconMapLayer(false);
+    }
 }
 
-export function refreshBeaconMapLayer() {
-    if (!_map || !_layer || !window.L) return;
+export function refreshBeaconMapLayer(panToLocal) {
+    if (!_map || !_layer || !window.L) {
+        _pendingRefresh = true;
+        if (panToLocal) _pendingPanLocal = true;
+        return;
+    }
     var list = [];
     if (typeof window.patracGetMapBeacons === 'function') {
         try { list = window.patracGetMapBeacons() || []; } catch (e) {}
@@ -67,7 +101,8 @@ export function refreshBeaconMapLayer() {
         var marker = window.L.marker([b.lat, b.lng], {
             icon: beaconIcon(true),
             interactive: true,
-            keyboard: false
+            keyboard: false,
+            zIndexOffset: 1200
         });
         var label = b.label || 'BEACON';
         var freq = b.frequency ? (' · ' + b.frequency + ' MHz') : '';
@@ -82,6 +117,7 @@ export function refreshBeaconMapLayer() {
             delete _markers[mid];
         }
     }
+    if (panToLocal && list.length) panToBeaconList(list, true);
 }
 
 export function destroyBeaconMapLayer() {
@@ -95,4 +131,6 @@ export function destroyBeaconMapLayer() {
     }
     _layer = null;
     _map = null;
+    _pendingRefresh = false;
+    _pendingPanLocal = false;
 }

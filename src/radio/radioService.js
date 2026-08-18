@@ -155,10 +155,14 @@ export function stopRadioSubscriptions() {
 /**
  * Autosken — poslech celého pásma: collection group „messages“ napříč všemi frekvencemi.
  * Herní pravidlo: platí jen dosah, ne shoda s aktuálním krokem skenu.
+ * @param {{ backfillRecentMs?: number }} opts — při startu autoskenu načíst zprávy z posledních N ms
  */
-export async function subscribeRadioBandScan(onMessage) {
+export async function subscribeRadioBandScan(onMessage, opts) {
     stopRadioSubscriptions();
     if (!onMessage) return;
+
+    opts = opts || {};
+    var backfillRecentMs = opts.backfillRecentMs || 0;
 
     await ensureRadioAuth();
 
@@ -173,8 +177,21 @@ export async function subscribeRadioBandScan(onMessage) {
         if (initialSnap) {
             initialSnap = false;
             var i;
-            for (i = 0; i < snap.docs.length; i++) {
-                seen[snap.docs[i].ref.path] = true;
+            if (backfillRecentMs > 0) {
+                var cutoff = Date.now() - backfillRecentMs;
+                var docs = snap.docs.slice().reverse();
+                for (i = 0; i < docs.length; i++) {
+                    var docSnap = docs[i];
+                    seen[docSnap.ref.path] = true;
+                    var ts = Number((docSnap.data() || {}).timestamp) || 0;
+                    if (ts >= cutoff) {
+                        onMessage(mapDocToPayload(docSnap));
+                    }
+                }
+            } else {
+                for (i = 0; i < snap.docs.length; i++) {
+                    seen[snap.docs[i].ref.path] = true;
+                }
             }
             return;
         }
