@@ -48,7 +48,7 @@ import {
     deleteNoteById,
     countUnreadInbox
 } from './radioComms.js';
-import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions } from './radioService.js';
+import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, getRadioListenStatus } from './radioService.js';
 import { getFirebaseAuth } from '../lib/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -1268,7 +1268,13 @@ function renderDisplay() {
                 footerWrap.innerHTML = '0 KEY · <span id="radio-display-com"></span>';
                 foot = el('radio-display-com');
             }
-            if (foot) foot.textContent = standbyLines.footer;
+            if (foot) {
+                var rx = getRadioListenStatus();
+                var rxHint = rx && rx.state === 'ok' ? ' · RX OK'
+                    : (rx && rx.state === 'partial' ? ' · RX kanály'
+                        : (rx && rx.state === 'error' ? ' · RX?' : ''));
+                foot.textContent = standbyLines.footer + rxHint;
+            }
         }
     } else {
         var menuLines = osView.lines || ['', '', '', '', '', ''];
@@ -2599,8 +2605,11 @@ function refreshSubscriptions() {
     return subscribeRadioListen(onMsg, {
         frequencies: collectListenFrequencies(),
         backfillRecentMs: 45000
+    }).then(function() {
+        renderDisplay();
     }).catch(function(err) {
         console.warn('[radioUi] radio listen subscribe', err);
+        renderDisplay();
     });
 }
 

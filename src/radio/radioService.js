@@ -4,19 +4,31 @@
  */
 import { collection, collectionGroup, addDoc, setDoc, doc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
-import { ensurePatracAuth } from '../services/authService.js';
+import { ensurePatracAuth, ensurePatracUserDoc } from '../services/authService.js';
 import { ensureFirebaseAuth } from '../lib/firebase.js';
 import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
 
 var channelUnsubs = {};
+var radioListenStatus = { state: 'idle', detail: '', at: 0 };
+
+export function getRadioListenStatus() {
+    return radioListenStatus;
+}
+
+function setRadioListenStatus(state, detail) {
+    radioListenStatus = { state: state, detail: detail || '', at: Date.now() };
+}
 
 async function ensureRadioAuth(requirePatrac) {
     try {
-        return await ensurePatracAuth();
+        var user = await ensurePatracAuth();
+        return user;
     } catch (err) {
         if (requirePatrac) throw err;
         console.warn('[radioService] patrac auth, fallback firebase', err);
-        return ensureFirebaseAuth();
+        var fb = await ensureFirebaseAuth();
+        try { await ensurePatracUserDoc(fb); } catch (e2) {}
+        return fb;
     }
 }
 
@@ -262,6 +274,7 @@ export async function subscribeRadioListen(onMessage, opts) {
     if (!onMessage) return;
 
     opts = opts || {};
+    setRadioListenStatus('connecting', '');
     await ensureRadioAuth(false);
 
     var freqs = Array.isArray(opts.frequencies) ? opts.frequencies : [];
@@ -269,12 +282,22 @@ export async function subscribeRadioListen(onMessage, opts) {
         attachChannelListener(freqs[i], onMessage);
     }
 
+    var bandOk = false;
     try {
         await subscribeRadioBandScan(onMessage, {
             additive: true,
             backfillRecentMs: opts.backfillRecentMs || 0
         });
+        bandOk = true;
     } catch (err) {
         console.warn('[radioService] band scan unavailable, channels only', err);
+        setRadioListenStatus('partial', String(err && err.message ? err.message : err));
+    }
+    if (bandOk) {
+        setRadioListenStatus('ok', freqs.length + ' kan + feed');
+    } else if (freqs.length) {
+        setRadioListenStatus('partial', freqs.length + ' kan');
+    } else {
+        setRadioListenStatus('error', 'žádný kanál');
     }
 }

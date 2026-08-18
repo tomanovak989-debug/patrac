@@ -140,14 +140,39 @@ export async function ensureAnonymousAuth() {
 
 export async function ensurePatracAuth() {
     var auth = getAuthInstance();
+    var user = null;
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
-        return auth.currentUser;
+        user = auth.currentUser;
+    } else {
+        var restored = await restorePatracSessionFromLocal('');
+        if (restored && !restored.isAnonymous) {
+            user = restored;
+        }
     }
-    var restored = await restorePatracSessionFromLocal('');
-    if (restored && !restored.isAnonymous) {
-        return restored;
+    if (!user) {
+        throw new Error('Nejsi přihlášen — obnov stránku a přihlas se znovu.');
     }
-    throw new Error('Nejsi přihlášen — obnov stránku a přihlas se znovu.');
+    await ensurePatracUserDoc(user);
+    return user;
+}
+
+/** Firestore rules pro TX vyžadují users/{firebaseUid}.patracUserId — doplní chybějící záznam. */
+export async function ensurePatracUserDoc(user) {
+    user = user || getAuthInstance().currentUser;
+    if (!user || user.isAnonymous) return null;
+    var userId = normalizePatracUserId(
+        typeof localStorage !== 'undefined' ? localStorage.getItem('patrac_session') : ''
+    );
+    if (!userId) return user;
+    var ref = doc(getDb(), USERS_COLLECTION, user.uid);
+    var snap = await getDoc(ref);
+    var cur = snap.exists() ? (snap.data().patracUserId || '') : '';
+    if (cur === userId) return user;
+    await setDoc(ref, {
+        patracUserId: userId,
+        updatedAt: Date.now()
+    }, { merge: true });
+    return user;
 }
 
 export async function restorePatracSessionFromLocal(userId) {
