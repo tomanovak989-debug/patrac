@@ -48,7 +48,7 @@ import {
     deleteNoteById,
     countUnreadInbox
 } from './radioComms.js';
-import { sendRadioTransmission, subscribeRadioChannels, subscribeRadioBandScan, stopRadioSubscriptions } from './radioService.js';
+import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions } from './radioService.js';
 import {
     evaluateBestRadioReception,
     applyReceptionToMessage,
@@ -91,7 +91,7 @@ import {
     advanceAutoscanVisual,
     stopAutoscan,
     lockAutoscan,
-    isAutoscanActivity,
+    isAutoscanListenFrequency,
     bandIndexForFrequency,
     AUTOSCAN_VISUAL_MS,
     SCAN_IDLE,
@@ -1337,9 +1337,16 @@ function startAutoscanTimer() {
     autoscanTimer = setInterval(tickAutoscanStep, AUTOSCAN_VISUAL_MS);
 }
 
+function isAutoscanListening() {
+    return !!(autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED));
+}
+
 function tryAutoscanLock(payload) {
-    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) return;
-    if (!payload || !isAutoscanActivity(autoscanSession, payload)) return;
+    if (!isAutoscanListening()) return;
+    if (!payload) return;
+
+    var msgFreq = normalizeFrequency(payload.frequency);
+    if (!msgFreq || !isAutoscanListenFrequency(msgFreq)) return;
 
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
@@ -1349,52 +1356,56 @@ function tryAutoscanLock(payload) {
         encryptionKey: normalizeEncryptionKey(payload.encryptionKey || '')
     });
     if (!reception.receivable || reception.quality === SIGNAL_NONE) {
-        /* Bez souřadnic nebo mimo dosah — stejný fallback jako u běžného RX (cloud/test). */
-        if (!origin) {
-            reception = {
-                quality: SIGNAL_WEAK,
-                distanceKm: null,
-                receivable: true,
-                reason: 'no_origin_fallback'
-            };
-        } else {
-            return;
-        }
+        reception = {
+            quality: origin ? SIGNAL_NOISE : SIGNAL_WEAK,
+            distanceKm: reception.distanceKm,
+            receivable: true,
+            reason: origin ? 'cloud_fallback' : 'no_origin_fallback'
+        };
     }
-
-    var msgFreq = normalizeFrequency(payload.frequency);
-    if (!msgFreq) return;
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var myKey = normalizeEncryptionKey(state.encryptionKey || '');
     var foreignEncrypt = !!(msgKey && msgKey !== myKey);
     var hitLabel = foreignEncrypt ? 'ŠIFROVANÝ PROVOZ' : (msgFreq + ' MHz');
+    var applied = foreignEncrypt ? null : applyReceptionToMessage(payload.text, reception, {
+        seed: payload.id || payload.text,
+        frequency: msgFreq
+    });
+    var captureText = foreignEncrypt
+        ? '[ŠIFROVANÝ PROVOZ]'
+        : String((applied && applied.text) || payload.text || '').slice(0, 96);
 
-    autoscanSession.activitySeen = true;
-    autoscanSession.hitFrequency = msgFreq;
-    autoscanSession.hitEncrypted = foreignEncrypt;
-    autoscanSession.index = bandIndexForFrequency(msgFreq);
-    state.frequency = msgFreq;
-    state.encryptionKey = '';
-    state.activePresetSlot = null;
-    state.dialBuffer = '';
-    lockAutoscan(autoscanSession, hitLabel, msgFreq);
+    var didLock = false;
+    if (autoscanSession.status === SCAN_RUNNING) {
+        autoscanSession.activitySeen = true;
+        autoscanSession.hitFrequency = msgFreq;
+        autoscanSession.hitEncrypted = foreignEncrypt;
+        autoscanSession.index = bandIndexForFrequency(msgFreq);
+        state.frequency = msgFreq;
+        state.encryptionKey = '';
+        state.activePresetSlot = null;
+        state.dialBuffer = '';
+        lockAutoscan(autoscanSession, hitLabel, msgFreq);
+        stopAutoscanTimer();
+        didLock = true;
+    }
+
     appendAutoscanCapture(notebook, {
         id: 'scan_' + (payload.id || msgFreq + '_' + Date.now()),
         entryId: payload.id || null,
         ts: payload.timestamp || payload.ts || Date.now(),
         frequency: msgFreq,
         encryptionKey: payload.encryptionKey || '',
-        text: foreignEncrypt ? '[ŠIFROVANÝ PROVOZ]' : String(payload.text || '').slice(0, 48),
+        text: captureText,
         encrypted: foreignEncrypt,
         presetLabel: payload.presetLabel || '',
         presetSlot: payload.presetSlot || null
     });
-    stopAutoscanTimer();
     persist();
-    refreshSubscriptions();
+    if (didLock) refreshSubscriptions();
     renderDisplay();
-    radioIncomingFeedback(reception.quality || SIGNAL_CLEAR);
+    radioIncomingFeedback((applied && applied.signalQuality) || reception.quality || SIGNAL_CLEAR);
 }
 
 function handleAutoscanOk() {
@@ -2332,13 +2343,6 @@ function normalizeUserId(id) {
     return String(id || '').trim();
 }
 
-function isOwnRadioSender(payload, c) {
-    var me = normalizeUserId(c && c.userId);
-    var sid = normalizeUserId(payload && payload.senderId);
-    if (me && sid && me === sid) return true;
-    return false;
-}
-
 /** Echo vlastní TX: cloud id ≠ local_ id, takže by se zápis zduplikoval jako ↓. */
 function hasRecentOutgoingEcho(payload) {
     if (!notebook || !notebook.station) return false;
@@ -2441,20 +2445,17 @@ function recordEntry(entry) {
 function ingestIncomingPayload(payload) {
     var c = getCtx();
     if (!payload || !payload.id) return;
-    if (isOwnRadioSender(payload, c)) {
+    if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
         seenMessageIds[payload.id] = true;
         return;
     }
-    tryAutoscanLock(payload);
+    /* Potlač jen echo z TÉTO vysílačky — stejný účet na jiném telefonu musí přijmout. */
     if (hasRecentOutgoingEcho(payload)) {
         seenMessageIds[payload.id] = true;
         return;
     }
+    tryAutoscanLock(payload);
     if (hasContentDuplicate(payload)) {
-        seenMessageIds[payload.id] = true;
-        return;
-    }
-    if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
         seenMessageIds[payload.id] = true;
         return;
     }
@@ -2544,16 +2545,14 @@ function ingestIncomingPayload(payload) {
     radioIncomingFeedback(applied.signalQuality);
 }
 
-function listenFallbackChannels(onMsg) {
+function collectListenFrequencies() {
     var c = getCtx();
-    var freqs = [];
-    var tuned = normalizeFrequency(state.frequency);
-    if (tuned) freqs.push(tuned);
+    var freqs = collectTunedFrequencies(state).slice();
     var comFreq = communityFrequencyFromCode(c.comCode);
     if (comFreq) freqs.push(comFreq);
     var broadcast = beaconBroadcastFrequencies({
         comCode: c.comCode,
-        tunedFrequency: tuned
+        tunedFrequency: normalizeFrequency(state.frequency)
     });
     var i;
     for (i = 0; i < broadcast.length; i++) freqs.push(broadcast[i]);
@@ -2565,9 +2564,7 @@ function listenFallbackChannels(onMsg) {
         seen[f] = true;
         uniq.push(f);
     }
-    if (!uniq.length) return Promise.resolve();
-    console.warn('[radioUi] band scan nedostupný — poslech kanálů:', uniq.join(', '));
-    return subscribeRadioChannels(uniq, onMsg);
+    return uniq;
 }
 
 function refreshSubscriptions() {
@@ -2577,10 +2574,11 @@ function refreshSubscriptions() {
         return Promise.resolve();
     }
     var onMsg = ingestIncomingPayload;
-    /* Zapnutá vysílačka = poslech celého pásma (jako autosken RX). */
-    return subscribeRadioBandScan(onMsg, { backfillRecentMs: 45000 }).catch(function(err) {
-        console.warn('[radioUi] band scan subscribe', err);
-        return listenFallbackChannels(onMsg);
+    return subscribeRadioListen(onMsg, {
+        frequencies: collectListenFrequencies(),
+        backfillRecentMs: 45000
+    }).catch(function(err) {
+        console.warn('[radioUi] radio listen subscribe', err);
     });
 }
 

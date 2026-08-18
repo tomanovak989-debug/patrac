@@ -94,56 +94,58 @@ function mapDocToPayload(docSnap, fallbackFreq, channelId) {
     };
 }
 
+function attachChannelListener(raw, onMessage) {
+    var freq = normalizeFrequency(raw);
+    var channelId = freq ? frequencyChannelId(freq) : String(raw || '');
+    if (!channelId || channelUnsubs[channelId]) return;
+    if (!freq && channelId.indexOf('f_') !== 0) return;
+
+    var q = query(
+        collection(getDb(), 'radio_freq', channelId, 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(40)
+    );
+    var seen = {};
+    var initialSnap = true;
+    channelUnsubs[channelId] = onSnapshot(q, function(snap) {
+        if (initialSnap) {
+            initialSnap = false;
+            var docs = snap.docs.slice().reverse();
+            for (var s = 0; s < docs.length; s++) {
+                seen[docs[s].id] = true;
+                onMessage(mapDocToPayload(docs[s], freq, channelId));
+            }
+            return;
+        }
+        var changes = snap.docChanges();
+        for (var c = 0; c < changes.length; c++) {
+            if (changes[c].type !== 'added') continue;
+            var docSnap = changes[c].doc;
+            var msgId = docSnap.id;
+            if (seen[msgId]) continue;
+            seen[msgId] = true;
+            onMessage(mapDocToPayload(docSnap, freq, channelId));
+        }
+    }, function(err) {
+        console.warn('[radioService] subscribe', channelId, err);
+    });
+}
+
 /**
  * @param {string[]} frequenciesOrIds — normalizované frekvence („400.025“) nebo id („f_400025“)
  * @param {(payload: object) => void} onMessage
+ * @param {{ additive?: boolean }} opts
  * @returns {Promise<void>}
  */
-export async function subscribeRadioChannels(frequenciesOrIds, onMessage) {
-    stopRadioSubscriptions();
-    if (!Array.isArray(frequenciesOrIds) || !frequenciesOrIds.length) return;
+export async function subscribeRadioChannels(frequenciesOrIds, onMessage, opts) {
+    opts = opts || {};
+    if (!opts.additive) stopRadioSubscriptions();
+    if (!Array.isArray(frequenciesOrIds) || !frequenciesOrIds.length || !onMessage) return;
 
     await ensureRadioAuth(false);
 
     for (var i = 0; i < frequenciesOrIds.length; i++) {
-        (function(raw) {
-            var freq = normalizeFrequency(raw);
-            var channelId = freq ? frequencyChannelId(freq) : String(raw || '');
-            if (!channelId || channelUnsubs[channelId]) return;
-            if (!freq && channelId.indexOf('f_') !== 0) return;
-
-            var q = query(
-                collection(getDb(), 'radio_freq', channelId, 'messages'),
-                orderBy('timestamp', 'desc'),
-                limit(40)
-            );
-            var seen = {};
-            var initialSnap = true;
-            channelUnsubs[channelId] = onSnapshot(q, function(snap) {
-                if (initialSnap) {
-                    initialSnap = false;
-                    /* Backfill: chronologicky (starší → novější), ať přepnutí profilu
-                       dostane nedávný provoz na naladěné frekvenci do staničníku. */
-                    var docs = snap.docs.slice().reverse();
-                    for (var s = 0; s < docs.length; s++) {
-                        seen[docs[s].id] = true;
-                        onMessage(mapDocToPayload(docs[s], freq, channelId));
-                    }
-                    return;
-                }
-                var changes = snap.docChanges();
-                for (var c = 0; c < changes.length; c++) {
-                    if (changes[c].type !== 'added') continue;
-                    var docSnap = changes[c].doc;
-                    var msgId = docSnap.id;
-                    if (seen[msgId]) continue;
-                    seen[msgId] = true;
-                    onMessage(mapDocToPayload(docSnap, freq, channelId));
-                }
-            }, function(err) {
-                console.warn('[radioService] subscribe', channelId, err);
-            });
-        })(frequenciesOrIds[i]);
+        attachChannelListener(frequenciesOrIds[i], onMessage);
     }
 }
 
@@ -157,14 +159,14 @@ export function stopRadioSubscriptions() {
 
 /**
  * Autosken — poslech celého pásma: collection group „messages“ napříč všemi frekvencemi.
- * Herní pravidlo: platí jen dosah, ne shoda s aktuálním krokem skenu.
- * @param {{ backfillRecentMs?: number }} opts — při startu autoskenu načíst zprávy z posledních N ms
+ * @param {{ backfillRecentMs?: number, additive?: boolean }} opts
  */
 export async function subscribeRadioBandScan(onMessage, opts) {
-    stopRadioSubscriptions();
-    if (!onMessage) return;
-
     opts = opts || {};
+    if (!opts.additive) stopRadioSubscriptions();
+    if (!onMessage) return;
+    if (channelUnsubs.__band_scan__) return Promise.resolve();
+
     var backfillRecentMs = opts.backfillRecentMs || 0;
 
     await ensureRadioAuth(false);
@@ -222,4 +224,30 @@ export async function subscribeRadioBandScan(onMessage, opts) {
             }
         });
     });
+}
+
+/**
+ * Poslech naladěných kanálů + volitelný band scan (oba najednou, deduplikace v ingest).
+ * @param {{ frequencies?: string[], backfillRecentMs?: number }} opts
+ */
+export async function subscribeRadioListen(onMessage, opts) {
+    stopRadioSubscriptions();
+    if (!onMessage) return;
+
+    opts = opts || {};
+    await ensureRadioAuth(false);
+
+    var freqs = Array.isArray(opts.frequencies) ? opts.frequencies : [];
+    for (var i = 0; i < freqs.length; i++) {
+        attachChannelListener(freqs[i], onMessage);
+    }
+
+    try {
+        await subscribeRadioBandScan(onMessage, {
+            additive: true,
+            backfillRecentMs: opts.backfillRecentMs || 0
+        });
+    } catch (err) {
+        console.warn('[radioService] band scan unavailable, channels only', err);
+    }
 }
