@@ -4,6 +4,7 @@
 import { findPreset, upsertPreset, clearPreset } from './radioComms.js';
 import { buildAutoscanOsView } from './radioAutoscan.js';
 import { buildCommsOsView } from './radioMessages.js';
+import { buildBeaconOsView } from './radioBeacon.js';
 import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
 
 export var SCREEN_STANDBY = 'standby';
@@ -17,7 +18,7 @@ var RADIO_MENU = [
     { id: 'radio_comms', label: '1 · ZPRÁVY', action: 'screen:comms', shortcutAction: 'menu:comms' },
     { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
     { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
-    { id: 'radio_beacon', label: '4 · BEACON', action: 'stub', shortcutAction: 'stub:beacon' },
+    { id: 'radio_beacon', label: '4 · BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
     { id: 'radio_templates', label: '5 · ŠABLONY', action: 'stub', shortcutAction: 'stub:templates' },
     { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
 ];
@@ -282,6 +283,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.menuPath.pop();
             return { changed: true, effect: 'autoscan_close' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'beacon') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'beacon_close' };
+        }
         if (os.menuPath[os.menuPath.length - 1] === 'comms') {
             return { changed: true, effect: 'comms_back' };
         }
@@ -305,6 +310,13 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
         if (action === 'ok' || action === 'right') return { changed: true, effect: 'autoscan_ok' };
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'beacon') {
+        if (action === 'up') return { changed: true, effect: 'beacon_up' };
+        if (action === 'down') return { changed: true, effect: 'beacon_down' };
+        if (action === 'ok' || action === 'right') return { changed: true, effect: 'beacon_ok' };
         return { changed: false };
     }
 
@@ -394,6 +406,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.menuPath.push('comms');
                 return { changed: true, effect: 'comms_open' };
             }
+            if (pick.action === 'screen:beacon') {
+                os.menuPath.push('beacon');
+                return { changed: true, effect: 'beacon_open' };
+            }
             if (pick.action === 'preset_detail') {
                 os.selectedSlot = pick.slot;
                 os.menuPath.push('detail');
@@ -410,7 +426,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -471,6 +487,10 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     if (os.menuPath[os.menuPath.length - 1] === 'comms') {
         return buildCommsOsView(commsSession, notebook, radioState);
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'beacon') {
+        return buildBeaconOsView(beaconSession, radioState, localBeacon);
     }
 
     if (os.screen === SCREEN_STUB) {

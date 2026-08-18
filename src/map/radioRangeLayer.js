@@ -1,7 +1,7 @@
 /**
- * Mapová vrstva rádiového dosahu — kruhy 5 / 7.5 / 10 / 12.5 km (+ bonus výšky).
+ * Mapová vrstva rádiového dosahu — kruhy 5 / 7.5 / 10 / 12.5 km (bez výplně).
  */
-import { rangeBandsForElevation } from '../radio/radioPropagation.js';
+import { RANGE_KM } from '../radio/radioPropagation.js';
 import { nodesForRangeDisplay } from '../radio/radioNodes.js';
 
 var STORAGE_VISIBLE = 'patrac_radio_range_visible';
@@ -36,17 +36,29 @@ function clearCircles() {
     _circles = [];
 }
 
-function bandStyle(role) {
+/** Na mapě vždy základní matice — simulace signálu používá výšku zvlášť. */
+function rangeBandsForMapDisplay() {
+    return {
+        clear: RANGE_KM.CLEAR_MAX,
+        weak: RANGE_KM.WEAK_MAX,
+        fragment: RANGE_KM.FRAGMENT_MAX,
+        noise: RANGE_KM.NOISE_MAX
+    };
+}
+
+function bandStyle(bandIndex, role) {
     var isReceiver = role === 'receiver';
     var isBase = role === 'base';
-    /* active = vlastní poloha (GPS / nosič), receiver = oranžová, útočiště = červená tečkovaná */
+    var weights = [2.4, 1.8, 1.4, 1.0];
+    var opacities = [0.85, 0.55, 0.38, 0.22];
     var color = isReceiver ? '#ff8800' : (isBase ? '#ff5566' : '#33aaff');
+    var roleScale = isBase ? 0.7 : (isReceiver ? 0.85 : 1);
     return {
         color: color,
-        weight: isReceiver ? 2 : (isBase ? 1.6 : 2.2),
-        opacity: isBase ? 0.55 : 0.85,
+        weight: weights[bandIndex] || 1,
+        opacity: (opacities[bandIndex] || 0.25) * roleScale,
         fillOpacity: 0,
-        dashArray: isBase ? '8 6' : (isReceiver ? '6 4' : null),
+        dashArray: isBase ? '6 6' : (isReceiver ? '4 8' : null),
         interactive: false
     };
 }
@@ -88,34 +100,26 @@ export function syncCheckbox() {
     if (cb) cb.checked = !!_visible;
 }
 
-function nodeElevationM(node) {
-    if (!node) return 0;
-    if (node.elevationM != null && isFinite(node.elevationM)) return node.elevationM;
-    if (typeof window.patracGetCachedElevationM === 'function') {
-        var cached = window.patracGetCachedElevationM(node.lat, node.lng);
-        if (cached != null) return cached;
-    }
-    return 0;
-}
-
 export function refreshRadioRangeLayer() {
     if (!_map || !_layer || !window.L) return;
     clearCircles();
     if (!_visible) return;
 
     var entries = nodesForRangeDisplay(_deps);
+    var bands = rangeBandsForMapDisplay();
+    var radii = [bands.clear, bands.weak, bands.fragment, bands.noise];
+
     for (var e = 0; e < entries.length; e++) {
         var entry = entries[e];
         var node = entry && entry.node;
         if (!node || !isFinite(node.lat) || !isFinite(node.lng)) continue;
-        var bands = rangeBandsForElevation(nodeElevationM(node));
-        var maxKm = bands.noise;
-        if (!isFinite(maxKm) || maxKm <= 0) continue;
-        var circle = window.L.circle([node.lat, node.lng], Object.assign({
-            radius: maxKm * 1000
-        }, bandStyle(entry.role)));
-        circle.addTo(_layer);
-        _circles.push(circle);
+        for (var b = radii.length - 1; b >= 0; b--) {
+            var circle = window.L.circle([node.lat, node.lng], Object.assign({
+                radius: radii[b] * 1000
+            }, bandStyle(b, entry.role)));
+            circle.addTo(_layer);
+            _circles.push(circle);
+        }
     }
 }
 

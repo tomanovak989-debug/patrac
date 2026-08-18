@@ -44,6 +44,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initRadioRangeModule();
+        initBeaconMapModule();
         bindMapZoomControls();
         return;
     }
@@ -89,6 +90,7 @@ function initMap() {
         initRoutePlannerModule();
         initMgrsGridModule();
         initRadioRangeModule();
+        initBeaconMapModule();
         bindMapZoomControls();
     } catch(e) {
         console.error('initMap', e);
@@ -418,6 +420,15 @@ function initRadioRangeModule() {
             radioRangeMod.setRadioRangeVisible(!!on);
         };
     }).catch(function(err) { console.warn('[radioRange]', err); });
+}
+
+function initBeaconMapModule() {
+    patracImport('map/beaconMapLayer.js').then(function(mod) {
+        mod.initBeaconMapLayer(map);
+        window.patracRefreshBeaconMap = function() {
+            mod.refreshBeaconMapLayer();
+        };
+    }).catch(function(err) { console.warn('[beaconMap]', err); });
 }
 
 window.patracToggleMgrsGrid = function(on) {

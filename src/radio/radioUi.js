@@ -98,6 +98,20 @@ import {
     SCAN_LOCKED
 } from './radioAutoscan.js';
 import {
+    createBeaconSession,
+    loadLocalBeacon,
+    saveLocalBeacon,
+    clearLocalBeacon,
+    registerRemoteBeacon,
+    getMapBeacons,
+    getFocusedBeaconAction,
+    clampBeaconFocus,
+    BEACON_HUB,
+    BEACON_CONFIRM,
+    BEACON_REPEAT_MS,
+    buildBeaconPayload
+} from './radioBeacon.js';
+import {
     createCommsState,
     clampCommsFocus,
     getFocusedCommsAction,
@@ -182,6 +196,10 @@ var fieldEditKeyLongFired = false;
 var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
+var beaconSession = null;
+var beaconActive = null;
+var beaconRepeatTimer = null;
+var beaconPttPending = false;
 var commsSession = null;
 var standbyUi = createStandbyUiState();
 var pttSession = createPttSession();
@@ -786,6 +804,26 @@ function applyRadioOsEffect(result) {
         handleAutoscanOk();
         return true;
     }
+    if (result.effect === 'beacon_open') {
+        handleBeaconOpen();
+        return true;
+    }
+    if (result.effect === 'beacon_close') {
+        handleBeaconClose();
+        return true;
+    }
+    if (result.effect === 'beacon_ok') {
+        handleBeaconOk();
+        return true;
+    }
+    if (result.effect === 'beacon_up') {
+        handleBeaconUp();
+        return true;
+    }
+    if (result.effect === 'beacon_down') {
+        handleBeaconDown();
+        return true;
+    }
     if (result.effect === 'comms_open') {
         ensureCommsSession();
         commsSession.screen = COMMS_HUB;
@@ -891,6 +929,13 @@ function executeQuickKey(keyId) {
         ensureCommsSession();
         commsSession.screen = COMMS_HUB;
         renderDisplay();
+        return true;
+    }
+    if (action === 'beacon:open') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['beacon'];
+        handleBeaconOpen();
         return true;
     }
     if (action === 'menu:presets') {
@@ -1001,11 +1046,11 @@ function renderDisplay() {
         line4: dialBuffer,
         footer: standbyLines.footer,
         buffer: dialBuffer
-    }, state, presetEditDraft, autoscanSession, commsSession, notebook);
+    }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon');
         screen.classList.toggle('is-standby', osView.mode === 'standby');
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
     }
@@ -1026,10 +1071,16 @@ function renderDisplay() {
             editOpts.status = 'P' + presetEditDraft.slot + ' · PRESET';
         } else if (fieldEditSession.returnTo === 'comms') {
             editOpts.status = 'NOVÁ SMS · TX';
+        } else if (fieldEditSession.returnTo === 'beacon') {
+            editOpts.status = 'BEACON · SMS';
         }
         var editView = buildFieldEditView(fieldEditSession, editOpts);
         if (fieldEditSession.returnTo === 'comms') {
             editView.footer = 'OK = TX · Zpět';
+            editView.hint = textEditHint();
+        }
+        if (fieldEditSession.returnTo === 'beacon') {
+            editView.footer = 'OK · Zpět';
             editView.hint = textEditHint();
         }
         if (screen) {
@@ -1312,6 +1363,228 @@ function handleAutoscanClose() {
     persist();
     refreshSubscriptions();
     renderDisplay();
+}
+
+function refreshBeaconActiveFromStorage() {
+    var c = getCtx();
+    beaconActive = loadLocalBeacon(c.comCode || '');
+    return beaconActive;
+}
+
+function ensureBeaconSession() {
+    if (!beaconSession) beaconSession = createBeaconSession();
+    refreshBeaconActiveFromStorage();
+    return beaconSession;
+}
+
+function notifyBeaconMap() {
+    if (typeof window.patracRefreshBeaconMap === 'function') {
+        try { window.patracRefreshBeaconMap(); } catch (e) {}
+    }
+}
+
+function stopBeaconRepeatTimer() {
+    if (beaconRepeatTimer) {
+        clearInterval(beaconRepeatTimer);
+        beaconRepeatTimer = null;
+    }
+}
+
+async function transmitBeaconPulse(skipTxFx) {
+    if (!beaconActive || !beaconActive.active) return;
+    var payload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
+    await transmitMessage(beaconActive.text, payload);
+}
+
+function startBeaconRepeatTimer() {
+    stopBeaconRepeatTimer();
+    beaconRepeatTimer = setInterval(function() {
+        transmitBeaconPulse(true).catch(function(err) {
+            console.warn('[beacon] repeat', err);
+        });
+    }, BEACON_REPEAT_MS);
+}
+
+async function startBeacon(opts) {
+    opts = opts || {};
+    var c = getCtx();
+    if (c.originLat == null || c.originLng == null) {
+        alert('Beacon potřebuje GPS polohu.');
+        return;
+    }
+    if (!state.frequency) {
+        alert('Nalaď frekvenci kanálu.');
+        return;
+    }
+    beaconActive = {
+        active: true,
+        lat: c.originLat,
+        lng: c.originLng,
+        frequency: normalizeFrequency(state.frequency),
+        encryptionKey: normalizeEncryptionKey(state.encryptionKey || ''),
+        messageType: opts.messageType || 'sms',
+        text: opts.text || '',
+        pttAudio: opts.pttAudio || '',
+        pttMime: opts.pttMime || '',
+        label: c.playerName || 'Beacon',
+        senderId: c.userId || '',
+        startedAt: Date.now()
+    };
+    saveLocalBeacon(c.comCode || '', beaconActive);
+    await transmitBeaconPulse(false);
+    startBeaconRepeatTimer();
+    notifyBeaconMap();
+    renderDisplay();
+}
+
+function stopBeacon() {
+    stopBeaconRepeatTimer();
+    var c = getCtx();
+    clearLocalBeacon(c.comCode || '');
+    beaconActive = null;
+    if (beaconSession) {
+        beaconSession.screen = BEACON_HUB;
+        beaconSession.focusIndex = 0;
+        beaconSession.pendingText = '';
+    }
+    notifyBeaconMap();
+    renderDisplay();
+}
+
+function handleBeaconOpen() {
+    ensureBeaconSession();
+    renderDisplay();
+}
+
+function handleBeaconClose() {
+    beaconSession = createBeaconSession();
+    renderDisplay();
+}
+
+function openBeaconCompose() {
+    ensureBeaconSession();
+    beaconSession.pendingType = 'sms';
+    startFieldEdit('text', {
+        text: '',
+        returnTo: 'beacon',
+        maxLen: 64
+    });
+    if (fieldEditSession) {
+        fieldEditSession.digitMode = true;
+        fieldEditSession.okExitPending = false;
+        fieldEditSession.cursor = 0;
+    }
+}
+
+function finishBeaconCompose() {
+    if (!fieldEditSession || fieldEditSession.returnTo !== 'beacon') return;
+    finalizeT9Session(fieldEditSession);
+    var vals = readFieldEditValues(fieldEditSession);
+    var text = vals && vals.text ? String(vals.text).trim() : '';
+    cancelFieldEdit(fieldEditSession);
+    fieldEditSession = null;
+    var session = ensureBeaconSession();
+    session.pendingText = text;
+    if (!text) {
+        renderDisplay();
+        return;
+    }
+    session.screen = BEACON_CONFIRM;
+    session.focusIndex = 0;
+    renderDisplay();
+}
+
+function startBeaconPttRecord() {
+    if (!isPttSupported()) {
+        alert('Mikrofon není dostupný.');
+        return;
+    }
+    startPttRecording(pttSession).then(function(ok) {
+        if (!ok) return;
+        beaconPttPending = true;
+        radioKeypadPttDown();
+        renderDisplay();
+        clearPttMaxTimer();
+        pttMaxTimer = setTimeout(finishBeaconPttRecord, PTT_MAX_MS);
+    });
+}
+
+async function finishBeaconPttRecord() {
+    if (!pttSession.active && !beaconPttPending) return;
+    beaconPttPending = false;
+    clearPttMaxTimer();
+    radioKeypadPttUp();
+    var result = await stopPttRecording(pttSession);
+    pttSession = createPttSession();
+    if (!result || !result.base64) {
+        renderDisplay();
+        return;
+    }
+    var session = ensureBeaconSession();
+    session.pendingType = 'ptt';
+    session.pendingText = formatPttNotebookText(result.durationMs);
+    session.pendingPttAudio = result.base64;
+    session.pendingPttMime = result.mime;
+    session.screen = BEACON_CONFIRM;
+    session.focusIndex = 0;
+    renderDisplay();
+}
+
+function handleBeaconUp() {
+    var session = ensureBeaconSession();
+    if (session.screen === BEACON_CONFIRM) return;
+    clampBeaconFocus(session, beaconActive);
+    session.focusIndex = Math.max(0, session.focusIndex - 1);
+    renderDisplay();
+}
+
+function handleBeaconDown() {
+    var session = ensureBeaconSession();
+    if (session.screen === BEACON_CONFIRM) return;
+    var items = clampBeaconFocus(session, beaconActive);
+    if (!items.length) return;
+    session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
+    renderDisplay();
+}
+
+function handleBeaconOk() {
+    var session = ensureBeaconSession();
+    refreshBeaconActiveFromStorage();
+
+    if (session.screen === BEACON_CONFIRM) {
+        if (session.pendingType === 'ptt') {
+            startBeacon({
+                messageType: 'ptt',
+                text: session.pendingText,
+                pttAudio: session.pendingPttAudio,
+                pttMime: session.pendingPttMime
+            });
+        } else {
+            startBeacon({
+                messageType: 'sms',
+                text: session.pendingText
+            });
+        }
+        session.screen = BEACON_HUB;
+        session.focusIndex = 0;
+        session.pendingText = '';
+        session.pendingPttAudio = '';
+        return;
+    }
+
+    var action = getFocusedBeaconAction(session, beaconActive);
+    if (!action || action.type !== 'action') return;
+    if (action.id === 'beacon_sms') {
+        openBeaconCompose();
+    } else if (action.id === 'beacon_ptt') {
+        startBeaconPttRecord();
+    } else if (action.id === 'beacon_stop') {
+        stopBeacon();
+    }
+}
+
+function isBeaconMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'beacon');
 }
 
 function ensureCommsSession() {
@@ -1605,6 +1878,10 @@ function handleRadioOsInput(action) {
                 finishCommsCompose();
                 return true;
             }
+            if (fieldEditSession.returnTo === 'beacon') {
+                finishBeaconCompose();
+                return true;
+            }
             var okResult = handleFieldEditOk(fieldEditSession);
             if (okResult === 'done') finishFieldEdit(true);
             else renderDisplay();
@@ -1612,6 +1889,9 @@ function handleRadioOsInput(action) {
         }
         if (action === 'back') {
             if (fieldEditSession.returnTo === 'comms') {
+                return handleFieldEditBackAction();
+            }
+            if (fieldEditSession.returnTo === 'beacon') {
                 return handleFieldEditBackAction();
             }
             if (fieldEditSession.returnTo === 'standby_manual') {
@@ -1623,6 +1903,14 @@ function handleRadioOsInput(action) {
     }
 
     if (action === 'open_menu') clearMenuDial(menuDial);
+
+    if (isBeaconMenuOpen() && beaconSession && beaconSession.screen === BEACON_CONFIRM && action === 'back') {
+        beaconSession.screen = BEACON_HUB;
+        beaconSession.focusIndex = 0;
+        beaconSession.pendingText = '';
+        renderDisplay();
+        return true;
+    }
 
     if (action === 'ok' && menuDial && menuDial.buffer) {
         executeMenuDialCommit();
@@ -2035,6 +2323,11 @@ function ingestIncomingPayload(payload) {
     if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
         seenMessageIds[payload.id] = true;
         return;
+    }
+
+    if (payload.messageType === 'beacon') {
+        registerRemoteBeacon(payload);
+        notifyBeaconMap();
     }
 
     var origin = (payload.originLat != null && payload.originLng != null)
@@ -2839,6 +3132,13 @@ export function initRadioCommsSystem(options) {
     window.patracRefreshRadioReception = function() {
         return prefetchReceptionElevations();
     };
+    refreshBeaconActiveFromStorage();
+    if (beaconActive && beaconActive.active) startBeaconRepeatTimer();
+    window.patracGetMapBeacons = function() {
+        refreshBeaconActiveFromStorage();
+        var c = getCtx();
+        return getMapBeacons(c.comCode || '', beaconActive);
+    };
 }
 
 export function refreshRadioCommsContext() {
@@ -2857,6 +3157,7 @@ export function refreshRadioCommsContext() {
 export function stopRadioComms() {
     haltAutoscan(true);
     autoscanSession = null;
+    stopBeacon();
     cancelStandbyPtt();
     clearPttMaxTimer();
     stopRadioSubscriptions();

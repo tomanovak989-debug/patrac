@@ -992,6 +992,13 @@ body.admin-mode .admin-only-tab { display: flex !important; }
     border-radius: 3px; padding: 3px 6px;
 }
 .data-admin-check { cursor: pointer; }
+
+.map-beacon-marker-wrap { background: transparent; border: none; }
+.map-beacon-marker {
+    font-size: 22px; line-height: 1; text-align: center;
+    filter: drop-shadow(0 0 6px rgba(255, 136, 0, 0.9));
+    transition: opacity 0.15s ease;
+}
 .bottom-action-bar .action-tab { font-size: var(--text-xxs); padding: 0 4px; letter-spacing: 0.02em; }
 #btn-center-shelter { display: none; }
 .avatar-box {

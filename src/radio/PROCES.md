@@ -70,8 +70,16 @@ TX → radio_freq/{f_400025}/messages
 - [x] Open-Meteo výška + cache
 - [x] Zesílení signálu jen na shodném kanálu (freq + šifra)
 - [x] Mesh příjem přes receiver komunity
+- [x] Mapové kruhy dosahu: 5 / 7.5 / 10 / 12.5 km bez výplně (modrá poloha, oranž RX)
 - [ ] Nabourání cizích receiverů → odhalení kanálu (F4b)
-- [ ] **Útočiště v dosahu:** receiver kamkoliv rozšíří signál hráče, ale příběhové mise / hlavní úkoly útočiště vyžadují spojení útočiště ↔ síť (hráč nebo RX v dosahu útočiště) — až po dokončení zadávání questů (F5)
+- [ ] **Útočiště v dosahu:** receiver kamkoliv rozšíří signál hráče, ale příběhové mise / hlavní úkoly útočiště vyžadují spojení útočiště ↔ síť — až po dokončení zadávání questů (F5)
+
+### F4b — BEACON (MVP)
+- [x] Menu 4 · BEACON — SMS nebo PTT na naladěném kanálu (freq + šifra)
+- [x] Opakované vysílání do vypnutí (~18 s interval)
+- [x] Příjem: naladěný kanál + autosken (dosahová matice + výškový profil)
+- [x] Blikající bod na mapě u GPS zapnutí
+- [ ] Sdílení aktivního beaconu mezi hráči komunity (Firestore stav)
 
 ### F3 — Šifra a luštění
 ### F5 — Živý staničník + mise
