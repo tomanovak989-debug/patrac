@@ -13,7 +13,7 @@ export const STORY_POINT_ICONS = {
 };
 
 export function defaultMapLayerFilter() {
-    return { permanent: true, custom: true, pocta: false };
+    return { permanent: true, custom: true, radio: true, pocta: false };
 }
 
 export function loadMapLayerFilter() {
@@ -24,6 +24,7 @@ export function loadMapLayerFilter() {
             return {
                 permanent: parsed.permanent !== false,
                 custom: parsed.custom !== false,
+                radio: parsed.radio !== false,
                 pocta: parsed.pocta === true
             };
         }
@@ -90,6 +91,13 @@ function glyphSvg(glyph, color) {
             color
         );
     }
+    if (glyph === 'radio') {
+        return svgWrap(
+            '<path d="M16 6 L22 14 L19 14 L19 24 L13 24 L13 14 L10 14 Z" fill="' + color + '" opacity="0.85"/>' +
+            '<circle cx="16" cy="26" r="2" fill="' + color + '"/>',
+            color
+        );
+    }
     if (glyph === 'custom') {
         return svgWrap(
             '<path d="M16 4 C11 4 8 10 8 14 C8 22 16 28 16 28 S24 22 24 14 C24 10 21 4 16 4 Z" fill="none" stroke="' + color + '" stroke-width="2"/>' +
@@ -124,6 +132,9 @@ export function buildMapMarkerHtml(opts) {
     } else if (cat === 'pocta') {
         glyph = 'pocta';
         color = '#e8c547';
+    } else if (cat === 'radio') {
+        glyph = 'radio';
+        color = opts.color || '#33aaff';
     } else if (cat === 'custom') {
         glyph = 'custom';
         color = opts.color || '#4af626';
@@ -151,10 +162,13 @@ export function buildTacticalPopupHtml(opts) {
         color = STORY_POINT_ICONS[opts.storyId].color;
     }
     if (cat === 'pocta') color = '#e8c547';
+    if (cat === 'radio') color = '#33aaff';
     var title = (opts.title || 'Bod').replace(/</g, '&lt;');
     var desc = (opts.desc || '').replace(/</g, '&lt;');
     var time = opts.timestamp || '';
-    var catLabel = cat === 'permanent' ? 'TRVALÝ BOD' : (cat === 'pocta' ? 'POCTA' : 'VLASTNÍ BOD');
+    var catLabel = cat === 'permanent' ? 'TRVALÝ BOD'
+        : (cat === 'pocta' ? 'POCTA'
+        : (cat === 'radio' ? 'RECEIVER' : 'VLASTNÍ BOD'));
     var html = '<div class="map-v3-popup">';
     html += '<div class="map-v3-popup-header" style="border-color:' + color + ';color:' + color + '">';
     html += '<span class="map-v3-popup-cat">' + catLabel + '</span>';

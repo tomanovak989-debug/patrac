@@ -16,7 +16,7 @@ export var SIGNAL_FRAGMENT = 'fragment';
 export var SIGNAL_NOISE = 'noise';
 export var SIGNAL_NONE = 'none';
 
-/** Horní meze pásem v km (včetně). */
+/** Horní meze pásem v km (včetně) — základ pro výšku 0 m. */
 export var RANGE_KM = {
     CLEAR_MAX: 5,
     WEAK_MAX: 7.5,
@@ -24,7 +24,48 @@ export var RANGE_KM = {
     NOISE_MAX: 12.5
 };
 
+/** Max. bonus dosahu z nadmořské výšky (+50 % při ~500 m). */
+export var ELEV_RANGE_BONUS_CAP = 0.5;
+
 var EARTH_RADIUS_KM = 6371;
+var QUALITY_RANK = {
+    clear: 4,
+    weak: 3,
+    fragment: 2,
+    noise: 1,
+    none: 0
+};
+
+export function elevationRangeMultiplier(elevationM) {
+    var elev = Number(elevationM);
+    if (!isFinite(elev) || elev <= 0) return 1;
+    return 1 + Math.min(ELEV_RANGE_BONUS_CAP, elev / 1000);
+}
+
+/**
+ * Efektivní vzdálenost pro pásmo — výška obou konců zkracuje „virtuální“ km.
+ */
+export function effectiveDistanceKm(km, originElevM, receiverElevM) {
+    if (!isFinite(km)) return km;
+    var scale = Math.max(
+        elevationRangeMultiplier(originElevM),
+        elevationRangeMultiplier(receiverElevM)
+    );
+    return km / scale;
+}
+
+/**
+ * Zjednodušená kontrola LoS — přímka vs. terén ve středu + zakřivení Země.
+ */
+export function hasRadioLineOfSight(distanceKm, originElevM, receiverElevM, midElevM) {
+    if (!isFinite(distanceKm) || distanceKm <= 0) return true;
+    if (midElevM == null || !isFinite(midElevM)) return true;
+    var h1 = (Number(originElevM) || 0) + 2.0;
+    var h2 = (Number(receiverElevM) || 0) + 1.5;
+    var lineH = (h1 + h2) / 2;
+    var bulge = (distanceKm * 1000) * (distanceKm * 1000) / (8 * 6371000);
+    return lineH > midElevM + bulge + 8;
+}
 
 export function haversineKm(lat1, lng1, lat2, lng2) {
     if (![lat1, lng1, lat2, lng2].every(function(v) { return typeof v === 'number' && isFinite(v); })) {
@@ -47,19 +88,20 @@ export function parseLatLng(point) {
 }
 
 /**
- * @returns {{ quality: string, distanceKm: number|null, receivable: boolean, reason?: string }}
+ * @returns {{ quality: string, distanceKm: number|null, receivable: boolean, reason?: string, lineOfSight?: boolean, viaRelay?: string|null }}
  */
-export function evaluateRadioReception(origin, receiver) {
+export function evaluateRadioReception(origin, receiver, opts) {
+    opts = opts || {};
     var from = parseLatLng(origin);
     var to = parseLatLng(receiver);
     if (!from || !to) {
-        /* Bez GPS/útočiště neshazovat provoz — lokální / stejné zařízení by jinak
-           nikdy nezapsalo příchozí do staničníku. Dosah se uplatní, až budou coords. */
         return {
             quality: SIGNAL_CLEAR,
             distanceKm: 0,
             receivable: true,
-            reason: 'missing_coords_assumed_local'
+            reason: 'missing_coords_assumed_local',
+            lineOfSight: true,
+            viaRelay: null
         };
     }
 
@@ -69,21 +111,146 @@ export function evaluateRadioReception(origin, receiver) {
             quality: SIGNAL_NONE,
             distanceKm: null,
             receivable: false,
-            reason: 'bad_distance'
+            reason: 'bad_distance',
+            lineOfSight: false,
+            viaRelay: null
         };
     }
 
+    var originElev = opts.originElevM != null ? opts.originElevM : (from.elevationM != null ? from.elevationM : 0);
+    var receiverElev = opts.receiverElevM != null ? opts.receiverElevM : (to.elevationM != null ? to.elevationM : 0);
+    var midElev = opts.midElevM;
+    var los = opts.skipLos === true ? true : hasRadioLineOfSight(km, originElev, receiverElev, midElev);
+
+    var effKm = effectiveDistanceKm(km, originElev, receiverElev);
     var quality;
-    if (km <= RANGE_KM.CLEAR_MAX) quality = SIGNAL_CLEAR;
-    else if (km <= RANGE_KM.WEAK_MAX) quality = SIGNAL_WEAK;
-    else if (km <= RANGE_KM.FRAGMENT_MAX) quality = SIGNAL_FRAGMENT;
-    else if (km <= RANGE_KM.NOISE_MAX) quality = SIGNAL_NOISE;
+    if (!los) quality = SIGNAL_NOISE;
+    else if (effKm <= RANGE_KM.CLEAR_MAX) quality = SIGNAL_CLEAR;
+    else if (effKm <= RANGE_KM.WEAK_MAX) quality = SIGNAL_WEAK;
+    else if (effKm <= RANGE_KM.FRAGMENT_MAX) quality = SIGNAL_FRAGMENT;
+    else if (effKm <= RANGE_KM.NOISE_MAX) quality = SIGNAL_NOISE;
     else quality = SIGNAL_NONE;
 
     return {
         quality: quality,
         distanceKm: Math.round(km * 100) / 100,
-        receivable: quality !== SIGNAL_NONE
+        effectiveKm: Math.round(effKm * 100) / 100,
+        receivable: quality !== SIGNAL_NONE,
+        lineOfSight: los,
+        viaRelay: null,
+        reason: !los ? 'blocked_los' : undefined
+    };
+}
+
+/** Zesílení signálu přes receiver na shodném kanálu (zkrácení efektivní vzdálenosti). */
+export var RELAY_AMPLIFY_FACTOR = 0.82;
+
+function relayMatchesChannel(relay, channel) {
+    if (!relay || !channel || !channel.frequency) return false;
+    var rf = relay.frequency || '';
+    var rk = relay.encryptionKey || '';
+    var cf = channel.frequency || '';
+    var ck = channel.encryptionKey != null ? channel.encryptionKey : '';
+    if (!rf || !cf) return false;
+    if (String(rf) !== String(cf)) return false;
+    return String(rk || '') === String(ck || '');
+}
+
+function worseQuality(a, b) {
+    var ra = QUALITY_RANK[a] || 0;
+    var rb = QUALITY_RANK[b] || 0;
+    return ra <= rb ? a : b;
+}
+
+function qualityForEffectiveKm(effKm, los) {
+    if (!los) return SIGNAL_NOISE;
+    if (effKm <= RANGE_KM.CLEAR_MAX) return SIGNAL_CLEAR;
+    if (effKm <= RANGE_KM.WEAK_MAX) return SIGNAL_WEAK;
+    if (effKm <= RANGE_KM.FRAGMENT_MAX) return SIGNAL_FRAGMENT;
+    if (effKm <= RANGE_KM.NOISE_MAX) return SIGNAL_NOISE;
+    return SIGNAL_NONE;
+}
+
+function combineRelayReception(legA, legB, relayId) {
+    if (!legA || !legB || !legA.receivable || !legB.receivable) return null;
+    var quality = worseQuality(legA.quality, legB.quality);
+    var dist = (legA.distanceKm || 0) + (legB.distanceKm || 0);
+    var eff = (legA.effectiveKm || legA.distanceKm || 0) + (legB.effectiveKm || legB.distanceKm || 0);
+    return {
+        quality: quality,
+        distanceKm: Math.round(dist * 100) / 100,
+        effectiveKm: Math.round(eff * 100) / 100,
+        receivable: quality !== SIGNAL_NONE,
+        lineOfSight: !!(legA.lineOfSight && legB.lineOfSight),
+        viaRelay: relayId || null,
+        reason: 'via_relay'
+    };
+}
+
+/**
+ * Přímý příjem nebo přes nejlepší receiver/repeater v síti.
+ * @param {object} origin — {lat,lng,elevationM?}
+ * @param {object} receiver — {lat,lng,elevationM?}
+ * @param {{ relays?: object[], pathElevs?: {fromM,toM,midM}, skipLos?: boolean }} opts
+ */
+export function evaluateBestRadioReception(origin, receiver, opts) {
+    opts = opts || {};
+    var directOpts = {
+        originElevM: opts.originElevM,
+        receiverElevM: opts.receiverElevM,
+        midElevM: opts.pathElevs ? opts.pathElevs.midM : opts.midElevM,
+        skipLos: opts.skipLos
+    };
+    if (opts.pathElevs) {
+        directOpts.originElevM = opts.pathElevs.fromM;
+        directOpts.receiverElevM = opts.pathElevs.toM;
+    }
+    var best = evaluateRadioReception(origin, receiver, directOpts);
+    var relays = opts.relays || [];
+    var channel = opts.channel || null;
+    var i;
+    for (i = 0; i < relays.length; i++) {
+        var relay = relays[i];
+        if (!relay || !isFinite(relay.lat) || !isFinite(relay.lng)) continue;
+        if (channel && !relayMatchesChannel(relay, channel)) continue;
+        var leg1 = evaluateRadioReception(origin, relay, {
+            originElevM: directOpts.originElevM,
+            receiverElevM: relay.elevationM,
+            skipLos: opts.skipLos
+        });
+        if (!leg1.receivable) continue;
+        var leg2 = evaluateRadioReception(relay, receiver, {
+            originElevM: relay.elevationM,
+            receiverElevM: directOpts.receiverElevM,
+            skipLos: opts.skipLos
+        });
+        if (!leg2.receivable) continue;
+        if (channel && leg2.effectiveKm != null) {
+            leg2 = Object.assign({}, leg2, {
+                effectiveKm: Math.round(leg2.effectiveKm * RELAY_AMPLIFY_FACTOR * 100) / 100,
+                quality: qualityForEffectiveKm(leg2.effectiveKm * RELAY_AMPLIFY_FACTOR, leg2.lineOfSight !== false)
+            });
+        }
+        var combined = combineRelayReception(leg1, leg2, relay.id);
+        if (!combined) continue;
+        if ((QUALITY_RANK[combined.quality] || 0) > (QUALITY_RANK[best.quality] || 0)) {
+            best = combined;
+        }
+    }
+    return best;
+}
+
+/**
+ * Dosahové pásma v km pro uzel s danou výškou (pro mapové kruhy).
+ */
+export function rangeBandsForElevation(elevationM) {
+    var mult = elevationRangeMultiplier(elevationM);
+    return {
+        clear: RANGE_KM.CLEAR_MAX * mult,
+        weak: RANGE_KM.WEAK_MAX * mult,
+        fragment: RANGE_KM.FRAGMENT_MAX * mult,
+        noise: RANGE_KM.NOISE_MAX * mult,
+        multiplier: mult
     };
 }
 
@@ -205,14 +372,14 @@ export function applyReceptionToMessage(plainText, reception, opts) {
     }
     if (quality === SIGNAL_WEAK) {
         return {
-            text: garbleRadioText(plainText, km, seed),
+            text: garbleRadioText(plainText, reception.effectiveKm != null ? reception.effectiveKm : km, seed),
             signalQuality: SIGNAL_WEAK,
             distanceKm: km
         };
     }
     if (quality === SIGNAL_FRAGMENT) {
         return {
-            text: fragmentRadioText(plainText, km, seed),
+            text: fragmentRadioText(plainText, reception.effectiveKm != null ? reception.effectiveKm : km, seed),
             signalQuality: SIGNAL_FRAGMENT,
             distanceKm: km
         };

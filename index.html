@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&family=Roboto+Condensed:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e101" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e104" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -333,7 +333,6 @@
         <button class="tool-btn" id="btn-center-shelter" onclick="centerMapToShelter()" title="Vycentrovat na útočiště"><div>🏠</div>ÚTOČIŠTĚ</button>
         <button class="tool-btn" onclick="centerMapToUser()"><div>▲</div>CENTR.</button>
         <button class="tool-btn" id="btn-center-all-points" onclick="centerMapToAllSavedPoints()" title="Zobrazit všechny uložené body na mapě"><div>⛶</div>VŠECHNY</button>
-        <button class="tool-btn" id="btn-admin-fog" onclick="patracToggleAdminFog()" title="Zapnout / vypnout mlhu války (operátor)"><div>🌫</div><span class="fog-btn-label">MLHA</span></button>
         <button class="tool-btn" onclick="toggleMapLayersPanel()" title="Filtr vrstev mapy"><div>◫</div>VRSTVY</button>
         <button class="tool-btn" style="border-color:var(--danger-orange); color:var(--danger-orange);" onclick="hardResetData()"><div>☠</div>RESET</button>
     </div>
@@ -346,11 +345,7 @@
             <label><input type="checkbox" id="map-filter-permanent" checked onchange="setMapLayerFilter('permanent', this.checked)"> Trvalé body mapy</label>
             <label><input type="checkbox" id="map-filter-custom" checked onchange="setMapLayerFilter('custom', this.checked)"> Vlastní body</label>
             <label><input type="checkbox" id="map-filter-radio-range" checked onchange="patracToggleRadioRange(this.checked)"> Rádiový dosah</label>
-            <div id="map-fog-admin-controls">
-                <p class="fog-admin-heading">Mlha války — operátor</p>
-                <label><input type="checkbox" id="map-fog-enabled" checked onchange="patracToggleFogEnabled(this.checked)"> Mlha zapnutá</label>
-                <label><input type="checkbox" id="map-fog-reveal-all" onchange="patracToggleFogRevealAll(this.checked)"> Zobrazit celou mapu (test)</label>
-            </div>
+            <label><input type="checkbox" id="map-filter-radio" checked onchange="setMapLayerFilter('radio', this.checked)"> Receivery</label>
         </div>
     </div>
 
@@ -383,12 +378,33 @@
 
     <div class="hud-element" id="map-tools-bar">
         <button class="tool-btn" onclick="toggleAddPoiPanel()" title="Nový bod"><div>📍</div>BOD+</button>
+        <button class="tool-btn" onclick="toggleAddRxPanel()" title="Nový rádiový receiver" style="border-color:#33aaff;color:#66ccff;"><div>📡</div>RX+</button>
         <button class="tool-btn" onclick="toggleStoryPositionsPanel()" title="Prvotní pozice"><div>🧭</div>POZICE</button>
         <select id="map-tile-select" onchange="switchMapTile(this.value)" title="Globální mapa">
             <option value="satellite">🛰️ Sat</option>
             <option value="street">🗺️ OSM</option>
             <option value="topo">⛰️ Topo</option>
         </select>
+    </div>
+
+    <div id="map-add-rx-bar" class="map-overlay-panel">
+        <div id="map-add-rx-title" class="map-overlay-panel-head" style="color:#66ccff;">📡 NOVÝ RECEIVER (GPS POLOHA)</div>
+        <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV:</label><input type="text" id="rx-name" placeholder="Vrchol · sever"></div>
+        <div class="form-group" style="margin-bottom:4px;"><label>FREKVENCE (MHz):</label><input type="text" id="rx-frequency" placeholder="462.550" inputmode="decimal"></div>
+        <div class="form-group" style="margin-bottom:6px;"><label>ŠIFRA (prázdné = PT):</label><input type="text" id="rx-encryption" placeholder="volitelně · 5 znaků" maxlength="5" autocapitalize="characters"></div>
+        <button class="btn-accept" style="width:100%; border-color:#33aaff; color:#66ccff; padding:8px;" onclick="confirmAddMapReceiver()">ULOŽIT RECEIVER</button>
+    </div>
+
+    <div id="map-rx-edit-bar" class="map-overlay-panel">
+        <button type="button" class="map-panel-hide-btn" onclick="closeRxEditor()" title="Skrýt" aria-label="Skrýt">✕</button>
+        <div class="map-overlay-panel-head" style="color:#66ccff;">📡 UPRAVIT RECEIVER</div>
+        <input type="hidden" id="rx-edit-id">
+        <div class="form-group" style="margin-bottom:4px;"><label>NÁZEV:</label><input type="text" id="rx-edit-name"></div>
+        <div class="form-group" style="margin-bottom:4px;"><label>FREKVENCE (MHz):</label><input type="text" id="rx-edit-frequency" inputmode="decimal"></div>
+        <div class="form-group" style="margin-bottom:4px;"><label>ŠIFRA (prázdné = PT):</label><input type="text" id="rx-edit-encryption" maxlength="5" autocapitalize="characters"></div>
+        <p id="rx-edit-elev" class="map-rx-meta-line">—</p>
+        <button class="btn-accept" style="width:100%; border-color:#33aaff; color:#66ccff; padding:8px;" onclick="saveRxChanges()">ULOŽIT ZMĚNY</button>
+        <button class="btn-accept" style="width:100%; margin-top:6px; border-color:var(--danger-orange); color:var(--danger-orange); padding:6px;" onclick="deleteMapRxFromEditor()">🗑️ SMAZAT RECEIVER</button>
     </div>
 
     <div id="map-add-poi-bar" class="map-overlay-panel">
@@ -697,6 +713,37 @@
         <!-- ZÁLOŽKA DATA KARTA -->
         <div id="data-karta" style="display:none;">
             <div class="panel-content-inner">
+                <div class="quest-card card-tone-operator admin-only-section" id="data-admin-panel-wrap" style="border-color:var(--danger-orange);margin-bottom:14px;">
+                    <div class="quest-section-title" style="margin-top:0;color:var(--danger-orange);">⚙ DATA — OPERÁTOR</div>
+                    <div class="data-admin-toolbar">
+                        <label>Složka
+                            <select id="data-admin-panel"></select>
+                        </label>
+                    </div>
+                    <div id="data-admin-list" class="data-admin-list"></div>
+                    <div class="quest-card card-tone-operator qdef-form data-admin-form" style="border-color:var(--danger-orange);margin-top:10px;">
+                        <div class="quest-section-title" id="data-admin-form-title" style="margin-top:0;color:var(--danger-orange);">＋ Nový příspěvek</div>
+                        <div class="qdef-grid-2">
+                            <div class="form-group"><label>ID</label><input type="text" id="data-admin-id" placeholder="automaticky z názvu" autocomplete="off"></div>
+                            <div class="form-group"><label>NÁZEV</label><input type="text" id="data-admin-title" placeholder="Nadpis příspěvku"></div>
+                        </div>
+                        <div class="form-group"><label>KLÍČOVÁ SLOVA (čárkou)</label><input type="text" id="data-admin-keywords" placeholder="pátrač, mapa, lore…"></div>
+                        <div class="data-admin-blocks-head">
+                            <span>Obsah</span>
+                            <div class="data-admin-blocks-actions">
+                                <button type="button" class="data-admin-mini" id="data-admin-add-text">＋ Text</button>
+                                <button type="button" class="data-admin-mini" id="data-admin-add-image">＋ Obrázek / GIF</button>
+                                <input type="file" id="data-admin-image-input" accept="image/*" hidden>
+                            </div>
+                        </div>
+                        <div id="data-admin-blocks" class="data-admin-blocks"></div>
+                        <div class="qdef-form-actions">
+                            <button type="button" class="btn-accept" id="data-admin-save" style="border-color:var(--text-green);color:var(--text-green);">ULOŽIT</button>
+                            <button type="button" class="btn-accept" id="data-admin-new" style="border-color:var(--xp-blue);color:var(--xp-blue);">NOVÝ</button>
+                            <button type="button" class="btn-accept" id="data-admin-delete" style="border-color:var(--danger-orange);color:var(--danger-orange);">SMAZAT</button>
+                        </div>
+                    </div>
+                </div>
                 <div id="lore-box" class="data-karta-block quest-card">
                     <div class="quest-section-title" style="margin-top:0;">📜 LORE</div>
                     <div class="data-karta-search-wrap">
@@ -726,7 +773,12 @@
                 </div>
                 <div id="schránka-nápadů-box" class="data-karta-block quest-card">
                     <div class="quest-section-title" style="margin-top:0;">💡 SCHRÁNKA NÁPADŮ</div>
-                    <p style="font-size:var(--text-sm);color:var(--dim-fg);margin:0;">Nápady a poznámky ke hře — doplní se postupně.</p>
+                    <div class="data-karta-search-wrap">
+                        <label class="data-karta-search-label" for="data-search-napady">Hledat v SCHRÁNCE NÁPADŮ</label>
+                        <input type="search" id="data-search-napady" class="data-karta-search" data-panel="napady" placeholder="Min. 3 znaky…" autocomplete="off" spellcheck="false">
+                        <ul class="data-karta-suggest" data-panel="napady" role="listbox" aria-label="Nápověda Schránka nápadů"></ul>
+                    </div>
+                    <div class="data-karta-results" data-panel="napady"></div>
                 </div>
             </div>
         </div>
@@ -949,7 +1001,7 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e101';
+        window.PATRAC_BUILD = '20260723e104';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };

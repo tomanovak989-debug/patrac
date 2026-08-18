@@ -58,15 +58,21 @@ TX → radio_freq/{f_400025}/messages
 5. [x] Stejná freq + PT/stejné heslo → text; cizí heslo → šum
 6. [x] Presety / přímý zápis
 
-### F2 — Autoscan (MVP hotovo)
-- Menu AUTOSKEN — cyklus presetových kanálů, zachycení aktivity, zamčení
-- [ ] Band-scan (krok 0.025 MHz po pásmu)
+### F2 — Autoscan — hotovo
+- Menu AUTOSKEN — celé pásmo, zachycení aktivity, zamčení, složka AUTOSKEN ve ZPRÁVÁCH
+- [x] Band-scan (krok 0.025 MHz po pásmu)
 
 ### F2b — SMS / ZPRÁVY (MVP hotovo)
 - Seznam zpráv ze staničníku, nová zpráva T9, OK = TX
 
+### F4 — Receivery / Repeater (MVP hotovo)
+- [x] Uložitelný bod mapy (RX+) — název, frekvence, šifra
+- [x] Open-Meteo výška + cache
+- [x] Zesílení signálu jen na shodném kanálu (freq + šifra)
+- [x] Mesh příjem přes receiver komunity
+- [ ] Nabourání cizích receiverů → odhalení kanálu (F4b)
+
 ### F3 — Šifra a luštění
-### F4 — Receivery / Repeater
 ### F5 — Živý staničník + mise
 
 ---
@@ -77,5 +83,6 @@ TX → radio_freq/{f_400025}/messages
 - [x] Pásmo + dial
 - [x] Freq-first Firestore
 - [ ] Nasadit `firestore.rules` (`radio_freq`)
-- [x] F2 Autoscan MVP (presety)
+- [x] F2 Autoscan (celé pásmo)
+- [x] F4 Receivery / výška / mesh (MVP)
 - [x] SMS / ZPRÁVY v menu vysílačky

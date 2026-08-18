@@ -1,14 +1,16 @@
 /**
  * Rádiové uzly — abstrakce vysílací / přijímací pozice.
- * Fáze 1: shelter (útočiště) + handset (GPS). Receiver později.
+ * Fáze 4: shelter + handset + komunitní receivery.
  */
 
 export var KIND_SHELTER = 'shelter';
 export var KIND_HANDSET = 'handset';
+export var KIND_RECEIVER = 'receiver';
 
 export var NODE_KIND_LABELS = {
     shelter: 'BÁZE',
-    handset: 'NOSIČ'
+    handset: 'NOSIČ',
+    receiver: 'RECEIVER'
 };
 
 function parseLatLng(lat, lng) {
@@ -45,6 +47,7 @@ export function makeRadioNode(kind, latLng, meta) {
         kind: kind,
         lat: pos.lat,
         lng: pos.lng,
+        elevationM: meta.elevationM != null ? meta.elevationM : null,
         label: meta.label || NODE_KIND_LABELS[kind] || kind
     };
 }
@@ -122,6 +125,13 @@ export function nodesForRangeDisplay(deps) {
     if (active.kind === KIND_HANDSET && active.node && shelter &&
         (Math.abs(shelter.lat - active.node.lat) > 1e-5 || Math.abs(shelter.lng - active.node.lng) > 1e-5)) {
         list.push({ node: shelter, role: 'base' });
+    }
+    var receivers = typeof deps.getReceivers === 'function' ? deps.getReceivers() : [];
+    var i;
+    for (i = 0; i < receivers.length; i++) {
+        var rx = receivers[i];
+        if (!rx || !isFinite(rx.lat) || !isFinite(rx.lng)) continue;
+        list.push({ node: rx, role: 'receiver' });
     }
     return list;
 }

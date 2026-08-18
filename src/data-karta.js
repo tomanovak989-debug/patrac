@@ -1,18 +1,13 @@
 /** Data karta — Lore, Postapopedie, Mechanismus hry + vyhledávání od 3 znaků. */
 
+import {
+    DATA_PANELS,
+    loadDataContentStore,
+    getPanelEntries,
+    entrySearchHaystack
+} from './data/dataContentStore.js';
+
 const MIN_QUERY_LEN = 3;
-
-const PANELS = [
-    { key: 'lore', file: './src/data/lore.json' },
-    { key: 'postapopedie', file: './src/data/postapopedie.json' },
-    { key: 'mechanismy', file: './src/data/mechanismy.json' }
-];
-
-const store = {
-    lore: [],
-    postapopedie: [],
-    mechanismy: []
-};
 
 function normalizeText(value) {
     return String(value || '')
@@ -22,11 +17,7 @@ function normalizeText(value) {
 }
 
 function entryHaystack(entry) {
-    return normalizeText([
-        entry.title,
-        (entry.keywords || []).join(' '),
-        entry.body
-    ].join(' '));
+    return normalizeText(entrySearchHaystack(entry));
 }
 
 function filterEntries(entries, query) {
@@ -61,6 +52,45 @@ function highlightText(text, query) {
     return escapeHtml(before) + '<mark>' + escapeHtml(match) + '</mark>' + escapeHtml(after);
 }
 
+function renderImageBlock(block) {
+    var widthPct = Math.max(15, Math.min(100, Number(block.widthPct) || 60));
+    var align = block.align === 'right' || block.align === 'center' ? block.align : 'left';
+    var wrapClass = block.wrap ? ' data-karta-img-wrap' : '';
+    var floatStyle = '';
+    if (block.wrap && align === 'left') floatStyle = ' style="float:left;margin:0 12px 8px 0;"';
+    else if (block.wrap && align === 'right') floatStyle = ' style="float:right;margin:0 0 8px 12px;"';
+    else if (align === 'center') floatStyle = ' style="display:block;margin:8px auto;"';
+
+    return (
+        '<figure class="data-karta-img' + wrapClass + ' data-karta-img-' + align + '"' + floatStyle + '>' +
+            '<img src="' + escapeHtml(block.src) + '" alt="' + escapeHtml(block.alt || '') + '" ' +
+                'style="width:' + widthPct + '%;max-width:100%;height:auto;">' +
+            (block.alt ? '<figcaption>' + escapeHtml(block.alt) + '</figcaption>' : '') +
+        '</figure>'
+    );
+}
+
+function renderEntryBody(entry, query) {
+    var blocks = entry.blocks || [];
+    if (!blocks.length && entry.body) {
+        blocks = [{ type: 'text', content: entry.body }];
+    }
+    if (!blocks.length) {
+        return '<p class="data-karta-empty-body">—</p>';
+    }
+
+    var html = '<div class="data-karta-entry-content">';
+    blocks.forEach(function(block) {
+        if (block.type === 'image' && block.src) {
+            html += renderImageBlock(block);
+        } else if (block.type === 'text') {
+            html += '<p>' + highlightText(block.content, query).replace(/\n/g, '<br>') + '</p>';
+        }
+    });
+    html += '<div class="data-karta-clear"></div></div>';
+    return html;
+}
+
 function renderEntry(entry, query, expanded) {
     var openClass = expanded ? ' open' : '';
     var bodyStyle = expanded ? '' : ' style="display:none;"';
@@ -71,7 +101,7 @@ function renderEntry(entry, query, expanded) {
                 '<span class="toggle-icon">▼</span>' +
             '</button>' +
             '<div class="data-karta-entry-body"' + bodyStyle + '>' +
-                '<p>' + highlightText(entry.body, query).replace(/\n/g, '<br>') + '</p>' +
+                renderEntryBody(entry, query) +
             '</div>' +
         '</article>'
     );
@@ -169,7 +199,7 @@ function onSearchInput(panelKey) {
     if (!input) return;
 
     var query = input.value;
-    var matched = filterEntries(store[panelKey] || [], query);
+    var matched = filterEntries(getPanelEntries(panelKey), query);
     renderSuggest(panelKey, matched, query);
     renderResults(panelKey, matched, query, null);
 }
@@ -202,23 +232,27 @@ function bindSearch(panelKey) {
     });
 }
 
-async function loadPanelData(panel) {
-    var res = await fetch(panel.file);
-    if (!res.ok) throw new Error('Data load failed: ' + panel.file);
-    var json = await res.json();
-    store[panel.key] = json.entries || [];
-}
-
-export async function initDataKarta() {
-    await Promise.all(PANELS.map(loadPanelData));
-
-    PANELS.forEach(function(panel) {
-        bindSearch(panel.key);
-        renderResults(panel.key, store[panel.key], '', null);
+function refreshAllPanels() {
+    DATA_PANELS.forEach(function(panel) {
+        onSearchInput(panel.key);
     });
 }
 
+export async function initDataKarta() {
+    await loadDataContentStore();
+
+    DATA_PANELS.forEach(function(panel) {
+        bindSearch(panel.key);
+        renderResults(panel.key, getPanelEntries(panel.key), '', null);
+    });
+
+    window.patracRefreshDataKarta = refreshAllPanels;
+}
+
 export function refreshDataKartaPanel(panelKey) {
-    if (!store[panelKey]) return;
     onSearchInput(panelKey);
+}
+
+export function refreshDataKarta() {
+    refreshAllPanels();
 }

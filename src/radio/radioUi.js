@@ -50,13 +50,20 @@ import {
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioChannels, subscribeRadioBandScan, stopRadioSubscriptions } from './radioService.js';
 import {
-    evaluateRadioReception,
+    evaluateBestRadioReception,
     applyReceptionToMessage,
     noisePlaceholder,
     SIGNAL_NOISE,
     SIGNAL_CLEAR,
     SIGNAL_NONE
 } from './radioPropagation.js';
+import {
+    fetchElevationsM,
+    fetchPathElevationsM,
+    getCachedElevationM,
+    midpointLatLng
+} from './radioElevation.js';
+import { listReceiverNodes, listReceivers } from './radioReceivers.js';
 import {
     getGridPageCount,
     getGridPage,
@@ -165,6 +172,10 @@ import {
 
 var ctx = {};
 var state = null;
+var receptionElev = {
+    shelterM: null,
+    playerM: null
+};
 var radioOs = createRadioOsState();
 var fieldEditSession = null;
 var fieldEditKeyLongFired = false;
@@ -313,11 +324,70 @@ function getPlayerLatLng() {
     return null;
 }
 
+function getComCode() {
+    return ctx.getComCode ? ctx.getComCode() : (localStorage.getItem('com_code') || '');
+}
+
+function getRelayNodes(channel) {
+    return listReceiverNodes(getComCode(), channel || null);
+}
+
+function evaluateIncomingReception(origin, channel) {
+    var receiver = getRadioLatLng();
+    var resolved = resolveActiveRadioNode(radioNodeDeps());
+    var receiverElev = activeNodeElevationM(resolved);
+    var originElev = getCachedElevationM(origin && origin.lat, origin && origin.lng);
+    if (originElev == null) originElev = 0;
+    var pathElevs = null;
+    if (origin && receiver) {
+        var mid = midpointLatLng(origin, receiver);
+        var midElev = mid ? getCachedElevationM(mid.lat, mid.lng) : null;
+        pathElevs = { fromM: originElev, toM: receiverElev, midM: midElev };
+    }
+    return evaluateBestRadioReception(origin, receiver, {
+        pathElevs: pathElevs,
+        relays: getRelayNodes(channel),
+        channel: channel || null
+    });
+}
+
+async function prefetchReceptionElevations() {
+    var shelter = getShelterLatLng();
+    var player = getPlayerLatLng();
+    var relays = getRelayNodes();
+    var points = [];
+    if (shelter) points.push(shelter);
+    if (player) points.push(player);
+    var i;
+    for (i = 0; i < relays.length; i++) {
+        if (relays[i]) points.push({ lat: relays[i].lat, lng: relays[i].lng });
+    }
+    if (!points.length) return;
+    await fetchElevationsM(points);
+    if (shelter) receptionElev.shelterM = getCachedElevationM(shelter.lat, shelter.lng);
+    if (player) receptionElev.playerM = getCachedElevationM(player.lat, player.lng);
+    for (i = 0; i < relays.length; i++) {
+        var rx = relays[i];
+        if (!rx) continue;
+        rx.elevationM = getCachedElevationM(rx.lat, rx.lng);
+    }
+    notifyRadioRangeLayer();
+}
+
+function schedulePathElevationPrefetch(origin) {
+    var receiver = getRadioLatLng();
+    if (!origin || !receiver) return;
+    fetchPathElevationsM(origin, receiver).catch(function(err) {
+        console.warn('[radioUi] path elevation', err);
+    });
+}
+
 function radioNodeDeps(userId) {
     return {
         userId: userId || (ctx.getUserId ? ctx.getUserId() : ''),
         getShelterLatLng: getShelterLatLng,
-        getPlayerLatLng: getPlayerLatLng
+        getPlayerLatLng: getPlayerLatLng,
+        getReceivers: getRelayNodes
     };
 }
 
@@ -1164,7 +1234,10 @@ function tryAutoscanLock(payload) {
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
         : null;
-    var reception = evaluateRadioReception(origin, getRadioLatLng());
+    var reception = evaluateIncomingReception(origin, {
+        frequency: normalizeFrequency(payload.frequency),
+        encryptionKey: normalizeEncryptionKey(payload.encryptionKey || '')
+    });
     if (!reception.receivable || reception.quality === SIGNAL_NONE) return;
 
     var msgFreq = normalizeFrequency(payload.frequency);
@@ -1967,8 +2040,11 @@ function ingestIncomingPayload(payload) {
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
         : null;
-    var receiver = getRadioLatLng();
-    var reception = evaluateRadioReception(origin, receiver);
+    var reception = evaluateIncomingReception(origin, {
+        frequency: normalizeFrequency(payload.frequency),
+        encryptionKey: normalizeEncryptionKey(payload.encryptionKey || '')
+    });
+    schedulePathElevationPrefetch(origin);
     if (!reception.receivable) {
         reception = {
             quality: SIGNAL_NOISE,
@@ -2750,6 +2826,19 @@ export function initRadioCommsSystem(options) {
     renderNotebook();
     refreshSubscriptions();
     notifyRadioRangeLayer();
+    prefetchReceptionElevations().catch(function(err) {
+        console.warn('[radioUi] elevation prefetch', err);
+    });
+    window.patracListReceivers = function() {
+        return listReceivers(getComCode());
+    };
+    window.patracGetReceiverNodes = function(channel) {
+        return getRelayNodes(channel || null);
+    };
+    window.patracGetCachedElevationM = getCachedElevationM;
+    window.patracRefreshRadioReception = function() {
+        return prefetchReceptionElevations();
+    };
 }
 
 export function refreshRadioCommsContext() {
@@ -2760,6 +2849,9 @@ export function refreshRadioCommsContext() {
     refreshSubscriptions();
     notifyRadioRangeLayer();
     refreshRadioUnreadBadge();
+    prefetchReceptionElevations().catch(function(err) {
+        console.warn('[radioUi] elevation prefetch', err);
+    });
 }
 
 export function stopRadioComms() {

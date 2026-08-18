@@ -1,7 +1,7 @@
 /**
- * Mapová vrstva rádiového dosahu — kruhy 5 / 7.5 / 10 / 12.5 km.
+ * Mapová vrstva rádiového dosahu — kruhy 5 / 7.5 / 10 / 12.5 km (+ bonus výšky).
  */
-import { RANGE_KM } from '../radio/radioPropagation.js';
+import { rangeBandsForElevation } from '../radio/radioPropagation.js';
 import { nodesForRangeDisplay } from '../radio/radioNodes.js';
 
 var STORAGE_VISIBLE = 'patrac_radio_range_visible';
@@ -37,19 +37,21 @@ function clearCircles() {
 }
 
 function bandStyle(bandIndex, role) {
-    /* 0 = 5, 1 = 7.5, 2 = 10, 3 = 12.5 km */
+    /* 0 = clear, 1 = weak, 2 = fragment, 3 = noise */
     var isBase = role === 'base';
+    var isReceiver = role === 'receiver';
     var weights = [2.4, 1.8, 1.4, 1.0];
     var opacities = [0.85, 0.55, 0.38, 0.22];
     var fills = [0.06, 0.035, 0.02, 0.008];
-    var color = isBase ? '#ff3355' : '#ff0033';
+    var color = isReceiver ? '#33aaff' : (isBase ? '#ff3355' : '#ff0033');
+    var roleScale = isBase ? 0.7 : (isReceiver ? 0.85 : 1);
     return {
         color: color,
         weight: weights[bandIndex] || 1,
-        opacity: (opacities[bandIndex] || 0.25) * (isBase ? 0.7 : 1),
+        opacity: (opacities[bandIndex] || 0.25) * roleScale,
         fillColor: color,
-        fillOpacity: (fills[bandIndex] || 0) * (isBase ? 0.5 : 1),
-        dashArray: isBase ? '6 6' : null,
+        fillOpacity: (fills[bandIndex] || 0) * roleScale,
+        dashArray: isBase ? '6 6' : (isReceiver ? '4 8' : null),
         interactive: false
     };
 }
@@ -91,22 +93,28 @@ export function syncCheckbox() {
     if (cb) cb.checked = !!_visible;
 }
 
+function nodeElevationM(node) {
+    if (!node) return 0;
+    if (node.elevationM != null && isFinite(node.elevationM)) return node.elevationM;
+    if (typeof window.patracGetCachedElevationM === 'function') {
+        var cached = window.patracGetCachedElevationM(node.lat, node.lng);
+        if (cached != null) return cached;
+    }
+    return 0;
+}
+
 export function refreshRadioRangeLayer() {
     if (!_map || !_layer || !window.L) return;
     clearCircles();
     if (!_visible) return;
 
     var entries = nodesForRangeDisplay(_deps);
-    var radii = [
-        RANGE_KM.CLEAR_MAX,
-        RANGE_KM.WEAK_MAX,
-        RANGE_KM.FRAGMENT_MAX,
-        RANGE_KM.NOISE_MAX
-    ];
     for (var e = 0; e < entries.length; e++) {
         var entry = entries[e];
         var node = entry && entry.node;
         if (!node || !isFinite(node.lat) || !isFinite(node.lng)) continue;
+        var bands = rangeBandsForElevation(nodeElevationM(node));
+        var radii = [bands.clear, bands.weak, bands.fragment, bands.noise];
         for (var b = radii.length - 1; b >= 0; b--) {
             var circle = window.L.circle([node.lat, node.lng], Object.assign({
                 radius: radii[b] * 1000

@@ -1,10 +1,6 @@
 /* PATRAC app chunk: 03-map.js — do not reorder script tags in index.html */
 function ensureMapPanes() {
     if (!map) return;
-    if (!map.getPane('mapFogPane')) {
-        map.createPane('mapFogPane');
-        map.getPane('mapFogPane').style.zIndex = 450;
-    }
     if (!map.getPane('mapGridPane')) {
         map.createPane('mapGridPane');
         map.getPane('mapGridPane').style.zIndex = 665;
@@ -47,7 +43,6 @@ function initMap() {
         initTopoRulerModule();
         initRoutePlannerModule();
         initMgrsGridModule();
-        initFogOfWarModule();
         initRadioRangeModule();
         bindMapZoomControls();
         return;
@@ -93,7 +88,6 @@ function initMap() {
         initTopoRulerModule();
         initRoutePlannerModule();
         initMgrsGridModule();
-        initFogOfWarModule();
         initRadioRangeModule();
         bindMapZoomControls();
     } catch(e) {
@@ -153,8 +147,10 @@ function syncMapLayerFilterCheckboxes() {
     var f = getMapLayerFilter();
     var p = document.getElementById('map-filter-permanent');
     var c = document.getElementById('map-filter-custom');
+    var r = document.getElementById('map-filter-radio');
     if (p) p.checked = f.permanent;
     if (c) c.checked = f.custom;
+    if (r) r.checked = f.radio !== false;
 }
 
 function syncMgrsGridWithRuler(show) {
@@ -188,11 +184,32 @@ window.patracHideCompass = function() {
 
 function getMapPointCategory(meta) {
     var id = meta.id || '';
+    if (meta.isRadioReceiver || id.indexOf('rx_') === 0) return 'radio';
     if (gameQuests[id]) return 'permanent';
     if (meta.isPoi || id.indexOf('poi_') === 0) return 'custom';
     if (id.indexOf('pocta_ent_') === 0 || id.indexOf('cquest_ent_') === 0) return 'pocta';
     if (id.indexOf('custom_') === 0 || id.indexOf('random_') === 0) return 'permanent';
     return 'custom';
+}
+
+function getCommunityReceiversForMap() {
+    if (typeof window.patracListReceivers === 'function') {
+        return window.patracListReceivers();
+    }
+    try {
+        var comCode = localStorage.getItem('com_code') || '';
+        var all = JSON.parse(localStorage.getItem('patrac_radio_receivers_v1') || '{}');
+        return Array.isArray(all[comCode]) ? all[comCode] : [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function maskRxKeyForPopup(key) {
+    key = String(key || '').trim();
+    if (!key) return 'PT · otevřený kanál';
+    if (key.length <= 2) return 'CT · **';
+    return 'CT · ' + '*'.repeat(Math.max(0, key.length - 2)) + key.slice(-2);
 }
 
 function isActiveQuestAtPoint(id) {
@@ -360,6 +377,15 @@ function initMgrsGridModule() {
 function getRadioRangeDeps() {
     return {
         userId: localStorage.getItem('patrac_session') || '',
+        getComCode: function() {
+            return localStorage.getItem('com_code') || '';
+        },
+        getReceivers: function() {
+            if (typeof window.patracListReceivers === 'function') {
+                return window.patracListReceivers();
+            }
+            return [];
+        },
         getShelterLatLng: function() {
             var lat = parseFloat(localStorage.getItem('point_roxy_lat'));
             var lng = parseFloat(localStorage.getItem('point_roxy_lng'));
@@ -936,6 +962,13 @@ function buildMapPopupHtml(meta) {
             if (meta.poiImg) extra += '<img class="poi-popup-img" src="' + meta.poiImg + '" alt="">';
             extra += '<button type="button" class="map-popup-edit" onclick="openPoiEditor(\'' + meta.id + '\')">📝 UPRAVIT</button>';
             extra += '<button type="button" class="map-popup-reset" onclick="deleteMapPoi(\'' + meta.id + '\')">🗑️ SMAZAT</button>';
+        } else if (meta.isRadioReceiver) {
+            extra += '<p class="popup-meta map-rx-popup-freq">📻 ' + (meta.rxFreqLabel || '') + '</p>';
+            if (meta.elevationM != null) {
+                extra += '<p class="popup-meta">⛰ ' + Math.round(meta.elevationM) + ' m n.m.</p>';
+            }
+            extra += '<button type="button" class="map-popup-edit" onclick="openRxEditor(\'' + meta.id + '\')">📝 NASTAVIT KANÁL</button>';
+            extra += '<button type="button" class="map-popup-reset" onclick="deleteMapReceiver(\'' + meta.id + '\')">🗑️ SMAZAT</button>';
         } else {
             if (faded) extra += '<p class="popup-meta popup-inactive-tag">⏸ Neaktivní · mise splněna</p>';
             if (meta.isStoryQuest) {
@@ -1528,7 +1561,6 @@ function saveQuestCoords(questId, lat, lng) {
     snapshotCommunityMapCache();
     syncCommunityQuestsToCloud();
     syncCommunityPoisToCloud();
-    patracRefreshFogOfWar();
 }
 
 function getMapPointMeta(id, lat, lng) {
@@ -1588,6 +1620,29 @@ function getMapPointMeta(id, lat, lng) {
                 isStoryQuest: false,
                 canReset: false
             };
+        }
+    }
+    if (id.indexOf('rx_') === 0) {
+        var receivers = getCommunityReceiversForMap();
+        for (var rx = 0; rx < receivers.length; rx++) {
+            if (receivers[rx] && receivers[rx].id === id) {
+                var item = receivers[rx];
+                var keyLabel = maskRxKeyForPopup(item.encryptionKey);
+                return {
+                    id: id,
+                    lat: lat,
+                    lng: lng,
+                    mapLabel: item.label || 'Receiver',
+                    popupDesc: 'Zesiluje kanál ' + (item.frequency || '—') + ' MHz',
+                    isRadioReceiver: true,
+                    rxFrequency: item.frequency || '',
+                    rxEncryptionKey: item.encryptionKey || '',
+                    rxFreqLabel: (item.frequency || '—') + ' MHz · ' + keyLabel,
+                    elevationM: item.elevationM,
+                    isStoryQuest: false,
+                    canReset: false
+                };
+            }
         }
     }
     return {
@@ -1732,19 +1787,28 @@ function reloadAllMapPoints() {
         var poi = pois[p];
         renderPointOnMap(poi.id, poi.lat, poi.lng, poi.name, poi.note || poi.desc || '');
     }
+    var rxList = getCommunityReceiversForMap();
+    for (var rx = 0; rx < rxList.length; rx++) {
+        var receiver = rxList[rx];
+        if (!receiver || !receiver.frequency) continue;
+        renderPointOnMap(
+            receiver.id,
+            receiver.lat,
+            receiver.lng,
+            receiver.label || 'Receiver',
+            'Kanál ' + receiver.frequency + ' MHz'
+        );
+    }
     if (typeof window.patracPoctaReloadMap === 'function') window.patracPoctaReloadMap();
-    patracRefreshFogOfWar();
     if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
 }
 
 /** Obnoví vrstvy mapy po init (pořadí: mlha < body < MGRS). */
 function refreshMapLayerStack() {
     ensureMapPanes();
-    if (map && map.getPane('mapFogPane')) map.getPane('mapFogPane').style.zIndex = 450;
     if (map && map.getPane('mapPointsPane')) map.getPane('mapPointsPane').style.zIndex = 640;
     if (map && map.getPane('mapGridPane')) map.getPane('mapGridPane').style.zIndex = 665;
     if (map && map.getPane('mapMeasurePane')) map.getPane('mapMeasurePane').style.zIndex = 670;
-    patracRefreshFogOfWar();
     if (mgrsGridMod && mgrsGridMod.refreshMgrsGrid) mgrsGridMod.refreshMgrsGrid();
 }
 
@@ -1993,7 +2057,6 @@ function setMapToolsVisible(show) {
         if (map) setTimeout(function() {
             map.invalidateSize();
             ensureMapTouchPan();
-            patracRefreshFogOfWar();
         }, 150);
     } else {
         resetMapBearingRotation();
@@ -2005,10 +2068,15 @@ function isPoiPanelOpen() {
     return bar && bar.style.display === 'block';
 }
 
+function isRxPanelOpen() {
+    var bar = document.getElementById('map-add-rx-bar');
+    return bar && bar.style.display === 'block';
+}
+
 function updateMapCrosshair() {
     var el = document.getElementById('map-crosshair');
     if (!el) return;
-    var show = canUseMapPlacement() && (!!activeTargetingQuest || isPoiPanelOpen());
+    var show = canUseMapPlacement() && (!!activeTargetingQuest || isPoiPanelOpen() || isRxPanelOpen());
     el.style.display = show ? 'block' : 'none';
 }
 
@@ -2017,6 +2085,8 @@ function openAddPoiPanel() {
     closeStoryPositionsPanel();
     closePoiEditor();
     closeStoryPosEditor();
+    closeAddRxPanel();
+    closeRxEditor();
     base64PoiImg = '';
     var prev = document.getElementById('poi-create-preview');
     if (prev) prev.innerHTML = 'BEZ FOTO';
@@ -2079,6 +2149,163 @@ function confirmAddMapPoi() {
     closeAddPoiPanel();
     alert('Bod „' + name + '“ uložen. Poznámku a foto doplníš kdykoli v detailu bodu.');
     syncCommunityPoisToCloud();
-    patracRefreshFogOfWar();
 }
 
+function openAddRxPanel() {
+    cancelTargeting();
+    closeStoryPositionsPanel();
+    closePoiEditor();
+    closeStoryPosEditor();
+    closeAddPoiPanel();
+    closeRxEditor();
+    var titleEl = document.getElementById('map-add-rx-title');
+    if (titleEl) {
+        titleEl.textContent = canUseMapPlacement()
+            ? '📡 NOVÝ RECEIVER (STŘED MAPY — ADMIN)'
+            : '📡 NOVÝ RECEIVER (GPS POLOHA)';
+    }
+    document.getElementById('map-add-rx-bar').style.display = 'block';
+    switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+    updateMapCrosshair();
+}
+
+function closeAddRxPanel() {
+    var bar = document.getElementById('map-add-rx-bar');
+    if (bar) bar.style.display = 'none';
+    updateMapCrosshair();
+}
+
+function toggleAddRxPanel() {
+    var el = document.getElementById('map-add-rx-bar');
+    if (el && el.style.display === 'block') {
+        closeAddRxPanel();
+        return;
+    }
+    openAddRxPanel();
+}
+
+async function confirmAddMapReceiver() {
+    var name = document.getElementById('rx-name').value.trim();
+    var freq = document.getElementById('rx-frequency').value.trim();
+    var enc = document.getElementById('rx-encryption').value.trim();
+    if (!name) { alert('Zadej název receiveru!'); return; }
+    if (!freq) { alert('Zadej frekvenci v MHz (400–470).'); return; }
+    var lat, lng;
+    if (canUseMapPlacement()) {
+        var center = getMapCenterCoords();
+        lat = center.lat;
+        lng = center.lng;
+    } else {
+        var pos = getUserPositionOrAlert();
+        if (!pos) return;
+        lat = pos.lat;
+        lng = pos.lng;
+    }
+    var comCode = localStorage.getItem('com_code') || '';
+    if (!comCode) { alert('Nejdřív se přihlas do komunity.'); return; }
+    try {
+        var mod = await patracImport('radio/radioReceivers.js');
+        var entry = await mod.installReceiver(comCode, {
+            lat: lat,
+            lng: lng,
+            label: name,
+            frequency: freq,
+            encryptionKey: enc
+        });
+        renderPointOnMap(entry.id, entry.lat, entry.lng, entry.label, 'Kanál ' + entry.frequency + ' MHz');
+        document.getElementById('rx-name').value = '';
+        document.getElementById('rx-frequency').value = '';
+        document.getElementById('rx-encryption').value = '';
+        closeAddRxPanel();
+        alert('Receiver „' + entry.label + '“ uložen · ' + entry.frequency + ' MHz · ' + Math.round(entry.elevationM) + ' m n.m.');
+        if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
+        if (typeof window.patracRefreshRadioReception === 'function') window.patracRefreshRadioReception();
+    } catch (err) {
+        alert(err && err.message ? err.message : 'Uložení receiveru selhalo.');
+    }
+}
+
+function openRxEditor(rxId) {
+    var list = getCommunityReceiversForMap();
+    var rx = null;
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === rxId) { rx = list[i]; break; }
+    }
+    if (!rx) { alert('Receiver nenalezen.'); return; }
+    closeAddRxPanel();
+    closeAddPoiPanel();
+    document.getElementById('rx-edit-id').value = rxId;
+    document.getElementById('rx-edit-name').value = rx.label || '';
+    document.getElementById('rx-edit-frequency').value = rx.frequency || '';
+    document.getElementById('rx-edit-encryption').value = rx.encryptionKey || '';
+    var elevEl = document.getElementById('rx-edit-elev');
+    if (elevEl) {
+        elevEl.textContent = rx.elevationM != null
+            ? ('Nadmořská výška: ' + Math.round(rx.elevationM) + ' m · zesiluje kanál ' + rx.frequency + ' MHz')
+            : 'Výška se načítá…';
+    }
+    document.getElementById('map-rx-edit-bar').style.display = 'block';
+    switchMainTab('map-only', document.querySelectorAll('.bottom-action-bar button')[2]);
+}
+
+function closeRxEditor() {
+    var bar = document.getElementById('map-rx-edit-bar');
+    if (bar) bar.style.display = 'none';
+}
+
+async function saveRxChanges() {
+    var rxId = document.getElementById('rx-edit-id').value;
+    var name = document.getElementById('rx-edit-name').value.trim();
+    var freq = document.getElementById('rx-edit-frequency').value.trim();
+    var enc = document.getElementById('rx-edit-encryption').value.trim();
+    if (!rxId || !name || !freq) { alert('Vyplň název a frekvenci.'); return; }
+    var comCode = localStorage.getItem('com_code') || '';
+    try {
+        var mod = await patracImport('radio/radioReceivers.js');
+        var entry = await mod.updateReceiver(comCode, rxId, {
+            label: name,
+            frequency: freq,
+            encryptionKey: enc
+        });
+        reloadAllMapPoints();
+        closeRxEditor();
+        if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
+        if (typeof window.patracRefreshRadioReception === 'function') window.patracRefreshRadioReception();
+        alert('Receiver aktualizován · ' + entry.frequency + ' MHz');
+    } catch (err) {
+        alert(err && err.message ? err.message : 'Uložení selhalo.');
+    }
+}
+
+async function deleteMapReceiver(rxId) {
+    if (!rxId) return;
+    if (!confirm('Smazat tento receiver z mapy?')) return;
+    var comCode = localStorage.getItem('com_code') || '';
+    try {
+        var mod = await patracImport('radio/radioReceivers.js');
+        mod.removeReceiver(comCode, rxId);
+        if (map && mapMarkerRegistry[rxId] && mapPointsLayer) {
+            mapPointsLayer.removeLayer(mapMarkerRegistry[rxId]);
+            delete mapMarkerRegistry[rxId];
+        }
+        reloadAllMapPoints();
+        closeRxEditor();
+        if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
+        if (typeof window.patracRefreshRadioReception === 'function') window.patracRefreshRadioReception();
+    } catch (err) {
+        alert(err && err.message ? err.message : 'Mazání selhalo.');
+    }
+}
+
+function deleteMapRxFromEditor() {
+    deleteMapReceiver(document.getElementById('rx-edit-id').value);
+}
+
+window.openRxEditor = openRxEditor;
+window.closeRxEditor = closeRxEditor;
+window.deleteMapReceiver = deleteMapReceiver;
+window.toggleAddRxPanel = toggleAddRxPanel;
+window.confirmAddMapReceiver = confirmAddMapReceiver;
+window.saveRxChanges = saveRxChanges;
+window.deleteMapRxFromEditor = deleteMapRxFromEditor;

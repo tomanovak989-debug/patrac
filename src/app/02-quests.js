@@ -1537,10 +1537,6 @@ function stripMapCachePayloadForStorage(payload) {
 function captureCommunityMapCachePayload(comCode) {
     comCode = String(comCode || localStorage.getItem('com_code') || operatorComCode || '').trim().toUpperCase();
     if (!comCode) return null;
-    var fogPrefs = null;
-    if (fogOfWarMod && fogOfWarMod.getFogPrefsForCache) {
-        fogPrefs = fogOfWarMod.getFogPrefsForCache();
-    }
     return {
         version: 1,
         comCode: comCode,
@@ -1553,8 +1549,6 @@ function captureCommunityMapCachePayload(comCode) {
         reqOverrides: getQuestReqOverrides(),
         launched: getCommunityLaunchedQuests(),
         questDefinitions: getSafeJSON('quest_definitions_list'),
-        fogEnabled: fogPrefs ? fogPrefs.fogEnabled : undefined,
-        fogRevealAll: fogPrefs ? fogPrefs.fogRevealAll : undefined,
         savedAt: Date.now()
     };
 }
@@ -1630,8 +1624,6 @@ function snapshotCommunityMapCache(comCode, payload) {
             dismissed: stored.dismissed || [],
             reqOverrides: stored.reqOverrides || {},
             launched: stored.launched || {},
-            fogEnabled: stored.fogEnabled,
-            fogRevealAll: stored.fogRevealAll,
             savedAt: Date.now()
         };
         safeLocalStorageSet(getCommunityMapCacheKey(comCode), JSON.stringify(minimal));
@@ -1795,12 +1787,6 @@ function restoreCommunityMapCache(comCode, options) {
             if (data.launched && Object.keys(getCommunityLaunchedQuests()).length === 0) {
                 setCommunityLaunchedQuests(data.launched);
             }
-        }
-        if (fogOfWarMod && fogOfWarMod.applyCommunityFogPrefs) {
-            var fogApply = {};
-            if (typeof data.fogEnabled === 'boolean') fogApply.fogEnabled = data.fogEnabled;
-            if (typeof data.fogRevealAll === 'boolean') fogApply.fogRevealAll = data.fogRevealAll;
-            if (Object.keys(fogApply).length) fogOfWarMod.applyCommunityFogPrefs(fogApply);
         }
         return true;
     } catch (e) {
@@ -2534,7 +2520,6 @@ function applyUserPosition(position) {
         map.setView([lat, lng], 16);
         map._gpsCenteredOnce = true;
     }
-    patracRefreshFogOfWar();
     if (typeof window.patracRefreshRadioRange === 'function') window.patracRefreshRadioRange();
 }
 

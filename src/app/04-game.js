@@ -126,8 +126,6 @@ function centerMapToAllSavedPoints() {
             animate: true
         });
     }
-    try { patracRefreshFogOfWar(); } catch (e) {}
-}
 
 function centerMapToUser() {
     if (userMarker && map) {
@@ -1236,11 +1234,11 @@ function updateAdminBar() {
         document.body.classList.remove('admin-editing-player');
         if (exitAdminBtn) exitAdminBtn.style.display = 'none';
     }
-    if (fogOfWarMod && fogOfWarMod.syncFogAdminControls) fogOfWarMod.syncFogAdminControls();
-    updateAdminFogButtonUi();
-    patracRefreshFogOfWar();
     if (typeof window.patracRefreshQuestAdmin === 'function') {
         try { window.patracRefreshQuestAdmin(); } catch (eQ) {}
+    }
+    if (typeof window.patracRefreshDataAdmin === 'function') {
+        try { window.patracRefreshDataAdmin(); } catch (eD) {}
     }
     if (typeof window.patracRefreshSectorTech === 'function') {
         try { window.patracRefreshSectorTech(); } catch (eR) {}
@@ -2971,7 +2969,14 @@ function initPoctaModuleAsync() {
 
 function initDataKartaAsync() {
     patracImport('data-karta.js').then(function(mod) {
-        mod.initDataKarta();
+        return mod.initDataKarta().then(function() {
+            return patracImport('data/dataAdminUi.js');
+        }).then(function(adminMod) {
+            if (!adminMod) return;
+            return adminMod.initDataAdminUi().then(function() {
+                window.patracRefreshDataAdmin = adminMod.refreshDataAdminUi;
+            });
+        });
     }).catch(function(err) {
         console.error('initDataKarta', err);
     });
