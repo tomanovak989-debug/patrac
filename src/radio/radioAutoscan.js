@@ -2,13 +2,27 @@
  * F2 — Autoscan celého pásma 400–470 MHz (krok 0.025).
  */
 import { normalizeFrequency } from './radioComms.js';
-import { BAND_MIN_MHZ, BAND_MAX_MHZ, TUNE_STEP_MHZ } from './radioBand.js';
+import { BAND_MIN_MHZ, BAND_MAX_MHZ, TUNE_STEP_MHZ, parseFrequencyMHz, isInBand } from './radioBand.js';
 
 export var SCAN_IDLE = 'idle';
 export var SCAN_RUNNING = 'running';
 export var SCAN_LOCKED = 'locked';
 
-export var AUTOSCAN_DWELL_MS = 220;
+/** Rychlost vizuálního průtahu pásma (jen obrazovka). */
+export var AUTOSCAN_VISUAL_MS = 42;
+/** @deprecated alias — vizuální krok */
+export var AUTOSCAN_DWELL_MS = AUTOSCAN_VISUAL_MS;
+function scanProgressBar(index, total, width) {
+    width = width || 14;
+    if (!total || total <= 1) return '▓'.repeat(width);
+    var pct = index / (total - 1);
+    var filled = Math.round(pct * width);
+    if (filled > width) filled = width;
+    var bar = '';
+    var i;
+    for (i = 0; i < width; i++) bar += i < filled ? '▓' : '░';
+    return bar;
+}
 
 export function bandScanStepCount() {
     return Math.round((BAND_MAX_MHZ - BAND_MIN_MHZ) / TUNE_STEP_MHZ) + 1;
@@ -20,6 +34,16 @@ export function frequencyAtBandIndex(index) {
     return normalizeFrequency(n);
 }
 
+export function bandIndexForFrequency(mhz) {
+    var n = parseFrequencyMHz(mhz);
+    if (!isFinite(n)) return 0;
+    var idx = Math.round((n - BAND_MIN_MHZ) / TUNE_STEP_MHZ);
+    if (idx < 0) return 0;
+    var max = bandScanStepCount() - 1;
+    if (idx > max) return max;
+    return idx;
+}
+
 export function createAutoscanState() {
     return {
         status: SCAN_IDLE,
@@ -29,20 +53,23 @@ export function createAutoscanState() {
         savedEncryptionKey: null,
         savedActivePresetSlot: null,
         hitLabel: '',
+        hitFrequency: null,
+        hitEncrypted: false,
         stepStartedAt: 0,
         activitySeen: false
     };
 }
 
+/** Vizuální krok — nemění naladění vysílačky. */
+export function advanceAutoscanVisual(session) {
+    if (!session || session.status !== SCAN_RUNNING) return false;
+    session.index++;
+    if (session.index >= session.totalSteps) session.index = 0;
+    return true;
+}
+
 export function applyScanStep(session, radioState) {
     if (!session || !radioState) return false;
-    var freq = frequencyAtBandIndex(session.index);
-    if (!freq) return false;
-    radioState.frequency = freq;
-    radioState.encryptionKey = '';
-    radioState.activePresetSlot = null;
-    radioState.dialBuffer = '';
-    radioState.keypadMode = 'tx';
     session.stepStartedAt = Date.now();
     session.activitySeen = false;
     return true;
@@ -56,21 +83,17 @@ export function startAutoscan(session, radioState) {
     session.savedEncryptionKey = radioState.encryptionKey || '';
     session.savedActivePresetSlot = radioState.activePresetSlot || null;
     session.hitLabel = '';
+    session.hitFrequency = null;
+    session.hitEncrypted = false;
     session.status = SCAN_RUNNING;
     return applyScanStep(session, radioState);
 }
 
-export function advanceAutoscan(session, radioState) {
-    if (!session || session.status !== SCAN_RUNNING) return false;
-    session.index++;
-    if (session.index >= session.totalSteps) session.index = 0;
-    return applyScanStep(session, radioState);
-}
-
-export function lockAutoscan(session, hitLabel) {
+export function lockAutoscan(session, hitLabel, hitFrequency) {
     if (!session || session.status !== SCAN_RUNNING) return false;
     session.status = SCAN_LOCKED;
     session.hitLabel = hitLabel || '';
+    if (hitFrequency) session.hitFrequency = normalizeFrequency(hitFrequency);
     return true;
 }
 
@@ -84,25 +107,28 @@ export function stopAutoscan(session, radioState, restore) {
     session.status = SCAN_IDLE;
     session.index = 0;
     session.hitLabel = '';
+    session.hitFrequency = null;
+    session.hitEncrypted = false;
     session.activitySeen = false;
+}
+
+export function isAutoscanListenFrequency(mhz) {
+    var freq = normalizeFrequency(mhz);
+    if (!freq || !isInBand(parseFrequencyMHz(freq))) return false;
+    return true;
+}
+
+/** Herní odchyt: libovolná frekvence v pásmu — podmínka je jen dosah (ingest). */
+export function isAutoscanActivity(session, payload) {
+    if (!session || session.status !== SCAN_RUNNING || !payload) return false;
+    return isAutoscanListenFrequency(payload.frequency);
 }
 
 export function getAutoscanStep(session) {
     if (!session) return null;
-    var freq = frequencyAtBandIndex(session.index);
+    var freq = session.hitFrequency || frequencyAtBandIndex(session.index);
     if (!freq) return null;
     return { frequency: freq, label: freq + ' MHz', slot: 0 };
-}
-
-export function isAutoscanActivity(session, payload) {
-    if (!session || session.status !== SCAN_RUNNING || !payload) return false;
-    var step = getAutoscanStep(session);
-    if (!step) return false;
-    var msgFreq = normalizeFrequency(payload.frequency);
-    if (!msgFreq || msgFreq !== normalizeFrequency(step.frequency)) return false;
-    var ts = payload.timestamp || payload.ts || 0;
-    if (ts && ts < session.stepStartedAt - 250) return false;
-    return true;
 }
 
 export function buildAutoscanOsView(session, radioState) {
@@ -111,27 +137,28 @@ export function buildAutoscanOsView(session, radioState) {
     var lines;
     var footer;
     var status;
+    var visual = getAutoscanStep(session);
+    var visualFreq = visual && !session.hitFrequency ? frequencyAtBandIndex(session.index) : null;
 
     if (session.status === SCAN_RUNNING) {
-        var step = getAutoscanStep(session);
-        var n = session.index + 1;
+        var pct = total > 1 ? Math.round((session.index / (total - 1)) * 100) : 0;
         lines = [
-            'SKEN ' + n + '/' + total,
-            step ? step.frequency + ' MHz' : '',
-            BAND_MIN_MHZ + '–' + BAND_MAX_MHZ + ' · 0.025',
-            session.activitySeen ? '● AKTIVITA' : '○ poslouchám…',
-            '',
+            'SKEN · ' + pct + '%',
+            visualFreq ? ('▸ ' + visualFreq) : '',
+            'POSLECH · celé pásmo',
+            scanProgressBar(session.index, total, 14),
+            session.activitySeen ? '● zachyceno' : '○ čekám…',
             ''
         ];
-        footer = 'OK stop · Zpět';
+        footer = 'Obraz = průtah · RX = celé pásmo';
         status = 'AUTOSKEN · SKEN';
     } else if (session.status === SCAN_LOCKED) {
-        var locked = getAutoscanStep(session);
+        var locked = session.hitFrequency || (visual && visual.frequency);
         lines = [
             'ZAMČENO',
-            locked ? (locked.frequency + ' MHz') : '',
-            String(session.hitLabel || '').slice(0, 18),
-            'Signál na kanálu',
+            locked ? (locked + ' MHz') : '',
+            session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : String(session.hitLabel || '').slice(0, 18),
+            session.hitEncrypted ? 'Lustit heslo později' : 'Signál v dosahu',
             '',
             ''
         ];
@@ -141,9 +168,9 @@ export function buildAutoscanOsView(session, radioState) {
         lines = [
             'AUTOSKEN',
             'Pásmo ' + BAND_MIN_MHZ + '–' + BAND_MAX_MHZ,
-            'Krok 0.025 MHz',
-            total + ' kanálů',
-            'OK = spustit sken',
+            'Odchyt dle dosahu',
+            'Libovolná frekvence v pásmu',
+            'OK = spustit',
             ''
         ];
         footer = 'OK · Zpět';

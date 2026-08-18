@@ -874,6 +874,11 @@ export function createOutgoingEntry(text, ctx, state, extras) {
     if (extras.messageType) entry.messageType = extras.messageType;
     if (extras.pttAudio) entry.pttAudio = extras.pttAudio;
     if (extras.pttMime) entry.pttMime = extras.pttMime;
+    if (state.activePresetSlot) {
+        entry.presetSlot = state.activePresetSlot;
+        var txPreset = findPreset(state, state.activePresetSlot);
+        if (txPreset && txPreset.label) entry.presetLabel = txPreset.label;
+    }
     if (ctx.originLat != null && ctx.originLng != null) {
         entry.originLat = ctx.originLat;
         entry.originLng = ctx.originLng;
@@ -899,6 +904,8 @@ export function createIncomingEntry(payload, ctx) {
         read: false
     };
     if (payload.messageType) entry.messageType = payload.messageType;
+    if (payload.presetSlot) entry.presetSlot = payload.presetSlot;
+    if (payload.presetLabel) entry.presetLabel = payload.presetLabel;
     if (payload.pttAudio) entry.pttAudio = payload.pttAudio;
     if (payload.pttMime) entry.pttMime = payload.pttMime;
     if (payload.signalQuality) entry.signalQuality = payload.signalQuality;

@@ -70,15 +70,25 @@ function filterDrafts(notebook) {
     return drafts.slice().reverse();
 }
 
-function formatEntryLine(entry) {
+function formatEntryChannelLabel(entry, radioState) {
+    if (!entry) return '?';
+    if (entry.presetSlot && radioState) {
+        var preset = findPreset(radioState, entry.presetSlot);
+        if (preset && preset.label) return String(preset.label).slice(0, 9);
+    }
+    if (entry.presetLabel) return String(entry.presetLabel).slice(0, 9);
+    var freq = normalizeFrequency(entry.frequency);
+    return freq || '?';
+}
+
+function formatEntryLine(entry, radioState) {
     if (!entry) return { text: '', bold: false };
     var arrow = entry.dir === 'out' ? '↑' : '↓';
-    var who = String(entry.from || '?').slice(0, 5);
+    var channel = formatEntryChannelLabel(entry, radioState);
     var text = String(entry.text || '').replace(/\s+/g, ' ').trim();
     if (entry.messageType === 'ptt' || /^\[PTT/.test(text)) text = text || '[PTT]';
     var when = formatDateShort(entry.ts);
-    var line = when + ' ' + arrow + who + ' ' + text;
-    if (line.length > LINE_CHARS) line = line.slice(0, LINE_CHARS - 1) + '…';
+    var line = when + ' ' + arrow + ' ' + channel + ' ' + text;
     var bold = entry.dir === 'in' && entry.read !== true;
     return { text: line, bold: bold };
 }
@@ -103,7 +113,7 @@ function formatItem(item, radioState) {
     if (item.type === 'draft') {
         return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };
     }
-    if (item.type === 'msg') return formatEntryLine(item.entry);
+    if (item.type === 'msg') return formatEntryLine(item.entry, radioState);
     return { text: '', bold: false };
 }
 
@@ -245,7 +255,7 @@ export function buildCommsOsView(session, notebook, radioState) {
         var isPtt = e.messageType === 'ptt' || /^\[PTT/.test(String(e.text || ''));
         if (isPtt) {
             lines = [
-                formatDateShort(e.ts) + ' ' + (e.from || '?'),
+                formatDateShort(e.ts) + ' ' + formatEntryChannelLabel(e, radioState),
                 String(e.text || '[PTT]'),
                 session.detailPlaying ? '▶ PŘehrávám…' : '⏸ Zastaveno',
                 '————————————',
@@ -256,7 +266,7 @@ export function buildCommsOsView(session, notebook, radioState) {
             var body = String(e.text || '');
             var wrapped = body.match(/.{1,18}/g) || [''];
             lines = [
-                formatDateShort(e.ts) + ' ' + (e.from || '?'),
+                formatDateShort(e.ts) + ' ' + formatEntryChannelLabel(e, radioState),
                 wrapped[0] || '',
                 wrapped[1] || '',
                 wrapped[2] || '',

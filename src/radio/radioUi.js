@@ -48,13 +48,14 @@ import {
     deleteNoteById,
     countUnreadInbox
 } from './radioComms.js';
-import { sendRadioTransmission, subscribeRadioChannels, stopRadioSubscriptions } from './radioService.js';
+import { sendRadioTransmission, subscribeRadioChannels, subscribeRadioBandScan, stopRadioSubscriptions } from './radioService.js';
 import {
     evaluateRadioReception,
     applyReceptionToMessage,
     noisePlaceholder,
     SIGNAL_NOISE,
-    SIGNAL_CLEAR
+    SIGNAL_CLEAR,
+    SIGNAL_NONE
 } from './radioPropagation.js';
 import {
     getGridPageCount,
@@ -79,12 +80,12 @@ import {
 import {
     createAutoscanState,
     startAutoscan,
-    advanceAutoscan,
+    advanceAutoscanVisual,
     stopAutoscan,
     lockAutoscan,
     isAutoscanActivity,
-    getAutoscanStep,
-    AUTOSCAN_DWELL_MS,
+    bandIndexForFrequency,
+    AUTOSCAN_VISUAL_MS,
     SCAN_IDLE,
     SCAN_RUNNING,
     SCAN_LOCKED
@@ -364,11 +365,66 @@ var DISPLAY_LINE_IDS = [
     'radio-display-line6'
 ];
 
+var LINE_MARQUEE_HOLD_MS = 2000;
+var lineMarqueeState = null;
+
+function escapeDisplayText(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function clearLineMarquee() {
+    if (lineMarqueeState && lineMarqueeState.holdTimer) {
+        clearTimeout(lineMarqueeState.holdTimer);
+    }
+    if (lineMarqueeState && lineMarqueeState.lineEl) {
+        lineMarqueeState.lineEl.classList.remove('radio-display-row-marquee-active');
+    }
+    lineMarqueeState = null;
+}
+
+function isCommsMarqueeScreen() {
+    return isCommsMenuOpen() && commsSession && (
+        commsSession.screen === COMMS_INBOX ||
+        commsSession.screen === COMMS_OUTBOX ||
+        commsSession.screen === COMMS_DRAFTS
+    );
+}
+
+function startLineMarquee(row, fullText) {
+    if (!row || !fullText) return;
+    row.textContent = fullText;
+    if (row.scrollWidth <= row.clientWidth + 2) return;
+    var duration = Math.max(2.8, (fullText.length * 0.11));
+    row.classList.add('radio-display-row-marquee-active');
+    row.innerHTML = '<span class="radio-display-line-inner" style="--marquee-duration:' + duration.toFixed(2) + 's;--marquee-shift:' + (row.scrollWidth - row.clientWidth) + 'px">' +
+        escapeDisplayText(fullText) + '</span>';
+}
+
+function scheduleLineMarquee(focusLine, fullText) {
+    clearLineMarquee();
+    if (focusLine == null || focusLine < 0 || !fullText || !isCommsMarqueeScreen()) return;
+    var row = el(DISPLAY_LINE_IDS[focusLine]);
+    if (!row) return;
+    lineMarqueeState = {
+        lineEl: row,
+        fullText: fullText,
+        focusLine: focusLine,
+        holdTimer: setTimeout(function() {
+            if (!lineMarqueeState || lineMarqueeState.focusLine !== focusLine) return;
+            startLineMarquee(lineMarqueeState.lineEl, lineMarqueeState.fullText);
+        }, LINE_MARQUEE_HOLD_MS)
+    };
+}
+
 function setDisplayTextLines(lines) {
     setDisplayMenuLines(lines, -1);
 }
 
 function setDisplayMenuLines(lines, focusLine, lineStyles) {
+    clearLineMarquee();
     lines = lines || [];
     focusLine = focusLine == null ? -1 : focusLine;
     lineStyles = lineStyles || [];
@@ -377,8 +433,12 @@ function setDisplayMenuLines(lines, focusLine, lineStyles) {
         if (!row) continue;
         var text = i < lines.length ? (lines[i] || '') : '';
         row.textContent = text;
+        row.classList.remove('radio-display-row-marquee-active');
         row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
         row.classList.toggle('radio-display-row-focus', i === focusLine);
+    }
+    if (focusLine >= 0 && focusLine < lines.length && lines[focusLine]) {
+        scheduleLineMarquee(focusLine, lines[focusLine]);
     }
 }
 
@@ -1083,30 +1143,47 @@ function tickAutoscanStep() {
         stopAutoscanTimer();
         return;
     }
-    advanceAutoscan(autoscanSession, state);
-    persist();
-    refreshSubscriptions();
+    advanceAutoscanVisual(autoscanSession);
     renderDisplay();
 }
 
 function startAutoscanTimer() {
     stopAutoscanTimer();
-    autoscanTimer = setInterval(tickAutoscanStep, AUTOSCAN_DWELL_MS);
+    autoscanTimer = setInterval(tickAutoscanStep, AUTOSCAN_VISUAL_MS);
 }
 
-function handleAutoscanActivity(payload) {
-    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) return false;
-    if (!isAutoscanActivity(autoscanSession, payload)) return false;
+function tryAutoscanLock(payload) {
+    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) return;
+    if (!payload || !isAutoscanActivity(autoscanSession, payload)) return;
+
+    var origin = (payload.originLat != null && payload.originLng != null)
+        ? { lat: payload.originLat, lng: payload.originLng }
+        : null;
+    var reception = evaluateRadioReception(origin, getRadioLatLng());
+    if (!reception.receivable || reception.quality === SIGNAL_NONE) return;
+
+    var msgFreq = normalizeFrequency(payload.frequency);
+    if (!msgFreq) return;
+
+    var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
+    var myKey = normalizeEncryptionKey(state.encryptionKey || '');
+    var foreignEncrypt = !!(msgKey && msgKey !== myKey);
+    var hitLabel = foreignEncrypt ? 'ŠIFROVANÝ PROVOZ' : (msgFreq + ' MHz');
+
     autoscanSession.activitySeen = true;
-    var step = getAutoscanStep(autoscanSession);
-    var label = (payload.senderName || payload.from || step.label || '').slice(0, 16);
-    lockAutoscan(autoscanSession, label);
+    autoscanSession.hitFrequency = msgFreq;
+    autoscanSession.hitEncrypted = foreignEncrypt;
+    autoscanSession.index = bandIndexForFrequency(msgFreq);
+    state.frequency = msgFreq;
+    state.encryptionKey = '';
+    state.activePresetSlot = null;
+    state.dialBuffer = '';
+    lockAutoscan(autoscanSession, hitLabel, msgFreq);
     stopAutoscanTimer();
     persist();
     refreshSubscriptions();
     renderDisplay();
-    radioIncomingFeedback(payload.signalQuality || SIGNAL_CLEAR);
-    return true;
+    radioIncomingFeedback(reception.quality || SIGNAL_CLEAR);
 }
 
 function handleAutoscanOk() {
@@ -1840,7 +1917,7 @@ function ingestIncomingPayload(payload) {
         seenMessageIds[payload.id] = true;
         return;
     }
-    if (handleAutoscanActivity(payload)) return;
+    tryAutoscanLock(payload);
     if (hasRecentOutgoingEcho(payload)) {
         seenMessageIds[payload.id] = true;
         return;
@@ -1903,8 +1980,14 @@ function ingestIncomingPayload(payload) {
 
 function refreshSubscriptions() {
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
-    var freqs = collectTunedFrequencies(state);
-    subscribeRadioChannels(freqs, ingestIncomingPayload).catch(function(err) {
+    var onMsg = ingestIncomingPayload;
+    if (autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED)) {
+        subscribeRadioBandScan(onMsg).catch(function(err) {
+            console.warn('[radioUi] band scan subscribe', err);
+        });
+        return;
+    }
+    subscribeRadioChannels(collectTunedFrequencies(state), onMsg).catch(function(err) {
         console.warn('[radioUi] subscribe', err);
     });
 }
@@ -1945,6 +2028,8 @@ async function transmitMessage(text, extras) {
         frequency: txFreq,
         encryptionKey: txKey || ''
     });
+    var txPresetSlot = extras.presetSlot != null ? extras.presetSlot : state.activePresetSlot;
+    if (txPresetSlot) txState.activePresetSlot = txPresetSlot;
     if (!extras.skipTxFx) radioTxStart();
     var entry = createOutgoingEntry(text, c, txState, extras);
     recordEntry(entry);
@@ -1966,6 +2051,8 @@ async function transmitMessage(text, extras) {
             messageType: extras.messageType,
             pttAudio: extras.pttAudio,
             pttMime: extras.pttMime,
+            presetSlot: entry.presetSlot,
+            presetLabel: entry.presetLabel,
             timestamp: entry.ts,
             originLat: c.originLat,
             originLng: c.originLng

@@ -2,7 +2,7 @@
  * Rádiové zprávy ve Firestore — kanál = frekvence (freq-first).
  * Cesta: radio_freq/{f_400025}/messages/{msgId}
  */
-import { collection, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth } from '../services/authService.js';
 import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
@@ -36,6 +36,8 @@ export async function sendRadioTransmission(payload) {
         timestamp: payload.timestamp || Date.now()
     };
     if (payload.messageType) docPayload.messageType = payload.messageType;
+    if (payload.presetSlot) docPayload.presetSlot = payload.presetSlot;
+    if (payload.presetLabel) docPayload.presetLabel = payload.presetLabel;
     if (payload.pttAudio) docPayload.pttAudio = payload.pttAudio;
     if (payload.pttMime) docPayload.pttMime = payload.pttMime;
     if (payload.originLat != null && payload.originLng != null &&
@@ -50,12 +52,27 @@ export async function sendRadioTransmission(payload) {
     return { id: ref.id, ...docPayload };
 }
 
+function channelIdFromDocRef(docSnap) {
+    var parts = String(docSnap && docSnap.ref && docSnap.ref.path ? docSnap.ref.path : '').split('/');
+    var i;
+    for (i = 0; i < parts.length - 1; i++) {
+        if (parts[i] === 'radio_freq' && parts[i + 1]) return parts[i + 1];
+    }
+    return '';
+}
+
 function mapDocToPayload(docSnap, fallbackFreq, channelId) {
+    channelId = channelId || channelIdFromDocRef(docSnap);
     var data = docSnap.data() || {};
+    var freqFromId = '';
+    if (channelId && channelId.indexOf('f_') === 0) {
+        var raw = channelId.slice(2);
+        if (raw.length >= 4) freqFromId = raw.slice(0, 3) + '.' + raw.slice(3);
+    }
     return {
         id: docSnap.id,
         channelId: channelId,
-        frequency: data.frequency || fallbackFreq,
+        frequency: data.frequency || fallbackFreq || normalizeFrequency(freqFromId),
         encryptionKey: data.encryptionKey,
         scope: data.scope,
         comCode: data.comCode,
@@ -63,6 +80,8 @@ function mapDocToPayload(docSnap, fallbackFreq, channelId) {
         senderName: data.senderName,
         text: data.text,
         messageType: data.messageType,
+        presetSlot: data.presetSlot,
+        presetLabel: data.presetLabel,
         pttAudio: data.pttAudio,
         pttMime: data.pttMime,
         timestamp: data.timestamp,
@@ -130,4 +149,45 @@ export function stopRadioSubscriptions() {
         try { channelUnsubs[id](); } catch (e) {}
     }
     channelUnsubs = {};
+}
+
+/**
+ * Autosken — poslech celého pásma: collection group „messages“ napříč všemi frekvencemi.
+ * Herní pravidlo: platí jen dosah, ne shoda s aktuálním krokem skenu.
+ */
+export async function subscribeRadioBandScan(onMessage) {
+    stopRadioSubscriptions();
+    if (!onMessage) return;
+
+    await ensureRadioAuth();
+
+    var q = query(
+        collectionGroup(getDb(), 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(96)
+    );
+    var seen = {};
+    var initialSnap = true;
+    channelUnsubs.__band_scan__ = onSnapshot(q, function(snap) {
+        if (initialSnap) {
+            initialSnap = false;
+            var i;
+            for (i = 0; i < snap.docs.length; i++) {
+                seen[snap.docs[i].ref.path] = true;
+            }
+            return;
+        }
+        var changes = snap.docChanges();
+        var c;
+        for (c = 0; c < changes.length; c++) {
+            if (changes[c].type !== 'added') continue;
+            var docSnap = changes[c].doc;
+            var pathKey = docSnap.ref.path;
+            if (seen[pathKey]) continue;
+            seen[pathKey] = true;
+            onMessage(mapDocToPayload(docSnap));
+        }
+    }, function(err) {
+        console.warn('[radioService] band scan subscribe', err);
+    });
 }
