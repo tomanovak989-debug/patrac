@@ -173,6 +173,8 @@ var pttSession = createPttSession();
 var pttMaxTimer = null;
 var shortcutHoldKey = null;
 var shortcutHoldTimer = null;
+var shortcutBindNotice = null;
+var shortcutBindNoticeTimer = null;
 var standbyPttActive = false;
 var menuDial = createMenuDialState();
 var notebook = null;
@@ -543,7 +545,8 @@ function getBindableShortcutContext() {
         ? radioOs.menuPath[radioOs.menuPath.length - 1]
         : '';
 
-    if (leaf === 'comms' && commsSession) {
+    if (leaf === 'comms') {
+        ensureCommsSession();
         return bindingFromCommsItem(getFocusedCommsAction(commsSession, notebook), commsSession);
     }
     if (leaf === 'detail' && presetEditDraft) {
@@ -555,13 +558,43 @@ function getBindableShortcutContext() {
     return bindingFromMenuItem(getFocusedMenuItem(radioOs, state));
 }
 
+function showShortcutBindNotice(keyId, label) {
+    shortcutBindNotice = {
+        keyId: String(keyId || '').toUpperCase(),
+        label: label || ''
+    };
+    if (shortcutBindNoticeTimer) clearTimeout(shortcutBindNoticeTimer);
+    shortcutBindNoticeTimer = setTimeout(function() {
+        shortcutBindNotice = null;
+        shortcutBindNoticeTimer = null;
+        renderDisplay();
+    }, 1600);
+}
+
 function bindShortcutFromMenu(keyId) {
     if (state.operatingMode === 'off' || !isRadioOsActive(radioOs)) return;
+    if (isFieldEditActive(fieldEditSession)) return;
     var binding = getBindableShortcutContext();
     if (!binding) return;
     bindQuickKey(state, keyId, binding);
     persist();
+    showShortcutBindNotice(keyId, binding.label);
     renderDisplay();
+}
+
+function isCommsMenuContext() {
+    return isCommsMenuOpen() && commsSession && !isFieldEditActive(fieldEditSession);
+}
+
+function isQuickKeyId(keyId) {
+    return keyId === 'p1' || keyId === 'p2' || /^[1-9]$/.test(keyId);
+}
+
+function tryExecuteQuickKey(keyId) {
+    if (!isQuickKeyId(keyId)) return false;
+    if (isFieldEditActive(fieldEditSession)) return false;
+    if (!isStandbyScreen() && !isRadioOsActive(radioOs)) return false;
+    return executeQuickKey(keyId);
 }
 
 function applyRadioOsEffect(result) {
@@ -707,6 +740,7 @@ function clearMenuDialIfActive() {
 function executeQuickKey(keyId) {
     var binding = getQuickKeyBinding(state, keyId);
     if (!binding || !binding.action) return false;
+    clearMenuDial(menuDial);
     var action = binding.action;
     if (action === 'autoscan:start') {
         resetRadioOs(radioOs);
@@ -872,7 +906,13 @@ function renderDisplay() {
             screen.classList.toggle('is-key-edit', editView.editType === 'encrypt');
             screen.classList.toggle('is-text-edit', editView.editType === 'text');
         }
-        if (ch) ch.textContent = editView.status || '';
+        if (ch) {
+            if (shortcutBindNotice) {
+                ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
+            } else {
+                ch.textContent = editView.status || '';
+            }
+        }
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
         if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
         if (f) {
@@ -994,12 +1034,18 @@ function renderDisplay() {
         }
         setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
         var dialPreview = menuDialPreview(menuDial);
-        if (dialPreview && buf) buf.textContent = dialPreview;
-        else if (dialPreview) {
+        if (dialPreview && buf && !isCommsMenuContext()) buf.textContent = dialPreview;
+        else if (dialPreview && !isCommsMenuContext()) {
             var bufRow = el('radio-display-buffer');
             if (bufRow) bufRow.textContent = dialPreview;
         }
-        if (ch) ch.textContent = osView.status || 'MENU';
+        if (ch) {
+            if (shortcutBindNotice) {
+                ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
+            } else {
+                ch.textContent = osView.status || 'MENU';
+            }
+        }
         if (sig) {
             sig.textContent = '';
             sig.style.color = '';
@@ -1960,6 +2006,7 @@ function bindShortcutHold() {
     grid._shortcutHoldBound = true;
     grid.addEventListener('pointerdown', function(e) {
         if (state.operatingMode === 'off' || !isRadioOsActive(radioOs)) return;
+        if (isFieldEditActive(fieldEditSession)) return;
         var btn = e.target.closest('[data-key]');
         if (!btn) return;
         var key = btn.getAttribute('data-key');
@@ -2232,11 +2279,11 @@ function bindKeypad() {
             var quickBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
             if (quickBtn) {
                 var qkey = quickBtn.getAttribute('data-key');
-                if (qkey === 'p1' || qkey === 'p2' || /^[1-9]$/.test(qkey)) {
-                    if (isStandbyScreen()) {
-                        if (executeQuickKey(qkey)) return;
-                    }
+                if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-4]$/.test(qkey)) {
+                    handleCommsDigit(qkey);
+                    return;
                 }
+                if (isQuickKeyId(qkey) && tryExecuteQuickKey(qkey)) return;
             }
 
             if (isRadioOsActive(radioOs)) {
@@ -2244,6 +2291,7 @@ function bindKeypad() {
                 if (menuBtn) {
                     var mkey = menuBtn.getAttribute('data-key');
                     if (/^[0-9]$/.test(mkey)) {
+                        if (isCommsMenuContext()) return;
                         appendMenuDialDigit(menuDial, mkey);
                         renderDisplay();
                         return;
@@ -2254,11 +2302,11 @@ function bindKeypad() {
 
             if (!isStandbyScreen()) return;
 
-            var btn = e.target.closest('.radio-key[data-key]');
+            var btn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
             if (!btn) return;
             var key = btn.getAttribute('data-key');
             if (/^[1-9]$/.test(key)) {
-                if (executeQuickKey(key)) return;
+                tryExecuteQuickKey(key);
             }
         });
     }

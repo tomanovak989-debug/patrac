@@ -1376,20 +1376,27 @@ body.sector-calibrate-on .sector-cal-rulers {
     font-weight: 600 !important;
 }
 body.theme-light .sector-tech-screen {
-    --radio-phosphor: #1a2a10;
-    --radio-phosphor-dim: #5a6a52;
-    color: #1a2a10;
-    text-shadow: none;
+    --radio-phosphor: #122014;
+    --radio-phosphor-dim: #4a5a48;
+    --radio-phosphor-glow: rgba(0, 35, 12, 0.22);
+    --radio-phosphor-halo: rgba(0, 35, 12, 0.08);
+    color: #122014;
+    text-shadow:
+        0 0 1px rgba(0, 30, 10, 0.42),
+        0 1px 0 rgba(0, 40, 12, 0.16);
     background: linear-gradient(180deg, #d8e8a8 0%, #c8d898 100%);
     box-shadow:
         inset 0 2px 6px rgba(0, 0, 0, 0.12),
         0 2px 0 rgba(255, 255, 255, 0.35);
 }
 body.theme-light .sector-tech-screen::after {
+    z-index: 3;
+    opacity: 0.92;
+    mix-blend-mode: multiply;
     background: repeating-linear-gradient(
         0deg,
-        rgba(0, 0, 0, 0.05),
-        rgba(0, 0, 0, 0.05) 1px,
+        rgba(0, 35, 12, 0.09),
+        rgba(0, 35, 12, 0.09) 1px,
         transparent 1px,
         transparent 2px
     );
@@ -1399,16 +1406,20 @@ body.theme-light .sector-tech-screen .radio-display-status > button,
 body.theme-light .sector-tech-screen .radio-display-main > div,
 body.theme-light .sector-tech-screen .radio-display-sub,
 body.theme-light .sector-tech-screen .radio-display-node,
-body.theme-light .sector-tech-screen .radio-display-edit-large {
-    text-shadow: none;
+body.theme-light .sector-tech-screen .radio-display-edit-large,
+body.theme-light .sector-tech-screen .radio-edit-char {
+    color: inherit;
+    text-shadow: inherit;
 }
 body.theme-light #radio-display-freq.radio-display-freq-node.is-handset,
 body.theme-light .radio-display-node.is-handset {
-    color: #2a4a30;
-    text-shadow: none;
+    color: #1a3824;
+    text-shadow:
+        0 0 1px rgba(0, 30, 10, 0.35),
+        0 1px 0 rgba(0, 40, 12, 0.12);
 }
 body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
-    text-shadow: none;
+    text-shadow: inherit;
 }
 body.theme-light .sector-tech-screen.is-field-edit .radio-edit-blink {
     background: rgba(20, 40, 16, 0.14);
@@ -1419,9 +1430,13 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-edit-blink {
 #radio-display-signal.is-standby {
     color: var(--radio-phosphor-dim);
 }
-body.theme-light #radio-display-signal.is-tuned,
+body.theme-light #radio-display-signal.is-tuned {
+    color: #122014;
+    text-shadow: inherit;
+}
 body.theme-light #radio-display-signal.is-standby {
-    text-shadow: none;
+    color: var(--radio-phosphor-dim);
+    text-shadow: inherit;
 }
 .sector-tech-screen.is-off {
     background: var(--radio-screen-bg-off);
@@ -1532,6 +1547,9 @@ body.theme-light .sector-tech-screen.is-off {
     text-shadow:
         0 0 5px var(--radio-phosphor-glow),
         0 0 14px var(--radio-phosphor-halo);
+}
+body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
+    text-shadow: inherit;
 }
 .sector-tech-screen.is-freq-edit .radio-display-edit-large {
     font-size: 2.2em;

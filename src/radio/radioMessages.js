@@ -2,6 +2,7 @@
  * SMS — hub, seznamy, compose, detail, potvrzení odeslání.
  */
 import { findPreset, normalizeFrequency, formatTime } from './radioComms.js';
+import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
 
 var DISPLAY_LINES = 6;
 var LINE_CHARS = 18;
@@ -82,9 +83,23 @@ function formatEntryLine(entry) {
     return { text: line, bold: bold };
 }
 
-function formatItem(item) {
+function commsActionId(item) {
+    if (!item || item.type !== 'action') return null;
+    if (item.id === 'new_sms') return 'comms:new_sms';
+    if (item.id === 'inbox') return 'comms:inbox';
+    if (item.id === 'outbox') return 'comms:outbox';
+    if (item.id === 'drafts') return 'comms:drafts';
+    if (item.id === 'send_yes') return 'comms:send';
+    return null;
+}
+
+function formatItem(item, radioState) {
     if (!item) return { text: '', bold: false };
-    if (item.label) return { text: item.label, bold: false };
+    if (item.label) {
+        var actionId = commsActionId(item);
+        var key = actionId && radioState ? findQuickKeyForAction(radioState, actionId) : null;
+        return { text: key ? decorateMenuLabel(item.label, key) : item.label, bold: false };
+    }
     if (item.type === 'draft') {
         return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };
     }
@@ -207,7 +222,7 @@ export function buildCommsOsView(session, notebook, radioState) {
         ];
         items = clampCommsFocus(session, notebook);
         for (i = 0; i < DISPLAY_LINES; i++) {
-            if (i < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[i]));
+            if (i < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[i], radioState));
             else {
                 lines.push('');
                 lineStyles.push(false);
@@ -267,7 +282,7 @@ export function buildCommsOsView(session, notebook, radioState) {
     if (start + DISPLAY_LINES > items.length) start = Math.max(0, items.length - DISPLAY_LINES);
     for (i = 0; i < DISPLAY_LINES; i++) {
         var idx = start + i;
-        if (idx < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[idx]));
+        if (idx < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[idx], radioState));
         else {
             lines.push('');
             lineStyles.push(false);
