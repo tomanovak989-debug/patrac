@@ -296,6 +296,7 @@ function migrateNotebook(raw) {
         else raw.notes = normalizeNotesList(raw.notes);
         if (!Array.isArray(raw.grids)) raw.grids = [];
         if (!Array.isArray(raw.drafts)) raw.drafts = [];
+        if (!Array.isArray(raw.autoscan)) raw.autoscan = [];
         if (raw.pageIndex.grids == null) raw.pageIndex.grids = 0;
         return raw;
     }
@@ -314,6 +315,7 @@ function migrateNotebook(raw) {
         notes: [],
         grids: [],
         drafts: [],
+        autoscan: [],
         pageIndex: { station: 0, notes: 0, grids: 0 }
     };
 }

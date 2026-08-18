@@ -101,10 +101,13 @@ import {
     COMMS_INBOX,
     COMMS_OUTBOX,
     COMMS_DRAFTS,
+    COMMS_AUTOSCAN,
     COMMS_COMPOSE,
     COMMS_CONFIRM,
     COMMS_DETAIL,
-    markCommsEntryRead
+    markCommsEntryRead,
+    appendAutoscanCapture,
+    markAutoscanCaptureRead
 } from './radioMessages.js';
 import {
     createStandbyUiState,
@@ -389,7 +392,8 @@ function isCommsMarqueeScreen() {
     return isCommsMenuOpen() && commsSession && (
         commsSession.screen === COMMS_INBOX ||
         commsSession.screen === COMMS_OUTBOX ||
-        commsSession.screen === COMMS_DRAFTS
+        commsSession.screen === COMMS_DRAFTS ||
+        commsSession.screen === COMMS_AUTOSCAN
     );
 }
 
@@ -836,7 +840,7 @@ function executeQuickKey(keyId) {
             return true;
         }
     }
-    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts') {
+    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts' || action === 'comms:autoscan') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
         radioOs.menuPath = ['comms'];
@@ -845,7 +849,8 @@ function executeQuickKey(keyId) {
             'comms:new_sms': 'new_sms',
             'comms:inbox': 'inbox',
             'comms:outbox': 'outbox',
-            'comms:drafts': 'drafts'
+            'comms:drafts': 'drafts',
+            'comms:autoscan': 'autoscan'
         };
         openCommsAction(map[action]);
         return true;
@@ -1179,6 +1184,17 @@ function tryAutoscanLock(payload) {
     state.activePresetSlot = null;
     state.dialBuffer = '';
     lockAutoscan(autoscanSession, hitLabel, msgFreq);
+    appendAutoscanCapture(notebook, {
+        id: 'scan_' + (payload.id || msgFreq + '_' + Date.now()),
+        entryId: payload.id || null,
+        ts: payload.timestamp || payload.ts || Date.now(),
+        frequency: msgFreq,
+        encryptionKey: payload.encryptionKey || '',
+        text: foreignEncrypt ? '[ŠIFROVANÝ PROVOZ]' : String(payload.text || '').slice(0, 48),
+        encrypted: foreignEncrypt,
+        presetLabel: payload.presetLabel || '',
+        presetSlot: payload.presetSlot || null
+    });
     stopAutoscanTimer();
     persist();
     refreshSubscriptions();
@@ -1308,6 +1324,9 @@ function openCommsAction(actionId) {
     } else if (actionId === 'drafts') {
         session.screen = COMMS_DRAFTS;
         session.focusIndex = 0;
+    } else if (actionId === 'autoscan') {
+        session.screen = COMMS_AUTOSCAN;
+        session.focusIndex = 0;
     }
     renderDisplay();
 }
@@ -1404,7 +1423,17 @@ function handleCommsOk() {
         return;
     }
 
-    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
+    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX || session.screen === COMMS_AUTOSCAN) {
+        if (action && action.type === 'scan' && action.capture) {
+            if (markAutoscanCaptureRead(action.capture)) persist();
+            session.detailEntry = action.capture;
+            session.detailReturn = COMMS_AUTOSCAN;
+            session.screen = COMMS_DETAIL;
+            session.focusIndex = 0;
+            session.detailPlaying = false;
+            renderDisplay();
+            return;
+        }
         if (action && (action.type === 'msg' || action.type === 'draft') && (action.entry || action.draft)) {
             var entry = action.entry || action.draft;
             if (session.screen === COMMS_INBOX && action.entry) {
@@ -1436,7 +1465,11 @@ function handleCommsOk() {
             persist();
             renderDisplay();
         } else if (action.id === 'delete') {
-            /* simplified delete from list */
+            if (session.detailReturn === COMMS_AUTOSCAN && session.detailEntry && notebook.autoscan) {
+                var scanId = session.detailEntry.id;
+                notebook.autoscan = notebook.autoscan.filter(function(c) { return c && c.id !== scanId; });
+                persist();
+            }
             session.detailEntry = null;
             session.screen = session.detailReturn || COMMS_INBOX;
             renderDisplay();
@@ -2366,7 +2399,7 @@ function bindKeypad() {
             var quickBtn = e.target.closest('.radio-key[data-key], .sector-hit[data-key]');
             if (quickBtn) {
                 var qkey = quickBtn.getAttribute('data-key');
-                if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-4]$/.test(qkey)) {
+                if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-5]$/.test(qkey)) {
                     handleCommsDigit(qkey);
                     return;
                 }

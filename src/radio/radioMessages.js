@@ -11,6 +11,7 @@ export var COMMS_HUB = 'hub';
 export var COMMS_INBOX = 'inbox';
 export var COMMS_OUTBOX = 'outbox';
 export var COMMS_DRAFTS = 'drafts';
+export var COMMS_AUTOSCAN = 'autoscan';
 export var COMMS_COMPOSE = 'compose';
 export var COMMS_CONFIRM = 'confirm';
 export var COMMS_DETAIL = 'detail';
@@ -65,11 +66,51 @@ function filterEntries(notebook, opts) {
     return out;
 }
 
-function filterDrafts(notebook) {
-    var drafts = (notebook && notebook.drafts) ? notebook.drafts : [];
-    return drafts.slice().reverse();
+function filterAutoscanCaptures(notebook) {
+    var list = (notebook && notebook.autoscan) ? notebook.autoscan : [];
+    return list.slice().reverse();
 }
 
+export function appendAutoscanCapture(notebook, capture) {
+    if (!notebook || !capture) return false;
+    if (!Array.isArray(notebook.autoscan)) notebook.autoscan = [];
+    var id = capture.id || capture.entryId;
+    if (id) {
+        var i;
+        for (i = 0; i < notebook.autoscan.length; i++) {
+            if (notebook.autoscan[i] && (notebook.autoscan[i].id === id || notebook.autoscan[i].entryId === id)) {
+                return false;
+            }
+        }
+    }
+    notebook.autoscan.unshift({
+        id: capture.id || ('scan_' + Date.now()),
+        entryId: capture.entryId || null,
+        ts: capture.ts || Date.now(),
+        frequency: capture.frequency || '',
+        encryptionKey: capture.encryptionKey || '',
+        text: capture.text || '',
+        encrypted: !!capture.encrypted,
+        presetLabel: capture.presetLabel || '',
+        presetSlot: capture.presetSlot || null,
+        read: false
+    });
+    if (notebook.autoscan.length > 64) notebook.autoscan.length = 64;
+    return true;
+}
+
+function formatScanCaptureLine(capture, radioState) {
+    if (!capture) return { text: '', bold: false };
+    var channel = formatEntryChannelLabel(capture, radioState);
+    var text = String(capture.text || '').replace(/\s+/g, ' ').trim();
+    if (capture.encrypted && !text) text = '[ŠIFROVANÝ]';
+    if (!text) text = '[ZACHYCENO]';
+    var when = formatDateShort(capture.ts);
+    return {
+        text: when + ' ◎ ' + channel + ' ' + text,
+        bold: capture.read !== true
+    };
+}
 function formatEntryChannelLabel(entry, radioState) {
     if (!entry) return '?';
     if (entry.presetSlot && radioState) {
@@ -79,6 +120,11 @@ function formatEntryChannelLabel(entry, radioState) {
     if (entry.presetLabel) return String(entry.presetLabel).slice(0, 9);
     var freq = normalizeFrequency(entry.frequency);
     return freq || '?';
+}
+
+function filterDrafts(notebook) {
+    var drafts = (notebook && notebook.drafts) ? notebook.drafts : [];
+    return drafts.slice().reverse();
 }
 
 function formatEntryLine(entry, radioState) {
@@ -99,6 +145,7 @@ function commsActionId(item) {
     if (item.id === 'inbox') return 'comms:inbox';
     if (item.id === 'outbox') return 'comms:outbox';
     if (item.id === 'drafts') return 'comms:drafts';
+    if (item.id === 'autoscan') return 'comms:autoscan';
     if (item.id === 'send_yes') return 'comms:send';
     return null;
 }
@@ -113,6 +160,7 @@ function formatItem(item, radioState) {
     if (item.type === 'draft') {
         return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };
     }
+    if (item.type === 'scan') return formatScanCaptureLine(item.capture, radioState);
     if (item.type === 'msg') return formatEntryLine(item.entry, radioState);
     return { text: '', bold: false };
 }
@@ -129,7 +177,8 @@ function hubItems() {
         { type: 'action', id: 'new_sms', label: '1 · NOVÁ SMS', digit: '1' },
         { type: 'action', id: 'inbox', label: '2 · PŘIJATÉ', digit: '2' },
         { type: 'action', id: 'outbox', label: '3 · ODESLANÉ', digit: '3' },
-        { type: 'action', id: 'drafts', label: '4 · ROZPRACOVANÉ', digit: '4' }
+        { type: 'action', id: 'drafts', label: '4 · KONCEPTY', digit: '4' },
+        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN', digit: '5' }
     ];
 }
 
@@ -171,10 +220,24 @@ export function getCommsItems(session, notebook) {
     session = session || createCommsState();
     if (session.screen === COMMS_HUB) return hubItems();
     if (session.screen === COMMS_CONFIRM) return confirmItems();
-    if (session.screen === COMMS_DETAIL) return detailActions(session.detailEntry);
+    if (session.screen === COMMS_DETAIL) {
+        if (session.detailReturn === COMMS_AUTOSCAN) {
+            return [{ type: 'action', id: 'delete', label: 'SMAZAT' }];
+        }
+        return detailActions(session.detailEntry);
+    }
     if (session.screen === COMMS_INBOX) return listItems(filterEntries(notebook, { dir: 'in' }), '(žádné přijaté)');
     if (session.screen === COMMS_OUTBOX) return listItems(filterEntries(notebook, { dir: 'out' }), '(žádné odeslané)');
     if (session.screen === COMMS_DRAFTS) return listItems(filterDrafts(notebook), '(žádné koncepty)');
+    if (session.screen === COMMS_AUTOSCAN) {
+        var captures = filterAutoscanCaptures(notebook);
+        if (!captures.length) return [{ type: 'empty', label: '(žádné zachycení)' }];
+        var scanItems = [];
+        for (i = 0; i < captures.length; i++) {
+            scanItems.push({ type: 'scan', capture: captures[i] });
+        }
+        return scanItems;
+    }
     return [];
 }
 
@@ -252,7 +315,8 @@ export function buildCommsOsView(session, notebook, radioState) {
 
     if (session.screen === COMMS_DETAIL && session.detailEntry) {
         var e = session.detailEntry;
-        var isPtt = e.messageType === 'ptt' || /^\[PTT/.test(String(e.text || ''));
+        var isScanCapture = session.detailReturn === COMMS_AUTOSCAN || (e.id && String(e.id).indexOf('scan_') === 0);
+        var isPtt = !isScanCapture && (e.messageType === 'ptt' || /^\[PTT/.test(String(e.text || '')));
         if (isPtt) {
             lines = [
                 formatDateShort(e.ts) + ' ' + formatEntryChannelLabel(e, radioState),
@@ -278,7 +342,7 @@ export function buildCommsOsView(session, notebook, radioState) {
         focusLine = session.focusIndex;
         return {
             mode: 'comms',
-            status: isPtt ? 'PTT · DETAIL' : 'SMS · DETAIL',
+            status: isScanCapture ? 'AUTOSKEN · DETAIL' : (isPtt ? 'PTT · DETAIL' : 'SMS · DETAIL'),
             lines: lines,
             focusLine: focusLine,
             footer: 'OK · Zpět',
@@ -301,7 +365,7 @@ export function buildCommsOsView(session, notebook, radioState) {
     focusLine = items.length ? session.focusIndex - start : -1;
 
     if (session.screen === COMMS_HUB) {
-        status = 'SMS · ' + target.freq;
+        status = 'ZPRÁVY';
         footer = 'Čísla · OK · Zpět';
     } else if (session.screen === COMMS_INBOX) {
         status = 'PŘIJATÉ';
@@ -310,8 +374,11 @@ export function buildCommsOsView(session, notebook, radioState) {
         status = 'ODESLANÉ';
         footer = 'OK detail · Zpět';
     } else if (session.screen === COMMS_DRAFTS) {
-        status = 'ROZPRACOVANÉ';
+        status = 'KONCEPTY';
         footer = 'OK pokračovat · Zpět';
+    } else if (session.screen === COMMS_AUTOSCAN) {
+        status = 'AUTOSKEN';
+        footer = 'OK detail · Zpět';
     } else {
         status = 'SMS';
         footer = 'OK · Zpět';
@@ -350,6 +417,7 @@ export function hubActionFromDigit(digit) {
     if (digit === '2') return 'inbox';
     if (digit === '3') return 'outbox';
     if (digit === '4') return 'drafts';
+    if (digit === '5') return 'autoscan';
     return null;
 }
 
@@ -357,5 +425,12 @@ export function markCommsEntryRead(entry) {
     if (!entry || entry.dir !== 'in') return false;
     if (entry.read === true) return false;
     entry.read = true;
+    return true;
+}
+
+export function markAutoscanCaptureRead(capture) {
+    if (!capture) return false;
+    if (capture.read === true) return false;
+    capture.read = true;
     return true;
 }

@@ -50,7 +50,7 @@ function parsePathForContext(path, menuPath) {
 
     if (leaf === 'comms') {
         var hub = parseInt(path.charAt(0), 10);
-        if (hub >= 1 && hub <= 4) steps.push({ type: 'comms_hub', value: hub });
+        if (hub >= 1 && hub <= 5) steps.push({ type: 'comms_hub', value: hub });
         return { steps: steps, rest: path.slice(1) };
     }
 

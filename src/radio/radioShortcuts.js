@@ -60,7 +60,8 @@ export function bindingFromCommsItem(item, session) {
         if (item.id === 'new_sms') return { action: 'comms:new_sms', label: 'NOVÁ SMS' };
         if (item.id === 'inbox') return { action: 'comms:inbox', label: 'PŘIJATÉ' };
         if (item.id === 'outbox') return { action: 'comms:outbox', label: 'ODESLANÉ' };
-        if (item.id === 'drafts') return { action: 'comms:drafts', label: 'ROZPRACOVANÉ' };
+        if (item.id === 'drafts') return { action: 'comms:drafts', label: 'KONCEPTY' };
+        if (item.id === 'autoscan') return { action: 'comms:autoscan', label: 'AUTOSKEN' };
         if (item.id === 'send_yes') return { action: 'comms:send', label: 'ODESLAT' };
     }
     if (item.type === 'msg' && item.entry) {
@@ -95,7 +96,7 @@ export function bindingFromMenuItem(item) {
         return { action: 'autoscan:start', label: 'AUTOSKEN' };
     }
     if (item.action === 'screen:comms') {
-        return { action: 'menu:comms', label: 'SMS / PTT' };
+        return { action: 'menu:comms', label: 'ZPRÁVY' };
     }
     if (item.action === 'submenu:presets') {
         return { action: 'menu:presets', label: 'PRESETY' };

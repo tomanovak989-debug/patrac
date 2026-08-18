@@ -14,7 +14,7 @@ var PRESET_SLOTS = 15;
 var MENU_LINES = 6;
 
 var RADIO_MENU = [
-    { id: 'radio_comms', label: '1 · SMS / PTT', action: 'screen:comms', shortcutAction: 'menu:comms' },
+    { id: 'radio_comms', label: '1 · ZPRÁVY', action: 'screen:comms', shortcutAction: 'menu:comms' },
     { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
     { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
     { id: 'radio_beacon', label: '4 · BEACON', action: 'stub', shortcutAction: 'stub:beacon' },
@@ -155,7 +155,7 @@ function menuStatusLabel(os, radioState, draft) {
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
     if (leaf === 'quickkeys') return 'RYCHLÉ VOLBY';
     if (leaf === 'autoscan') return 'AUTOSKEN';
-    if (leaf === 'comms') return 'SMS / PTT';
+    if (leaf === 'comms') return 'ZPRÁVY';
     return 'MENU';
 }
 
