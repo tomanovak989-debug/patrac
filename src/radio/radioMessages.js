@@ -178,7 +178,7 @@ function hubItems() {
         { type: 'action', id: 'inbox', label: '2 · PŘIJATÉ', digit: '2' },
         { type: 'action', id: 'outbox', label: '3 · ODESLANÉ', digit: '3' },
         { type: 'action', id: 'drafts', label: '4 · KONCEPTY', digit: '4' },
-        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN', digit: '5' }
+        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN (spustit)', digit: '5' }
     ];
 }
 

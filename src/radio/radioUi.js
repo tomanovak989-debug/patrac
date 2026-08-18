@@ -920,11 +920,7 @@ function executeQuickKey(keyId) {
     clearMenuDial(menuDial);
     var action = binding.action;
     if (action === 'autoscan:start') {
-        resetRadioOs(radioOs);
-        radioOs.screen = 'menu';
-        radioOs.menuPath = ['autoscan'];
-        ensureAutoscanSession();
-        handleAutoscanOk();
+        openRadioAutoscanScreen(true);
         return true;
     }
     if (action === 'menu:comms') {
@@ -984,11 +980,7 @@ function executeQuickKey(keyId) {
         return true;
     }
     if (action === 'autoscan:open') {
-        resetRadioOs(radioOs);
-        radioOs.screen = 'menu';
-        radioOs.menuPath = ['autoscan'];
-        ensureAutoscanSession();
-        renderDisplay();
+        openRadioAutoscanScreen(false);
         return true;
     }
     if (action.indexOf('stub:') === 0) {
@@ -1418,7 +1410,24 @@ function tryAutoscanLock(payload) {
     radioIncomingFeedback((applied && applied.signalQuality) || reception.quality || SIGNAL_CLEAR);
 }
 
+function openRadioAutoscanScreen(autoStart) {
+    resetRadioOs(radioOs);
+    radioOs.screen = 'menu';
+    radioOs.menuPath = ['autoscan'];
+    ensureAutoscanSession();
+    if (autoStart) {
+        handleAutoscanOk();
+    } else {
+        renderDisplay();
+    }
+}
+
 function handleAutoscanOk() {
+    if (state.operatingMode === 'off') {
+        alert('Vysílačka je vypnutá (OFF). Přepni režim na ON.');
+        renderDisplay();
+        return true;
+    }
     var session = ensureAutoscanSession();
     if (session.status === SCAN_IDLE) {
         if (!startAutoscan(session, state)) {
@@ -1426,12 +1435,12 @@ function handleAutoscanOk() {
             return true;
         }
         persist();
+        startAutoscanTimer();
+        renderDisplay();
         refreshSubscriptions().then(function() {
-            startAutoscanTimer();
             renderDisplay();
         }).catch(function(err) {
             console.warn('[radioUi] autoscan subscribe', err);
-            startAutoscanTimer();
             renderDisplay();
         });
         return true;
@@ -1818,8 +1827,8 @@ function openCommsAction(actionId) {
         session.screen = COMMS_DRAFTS;
         session.focusIndex = 0;
     } else if (actionId === 'autoscan') {
-        session.screen = COMMS_AUTOSCAN;
-        session.focusIndex = 0;
+        openRadioAutoscanScreen(false);
+        return;
     }
     renderDisplay();
 }
