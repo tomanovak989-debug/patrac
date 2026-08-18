@@ -108,9 +108,9 @@ export function clearLocalBeacon(comCode) {
 }
 
 export function registerRemoteBeacon(payload) {
-    if (!payload || payload.messageType !== 'beacon') return;
-    if (payload.originLat == null || payload.originLng == null) return;
-    if (!isFinite(Number(payload.originLat)) || !isFinite(Number(payload.originLng))) return;
+    if (!payload || payload.messageType !== 'beacon') return false;
+    if (payload.originLat == null || payload.originLng == null) return false;
+    if (!isFinite(Number(payload.originLat)) || !isFinite(Number(payload.originLng))) return false;
     var id = payload.senderId || payload.id || ('beacon_' + payload.timestamp);
     _remote[id] = {
         id: id,
@@ -278,7 +278,7 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     lines.push('');
     if (localBeacon && localBeacon.active) {
         lines[4] = '● VYSÍLÁ · ' + (localBeacon.messageType === 'ptt' ? 'PTT' : 'SMS');
-        lines[5] = String(localBeacon.text || '').slice(0, 18);
+        lines[5] = (isFinite(localBeacon.lat) ? 'GPS OK · ' : 'GPS? · ') + String(localBeacon.text || '').slice(0, 14);
     }
     focusLine = items.length ? session.focusIndex - start : -1;
 

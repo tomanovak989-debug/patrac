@@ -482,7 +482,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'autoscan') {
-        return buildAutoscanOsView(autoscanSession, radioState);
+        return buildAutoscanOsView(autoscanSession, radioState, notebook);
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'comms') {

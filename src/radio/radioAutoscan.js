@@ -56,6 +56,8 @@ export function createAutoscanState() {
         hitFrequency: null,
         hitEncrypted: false,
         stepStartedAt: 0,
+        sessionStartedAt: 0,
+        captureCount: 0,
         activitySeen: false
     };
 }
@@ -85,6 +87,8 @@ export function startAutoscan(session, radioState) {
     session.hitLabel = '';
     session.hitFrequency = null;
     session.hitEncrypted = false;
+    session.captureCount = 0;
+    session.sessionStartedAt = Date.now();
     session.status = SCAN_RUNNING;
     return applyScanStep(session, radioState);
 }
@@ -110,6 +114,8 @@ export function stopAutoscan(session, radioState, restore) {
     session.hitFrequency = null;
     session.hitEncrypted = false;
     session.activitySeen = false;
+    session.captureCount = 0;
+    session.sessionStartedAt = 0;
 }
 
 export function isAutoscanListenFrequency(mhz) {
@@ -131,7 +137,12 @@ export function getAutoscanStep(session) {
     return { frequency: freq, label: freq + ' MHz', slot: 0 };
 }
 
-export function buildAutoscanOsView(session, radioState) {
+export function countAutoscanCaptures(notebook) {
+    var list = (notebook && notebook.autoscan) ? notebook.autoscan : [];
+    return list.length;
+}
+
+export function buildAutoscanOsView(session, radioState, notebook) {
     session = session || createAutoscanState();
     var total = session.totalSteps || bandScanStepCount();
     var lines;
@@ -139,42 +150,44 @@ export function buildAutoscanOsView(session, radioState) {
     var status;
     var visual = getAutoscanStep(session);
     var visualFreq = visual && !session.hitFrequency ? frequencyAtBandIndex(session.index) : null;
+    var sessionCount = session.captureCount || 0;
+    var totalSaved = countAutoscanCaptures(notebook);
 
     if (session.status === SCAN_RUNNING) {
         var pct = total > 1 ? Math.round((session.index / (total - 1)) * 100) : 0;
         lines = [
             'SKEN · ' + pct + '%',
-            visualFreq ? ('▸ ' + visualFreq) : '',
-            'POSLECH · celé pásmo',
+            'ZACHYCENO: ' + sessionCount + ' zpr.',
+            visualFreq ? ('▸ ' + visualFreq + ' MHz') : 'POSLECH · celé pásmo',
             scanProgressBar(session.index, total, 14),
-            session.activitySeen ? '● zachyceno' : '○ čekám…',
-            ''
+            sessionCount > 0 ? ('● ' + sessionCount + ' uloženo') : '○ čekám na provoz…',
+            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : ''
         ];
-        footer = 'Obraz = průtah · RX = celé pásmo';
+        footer = 'OK = stop · Zpět';
         status = 'AUTOSKEN · SKEN';
     } else if (session.status === SCAN_LOCKED) {
         var locked = session.hitFrequency || (visual && visual.frequency);
         lines = [
-            'ZAMČENO',
+            'ZASTAVENO · ' + sessionCount + ' zpr.',
             locked ? (locked + ' MHz') : '',
-            session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : String(session.hitLabel || '').slice(0, 18),
-            session.hitEncrypted ? 'Lustit heslo později' : 'Signál v dosahu',
+            session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : String(session.hitLabel || 'Signál v dosahu').slice(0, 18),
+            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : 'Seznam: KOM → AUTOSKEN',
             '',
             ''
         ];
-        footer = 'OK · Zpět';
-        status = 'AUTOSKEN · STOP';
+        footer = 'OK = ukončit · Zpět';
+        status = 'AUTOSKEN · ' + sessionCount + ' ZACHYC.';
     } else {
         lines = [
             'AUTOSKEN',
             'Pásmo ' + BAND_MIN_MHZ + '–' + BAND_MAX_MHZ,
-            'Odchyt dle dosahu',
-            'Libovolná frekvence v pásmu',
-            'OK = spustit sken',
-            'Po startu: POSLECH celé pásmo'
+            totalSaved > 0 ? ('Uloženo celkem: ' + totalSaved + ' zpr.') : 'Zatím nic zachyceno',
+            'OK = spustit poslech',
+            'Po skenu: počet zachycených',
+            'KOM → 5 · AUTOSKEN = seznam'
         ];
         footer = 'OK · Zpět';
-        status = 'AUTOSKEN';
+        status = totalSaved > 0 ? ('AUTOSKEN · ' + totalSaved) : 'AUTOSKEN';
     }
 
     return {

@@ -1351,6 +1351,11 @@ function tryAutoscanLock(payload) {
     var msgFreq = normalizeFrequency(payload.frequency);
     if (!msgFreq || !isAutoscanListenFrequency(msgFreq)) return;
 
+    var msgTs = Number(payload.timestamp || payload.ts) || Date.now();
+    if (autoscanSession.sessionStartedAt && msgTs < autoscanSession.sessionStartedAt - 3000) {
+        return;
+    }
+
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
         : null;
@@ -1378,26 +1383,19 @@ function tryAutoscanLock(payload) {
     var captureText = foreignEncrypt
         ? '[ŠIFROVANÝ PROVOZ]'
         : String((applied && applied.text) || payload.text || '').slice(0, 96);
+    if (!captureText && payload.messageType === 'ptt') captureText = '[PTT]';
+    if (!captureText) captureText = '[ZACHYCENO]';
 
-    var didLock = false;
-    if (autoscanSession.status === SCAN_RUNNING) {
-        autoscanSession.activitySeen = true;
-        autoscanSession.hitFrequency = msgFreq;
-        autoscanSession.hitEncrypted = foreignEncrypt;
-        autoscanSession.index = bandIndexForFrequency(msgFreq);
-        state.frequency = msgFreq;
-        state.encryptionKey = '';
-        state.activePresetSlot = null;
-        state.dialBuffer = '';
-        lockAutoscan(autoscanSession, hitLabel, msgFreq);
-        stopAutoscanTimer();
-        didLock = true;
-    }
+    /* Jen počítat a ukládat — bez auto-zamčení na první zásah. */
+    autoscanSession.hitFrequency = msgFreq;
+    autoscanSession.hitEncrypted = foreignEncrypt;
+    autoscanSession.hitLabel = hitLabel;
+    autoscanSession.index = bandIndexForFrequency(msgFreq);
 
-    appendAutoscanCapture(notebook, {
+    var saved = appendAutoscanCapture(notebook, {
         id: 'scan_' + (payload.id || msgFreq + '_' + Date.now()),
         entryId: payload.id || null,
-        ts: payload.timestamp || payload.ts || Date.now(),
+        ts: msgTs,
         frequency: msgFreq,
         encryptionKey: payload.encryptionKey || '',
         text: captureText,
@@ -1405,8 +1403,11 @@ function tryAutoscanLock(payload) {
         presetLabel: payload.presetLabel || '',
         presetSlot: payload.presetSlot || null
     });
+    if (saved) {
+        autoscanSession.captureCount = (autoscanSession.captureCount || 0) + 1;
+        autoscanSession.activitySeen = true;
+    }
     persist();
-    if (didLock) refreshSubscriptions();
     renderDisplay();
     radioIncomingFeedback((applied && applied.signalQuality) || reception.quality || SIGNAL_CLEAR);
 }
@@ -1432,6 +1433,7 @@ function handleAutoscanOk() {
     if (session.status === SCAN_RUNNING) {
         session.status = SCAN_LOCKED;
         stopAutoscanTimer();
+        refreshSubscriptions();
         renderDisplay();
         return true;
     }
@@ -1545,7 +1547,10 @@ async function startBeacon(opts) {
     };
     saveLocalBeacon(c.comCode || '', beaconActive);
     refreshSubscriptions();
-    await transmitBeaconPulse(false);
+    await transmitBeaconPulse(false).catch(function(err) {
+        console.warn('[beacon] start', err);
+        alert('Beacon TX selhal: ' + ((err && err.message) ? err.message : 'zkontroluj přihlášení a GPS'));
+    });
     startBeaconRepeatTimer();
     notifyBeaconMap(true);
     renderDisplay();
@@ -2464,10 +2469,7 @@ function ingestIncomingPayload(payload) {
     }
 
     if (payload.messageType === 'beacon') {
-        var addedRemote = registerRemoteBeacon(payload);
-        if (addedRemote) {
-            refreshSubscriptions();
-        }
+        registerRemoteBeacon(payload);
         notifyBeaconMap(false);
         var beaconOrigin = (payload.originLat != null && payload.originLng != null)
             ? { lat: payload.originLat, lng: payload.originLng }
@@ -2571,6 +2573,11 @@ function collectListenFrequencies() {
     });
     var i;
     for (i = 0; i < broadcast.length; i++) freqs.push(broadcast[i]);
+    /* Mřížka 5 MHz — spolehlivý poslech i bez radio_feed indexu */
+    var mhz;
+    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += 5) {
+        freqs.push(normalizeFrequency(mhz));
+    }
     var seen = {};
     var uniq = [];
     for (i = 0; i < freqs.length; i++) {
