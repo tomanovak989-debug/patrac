@@ -36,6 +36,7 @@ export async function sendRadioTransmission(payload) {
         timestamp: payload.timestamp || Date.now()
     };
     if (payload.messageType) docPayload.messageType = payload.messageType;
+    if (payload.beaconBandcast) docPayload.beaconBandcast = true;
     if (payload.presetSlot) docPayload.presetSlot = payload.presetSlot;
     if (payload.presetLabel) docPayload.presetLabel = payload.presetLabel;
     if (payload.pttAudio) docPayload.pttAudio = payload.pttAudio;

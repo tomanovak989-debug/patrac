@@ -75,7 +75,9 @@ TX → radio_freq/{f_400025}/messages
 - [ ] **Útočiště v dosahu:** receiver kamkoliv rozšíří signál hráče, ale příběhové mise / hlavní úkoly útočiště vyžadují spojení útočiště ↔ síť — až po dokončení zadávání questů (F5)
 
 ### F4b — BEACON (MVP)
-- [x] Menu 4 · BEACON — SMS nebo PTT na naladěném kanálu (freq + šifra)
+- [x] Menu 4 · BEACON — SMS nebo PTT na celé pásmo 400–470 MHz, vždy PT (bez šifry)
+- [x] SMS: každý puls na všech kanálech (krok 2,5 MHz); PTT: rotace po pásmu
+- [x] Opakování ~18 s, mapa bliká, příjem na naladěném kanálu + autosken (dosah)
 - [x] Opakované vysílání do vypnutí (~18 s interval)
 - [x] Příjem: naladěný kanál + autosken (dosahová matice + výškový profil)
 - [x] Blikající bod na mapě u GPS zapnutí

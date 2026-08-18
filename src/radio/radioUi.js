@@ -97,6 +97,7 @@ import {
     SCAN_RUNNING,
     SCAN_LOCKED
 } from './radioAutoscan.js';
+import { BAND_MIN_MHZ } from './radioBand.js';
 import {
     createBeaconSession,
     loadLocalBeacon,
@@ -109,7 +110,9 @@ import {
     BEACON_HUB,
     BEACON_CONFIRM,
     BEACON_REPEAT_MS,
-    buildBeaconPayload
+    buildBeaconPayload,
+    beaconBroadcastFrequencies,
+    nextBeaconBroadcastFrequency
 } from './radioBeacon.js';
 import {
     createCommsState,
@@ -1080,7 +1083,7 @@ function renderDisplay() {
             editView.hint = textEditHint();
         }
         if (fieldEditSession.returnTo === 'beacon') {
-            editView.footer = 'OK · Zpět';
+            editView.footer = 'OK = další · Zpět';
             editView.hint = textEditHint();
         }
         if (screen) {
@@ -1392,8 +1395,20 @@ function stopBeaconRepeatTimer() {
 
 async function transmitBeaconPulse(skipTxFx) {
     if (!beaconActive || !beaconActive.active) return;
-    var payload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
-    await transmitMessage(beaconActive.text, payload);
+    var basePayload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
+    var freqs = beaconActive.messageType === 'ptt'
+        ? [nextBeaconBroadcastFrequency(beaconActive)]
+        : beaconBroadcastFrequencies();
+    var i;
+    for (i = 0; i < freqs.length; i++) {
+        await transmitMessage(beaconActive.text, Object.assign({}, basePayload, {
+            frequency: freqs[i],
+            encryptionKey: '',
+            skipNotebook: !!skipTxFx || i > 0
+        }));
+    }
+    var c = getCtx();
+    saveLocalBeacon(c.comCode || '', beaconActive);
 }
 
 function startBeaconRepeatTimer() {
@@ -1409,25 +1424,22 @@ async function startBeacon(opts) {
     opts = opts || {};
     var c = getCtx();
     if (c.originLat == null || c.originLng == null) {
-        alert('Beacon potřebuje GPS polohu.');
-        return;
-    }
-    if (!state.frequency) {
-        alert('Nalaď frekvenci kanálu.');
+        alert('Beacon potřebuje polohu útočiště nebo GPS nosiče (BÁZE / NOSIČ na displeji).');
         return;
     }
     beaconActive = {
         active: true,
         lat: c.originLat,
         lng: c.originLng,
-        frequency: normalizeFrequency(state.frequency),
-        encryptionKey: normalizeEncryptionKey(state.encryptionKey || ''),
+        frequency: normalizeFrequency(state.frequency) || normalizeFrequency(BAND_MIN_MHZ),
+        encryptionKey: '',
         messageType: opts.messageType || 'sms',
         text: opts.text || '',
         pttAudio: opts.pttAudio || '',
         pttMime: opts.pttMime || '',
         label: c.playerName || 'Beacon',
         senderId: c.userId || '',
+        bandIndex: 0,
         startedAt: Date.now()
     };
     saveLocalBeacon(c.comCode || '', beaconActive);
@@ -1552,23 +1564,26 @@ function handleBeaconOk() {
     refreshBeaconActiveFromStorage();
 
     if (session.screen === BEACON_CONFIRM) {
-        if (session.pendingType === 'ptt') {
-            startBeacon({
+        var pendingOpts = session.pendingType === 'ptt'
+            ? {
                 messageType: 'ptt',
                 text: session.pendingText,
                 pttAudio: session.pendingPttAudio,
                 pttMime: session.pendingPttMime
-            });
-        } else {
-            startBeacon({
+            }
+            : {
                 messageType: 'sms',
                 text: session.pendingText
-            });
-        }
-        session.screen = BEACON_HUB;
-        session.focusIndex = 0;
-        session.pendingText = '';
-        session.pendingPttAudio = '';
+            };
+        startBeacon(pendingOpts).then(function() {
+            if (beaconActive && beaconActive.active) {
+                session.screen = BEACON_HUB;
+                session.focusIndex = 0;
+                session.pendingText = '';
+                session.pendingPttAudio = '';
+                renderDisplay();
+            }
+        });
         return;
     }
 
@@ -2328,6 +2343,25 @@ function ingestIncomingPayload(payload) {
     if (payload.messageType === 'beacon') {
         registerRemoteBeacon(payload);
         notifyBeaconMap();
+        var beaconOrigin = (payload.originLat != null && payload.originLng != null)
+            ? { lat: payload.originLat, lng: payload.originLng }
+            : null;
+        var beaconReception = evaluateIncomingReception(beaconOrigin, {
+            frequency: normalizeFrequency(payload.frequency),
+            encryptionKey: ''
+        });
+        schedulePathElevationPrefetch(beaconOrigin);
+        if (beaconReception.receivable) {
+            var beaconKey = normalizeEncryptionKey(payload.encryptionKey || '');
+            var myBeaconKey = normalizeEncryptionKey(state.encryptionKey || '');
+            var beaconReadable = !beaconKey || beaconKey === myBeaconKey;
+            if (beaconReadable && payload.messageType === 'ptt' && payload.pttAudio) {
+                playPttAudio(payload.pttAudio, payload.pttMime);
+            }
+            radioIncomingFeedback(beaconReception.quality);
+        }
+        seenMessageIds[payload.id] = true;
+        return;
     }
 
     var origin = (payload.originLat != null && payload.originLng != null)
@@ -2434,8 +2468,10 @@ async function transmitMessage(text, extras) {
     if (txPresetSlot) txState.activePresetSlot = txPresetSlot;
     if (!extras.skipTxFx) radioTxStart();
     var entry = createOutgoingEntry(text, c, txState, extras);
-    recordEntry(entry);
-    renderNotebook();
+    if (!extras.skipNotebook) {
+        recordEntry(entry);
+        renderNotebook();
+    }
     if (!extras.skipTxFx) radioTxEnd();
 
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
@@ -2451,6 +2487,7 @@ async function transmitMessage(text, extras) {
             senderName: c.playerName,
             text: text,
             messageType: extras.messageType,
+            beaconBandcast: extras.beaconBandcast,
             pttAudio: extras.pttAudio,
             pttMime: extras.pttMime,
             presetSlot: entry.presetSlot,
@@ -2641,8 +2678,15 @@ function bindKeypad() {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (isFieldEditActive(fieldEditSession)) {
-                    handleFieldEditOk(fieldEditSession);
-                    renderDisplay();
+                    if (fieldEditSession.returnTo === 'comms') {
+                        finishCommsCompose();
+                    } else if (fieldEditSession.returnTo === 'beacon') {
+                        finishBeaconCompose();
+                    } else {
+                        var enterOk = handleFieldEditOk(fieldEditSession);
+                        if (enterOk === 'done') finishFieldEdit(true);
+                        else renderDisplay();
+                    }
                 } else {
                     transmitMessage(input.value);
                     input.value = '';
@@ -2659,6 +2703,10 @@ function bindKeypad() {
             if (isFieldEditActive(fieldEditSession)) {
                 if (fieldEditSession.returnTo === 'comms') {
                     finishCommsCompose();
+                    return;
+                }
+                if (fieldEditSession.returnTo === 'beacon') {
+                    finishBeaconCompose();
                     return;
                 }
                 var okResult = handleFieldEditOk(fieldEditSession);

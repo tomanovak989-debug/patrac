@@ -1,10 +1,14 @@
 /**
- * BEACON — opakované vysílání SMS/PTT na naladěném kanálu (freq + šifra).
- * Příjem: naladěný kanál + autosken (aktivita v pásmu, dosahová matice).
+ * BEACON — opakované vysílání SMS/PTT na celé pásmo 400–470 MHz, vždy PT (bez šifry).
+ * SMS: každý puls na všech kanálech (krok 2,5 MHz). PTT: rotace po pásmu každý puls.
+ * Příjem: naladěný kanál + autosken (dosahová matice).
  */
-import { normalizeFrequency, normalizeEncryptionKey } from './radioComms.js';
+import { normalizeEncryptionKey } from './radioComms.js';
+import { BAND_MIN_MHZ, BAND_MAX_MHZ, normalizeFrequency } from './radioBand.js';
+import { bandScanStepCount, frequencyAtBandIndex } from './radioAutoscan.js';
 
 export var BEACON_REPEAT_MS = 18000;
+export var BEACON_BURST_STEP_MHZ = 2.5;
 export var BEACON_HUB = 'hub';
 export var BEACON_CONFIRM = 'confirm';
 
@@ -13,6 +17,27 @@ var _remote = {};
 
 function storageKey(comCode) {
     return STORAGE_PREFIX + String(comCode || '').trim().toUpperCase();
+}
+
+/** Frekvence pro SMS beacon — celé pásmo po 2,5 MHz (400, 402.5, … 470). */
+export function beaconBroadcastFrequencies() {
+    var list = [];
+    for (var mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += BEACON_BURST_STEP_MHZ) {
+        list.push(normalizeFrequency(mhz));
+    }
+    return list;
+}
+
+/** PTT beacon — jedna frekvence na puls, postupně celé pásmo. */
+export function nextBeaconBroadcastFrequency(beacon) {
+    if (!beacon) return normalizeFrequency(BAND_MIN_MHZ);
+    var total = bandScanStepCount();
+    var idx = beacon.bandIndex != null ? beacon.bandIndex : 0;
+    if (idx < 0) idx = 0;
+    if (idx >= total) idx = idx % total;
+    var freq = frequencyAtBandIndex(idx);
+    beacon.bandIndex = (idx + 1) % total;
+    return freq;
 }
 
 export function createBeaconSession() {
@@ -153,10 +178,13 @@ export function buildBeaconOsView(session, radioState, localBeacon) {
 
     if (session.screen === BEACON_CONFIRM) {
         var kind = session.pendingType === 'ptt' ? 'PTT' : 'SMS';
+        var bandLine = session.pendingType === 'ptt'
+            ? 'PT · rotace po pásmu'
+            : 'PT · celé pásmo 400–470';
         lines = [
             'SPUSTIT ' + kind + ' BEACON',
-            normalizeFrequency(radioState && radioState.frequency) + ' MHz',
-            (radioState && radioState.encryptionKey) ? 'CT · šifrováno' : 'PT · otevřený',
+            bandLine,
+            'Bez šifry · otevřený provoz',
             String(session.pendingText || '').slice(0, 18),
             'Opakuje se do vypnutí',
             ''
@@ -206,7 +234,8 @@ export function buildBeaconPayload(beacon, extras) {
         pttAudio: beacon.pttAudio || '',
         pttMime: beacon.pttMime || '',
         frequency: beacon.frequency,
-        encryptionKey: beacon.encryptionKey || '',
+        encryptionKey: '',
+        beaconBandcast: true,
         originLat: beacon.lat,
         originLng: beacon.lng,
         skipTxFx: !!extras.skipTxFx,
