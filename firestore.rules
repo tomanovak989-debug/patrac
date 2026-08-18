@@ -124,6 +124,13 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    /* Flat feed pro band scan / autosken — bez collection-group indexu */
+    match /radio_feed/{msgId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && patracUserId() != '';
+      allow update, delete: if false;
+    }
+
     match /entries/{entryId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && patracUserId() != '';

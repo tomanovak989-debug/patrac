@@ -49,6 +49,8 @@ import {
     countUnreadInbox
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions } from './radioService.js';
+import { getFirebaseAuth } from '../lib/firebase.js';
+import { onAuthStateChanged } from 'firebase/auth';
 import {
     evaluateBestRadioReception,
     applyReceptionToMessage,
@@ -216,6 +218,7 @@ var notebook = null;
 var activeNotebookTab = 'station';
 var seenMessageIds = {};
 var flipTimer = null;
+var radioAuthUnsub = null;
 
 function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
@@ -2545,6 +2548,18 @@ function ingestIncomingPayload(payload) {
     radioIncomingFeedback(applied.signalQuality);
 }
 
+function bindRadioAuthRefresh() {
+    if (radioAuthUnsub) return;
+    try {
+        radioAuthUnsub = onAuthStateChanged(getFirebaseAuth(), function(user) {
+            if (!state || !user || user.isAnonymous) return;
+            refreshSubscriptions();
+        });
+    } catch (e) {
+        console.warn('[radioUi] auth refresh bind', e);
+    }
+}
+
 function collectListenFrequencies() {
     var c = getCtx();
     var freqs = collectTunedFrequencies(state).slice();
@@ -3291,6 +3306,7 @@ export function initRadioCommsSystem(options) {
     }
 
     bindKeypad();
+    bindRadioAuthRefresh();
     initRadioFeedback(state && state.soundPrefs ? state.soundPrefs : null);
     setRadioSoundPrefs(state && state.soundPrefs ? state.soundPrefs : null);
     resetRadioOs(radioOs);
@@ -3352,6 +3368,10 @@ export function stopRadioComms() {
     cancelStandbyPtt();
     clearPttMaxTimer();
     stopRadioSubscriptions();
+    if (radioAuthUnsub) {
+        try { radioAuthUnsub(); } catch (e) {}
+        radioAuthUnsub = null;
+    }
 }
 
 export function updateRadioDisplayHud() {

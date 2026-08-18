@@ -5,6 +5,7 @@
   "scripts": {
     "env:firebase": "node scripts/generate-firebase-config.mjs",
     "firebase:deploy-rules": "firebase deploy --only firestore:rules,storage",
+    "firebase:deploy-radio": "firebase deploy --only firestore:rules,firestore:indexes",
     "build": "echo Static site — no build step",
     "vercel-build": "echo Static site — no build step"
   },

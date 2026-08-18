@@ -2,7 +2,7 @@
  * Rádiové zprávy ve Firestore — kanál = frekvence (freq-first).
  * Cesta: radio_freq/{f_400025}/messages/{msgId}
  */
-import { collection, collectionGroup, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, setDoc, doc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth } from '../services/authService.js';
 import { ensureFirebaseAuth } from '../lib/firebase.js';
@@ -53,6 +53,11 @@ export async function sendRadioTransmission(payload) {
 
     var col = collection(getDb(), 'radio_freq', channelId, 'messages');
     var ref = await addDoc(col, docPayload);
+    try {
+        await setDoc(doc(getDb(), 'radio_feed', ref.id), docPayload);
+    } catch (feedErr) {
+        console.warn('[radioService] radio_feed mirror', feedErr);
+    }
     return { id: ref.id, ...docPayload };
 }
 
@@ -158,7 +163,7 @@ export function stopRadioSubscriptions() {
 }
 
 /**
- * Autosken — poslech celého pásma: collection group „messages“ napříč všemi frekvencemi.
+ * Poslech celého pásma — primárně flat kolekce radio_feed (bez collection-group indexu).
  * @param {{ backfillRecentMs?: number, additive?: boolean }} opts
  */
 export async function subscribeRadioBandScan(onMessage, opts) {
@@ -172,15 +177,19 @@ export async function subscribeRadioBandScan(onMessage, opts) {
     await ensureRadioAuth(false);
 
     var q = query(
-        collectionGroup(getDb(), 'messages'),
+        collection(getDb(), 'radio_feed'),
         orderBy('timestamp', 'desc'),
         limit(96)
     );
+    return attachBandScanListener(q, onMessage, backfillRecentMs, '__band_scan__');
+}
+
+function attachBandScanListener(q, onMessage, backfillRecentMs, unsubKey) {
     return new Promise(function(resolve, reject) {
         var settled = false;
         var seen = {};
         var initialSnap = true;
-        channelUnsubs.__band_scan__ = onSnapshot(q, function(snap) {
+        channelUnsubs[unsubKey] = onSnapshot(q, function(snap) {
             if (!settled) {
                 settled = true;
                 resolve();
@@ -193,7 +202,7 @@ export async function subscribeRadioBandScan(onMessage, opts) {
                     var docs = snap.docs.slice().reverse();
                     for (i = 0; i < docs.length; i++) {
                         var docSnap = docs[i];
-                        seen[docSnap.ref.path] = true;
+                        seen[docSnap.id] = true;
                         var ts = Number((docSnap.data() || {}).timestamp) || 0;
                         if (ts >= cutoff) {
                             onMessage(mapDocToPayload(docSnap));
@@ -201,7 +210,7 @@ export async function subscribeRadioBandScan(onMessage, opts) {
                     }
                 } else {
                     for (i = 0; i < snap.docs.length; i++) {
-                        seen[snap.docs[i].ref.path] = true;
+                        seen[snap.docs[i].id] = true;
                     }
                 }
                 return;
@@ -211,7 +220,7 @@ export async function subscribeRadioBandScan(onMessage, opts) {
             for (c = 0; c < changes.length; c++) {
                 if (changes[c].type !== 'added') continue;
                 var docSnap = changes[c].doc;
-                var pathKey = docSnap.ref.path;
+                var pathKey = docSnap.id;
                 if (seen[pathKey]) continue;
                 seen[pathKey] = true;
                 onMessage(mapDocToPayload(docSnap));
@@ -224,6 +233,24 @@ export async function subscribeRadioBandScan(onMessage, opts) {
             }
         });
     });
+}
+
+/** Záloha — collection group (vyžaduje nasazený Firestore index). */
+export async function subscribeRadioBandScanLegacy(onMessage, opts) {
+    opts = opts || {};
+    if (!opts.additive) stopRadioSubscriptions();
+    if (!onMessage) return;
+    if (channelUnsubs.__band_scan_legacy__) return Promise.resolve();
+
+    var backfillRecentMs = opts.backfillRecentMs || 0;
+    await ensureRadioAuth(false);
+
+    var q = query(
+        collectionGroup(getDb(), 'messages'),
+        orderBy('timestamp', 'desc'),
+        limit(96)
+    );
+    return attachBandScanListener(q, onMessage, backfillRecentMs, '__band_scan_legacy__');
 }
 
 /**
