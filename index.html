@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&family=Roboto+Condensed:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e106" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e107" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -713,39 +713,12 @@
         <!-- ZÁLOŽKA DATA KARTA -->
         <div id="data-karta" style="display:none;">
             <div class="panel-content-inner">
-                <div class="quest-card card-tone-operator admin-only-section" id="data-admin-panel-wrap" style="border-color:var(--danger-orange);margin-bottom:14px;">
-                    <div class="quest-section-title" style="margin-top:0;color:var(--danger-orange);">⚙ DATA — OPERÁTOR</div>
-                    <div class="data-admin-toolbar">
-                        <label>Složka
-                            <select id="data-admin-panel"></select>
-                        </label>
-                    </div>
-                    <div id="data-admin-list" class="data-admin-list"></div>
-                    <div class="quest-card card-tone-operator qdef-form data-admin-form" style="border-color:var(--danger-orange);margin-top:10px;">
-                        <div class="quest-section-title" id="data-admin-form-title" style="margin-top:0;color:var(--danger-orange);">＋ Nový příspěvek</div>
-                        <div class="qdef-grid-2">
-                            <div class="form-group"><label>ID</label><input type="text" id="data-admin-id" placeholder="automaticky z názvu" autocomplete="off"></div>
-                            <div class="form-group"><label>NÁZEV</label><input type="text" id="data-admin-title" placeholder="Nadpis příspěvku"></div>
-                        </div>
-                        <div class="form-group"><label>KLÍČOVÁ SLOVA (čárkou)</label><input type="text" id="data-admin-keywords" placeholder="pátrač, mapa, lore…"></div>
-                        <div class="data-admin-blocks-head">
-                            <span>Obsah</span>
-                            <div class="data-admin-blocks-actions">
-                                <button type="button" class="data-admin-mini" id="data-admin-add-text">＋ Text</button>
-                                <button type="button" class="data-admin-mini" id="data-admin-add-image">＋ Obrázek / GIF</button>
-                                <input type="file" id="data-admin-image-input" accept="image/*" hidden>
-                            </div>
-                        </div>
-                        <div id="data-admin-blocks" class="data-admin-blocks"></div>
-                        <div class="qdef-form-actions">
-                            <button type="button" class="btn-accept" id="data-admin-save" style="border-color:var(--text-green);color:var(--text-green);">ULOŽIT</button>
-                            <button type="button" class="btn-accept" id="data-admin-new" style="border-color:var(--xp-blue);color:var(--xp-blue);">NOVÝ</button>
-                            <button type="button" class="btn-accept" id="data-admin-delete" style="border-color:var(--danger-orange);color:var(--danger-orange);">SMAZAT</button>
-                        </div>
-                    </div>
-                </div>
                 <div id="lore-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">📜 LORE</div>
+                    <div class="data-karta-block-head">
+                        <div class="quest-section-title" style="margin-top:0;">📜 LORE</div>
+                        <button type="button" class="data-admin-add-btn admin-only-section" data-panel="lore" title="Nový příspěvek">＋</button>
+                    </div>
+                    <div class="data-admin-entry-list admin-only-section" data-panel="lore"></div>
                     <div class="data-karta-search-wrap">
                         <label class="data-karta-search-label" for="data-search-lore">Hledat v LORE</label>
                         <input type="search" id="data-search-lore" class="data-karta-search" data-panel="lore" placeholder="Min. 3 znaky, např. Poc…" autocomplete="off" spellcheck="false">
@@ -754,7 +727,11 @@
                     <div class="data-karta-results" data-panel="lore"></div>
                 </div>
                 <div id="postapopedie-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">🌆 POSTAPOPEDIE</div>
+                    <div class="data-karta-block-head">
+                        <div class="quest-section-title" style="margin-top:0;">🌆 POSTAPOPEDIE</div>
+                        <button type="button" class="data-admin-add-btn admin-only-section" data-panel="postapopedie" title="Nový příspěvek">＋</button>
+                    </div>
+                    <div class="data-admin-entry-list admin-only-section" data-panel="postapopedie"></div>
                     <div class="data-karta-search-wrap">
                         <label class="data-karta-search-label" for="data-search-postapopedie">Hledat v POSTAPOPEDII</label>
                         <input type="search" id="data-search-postapopedie" class="data-karta-search" data-panel="postapopedie" placeholder="Min. 3 znaky…" autocomplete="off" spellcheck="false">
@@ -763,7 +740,11 @@
                     <div class="data-karta-results" data-panel="postapopedie"></div>
                 </div>
                 <div id="mechanismus-hry-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">⚙️ MECHANISMUS HRY</div>
+                    <div class="data-karta-block-head">
+                        <div class="quest-section-title" style="margin-top:0;">⚙️ MECHANISMUS HRY</div>
+                        <button type="button" class="data-admin-add-btn admin-only-section" data-panel="mechanismy" title="Nový příspěvek">＋</button>
+                    </div>
+                    <div class="data-admin-entry-list admin-only-section" data-panel="mechanismy"></div>
                     <div class="data-karta-search-wrap">
                         <label class="data-karta-search-label" for="data-search-mechanismy">Hledat v MECHANISMU HRY</label>
                         <input type="search" id="data-search-mechanismy" class="data-karta-search" data-panel="mechanismy" placeholder="Min. 3 znaky, např. Poc…" autocomplete="off" spellcheck="false">
@@ -772,13 +753,40 @@
                     <div class="data-karta-results" data-panel="mechanismy"></div>
                 </div>
                 <div id="schránka-nápadů-box" class="data-karta-block quest-card">
-                    <div class="quest-section-title" style="margin-top:0;">💡 SCHRÁNKA NÁPADŮ</div>
+                    <div class="data-karta-block-head">
+                        <div class="quest-section-title" style="margin-top:0;">💡 SCHRÁNKA NÁPADŮ</div>
+                        <button type="button" class="data-admin-add-btn admin-only-section" data-panel="napady" title="Nový příspěvek">＋</button>
+                    </div>
+                    <div class="data-admin-entry-list admin-only-section" data-panel="napady"></div>
                     <div class="data-karta-search-wrap">
                         <label class="data-karta-search-label" for="data-search-napady">Hledat v SCHRÁNCE NÁPADŮ</label>
                         <input type="search" id="data-search-napady" class="data-karta-search" data-panel="napady" placeholder="Min. 3 znaky…" autocomplete="off" spellcheck="false">
                         <ul class="data-karta-suggest" data-panel="napady" role="listbox" aria-label="Nápověda Schránka nápadů"></ul>
                     </div>
                     <div class="data-karta-results" data-panel="napady"></div>
+                </div>
+
+                <div id="data-admin-editor" class="quest-card card-tone-operator admin-only-section data-admin-form" style="display:none;border-color:var(--danger-orange);margin-top:14px;">
+                    <div class="quest-section-title" id="data-admin-form-title" style="margin-top:0;color:var(--danger-orange);">＋ Nový příspěvek</div>
+                    <input type="hidden" id="data-admin-panel-key" value="">
+                    <div class="qdef-grid-2">
+                        <div class="form-group"><label>ID</label><input type="text" id="data-admin-id" placeholder="automaticky z názvu" autocomplete="off"></div>
+                        <div class="form-group"><label>NÁZEV</label><input type="text" id="data-admin-title" placeholder="Nadpis příspěvku"></div>
+                    </div>
+                    <div class="form-group"><label>KLÍČOVÁ SLOVA (čárkou)</label><input type="text" id="data-admin-keywords" placeholder="pátrač, mapa, lore…"></div>
+                    <div class="data-admin-blocks-head">
+                        <span>Obsah</span>
+                        <div class="data-admin-blocks-actions">
+                            <button type="button" class="data-admin-mini" id="data-admin-add-text">＋ Text</button>
+                            <button type="button" class="data-admin-mini" id="data-admin-add-image">＋ Obrázek / GIF</button>
+                            <input type="file" id="data-admin-image-input" accept="image/*" hidden>
+                        </div>
+                    </div>
+                    <div id="data-admin-blocks" class="data-admin-blocks"></div>
+                    <div class="qdef-form-actions">
+                        <button type="button" class="btn-accept" id="data-admin-save" style="border-color:var(--text-green);color:var(--text-green);">ULOŽIT</button>
+                        <button type="button" class="btn-accept" id="data-admin-cancel" style="border-color:var(--xp-blue);color:var(--xp-blue);">ZRUŠIT</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1001,14 +1009,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e106';
+        window.PATRAC_BUILD = '20260723e107';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e106"></script>
-    <script src="src/app/02-quests.js?v=20260723e106"></script>
-    <script src="src/app/03-map.js?v=20260723e106"></script>
-    <script src="src/app/04-game.js?v=20260723e106"></script>
+    <script src="src/app/01-globals.js?v=20260723e107"></script>
+    <script src="src/app/02-quests.js?v=20260723e107"></script>
+    <script src="src/app/03-map.js?v=20260723e107"></script>
+    <script src="src/app/04-game.js?v=20260723e107"></script>
 </body>
 </html>

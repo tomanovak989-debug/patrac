@@ -213,6 +213,26 @@ export function deletePanelEntry(panelKey, entryId) {
     return list;
 }
 
+export function movePanelEntry(panelKey, entryId, delta) {
+    var list = getPanelEntries(panelKey).slice();
+    var idx = -1;
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (list[i] && list[i].id === entryId) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0) return list;
+    var newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= list.length) return list;
+    var tmp = list[newIdx];
+    list[newIdx] = list[idx];
+    list[idx] = tmp;
+    savePanelEntries(panelKey, list);
+    return list;
+}
+
 export function entrySearchHaystack(entry) {
     var parts = [entry.title, (entry.keywords || []).join(' ')];
     (entry.blocks || []).forEach(function(block) {

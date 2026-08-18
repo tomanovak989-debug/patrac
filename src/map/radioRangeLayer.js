@@ -36,22 +36,17 @@ function clearCircles() {
     _circles = [];
 }
 
-function bandStyle(bandIndex, role) {
-    /* 0 = clear, 1 = weak, 2 = fragment, 3 = noise */
-    var isBase = role === 'base';
+function bandStyle(role) {
     var isReceiver = role === 'receiver';
-    var weights = [2.4, 1.8, 1.4, 1.0];
-    var opacities = [0.85, 0.55, 0.38, 0.22];
-    var fills = [0.06, 0.035, 0.02, 0.008];
-    var color = isReceiver ? '#33aaff' : (isBase ? '#ff3355' : '#ff0033');
-    var roleScale = isBase ? 0.7 : (isReceiver ? 0.85 : 1);
+    var isBase = role === 'base';
+    /* active = vlastní poloha (GPS / nosič), receiver = oranžová, útočiště = červená tečkovaná */
+    var color = isReceiver ? '#ff8800' : (isBase ? '#ff5566' : '#33aaff');
     return {
         color: color,
-        weight: weights[bandIndex] || 1,
-        opacity: (opacities[bandIndex] || 0.25) * roleScale,
-        fillColor: color,
-        fillOpacity: (fills[bandIndex] || 0) * roleScale,
-        dashArray: isBase ? '6 6' : (isReceiver ? '4 8' : null),
+        weight: isReceiver ? 2 : (isBase ? 1.6 : 2.2),
+        opacity: isBase ? 0.55 : 0.85,
+        fillOpacity: 0,
+        dashArray: isBase ? '8 6' : (isReceiver ? '6 4' : null),
         interactive: false
     };
 }
@@ -114,14 +109,13 @@ export function refreshRadioRangeLayer() {
         var node = entry && entry.node;
         if (!node || !isFinite(node.lat) || !isFinite(node.lng)) continue;
         var bands = rangeBandsForElevation(nodeElevationM(node));
-        var radii = [bands.clear, bands.weak, bands.fragment, bands.noise];
-        for (var b = radii.length - 1; b >= 0; b--) {
-            var circle = window.L.circle([node.lat, node.lng], Object.assign({
-                radius: radii[b] * 1000
-            }, bandStyle(b, entry.role)));
-            circle.addTo(_layer);
-            _circles.push(circle);
-        }
+        var maxKm = bands.noise;
+        if (!isFinite(maxKm) || maxKm <= 0) continue;
+        var circle = window.L.circle([node.lat, node.lng], Object.assign({
+            radius: maxKm * 1000
+        }, bandStyle(entry.role)));
+        circle.addTo(_layer);
+        _circles.push(circle);
     }
 }
 

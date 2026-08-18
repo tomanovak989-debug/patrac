@@ -1,15 +1,16 @@
-/** Admin UI — Data karta (CRUD ve všech složkách + obrázky). */
+/** Admin UI — Data karta (CRUD per kategorie + obrázky). */
 import {
     DATA_PANELS,
     loadDataContentStore,
     getPanelEntries,
     upsertPanelEntry,
     deletePanelEntry,
+    movePanelEntry,
     suggestEntryId,
     normalizeEntry
 } from './dataContentStore.js';
 
-var editingPanel = 'lore';
+var editingPanel = null;
 var editingId = null;
 var draftBlocks = [];
 var bound = false;
@@ -59,6 +60,16 @@ function readFileAsDataUrl(file) {
 function refreshDataKartaPanels() {
     if (typeof window.patracRefreshDataKarta === 'function') {
         try { window.patracRefreshDataKarta(); } catch (e) {}
+    }
+}
+
+function showEditor(show) {
+    var editor = el('data-admin-editor');
+    if (editor) editor.style.display = show ? 'block' : 'none';
+    if (show) {
+        try {
+            editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } catch (e) {}
     }
 }
 
@@ -158,8 +169,6 @@ function renderBlockEditor() {
             width.addEventListener('input', function() {
                 draftBlocks[index].widthPct = Number(width.value);
                 if (widthVal) widthVal.textContent = width.value + '%';
-                var img = blockEl.querySelector('.data-admin-image-preview img');
-                if (img) img.style.maxWidth = width.value + '%';
             });
         }
         var align = blockEl.querySelector('.data-admin-align');
@@ -206,9 +215,11 @@ function syncBlocksFromDom() {
     });
 }
 
-function resetForm() {
+function resetForm(panelKey) {
+    editingPanel = panelKey || editingPanel || 'lore';
     editingId = null;
     draftBlocks = [{ type: 'text', content: '' }];
+    setVal('data-admin-panel-key', editingPanel);
     setVal('data-admin-title', '');
     setVal('data-admin-keywords', '');
     setVal('data-admin-id', '');
@@ -219,7 +230,8 @@ function resetForm() {
     renderBlockEditor();
 }
 
-function writeForm(entry) {
+function writeForm(panelKey, entry) {
+    editingPanel = panelKey;
     editingId = entry.id;
     draftBlocks = (entry.blocks || []).map(function(block) {
         if (block.type === 'image') {
@@ -235,45 +247,96 @@ function writeForm(entry) {
         return { type: 'text', content: block.content || '' };
     });
     if (!draftBlocks.length) draftBlocks = [{ type: 'text', content: '' }];
+    setVal('data-admin-panel-key', panelKey);
     setVal('data-admin-id', entry.id);
     setVal('data-admin-title', entry.title);
     setVal('data-admin-keywords', (entry.keywords || []).join(', '));
     var idInput = el('data-admin-id');
     if (idInput) idInput.readOnly = true;
     var titleEl = el('data-admin-form-title');
-    if (titleEl) titleEl.textContent = '✎ Upravit — ' + panelLabel(editingPanel);
+    if (titleEl) titleEl.textContent = '✎ Upravit — ' + panelLabel(panelKey);
     renderBlockEditor();
 }
 
-function renderList() {
-    var list = el('data-admin-list');
-    if (!list) return;
-    var entries = getPanelEntries(editingPanel);
-    if (!entries.length) {
-        list.innerHTML = '<p class="data-admin-empty">Ve složce zatím nic není.</p>';
-        return;
-    }
-    list.innerHTML = entries.map(function(entry) {
-        var active = editingId === entry.id ? ' active' : '';
-        return (
-            '<button type="button" class="data-admin-list-item' + active + '" data-entry-id="' + escapeAttr(entry.id) + '">' +
-                '<span class="data-admin-list-title">' + escapeHtml(entry.title) + '</span>' +
-                '<span class="data-admin-list-meta">' + escapeHtml(entry.id) + '</span>' +
-            '</button>'
-        );
-    }).join('');
+function openNewEntry(panelKey) {
+    resetForm(panelKey);
+    showEditor(true);
+    renderCategoryLists();
+}
 
-    list.querySelectorAll('.data-admin-list-item').forEach(function(item) {
-        item.addEventListener('click', function() {
-            var id = item.getAttribute('data-entry-id');
-            var found = getPanelEntries(editingPanel).find(function(e) { return e.id === id; });
-            if (found) writeForm(found);
-            renderList();
+function openEditEntry(panelKey, entryId) {
+    var found = getPanelEntries(panelKey).find(function(e) { return e.id === entryId; });
+    if (!found) return;
+    writeForm(panelKey, found);
+    showEditor(true);
+    renderCategoryLists();
+}
+
+function closeEditor() {
+    editingPanel = null;
+    editingId = null;
+    showEditor(false);
+    renderCategoryLists();
+}
+
+function renderCategoryLists() {
+    DATA_PANELS.forEach(function(panel) {
+        var host = document.querySelector('.data-admin-entry-list[data-panel="' + panel.key + '"]');
+        if (!host) return;
+        var entries = getPanelEntries(panel.key);
+        if (!entries.length) {
+            host.innerHTML = '<p class="data-admin-empty">Operátor: zatím žádné záznamy.</p>';
+            return;
+        }
+        host.innerHTML = entries.map(function(entry, index) {
+            var active = editingPanel === panel.key && editingId === entry.id ? ' active' : '';
+            var upDisabled = index === 0 ? ' disabled' : '';
+            var downDisabled = index === entries.length - 1 ? ' disabled' : '';
+            return (
+                '<div class="data-admin-row' + active + '" data-panel="' + escapeAttr(panel.key) + '" data-entry-id="' + escapeAttr(entry.id) + '">' +
+                    '<div class="data-admin-row-main">' +
+                        '<span class="data-admin-list-title">' + escapeHtml(entry.title) + '</span>' +
+                        '<span class="data-admin-list-meta">' + escapeHtml(entry.id) + '</span>' +
+                    '</div>' +
+                    '<div class="data-admin-row-actions">' +
+                        '<button type="button" class="data-admin-mini" data-act="edit" title="Upravit">Edit</button>' +
+                        '<button type="button" class="data-admin-mini danger" data-act="delete" title="Smazat">Smazat</button>' +
+                        '<button type="button" class="data-admin-mini" data-act="up" title="Výš"' + upDisabled + '>▲</button>' +
+                        '<button type="button" class="data-admin-mini" data-act="down" title="Níž"' + downDisabled + '>▼</button>' +
+                    '</div>' +
+                '</div>'
+            );
+        }).join('');
+
+        host.querySelectorAll('.data-admin-row').forEach(function(row) {
+            var panelKey = row.getAttribute('data-panel');
+            var entryId = row.getAttribute('data-entry-id');
+            row.querySelectorAll('[data-act]').forEach(function(btn) {
+                btn.addEventListener('click', function(ev) {
+                    ev.stopPropagation();
+                    if (btn.disabled) return;
+                    var act = btn.getAttribute('data-act');
+                    if (act === 'edit') {
+                        openEditEntry(panelKey, entryId);
+                    } else if (act === 'delete') {
+                        deleteEntry(panelKey, entryId);
+                    } else if (act === 'up') {
+                        movePanelEntry(panelKey, entryId, -1);
+                        renderCategoryLists();
+                        refreshDataKartaPanels();
+                    } else if (act === 'down') {
+                        movePanelEntry(panelKey, entryId, 1);
+                        renderCategoryLists();
+                        refreshDataKartaPanels();
+                    }
+                });
+            });
         });
     });
 }
 
 function saveFromForm() {
+    if (!editingPanel) return;
     syncBlocksFromDom();
     var title = val('data-admin-title');
     if (!title) {
@@ -309,26 +372,19 @@ function saveFromForm() {
 
     upsertPanelEntry(editingPanel, entry);
     editingId = entry.id;
-    var idInput = el('data-admin-id');
-    if (idInput) idInput.readOnly = true;
-    renderList();
+    closeEditor();
     refreshDataKartaPanels();
 }
 
-function deleteCurrent() {
-    if (!editingId) return;
-    if (!confirm('Smazat příspěvek „' + val('data-admin-title') + '“?')) return;
-    deletePanelEntry(editingPanel, editingId);
-    resetForm();
-    renderList();
+function deleteEntry(panelKey, entryId) {
+    var entries = getPanelEntries(panelKey);
+    var found = entries.find(function(e) { return e.id === entryId; });
+    if (!found) return;
+    if (!confirm('Smazat příspěvek „' + found.title + '“?')) return;
+    deletePanelEntry(panelKey, entryId);
+    if (editingPanel === panelKey && editingId === entryId) closeEditor();
+    else renderCategoryLists();
     refreshDataKartaPanels();
-}
-
-function onPanelChange() {
-    var sel = el('data-admin-panel');
-    editingPanel = sel ? (sel.value || 'lore') : 'lore';
-    resetForm();
-    renderList();
 }
 
 async function onImagePick(ev) {
@@ -366,14 +422,12 @@ function bindUi() {
     if (bound) return;
     bound = true;
 
-    var panelSel = el('data-admin-panel');
-    if (panelSel) {
-        panelSel.innerHTML = DATA_PANELS.map(function(panel) {
-            return '<option value="' + escapeAttr(panel.key) + '">' + escapeHtml(panel.label) + '</option>';
-        }).join('');
-        panelSel.value = editingPanel;
-        panelSel.addEventListener('change', onPanelChange);
-    }
+    document.querySelectorAll('.data-admin-add-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openNewEntry(btn.getAttribute('data-panel') || 'lore');
+        });
+    });
 
     var saveBtn = el('data-admin-save');
     if (saveBtn) saveBtn.addEventListener('click', function(e) {
@@ -381,17 +435,10 @@ function bindUi() {
         saveFromForm();
     });
 
-    var newBtn = el('data-admin-new');
-    if (newBtn) newBtn.addEventListener('click', function(e) {
+    var cancelBtn = el('data-admin-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', function(e) {
         e.preventDefault();
-        resetForm();
-        renderList();
-    });
-
-    var delBtn = el('data-admin-delete');
-    if (delBtn) delBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        deleteCurrent();
+        closeEditor();
     });
 
     var addTextBtn = el('data-admin-add-text');
@@ -415,6 +462,7 @@ function bindUi() {
     var titleInput = el('data-admin-title');
     if (titleInput) {
         titleInput.addEventListener('blur', function() {
+            if (!editingPanel) return;
             var idInput = el('data-admin-id');
             if (!idInput || idInput.readOnly || val('data-admin-id')) return;
             var ids = getPanelEntries(editingPanel).map(function(e) { return e.id; });
@@ -426,16 +474,16 @@ function bindUi() {
 export async function initDataAdminUi() {
     await loadDataContentStore();
     bindUi();
-    resetForm();
-    renderList();
+    showEditor(false);
+    renderCategoryLists();
 }
 
 export function refreshDataAdminUi() {
     bindUi();
-    renderList();
-    if (editingId) {
+    renderCategoryLists();
+    if (editingPanel && editingId) {
         var found = getPanelEntries(editingPanel).find(function(e) { return e.id === editingId; });
-        if (found) writeForm(found);
-        else resetForm();
+        if (found) writeForm(editingPanel, found);
+        else closeEditor();
     }
 }

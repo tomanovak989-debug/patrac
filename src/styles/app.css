@@ -871,6 +871,28 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 .pocta-chronicle-submit:disabled { opacity: 0.5; cursor: wait; }
 .pocta-chronicle-status { font-size: var(--text-xxs); color: var(--dim-fg); margin: 0; min-height: 1.2em; }
 .data-karta-block { margin-bottom: 12px; }
+.data-karta-block-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 4px;
+}
+.data-karta-block-head .quest-section-title { flex: 1; margin-bottom: 0 !important; }
+.data-admin-add-btn {
+    flex-shrink: 0; width: 32px; height: 32px; padding: 0;
+    border: 1px solid var(--danger-orange); border-radius: 4px;
+    background: rgba(255, 120, 0, 0.12); color: var(--danger-orange);
+    font-size: var(--text-lg); line-height: 1; cursor: pointer;
+}
+.data-admin-add-btn:hover { background: rgba(255, 120, 0, 0.22); }
+.data-admin-entry-list { margin: 0 0 10px; }
+.data-admin-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; margin-bottom: 4px;
+    border: 1px solid var(--divider-dotted); border-radius: 4px;
+    background: rgba(0, 0, 0, 0.12);
+}
+.data-admin-row.active { border-color: var(--text-green); }
+.data-admin-row-main { min-width: 0; flex: 1; }
+.data-admin-row-actions { display: flex; flex-wrap: wrap; gap: 4px; flex-shrink: 0; }
 .data-karta-search-wrap { position: relative; margin: 8px 0 10px; }
 .data-karta-search-label {
     display: block; font-size: var(--text-xs); color: var(--dim-fg);
@@ -922,24 +944,8 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 .data-karta-clear { clear: both; }
 .data-karta-empty-body { margin: 0; color: var(--dim-fg); font-style: italic; }
 
-.data-admin-toolbar { margin: 8px 0 10px; }
-.data-admin-toolbar label { font-size: var(--text-sm); color: var(--dim-fg); }
-.data-admin-toolbar select { margin-left: 6px; min-width: 180px; }
-.data-admin-list {
-    display: flex; flex-direction: column; gap: 4px;
-    max-height: 180px; overflow-y: auto; margin-bottom: 8px;
-}
-.data-admin-list-item {
-    display: flex; flex-direction: column; align-items: flex-start;
-    text-align: left; width: 100%; padding: 8px 10px;
-    background: var(--panel-bg); border: 1px solid var(--divider-dotted);
-    color: inherit; cursor: pointer; border-radius: 4px;
-}
-.data-admin-list-item:hover, .data-admin-list-item.active {
-    border-color: var(--text-green); color: var(--text-green);
-}
-.data-admin-list-title { font-size: var(--text-sm); font-weight: 600; }
-.data-admin-list-meta { font-size: var(--text-xs); color: var(--dim-fg); }
+.data-admin-list-title { font-size: var(--text-sm); font-weight: 600; display: block; }
+.data-admin-list-meta { font-size: var(--text-xs); color: var(--dim-fg); display: block; }
 .data-admin-empty, .data-admin-blocks-empty {
     font-size: var(--text-sm); color: var(--dim-fg); margin: 6px 0;
 }
@@ -955,6 +961,7 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 .data-admin-mini:hover { border-color: var(--text-green); }
 .data-admin-mini.danger { color: var(--danger-orange); }
+.data-admin-mini:disabled { opacity: 0.35; cursor: default; }
 .data-admin-block {
     border: 1px dashed var(--divider-dotted); border-radius: 4px;
     padding: 8px; margin-bottom: 8px; background: rgba(0,0,0,0.15);
