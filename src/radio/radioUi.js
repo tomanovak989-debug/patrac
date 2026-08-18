@@ -114,8 +114,7 @@ import {
     BEACON_REPEAT_MS,
     buildBeaconPayload,
     beaconBroadcastFrequencies,
-    nextBeaconBroadcastFrequency,
-    hasActiveRemoteBeacons
+    nextBeaconBroadcastFrequency
 } from './radioBeacon.js';
 import {
     createCommsState,
@@ -184,10 +183,7 @@ import {
     textEditHint
 } from './radioFieldEdit.js';
 import {
-    KIND_HANDSET,
-    NODE_KIND_LABELS,
-    resolveActiveRadioNode,
-    cycleRadioKind
+    resolveActiveRadioNode
 } from './radioNodes.js';
 
 var ctx = {};
@@ -416,7 +412,7 @@ function radioNodeDeps(userId) {
 }
 
 /**
- * TX/RX pozice = aktivní rádiový uzel (BÁZE = útočiště, NOSIČ = GPS).
+ * TX/RX pozice = GPS nosič (NOSIČ).
  */
 function getRadioLatLng() {
     var resolved = resolveActiveRadioNode(radioNodeDeps());
@@ -1217,9 +1213,7 @@ function renderDisplay() {
     if (osView.mode === 'standby' || osView.mode === 'standby_tune') {
         var freqVal = normalizeFrequency(state.frequency) || '---.---';
         var pt = !normalizeEncryptionKey(state.encryptionKey || '');
-        var kind = c.radioKind || 'shelter';
-        var nodeLabel = NODE_KIND_LABELS[kind] || 'BÁZE';
-        if (c.radioKindFallback) nodeLabel += '*';
+        var gpsOk = !!(c.originLat != null && c.originLng != null);
         if (standbyUi.active) {
             if (f) {
                 f.className = '';
@@ -1241,14 +1235,12 @@ function renderDisplay() {
         }
         if (f) {
             f.className = '';
-            f.textContent = nodeLabel + ' · ' + freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
-            f.title = kind === KIND_HANDSET
-                ? 'Uzel: NOSIČ (GPS). Klepni = BÁZE (útočiště).'
-                : 'Uzel: BÁZE (útočiště). Klepni = NOSIČ (GPS).';
-            f.setAttribute('data-kind', kind);
-            f.classList.toggle('radio-display-freq-node', true);
-            f.classList.toggle('is-handset', kind === KIND_HANDSET);
-            f.classList.toggle('is-fallback', !!c.radioKindFallback);
+            f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+            f.title = gpsOk
+                ? 'Frekvence · GPS nosič'
+                : 'Frekvence · GPS nedostupné — zapni polohu v prohlížeči';
+            f.removeAttribute('data-kind');
+            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
         }
         if (k) k.textContent = standbyLines.line2;
         if (p) p.textContent = standbyLines.line3;
@@ -1264,8 +1256,9 @@ function renderDisplay() {
         }
         if (ch) ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
         if (nodeEl) {
-            nodeEl.textContent = '';
+            nodeEl.textContent = gpsOk ? 'NOSIČ' : 'GPS?';
             nodeEl.style.visibility = 'hidden';
+            nodeEl.title = '';
         }
         if (footerWrap) {
             if (!footerWrap.querySelector('#radio-display-com')) {
@@ -1461,9 +1454,7 @@ function ensureBeaconSession() {
 }
 
 function getBeaconLatLng() {
-    var player = getPlayerLatLng();
-    if (player) return player;
-    return getShelterLatLng();
+    return getPlayerLatLng();
 }
 
 function notifyBeaconMap(panToLocal) {
@@ -1520,7 +1511,7 @@ async function startBeacon(opts) {
     var c = getCtx();
     var pos = getBeaconLatLng();
     if (!pos || !isFinite(pos.lat) || !isFinite(pos.lng)) {
-        alert('Beacon potřebuje GPS (NOSIČ) nebo souřadnice útočiště na mapě.');
+        alert('Beacon potřebuje GPS (NOSIČ). Zapni polohu v prohlížeči a počkej na fix.');
         return;
     }
     beaconActive = {
@@ -2553,19 +2544,43 @@ function ingestIncomingPayload(payload) {
     radioIncomingFeedback(applied.signalQuality);
 }
 
+function listenFallbackChannels(onMsg) {
+    var c = getCtx();
+    var freqs = [];
+    var tuned = normalizeFrequency(state.frequency);
+    if (tuned) freqs.push(tuned);
+    var comFreq = communityFrequencyFromCode(c.comCode);
+    if (comFreq) freqs.push(comFreq);
+    var broadcast = beaconBroadcastFrequencies({
+        comCode: c.comCode,
+        tunedFrequency: tuned
+    });
+    var i;
+    for (i = 0; i < broadcast.length; i++) freqs.push(broadcast[i]);
+    var seen = {};
+    var uniq = [];
+    for (i = 0; i < freqs.length; i++) {
+        var f = normalizeFrequency(freqs[i]);
+        if (!f || seen[f]) continue;
+        seen[f] = true;
+        uniq.push(f);
+    }
+    if (!uniq.length) return Promise.resolve();
+    console.warn('[radioUi] band scan nedostupný — poslech kanálů:', uniq.join(', '));
+    return subscribeRadioChannels(uniq, onMsg);
+}
+
 function refreshSubscriptions() {
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return Promise.resolve();
-    var onMsg = ingestIncomingPayload;
-    var bandListen = !!(autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED))
-        || !!(beaconActive && beaconActive.active)
-        || hasActiveRemoteBeacons();
-    if (bandListen) {
-        return subscribeRadioBandScan(onMsg, { backfillRecentMs: 60000 }).catch(function(err) {
-            console.warn('[radioUi] band scan subscribe', err);
-        });
+    if (state.operatingMode === 'off') {
+        stopRadioSubscriptions();
+        return Promise.resolve();
     }
-    return subscribeRadioChannels(collectTunedFrequencies(state), onMsg).catch(function(err) {
-        console.warn('[radioUi] subscribe', err);
+    var onMsg = ingestIncomingPayload;
+    /* Zapnutá vysílačka = poslech celého pásma (jako autosken RX). */
+    return subscribeRadioBandScan(onMsg, { backfillRecentMs: 45000 }).catch(function(err) {
+        console.warn('[radioUi] band scan subscribe', err);
+        return listenFallbackChannels(onMsg);
     });
 }
 
@@ -2644,6 +2659,10 @@ async function transmitMessage(text, extras) {
         }
     } catch (err) {
         console.warn('[radioUi] send', err);
+        if (!extras.isBeaconRepeat && !extras.skipTxFx) {
+            var msg = (err && err.message) ? String(err.message) : 'Neznámá chyba';
+            alert('Vysílání selhalo: ' + msg + '\n(Přihlas se znovu — Firebase Auth.)');
+        }
     }
 }
 
@@ -2659,12 +2678,7 @@ async function transmitPtt(result) {
 }
 
 function cycleRadioNode() {
-    if (state.operatingMode === 'off' || isRadioOsActive(radioOs) || isFieldEditActive(fieldEditSession)) return;
-    var uid = ctx.getUserId ? ctx.getUserId() : '';
-    cycleRadioKind(uid);
-    renderDisplay();
-    refreshSubscriptions();
-    notifyRadioRangeLayer();
+    /* Přepínač BÁZE/NOSIČ zrušen — vždy NOSIČ (GPS). */
 }
 
 function bindShortcutHold() {
@@ -2789,22 +2803,12 @@ function bindKeypad() {
     var nodeBtn = el('radio-display-node');
     if (nodeBtn && !nodeBtn._radioCommsBound) {
         nodeBtn._radioCommsBound = true;
-        nodeBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            cycleRadioNode();
-        });
+        nodeBtn.style.display = 'none';
     }
 
     var freqRow = el('radio-display-freq');
-    if (freqRow && !freqRow._radioNodeBound) {
+    if (freqRow) {
         freqRow._radioNodeBound = true;
-        freqRow.addEventListener('click', function(e) {
-            if (!freqRow.classList.contains('radio-display-freq-node')) return;
-            e.preventDefault();
-            e.stopPropagation();
-            cycleRadioNode();
-        });
     }
 
     var input = el('chat-input-field');

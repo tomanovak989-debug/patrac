@@ -22,18 +22,11 @@ function addFreq(set, list, value) {
     list.push(f);
 }
 
-/**
- * Frekvence pro SMS beacon — 1 MHz mřížka + komunita + nouzová + volitelné extra.
- * @param {{ comCode?: string, tunedFrequency?: string, extras?: string[] }} opts
- */
+/** Frekvence pro SMS beacon — priorita: komunita, naladěný kanál, mřížka 5 MHz. */
 export function beaconBroadcastFrequencies(opts) {
     opts = opts || {};
     var set = {};
     var list = [];
-    var mhz;
-    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += BEACON_BURST_STEP_MHZ) {
-        addFreq(set, list, mhz);
-    }
     addFreq(set, list, EMERGENCY_FREQUENCY);
     addFreq(set, list, BAND_MIN_MHZ);
     if (opts.comCode) addFreq(set, list, communityFrequencyFromCode(opts.comCode));
@@ -41,6 +34,10 @@ export function beaconBroadcastFrequencies(opts) {
     if (opts.extras && opts.extras.length) {
         var i;
         for (i = 0; i < opts.extras.length; i++) addFreq(set, list, opts.extras[i]);
+    }
+    var mhz;
+    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += 5) {
+        addFreq(set, list, mhz);
     }
     return list;
 }

@@ -25,15 +25,12 @@ function storageKey(userId) {
 }
 
 export function getStoredRadioKind(userId) {
-    try {
-        var raw = localStorage.getItem(storageKey(userId));
-        if (raw === KIND_HANDSET || raw === KIND_SHELTER) return raw;
-    } catch (e) {}
-    return KIND_SHELTER;
+    /* Vždy NOSIČ (GPS) — útočiště zůstává jen jako síťový receiver na mapě. */
+    return KIND_HANDSET;
 }
 
 export function setStoredRadioKind(userId, kind) {
-    kind = kind === KIND_HANDSET ? KIND_HANDSET : KIND_SHELTER;
+    kind = KIND_HANDSET;
     try { localStorage.setItem(storageKey(userId), kind); } catch (e) {}
     return kind;
 }
@@ -82,37 +79,21 @@ export function resolveHandsetNode(deps) {
 }
 
 /**
- * Aktivní uzel pro TX/RX. Preferuje zvolený kind; při chybě souřadnic spadne na druhý.
+ * Aktivní uzel pro TX/RX = NOSIČ (GPS). Útočiště jen nouzový fallback bez GPS.
  * @returns {{ node: object|null, kind: string, fallback: boolean }}
  */
 export function resolveActiveRadioNode(deps) {
     deps = deps || {};
-    var userId = deps.userId || '';
-    try {
-        if (!userId && typeof localStorage !== 'undefined') {
-            userId = localStorage.getItem('patrac_session') || '';
-        }
-    } catch (e) {}
-
-    var want = getStoredRadioKind(userId);
-    var shelter = resolveShelterNode(deps);
     var handset = resolveHandsetNode(deps);
-
-    if (want === KIND_HANDSET) {
-        if (handset) return { node: handset, kind: KIND_HANDSET, fallback: false };
-        if (shelter) return { node: shelter, kind: KIND_SHELTER, fallback: true };
-        return { node: null, kind: KIND_HANDSET, fallback: false };
-    }
-
-    if (shelter) return { node: shelter, kind: KIND_SHELTER, fallback: false };
-    if (handset) return { node: handset, kind: KIND_HANDSET, fallback: true };
-    return { node: null, kind: KIND_SHELTER, fallback: false };
+    if (handset) return { node: handset, kind: KIND_HANDSET, fallback: false };
+    var shelter = resolveShelterNode(deps);
+    if (shelter) return { node: shelter, kind: KIND_SHELTER, fallback: true };
+    return { node: null, kind: KIND_HANDSET, fallback: false };
 }
 
 export function cycleRadioKind(userId) {
-    var cur = getStoredRadioKind(userId);
-    var next = cur === KIND_HANDSET ? KIND_SHELTER : KIND_HANDSET;
-    return setStoredRadioKind(userId, next);
+    setStoredRadioKind(userId, KIND_HANDSET);
+    return KIND_HANDSET;
 }
 
 export function nodesForRangeDisplay(deps) {

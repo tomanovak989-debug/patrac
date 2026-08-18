@@ -1542,7 +1542,7 @@ body.theme-light .sector-tech-screen.is-off {
     display: none;
 }
 #radio-display-freq.radio-display-freq-node {
-    cursor: pointer;
+    cursor: default;
 }
 #radio-display-freq.radio-display-freq-node.is-handset {
     color: #7ee8a8;

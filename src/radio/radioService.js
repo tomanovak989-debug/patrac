@@ -5,20 +5,23 @@
 import { collection, collectionGroup, addDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth } from '../services/authService.js';
+import { ensureFirebaseAuth } from '../lib/firebase.js';
 import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
 
 var channelUnsubs = {};
 
-async function ensureRadioAuth() {
+async function ensureRadioAuth(requirePatrac) {
     try {
         return await ensurePatracAuth();
     } catch (err) {
-        console.warn('[radioService] auth', err);
+        if (requirePatrac) throw err;
+        console.warn('[radioService] patrac auth, fallback firebase', err);
+        return ensureFirebaseAuth();
     }
 }
 
 export async function sendRadioTransmission(payload) {
-    await ensureRadioAuth();
+    await ensureRadioAuth(true);
     var freq = normalizeFrequency(payload && payload.frequency);
     var channelId = (payload && payload.channelId) || frequencyChannelId(freq);
     if (!freq || !channelId) {
@@ -100,7 +103,7 @@ export async function subscribeRadioChannels(frequenciesOrIds, onMessage) {
     stopRadioSubscriptions();
     if (!Array.isArray(frequenciesOrIds) || !frequenciesOrIds.length) return;
 
-    await ensureRadioAuth();
+    await ensureRadioAuth(false);
 
     for (var i = 0; i < frequenciesOrIds.length; i++) {
         (function(raw) {
@@ -164,48 +167,59 @@ export async function subscribeRadioBandScan(onMessage, opts) {
     opts = opts || {};
     var backfillRecentMs = opts.backfillRecentMs || 0;
 
-    await ensureRadioAuth();
+    await ensureRadioAuth(false);
 
     var q = query(
         collectionGroup(getDb(), 'messages'),
         orderBy('timestamp', 'desc'),
         limit(96)
     );
-    var seen = {};
-    var initialSnap = true;
-    channelUnsubs.__band_scan__ = onSnapshot(q, function(snap) {
-        if (initialSnap) {
-            initialSnap = false;
-            var i;
-            if (backfillRecentMs > 0) {
-                var cutoff = Date.now() - backfillRecentMs;
-                var docs = snap.docs.slice().reverse();
-                for (i = 0; i < docs.length; i++) {
-                    var docSnap = docs[i];
-                    seen[docSnap.ref.path] = true;
-                    var ts = Number((docSnap.data() || {}).timestamp) || 0;
-                    if (ts >= cutoff) {
-                        onMessage(mapDocToPayload(docSnap));
+    return new Promise(function(resolve, reject) {
+        var settled = false;
+        var seen = {};
+        var initialSnap = true;
+        channelUnsubs.__band_scan__ = onSnapshot(q, function(snap) {
+            if (!settled) {
+                settled = true;
+                resolve();
+            }
+            if (initialSnap) {
+                initialSnap = false;
+                var i;
+                if (backfillRecentMs > 0) {
+                    var cutoff = Date.now() - backfillRecentMs;
+                    var docs = snap.docs.slice().reverse();
+                    for (i = 0; i < docs.length; i++) {
+                        var docSnap = docs[i];
+                        seen[docSnap.ref.path] = true;
+                        var ts = Number((docSnap.data() || {}).timestamp) || 0;
+                        if (ts >= cutoff) {
+                            onMessage(mapDocToPayload(docSnap));
+                        }
+                    }
+                } else {
+                    for (i = 0; i < snap.docs.length; i++) {
+                        seen[snap.docs[i].ref.path] = true;
                     }
                 }
-            } else {
-                for (i = 0; i < snap.docs.length; i++) {
-                    seen[snap.docs[i].ref.path] = true;
-                }
+                return;
             }
-            return;
-        }
-        var changes = snap.docChanges();
-        var c;
-        for (c = 0; c < changes.length; c++) {
-            if (changes[c].type !== 'added') continue;
-            var docSnap = changes[c].doc;
-            var pathKey = docSnap.ref.path;
-            if (seen[pathKey]) continue;
-            seen[pathKey] = true;
-            onMessage(mapDocToPayload(docSnap));
-        }
-    }, function(err) {
-        console.warn('[radioService] band scan subscribe', err);
+            var changes = snap.docChanges();
+            var c;
+            for (c = 0; c < changes.length; c++) {
+                if (changes[c].type !== 'added') continue;
+                var docSnap = changes[c].doc;
+                var pathKey = docSnap.ref.path;
+                if (seen[pathKey]) continue;
+                seen[pathKey] = true;
+                onMessage(mapDocToPayload(docSnap));
+            }
+        }, function(err) {
+            console.warn('[radioService] band scan subscribe', err);
+            if (!settled) {
+                settled = true;
+                reject(err);
+            }
+        });
     });
 }
