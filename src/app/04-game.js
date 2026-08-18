@@ -126,6 +126,7 @@ function centerMapToAllSavedPoints() {
             animate: true
         });
     }
+}
 
 function centerMapToUser() {
     if (userMarker && map) {
