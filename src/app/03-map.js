@@ -428,6 +428,12 @@ function initBeaconMapModule() {
         window.patracRefreshBeaconMap = function(panToLocal) {
             mod.refreshBeaconMapLayer(!!panToLocal);
         };
+        var pending = window._patracBeaconMapPending;
+        if (pending && pending.refresh) {
+            mod.refreshBeaconMapLayer(!!pending.pan);
+            pending.refresh = false;
+            pending.pan = false;
+        }
     }).catch(function(err) { console.warn('[beaconMap]', err); });
 }
 

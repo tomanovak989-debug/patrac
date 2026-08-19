@@ -398,7 +398,7 @@ export function buildCommsOsView(session, notebook, radioState) {
 export function commsBackScreen(session) {
     if (!session) return 'exit';
     if (session.screen === COMMS_HUB) return 'exit';
-    if (session.screen === COMMS_CONFIRM) return COMMS_COMPOSE;
+    if (session.screen === COMMS_CONFIRM) return COMMS_HUB;
     if (session.screen === COMMS_COMPOSE) return COMMS_HUB;
     if (session.screen === COMMS_DETAIL) {
         session.detailEntry = null;

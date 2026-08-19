@@ -1549,7 +1549,24 @@ function getBeaconLatLng() {
 function notifyBeaconMap(panToLocal) {
     if (typeof window.patracRefreshBeaconMap === 'function') {
         try { window.patracRefreshBeaconMap(!!panToLocal); } catch (e) {}
+        if (window._patracBeaconMapPending) {
+            window._patracBeaconMapPending.refresh = false;
+            window._patracBeaconMapPending.pan = false;
+        }
+        return;
     }
+    window._patracBeaconMapPending = window._patracBeaconMapPending || { refresh: false, pan: false };
+    window._patracBeaconMapPending.refresh = true;
+    if (panToLocal) window._patracBeaconMapPending.pan = true;
+}
+
+export function flushPendingBeaconMapRefresh() {
+    var pending = window._patracBeaconMapPending;
+    if (!pending || !pending.refresh) return;
+    if (typeof window.patracRefreshBeaconMap !== 'function') return;
+    try { window.patracRefreshBeaconMap(!!pending.pan); } catch (e) {}
+    pending.refresh = false;
+    pending.pan = false;
 }
 
 function stopBeaconRepeatTimer() {
@@ -1657,6 +1674,9 @@ function handleBeaconOpen() {
 }
 
 function handleBeaconClose() {
+    if (beaconSession && beaconSession.screen === BEACON_PTT_ARM) {
+        cancelBeaconPttRecord();
+    }
     beaconSession = createBeaconSession();
     renderDisplay();
 }
@@ -2157,19 +2177,12 @@ function handleRadioOsInput(action) {
     if (action === 'open_menu') clearMenuDial(menuDial);
 
     if (isBeaconMenuOpen() && beaconSession && action === 'back') {
-        if (beaconSession.screen === BEACON_CONFIRM) {
-            beaconSession.screen = BEACON_HUB;
-            beaconSession.focusIndex = 0;
-            beaconSession.pendingText = '';
-            renderDisplay();
-            return true;
-        }
         if (beaconSession.screen === BEACON_PTT_ARM) {
             cancelBeaconPttRecord();
-            beaconSession.screen = BEACON_HUB;
-            beaconSession.focusIndex = 0;
-            renderDisplay();
-            return true;
+        } else if (beaconSession.screen === BEACON_CONFIRM) {
+            beaconSession.pendingText = '';
+            beaconSession.pendingPttAudio = '';
+            beaconSession.pendingPttMime = '';
         }
     }
 
@@ -2177,12 +2190,12 @@ function handleRadioOsInput(action) {
         executeMenuDialCommit();
         return true;
     }
-    if (action === 'back' && clearMenuDialIfActive()) return true;
+    if (action === 'back' && clearMenuDialIfActive() &&
+        !(radioOs.menuPath && radioOs.menuPath.length)) return true;
 
     if (action === 'back' && isAutoscanMenuOpen() && autoscanSession &&
         autoscanSession.status === SCAN_RUNNING) {
         stopAutoscanToSummary();
-        return true;
     }
 
     var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
@@ -2571,6 +2584,13 @@ function ingestIncomingPayload(payload) {
         seenMessageIds[payload.id] = true;
         return;
     }
+
+    if (payload.messageType === 'beacon') {
+        ingestIncomingBeacon(payload, c);
+        seenMessageIds[payload.id] = true;
+        return;
+    }
+
     /* Potlač jen echo z TÉTO vysílačky — stejný účet na jiném telefonu musí přijmout. */
     if (hasRecentOutgoingEcho(payload)) {
         seenMessageIds[payload.id] = true;
@@ -2582,46 +2602,51 @@ function ingestIncomingPayload(payload) {
         return;
     }
 
-    if (payload.messageType === 'beacon') {
-        registerRemoteBeacon(payload);
-        notifyBeaconMap(false);
-        var beaconOrigin = (payload.originLat != null && payload.originLng != null)
-            ? { lat: payload.originLat, lng: payload.originLng }
-            : null;
-        var beaconReception = evaluateIncomingReception(beaconOrigin, {
-            frequency: normalizeFrequency(payload.frequency),
-            encryptionKey: ''
-        });
-        schedulePathElevationPrefetch(beaconOrigin);
-        if (!beaconReception.receivable || beaconReception.quality === SIGNAL_NONE) {
-            beaconReception = {
-                quality: SIGNAL_WEAK,
-                distanceKm: beaconReception.distanceKm,
-                receivable: true,
-                reason: 'beacon_fallback'
-            };
-        }
-        if (beaconReception.receivable) {
-            var beaconKey = normalizeEncryptionKey(payload.encryptionKey || '');
-            var myBeaconKey = normalizeEncryptionKey(state.encryptionKey || '');
-            var beaconReadable = !beaconKey || beaconKey === myBeaconKey;
-            if (beaconReadable && payload.messageType === 'ptt' && payload.pttAudio) {
-                playPttAudio(payload.pttAudio, payload.pttMime);
-            } else if (beaconReadable && payload.text && payload.messageType !== 'ptt') {
-                var beaconEntry = createIncomingEntry(Object.assign({}, payload, {
-                    text: '[BEACON] ' + String(payload.text || '').slice(0, 72),
-                    signalQuality: beaconReception.quality,
-                    distanceKm: beaconReception.distanceKm
-                }), c);
-                recordEntry(beaconEntry);
-            }
-            radioIncomingFeedback(beaconReception.quality);
-            renderDisplay();
-        }
-        seenMessageIds[payload.id] = true;
-        return;
-    }
+    ingestIncomingMessage(payload, c);
+    seenMessageIds[payload.id] = true;
+}
 
+function ingestIncomingBeacon(payload, c) {
+    var registered = registerRemoteBeacon(payload);
+    if (registered) notifyBeaconMap(true);
+    var beaconOrigin = (payload.originLat != null && payload.originLng != null)
+        ? { lat: payload.originLat, lng: payload.originLng }
+        : null;
+    if (!beaconOrigin) return;
+    var beaconReception = evaluateIncomingReception(beaconOrigin, {
+        frequency: normalizeFrequency(payload.frequency),
+        encryptionKey: ''
+    });
+    schedulePathElevationPrefetch(beaconOrigin);
+    if (!beaconReception.receivable || beaconReception.quality === SIGNAL_NONE) {
+        beaconReception = {
+            quality: SIGNAL_WEAK,
+            distanceKm: beaconReception.distanceKm,
+            receivable: true,
+            reason: 'beacon_fallback'
+        };
+    }
+    if (!beaconReception.receivable) return;
+    if (hasRecentOutgoingEcho(payload)) return;
+    if (hasContentDuplicate(payload)) return;
+    var beaconKey = normalizeEncryptionKey(payload.encryptionKey || '');
+    var myBeaconKey = normalizeEncryptionKey(state.encryptionKey || '');
+    var beaconReadable = !beaconKey || beaconKey === myBeaconKey;
+    if (beaconReadable && payload.pttAudio) {
+        playPttAudio(payload.pttAudio, payload.pttMime);
+    } else if (beaconReadable && payload.text) {
+        var beaconEntry = createIncomingEntry(Object.assign({}, payload, {
+            text: '[BEACON] ' + String(payload.text || '').slice(0, 72),
+            signalQuality: beaconReception.quality,
+            distanceKm: beaconReception.distanceKm
+        }), c);
+        recordEntry(beaconEntry);
+    }
+    radioIncomingFeedback(beaconReception.quality);
+    renderDisplay();
+}
+
+function ingestIncomingMessage(payload, c) {
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
         : null;
@@ -3518,6 +3543,7 @@ export function initRadioCommsSystem(options) {
         return getMapBeacons(c.comCode || '', beaconActive);
     };
     notifyBeaconMap(false);
+    flushPendingBeaconMapRefresh();
 }
 
 export function refreshRadioCommsContext() {
