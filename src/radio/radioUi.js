@@ -2854,7 +2854,6 @@ function refreshSubscriptions() {
         frequencies: collectListenFrequencies(),
         backfillRecentMs: 45000
     }).then(function() {
-        var c = getCtx();
         return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud);
     }).then(function() {
         renderDisplay();
