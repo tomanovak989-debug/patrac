@@ -439,18 +439,20 @@ function deleteTextChar(session) {
 /** Zpět během editace = backspace; po OK (kurzor vyp) = návrat do menu. */
 export function handleFieldEditBack(session) {
     if (!session) return false;
-    if (!session.digitMode) return 'exit';
+    if (!session.digitMode || session.okExitPending) return 'exit';
     if (session.type === 'freq') {
         if (session.cursor > 0) {
             session.cursor--;
+            session.digits[session.cursor] = '0';
+            return true;
         }
-        session.digits[session.cursor] = '0';
-        return true;
+        return 'exit';
     }
     if (isTextType(session)) {
-        return deleteTextChar(session);
+        if (deleteTextChar(session)) return true;
+        return 'exit';
     }
-    return false;
+    return 'exit';
 }
 
 /** OK: kurzor vyp/zap, pak ukončení dílčí editace. */

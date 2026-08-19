@@ -197,6 +197,8 @@ var receptionElev = {
 var radioOs = createRadioOsState();
 var fieldEditSession = null;
 var fieldEditKeyLongFired = false;
+var clrLongFired = false;
+var clrLongTimer = null;
 var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
@@ -707,7 +709,19 @@ function getBindableShortcutContext() {
         return bindingFromCommsItem(getFocusedCommsAction(commsSession, notebook), commsSession);
     }
     if (leaf === 'detail' && presetEditDraft) {
-        return bindingFromPresetField(presetEditDraft.slot, radioOs.presetFieldFocus || 0);
+        return {
+            action: 'preset:' + presetEditDraft.slot,
+            label: 'P' + presetEditDraft.slot
+        };
+    }
+    if (leaf === 'presets') {
+        var presetItem = getFocusedMenuItem(radioOs, state);
+        if (presetItem && presetItem.action === 'preset_detail' && presetItem.slot) {
+            return {
+                action: 'preset:' + presetItem.slot,
+                label: 'P' + presetItem.slot
+            };
+        }
     }
     if (leaf === 'autoscan') {
         return bindingFromAutoscan(autoscanSession);
@@ -1016,9 +1030,9 @@ function handleMenuKeypadDigit(keyId) {
                 renderDisplay();
                 return;
             }
+            appendMenuDialDigit(menuDial, keyId);
+            renderDisplay();
         }
-        appendMenuDialDigit(menuDial, keyId);
-        renderDisplay();
         return;
     }
 
@@ -2047,6 +2061,34 @@ function handleCommsClose() {
     renderDisplay();
 }
 
+function cancelFieldEditSession() {
+    if (!fieldEditSession) return;
+    cancelFieldEdit(fieldEditSession);
+    fieldEditSession = null;
+    renderDisplay();
+}
+
+function returnRadioToStandby() {
+    cancelFieldEditSession();
+    if (autoscanSession && autoscanSession.status === SCAN_RUNNING) {
+        stopAutoscanToSummary();
+    }
+    if (presetEditDraft) {
+        var c = getCtx();
+        savePresetDraft(presetEditDraft, state, {
+            scope: classifyChannel(presetEditDraft.frequency, presetEditDraft.encryptionKey, c)
+        });
+        persist();
+    }
+    presetEditDraft = null;
+    resetRadioOs(radioOs);
+    standbyUi.active = false;
+    clearMenuDial(menuDial);
+    beaconSession = createBeaconSession();
+    commsSession = createCommsState();
+    renderDisplay();
+}
+
 function handleFieldEditBackAction() {
     if (!isFieldEditActive(fieldEditSession)) return false;
     var backResult = handleFieldEditBack(fieldEditSession);
@@ -2763,6 +2805,35 @@ function cycleRadioNode() {
     /* Přepínač BÁZE/NOSIČ zrušen — vždy NOSIČ (GPS). */
 }
 
+function bindClrLongPress() {
+    var clr = el('radio-key-clr');
+    if (!clr || clr._clrLongBound) return;
+    clr._clrLongBound = true;
+    var holdMs = 1400;
+
+    function clearClrHold() {
+        if (clrLongTimer) {
+            clearTimeout(clrLongTimer);
+            clrLongTimer = null;
+        }
+    }
+
+    clr.addEventListener('pointerdown', function(e) {
+        if (state.operatingMode === 'off' || e.button !== 0) return;
+        clrLongFired = false;
+        clearClrHold();
+        clrLongTimer = setTimeout(function() {
+            clrLongTimer = null;
+            clrLongFired = true;
+            returnRadioToStandby();
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, holdMs);
+    }, true);
+
+    clr.addEventListener('pointerup', clearClrHold, true);
+    clr.addEventListener('pointercancel', clearClrHold, true);
+}
+
 function bindShortcutHold() {
     var grid = el('radio-keypad-grid');
     if (!grid || grid._shortcutHoldBound) return;
@@ -2770,6 +2841,10 @@ function bindShortcutHold() {
     grid.addEventListener('pointerdown', function(e) {
         if (state.operatingMode === 'off' || !isRadioOsActive(radioOs)) return;
         if (isFieldEditActive(fieldEditSession)) return;
+        var leaf = radioOs.menuPath && radioOs.menuPath.length
+            ? radioOs.menuPath[radioOs.menuPath.length - 1]
+            : '';
+        if (leaf === 'detail') return;
         var btn = e.target.closest('[data-key]');
         if (!btn) return;
         var key = btn.getAttribute('data-key');
@@ -2960,16 +3035,16 @@ function bindKeypad() {
     if (clr && !clr._radioCommsBound) {
         clr._radioCommsBound = true;
         clr.addEventListener('click', function() {
+            if (clrLongFired) {
+                clrLongFired = false;
+                return;
+            }
             if (state.operatingMode === 'off') return;
             if (standbyPttActive) {
                 cancelStandbyPtt();
                 return;
             }
             if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.returnTo === 'comms' || fieldEditSession.returnTo === 'standby_manual') {
-                    handleFieldEditBackAction();
-                    return;
-                }
                 handleFieldEditBackAction();
                 return;
             }
@@ -3035,6 +3110,7 @@ function bindKeypad() {
     bindDpadNavigation();
     bindRadioKeyT9();
     bindShortcutHold();
+    bindClrLongPress();
     bindKeypadPointerFeedback();
 
     var grid = el('radio-keypad-grid');
