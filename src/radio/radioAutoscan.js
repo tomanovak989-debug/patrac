@@ -163,20 +163,20 @@ export function buildAutoscanOsView(session, radioState, notebook) {
             sessionCount > 0 ? ('● ' + sessionCount + ' uloženo') : '○ čekám na provoz…',
             totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : ''
         ];
-        footer = 'OK = stop · Zpět';
+        footer = 'OK = stop · Zpět = stop';
         status = 'AUTOSKEN · SKEN';
     } else if (session.status === SCAN_LOCKED) {
         var locked = session.hitFrequency || (visual && visual.frequency);
         lines = [
-            'ZASTAVENO · ' + sessionCount + ' zpr.',
-            locked ? (locked + ' MHz') : '',
-            session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : String(session.hitLabel || 'Signál v dosahu').slice(0, 18),
-            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : 'Seznam: KOM → AUTOSKEN',
-            '',
-            ''
+            '■ SKEN ZASTAVEN',
+            'ZACHYCENO: ' + sessionCount + ' zpr.',
+            sessionCount > 0 ? '● uloženo do paměti' : '○ bez zachycení',
+            locked ? ('Poslední: ' + locked + ' MHz') : 'Poslech ukončen',
+            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : 'Seznam: KOM → 5',
+            session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : ''
         ];
-        footer = 'OK = ukončit · Zpět';
-        status = 'AUTOSKEN · ' + sessionCount + ' ZACHYC.';
+        footer = 'OK = zavřít · Zpět = menu';
+        status = 'AUTOSKEN · HOTOVO';
     } else {
         lines = [
             'AUTOSKEN',

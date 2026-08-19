@@ -797,8 +797,7 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'autoscan_open') {
-        ensureAutoscanSession();
-        renderDisplay();
+        openRadioAutoscanScreen(false);
         return true;
     }
     if (result.effect === 'autoscan_close') {
@@ -1238,7 +1237,13 @@ function renderDisplay() {
             f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
         }
         if (k) k.textContent = standbyLines.line2;
-        if (p) p.textContent = standbyLines.line3;
+        if (p) {
+            if (beaconActive && beaconActive.active) {
+                p.textContent = '● BEACON · ' + (beaconActive.messageType === 'ptt' ? 'PTT' : 'SMS');
+            } else {
+                p.textContent = standbyLines.line3;
+            }
+        }
         if (buf) buf.textContent = dialBuffer;
         clearExtraDisplayLines();
         clearDisplayRowFocus();
@@ -1339,7 +1344,25 @@ function startAutoscanTimer() {
 }
 
 function isAutoscanListening() {
-    return !!(autoscanSession && (autoscanSession.status === SCAN_RUNNING || autoscanSession.status === SCAN_LOCKED));
+    return !!(autoscanSession && autoscanSession.status === SCAN_RUNNING);
+}
+
+function isAutoscanMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'autoscan');
+}
+
+function stopAutoscanToSummary() {
+    if (!autoscanSession || autoscanSession.status !== SCAN_RUNNING) return false;
+    lockAutoscan(
+        autoscanSession,
+        autoscanSession.hitLabel || '',
+        autoscanSession.hitFrequency
+    );
+    stopAutoscanTimer();
+    refreshSubscriptions();
+    radioIncomingFeedback(SIGNAL_CLEAR);
+    renderDisplay();
+    return true;
 }
 
 function tryAutoscanLock(payload) {
@@ -1446,10 +1469,7 @@ function handleAutoscanOk() {
         return true;
     }
     if (session.status === SCAN_RUNNING) {
-        session.status = SCAN_LOCKED;
-        stopAutoscanTimer();
-        refreshSubscriptions();
-        renderDisplay();
+        stopAutoscanToSummary();
         return true;
     }
     if (session.status === SCAN_LOCKED) {
@@ -1464,8 +1484,11 @@ function handleAutoscanOk() {
 }
 
 function handleAutoscanClose() {
-    var restore = autoscanSession && autoscanSession.status === SCAN_RUNNING;
-    haltAutoscan(restore);
+    if (autoscanSession && autoscanSession.status === SCAN_RUNNING) {
+        stopAutoscanToSummary();
+        return;
+    }
+    haltAutoscan(false);
     autoscanSession = createAutoscanState();
     persist();
     refreshSubscriptions();
@@ -1504,6 +1527,11 @@ function stopBeaconRepeatTimer() {
 async function transmitBeaconPulse(skipTxFx) {
     if (!beaconActive || !beaconActive.active) return;
     var c = getCtx();
+    var pos = getBeaconLatLng();
+    if (pos && isFinite(pos.lat) && isFinite(pos.lng)) {
+        beaconActive.lat = pos.lat;
+        beaconActive.lng = pos.lng;
+    }
     var basePayload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
     var freqs = beaconActive.messageType === 'ptt'
         ? [nextBeaconBroadcastFrequency(beaconActive)]
@@ -1588,6 +1616,8 @@ function stopBeacon() {
 
 function handleBeaconOpen() {
     ensureBeaconSession();
+    refreshBeaconActiveFromStorage();
+    notifyBeaconMap(false);
     renderDisplay();
 }
 
@@ -2086,6 +2116,12 @@ function handleRadioOsInput(action) {
     }
     if (action === 'back' && clearMenuDialIfActive()) return true;
 
+    if (action === 'back' && isAutoscanMenuOpen() && autoscanSession &&
+        autoscanSession.status === SCAN_RUNNING) {
+        stopAutoscanToSummary();
+        return true;
+    }
+
     var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
     if (!result || !result.changed) return false;
 
@@ -2508,8 +2544,16 @@ function ingestIncomingPayload(payload) {
             var beaconReadable = !beaconKey || beaconKey === myBeaconKey;
             if (beaconReadable && payload.messageType === 'ptt' && payload.pttAudio) {
                 playPttAudio(payload.pttAudio, payload.pttMime);
+            } else if (beaconReadable && payload.text && payload.messageType !== 'ptt') {
+                var beaconEntry = createIncomingEntry(Object.assign({}, payload, {
+                    text: '[BEACON] ' + String(payload.text || '').slice(0, 72),
+                    signalQuality: beaconReception.quality,
+                    distanceKm: beaconReception.distanceKm
+                }), c);
+                recordEntry(beaconEntry);
             }
             radioIncomingFeedback(beaconReception.quality);
+            renderDisplay();
         }
         seenMessageIds[payload.id] = true;
         return;
