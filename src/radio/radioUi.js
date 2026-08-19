@@ -1324,7 +1324,6 @@ function renderDisplay() {
             f.style.color = '';
         }
         setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
-        if (buf) buf.textContent = '';
         if (ch) {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;

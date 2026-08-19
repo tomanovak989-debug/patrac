@@ -2361,6 +2361,17 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     color: inherit;
     min-height: 0;
 }
+.sector-tech-screen.is-menu #radio-display-buffer:empty,
+.sector-tech-screen.is-menu #radio-display-preset:empty,
+.sector-tech-screen.is-menu #radio-display-line5:empty,
+.sector-tech-screen.is-menu #radio-display-line6:empty,
+.sector-tech-screen.is-preset-detail #radio-display-buffer:empty,
+.sector-tech-screen.is-preset-detail #radio-display-preset:empty,
+.sector-tech-screen.is-preset-detail #radio-display-line5:empty,
+.sector-tech-screen.is-preset-detail #radio-display-line6:empty {
+    visibility: visible;
+    opacity: 0.35;
+}
 #radio-display-buffer:empty {
     visibility: hidden;
 }
