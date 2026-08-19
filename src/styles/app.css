@@ -1088,44 +1088,49 @@ body.admin-mode .hud-center-panel.hud-radio-fullwidth {
     overscroll-behavior-y: contain;
     background: transparent;
 }
-.sector-zoom-rail {
-    position: absolute;
-    left: 2px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 26;
-    display: flex;
+body:not(.sector-calibrate-on) .sector-tech-scroll {
+    overflow-y: hidden;
+}
+.sector-view-controls {
+    position: fixed;
+    right: max(8px, env(safe-area-inset-right, 0px));
+    bottom: calc(44px + 8px);
+    z-index: 520;
+    display: none;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 0;
-    background: transparent;
-    border: none;
+    gap: calc(44px * 0.12);
     pointer-events: none;
 }
-.sector-zoom-label {
-    display: none;
+body.radio-tab-active .sector-view-controls {
+    display: flex;
 }
-.sector-zoom-rail input[type="range"] {
+.sector-view-btn {
     pointer-events: auto;
-    writing-mode: vertical-lr;
-    direction: rtl;
-    width: 22px;
-    height: min(160px, 36vh);
-    margin: 0;
-    accent-color: #78ff66;
-    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.95));
-}
-.sector-zoom-rail #sector-scale-value {
-    pointer-events: none;
-    font: bold 8px 'IBM Plex Mono', monospace;
+    width: calc(44px * 0.62);
+    height: calc(44px * 0.62);
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid rgba(120, 255, 102, 0.55);
+    background: rgba(8, 18, 10, 0.82);
     color: #78ff66;
-    text-shadow: 0 0 4px #000, 0 0 2px #000;
-    min-width: 0;
+    font: bold calc(44px * 0.34) 'IBM Plex Mono', monospace;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
-body:not(.sector-calibrate-on) .sector-tech-scroll {
-    overflow-y: auto;
+.sector-view-btn.is-active {
+    border-color: #ffe600;
+    color: #ffe600;
+    background: rgba(28, 24, 4, 0.92);
+    box-shadow: 0 0 8px rgba(255, 230, 0, 0.35);
+}
+.sector-view-btn:active {
+    transform: scale(0.96);
 }
 .sector-scale-bar {
     display: none;
@@ -1172,6 +1177,78 @@ body.sector-calibrate-on .sector-scale-bar {
     font: bold 10px 'IBM Plex Mono', monospace;
     color: #ff3d3d;
 }
+.sector-band-readout {
+    flex: 1;
+    min-width: 0;
+    font: bold 9px 'IBM Plex Mono', monospace;
+    color: #78ff66;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sector-view-bands {
+    position: absolute;
+    inset: 0;
+    z-index: 24;
+    pointer-events: none;
+    display: none;
+}
+body.sector-calibrate-on .sector-view-bands {
+    display: block;
+    pointer-events: auto;
+}
+body.sector-band-dragging .sector-view-bands {
+    cursor: ns-resize;
+}
+.sector-band-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 0;
+    transform: translateY(-50%);
+    pointer-events: auto;
+    touch-action: none;
+}
+.sector-band-line::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -1px;
+    height: 2px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.85);
+}
+.sector-band-line--full::before {
+    background: rgba(0, 229, 255, 0.92);
+}
+.sector-band-line--focus::before {
+    background: rgba(255, 94, 196, 0.92);
+}
+.sector-band-line::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: -10px;
+    width: 22px;
+    height: 20px;
+    margin-left: -11px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    background: rgba(0, 0, 0, 0.55);
+}
+.sector-band-tag {
+    position: absolute;
+    left: 6px;
+    top: -18px;
+    font: bold 9px 'IBM Plex Mono', monospace;
+    color: #fff;
+    text-shadow: 0 0 4px #000;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.sector-band-line--full .sector-band-tag { color: #00e5ff; }
+.sector-band-line--focus .sector-band-tag { color: #ff5ec4; }
 .sector-cal-cross {
     position: absolute;
     z-index: 28;

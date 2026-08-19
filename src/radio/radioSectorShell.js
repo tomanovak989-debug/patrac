@@ -1,38 +1,68 @@
 /**
- * SECTOR-TECH — jeden pracovní pohled (displej + klávesnice), zoom slider, kalibrace.
+ * SECTOR-TECH — dva pohledy (celá / displej+klávesnice), kalibrace pásem, +/- ovládání.
  */
 import { applyRadioHitmap } from './radioHitmap.js';
+
 function el(id) {
     return document.getElementById(id);
 }
 
-var LAYOUT = {
-    displayTop: 333 / 800,
-    displayBottom: 540 / 800,
-    keypadBottom: 786 / 800
+var GRID_SRC = 800;
+var GRID_STEP = 50;
+var GRID_MINOR = 25;
+var BAND_MIN_GAP = 80;
+
+var VIEW_BANDS_KEY = 'patrac_sector_view_bands';
+var VIEW_MODE_KEY = 'patrac_sector_view_mode';
+var CAL_SCALE = 2.0;
+
+var DEFAULT_BANDS = {
+    full: { top: 120, bottom: 790 },
+    focus: { top: 333, bottom: 786 }
 };
 
-var SCALE_KEY = 'patrac_sector_scale';
-var DEFAULT_SCALE = 2.75;
-var SCALE_MIN = 1.85;
-var SCALE_MAX = 4.5;
+var viewMode = 'focus';
+var bandsCache = null;
+var dragState = null;
 
-var workScrollTopPx = 0;
-
-function workRegionFrac() {
-    return LAYOUT.keypadBottom - LAYOUT.displayTop;
+function cloneBands(src) {
+    return {
+        full: { top: src.full.top, bottom: src.full.bottom },
+        focus: { top: src.focus.top, bottom: src.focus.bottom }
+    };
 }
 
-function getUserScale() {
-    var raw = parseFloat(localStorage.getItem(SCALE_KEY));
-    if (!isFinite(raw)) return DEFAULT_SCALE;
-    return Math.max(SCALE_MIN, Math.min(SCALE_MAX, raw));
+function loadBands() {
+    if (bandsCache) return bandsCache;
+    try {
+        var raw = JSON.parse(localStorage.getItem(VIEW_BANDS_KEY));
+        if (raw && raw.full && raw.focus) {
+            bandsCache = cloneBands(raw);
+            return bandsCache;
+        }
+    } catch (e) {}
+    bandsCache = cloneBands(DEFAULT_BANDS);
+    return bandsCache;
 }
 
-function setUserScale(val) {
-    val = Math.max(SCALE_MIN, Math.min(SCALE_MAX, val));
-    try { localStorage.setItem(SCALE_KEY, String(val)); } catch (e) {}
-    return val;
+function saveBands(bands) {
+    bandsCache = cloneBands(bands);
+    try { localStorage.setItem(VIEW_BANDS_KEY, JSON.stringify(bandsCache)); } catch (e) {}
+    updateBandReadout();
+}
+
+function getViewMode() {
+    try {
+        var m = localStorage.getItem(VIEW_MODE_KEY);
+        if (m === 'full' || m === 'focus') return m;
+    } catch (e) {}
+    return 'focus';
+}
+
+function setViewMode(mode) {
+    viewMode = mode === 'full' ? 'full' : 'focus';
+    try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch (e) {}
+    updateViewControls();
 }
 
 function isCalibrateMode() {
@@ -43,51 +73,180 @@ function isCalibrateMode() {
         document.body.classList.contains('sector-calibrate');
 }
 
-function applyScale(scroll) {
-    var shell = scroll.closest('.sector-tech-shell');
-    if (!shell) return DEFAULT_SCALE;
-    var user = getUserScale();
-    shell.style.setProperty('--sector-img-scale', user.toFixed(3));
-    updateScaleUi(user, user);
-    return user;
+function clampY(y) {
+    return Math.max(0, Math.min(GRID_SRC, Math.round(y)));
 }
 
-function updateScaleUi(applied, requested) {
-    var slider = el('sector-scale-slider');
-    var label = el('sector-scale-value');
-    if (slider && requested != null) slider.value = String(requested);
-    else if (slider) slider.value = String(applied);
-    if (label) {
-        if (requested != null && Math.abs(requested - applied) > 0.04) {
-            label.textContent = applied.toFixed(2) + '× (' + requested.toFixed(2) + ')';
-        } else {
-            label.textContent = applied.toFixed(2) + '×';
-        }
+function normalizeBand(band) {
+    var top = clampY(band.top);
+    var bottom = clampY(band.bottom);
+    if (bottom - top < BAND_MIN_GAP) {
+        if (bottom + BAND_MIN_GAP <= GRID_SRC) top = bottom - BAND_MIN_GAP;
+        else bottom = top + BAND_MIN_GAP;
+    }
+    return { top: clampY(top), bottom: clampY(bottom) };
+}
+
+function currentBand() {
+    var bands = loadBands();
+    return normalizeBand(bands[viewMode] || bands.focus);
+}
+
+function computeScaleForBand(scroll, band) {
+    var viewH = scroll.clientHeight;
+    if (viewH < 40) viewH = 240;
+    var regionH = Math.max(BAND_MIN_GAP, band.bottom - band.top);
+    var vw = window.innerWidth || scroll.clientWidth || 360;
+    var scale = (viewH * GRID_SRC) / (regionH * vw);
+    return Math.max(1.4, Math.min(6.5, scale));
+}
+
+function applyViewLayout(scroll) {
+    var shell = scroll.closest('.sector-tech-shell');
+    if (!shell) return CAL_SCALE;
+    var band = currentBand();
+    var scale = computeScaleForBand(scroll, band);
+    shell.style.setProperty('--sector-img-scale', scale.toFixed(3));
+
+    var stage = scroll.querySelector('.sector-tech-stage');
+    if (stage) {
+        var stageH = stage.offsetHeight;
+        scroll.scrollTop = Math.max(0, (band.top / GRID_SRC) * stageH - 2);
+    }
+    updateViewControls();
+    return scale;
+}
+
+function applyCalLayout(scroll) {
+    var shell = scroll.closest('.sector-tech-shell');
+    if (shell) shell.style.setProperty('--sector-img-scale', String(CAL_SCALE));
+}
+
+function applyLayout(scroll) {
+    if (isCalibrateMode()) {
+        applyCalLayout(scroll);
+        return CAL_SCALE;
+    }
+    return applyViewLayout(scroll);
+}
+
+function updateViewControls() {
+    var plus = el('sector-view-plus');
+    var minus = el('sector-view-minus');
+    if (plus) plus.classList.toggle('is-active', viewMode === 'focus');
+    if (minus) minus.classList.toggle('is-active', viewMode === 'full');
+}
+
+function updateBandReadout() {
+    var node = el('sector-band-readout');
+    if (!node) return;
+    var b = loadBands();
+    node.textContent =
+        'CELO: Y ' + b.full.top + '–' + b.full.bottom +
+        ' · VÝŘEZ: Y ' + b.focus.top + '–' + b.focus.bottom;
+}
+
+function positionBandLine(line, ySrc) {
+    line.style.top = (clampY(ySrc) / GRID_SRC * 100).toFixed(4) + '%';
+}
+
+function updateBandLinePositions(stage) {
+    var wrap = stage && stage.querySelector('.sector-view-bands');
+    if (!wrap) return;
+    var b = loadBands();
+    var lines = wrap.querySelectorAll('.sector-band-line');
+    for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        var bandKey = line.getAttribute('data-band');
+        var edge = line.getAttribute('data-edge');
+        if (!bandKey || !edge || !b[bandKey]) continue;
+        positionBandLine(line, b[bandKey][edge]);
     }
 }
 
-function bindScaleControl() {
-    var bar = el('sector-scale-bar');
-    var slider = el('sector-scale-slider');
-    if (!slider || slider._sectorBound) return;
-    slider._sectorBound = true;
-    slider.min = String(SCALE_MIN);
-    slider.max = String(SCALE_MAX);
-    slider.step = '0.05';
-    slider.value = String(getUserScale());
+function bindViewControls() {
+    var minus = el('sector-view-minus');
+    var plus = el('sector-view-plus');
+    if (!minus || !plus || minus._sectorViewBound) return;
+    minus._sectorViewBound = true;
+    plus._sectorViewBound = true;
 
-    slider.addEventListener('input', function() {
-        setUserScale(parseFloat(slider.value));
+    minus.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setViewMode('full');
         remeasureAll();
     });
-
-    var rail = el('sector-zoom-rail');
-    if (rail) rail.style.display = 'flex';
+    plus.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        setViewMode('focus');
+        remeasureAll();
+    });
 }
 
-var GRID_SRC = 800;
-var GRID_STEP = 50;
-var GRID_MINOR = 25;
+function clientYToSourceY(stage, clientY) {
+    var stageRect = stage.getBoundingClientRect();
+    var metrics = getStageSourceMetrics(stage);
+    var rel = (clientY - stageRect.top) / Math.max(1, metrics.stageH);
+    return clampY(rel * metrics.srcH);
+}
+
+function bindBandLines() {
+    var wrap = el('sector-view-bands');
+    var stage = document.querySelector('.sector-tech-stage');
+    if (!wrap || !stage || wrap._sectorBandBound) return;
+    wrap._sectorBandBound = true;
+
+    function finishDrag() {
+        if (!dragState) return;
+        dragState = null;
+        document.body.classList.remove('sector-band-dragging');
+        saveBands(loadBands());
+        remeasureAll();
+    }
+
+    function onMove(clientY) {
+        if (!dragState) return;
+        var y = clientYToSourceY(stage, clientY);
+        var bands = loadBands();
+        var band = bands[dragState.bandKey];
+        if (!band) return;
+
+        if (dragState.edge === 'top') {
+            band.top = Math.min(y, band.bottom - BAND_MIN_GAP);
+        } else {
+            band.bottom = Math.max(y, band.top + BAND_MIN_GAP);
+        }
+        bands[dragState.bandKey] = normalizeBand(band);
+        bandsCache = cloneBands(bands);
+        positionBandLine(dragState.line, bands[dragState.bandKey][dragState.edge]);
+        updateBandReadout();
+    }
+
+    wrap.addEventListener('pointerdown', function(e) {
+        if (!isCalibrateMode()) return;
+        var line = e.target.closest('.sector-band-line');
+        if (!line) return;
+        e.preventDefault();
+        dragState = {
+            line: line,
+            bandKey: line.getAttribute('data-band'),
+            edge: line.getAttribute('data-edge')
+        };
+        document.body.classList.add('sector-band-dragging');
+        if (line.setPointerCapture) line.setPointerCapture(e.pointerId);
+    });
+
+    wrap.addEventListener('pointermove', function(e) {
+        if (!dragState) return;
+        e.preventDefault();
+        onMove(e.clientY);
+    });
+
+    wrap.addEventListener('pointerup', finishDrag);
+    wrap.addEventListener('pointercancel', finishDrag);
+}
 
 function gridLabel(parts, cls, x, y, text, anchor) {
     parts.push(
@@ -290,7 +449,14 @@ function updateCalibrationLabels() {
     var bar = el('sector-scale-bar');
     if (bar) bar.style.display = on ? 'flex' : 'none';
 
+    var bandWrap = el('sector-view-bands');
+    if (bandWrap) {
+        bandWrap.setAttribute('aria-hidden', on ? 'false' : 'true');
+    }
+
     rebuildCalGrid(stage);
+    updateBandLinePositions(stage);
+    updateBandReadout();
 
     var scroll = el('sector-tech-scroll');
     if (scroll) updateViewportRulers(scroll);
@@ -314,34 +480,24 @@ function updateCalibrationLabels() {
     }
 }
 
-/** Referenční pozice displeje (jen pro debug / measureStage). */
-function getDisplayScrollTop(scroll) {
-    var stage = scroll.querySelector('.sector-tech-stage');
-    if (!stage) return 0;
-    return Math.max(0, stage.offsetHeight * LAYOUT.displayTop - 6);
-}
-
 function measureStage(scroll) {
-    applyScale(scroll);
+    applyLayout(scroll);
     var stage = scroll.querySelector('.sector-tech-stage');
     if (!stage) return null;
-    workScrollTopPx = getDisplayScrollTop(scroll);
     updateCalibrationLabels();
     return {
         stageH: stage.offsetHeight,
-        viewH: scroll.clientHeight,
-        workScroll: workScrollTopPx
+        viewH: scroll.clientHeight
     };
 }
 
 function remeasureAll() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
-    var prevScroll = scroll.scrollTop;
     applyRadioHitmap();
     measureStage(scroll);
     if (!isCalibrateMode()) {
-        scroll.scrollTop = prevScroll;
+        applyViewLayout(scroll);
     }
 }
 
@@ -350,7 +506,10 @@ export function initSectorTechShell() {
     if (!scroll || scroll._sectorBound) return;
     scroll._sectorBound = true;
 
-    bindScaleControl();
+    viewMode = getViewMode();
+    loadBands();
+    bindViewControls();
+    bindBandLines();
     bindCrosshair();
     remeasureAll();
 
@@ -372,13 +531,11 @@ export function initSectorTechShell() {
     if (!window._patracSectorAdminBound) {
         window._patracSectorAdminBound = true;
         var obs = new MutationObserver(function() {
-            bindScaleControl();
             remeasureAll();
         });
         obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     }
 
-    /* Kalibrace: aktualizace pravítek při scrollu */
     scroll.addEventListener('scroll', function() {
         if (isCalibrateMode()) updateViewportRulers(scroll);
     }, { passive: true });

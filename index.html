@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&family=Roboto+Condensed:wght@600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e117" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e118" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -602,12 +602,12 @@
                 <div class="sector-scale-bar admin-only-section" id="sector-scale-bar" aria-label="Kalibrace vysílačky">
                     <button type="button" class="sector-cross-toggle" id="sector-cross-toggle" title="Zapni a klepni na fotku — umístí kříž s X/Y v px">📍 Kříž</button>
                     <span id="sector-cross-coords" class="sector-cross-coords">—</span>
+                    <span id="sector-band-readout" class="sector-band-readout">—</span>
                 </div>
                 <div class="sector-tech-viewport" id="sector-tech-viewport">
-                    <div class="sector-zoom-rail" id="sector-zoom-rail" aria-label="Zoom vysílačky">
-                        <span class="sector-zoom-label">Zoom</span>
-                        <input type="range" id="sector-scale-slider" min="1.85" max="4.5" step="0.05" value="2.75" orient="vertical">
-                        <span id="sector-scale-value">2.75×</span>
+                    <div class="sector-view-controls" id="sector-view-controls" aria-label="Pohled vysílačky">
+                        <button type="button" class="sector-view-btn" id="sector-view-plus" title="Displej a klávesnice">+</button>
+                        <button type="button" class="sector-view-btn" id="sector-view-minus" title="Celá vysílačka">−</button>
                     </div>
                     <div class="sector-cal-rulers" id="sector-cal-rulers" aria-hidden="true">
                         <div class="sector-cal-ruler sector-cal-ruler-x" id="sector-cal-ruler-x"></div>
@@ -632,6 +632,12 @@
                                 <div class="sector-cal-cross-line sector-cal-cross-line-v"></div>
                                 <div class="sector-cal-cross-dot"></div>
                                 <div class="sector-cal-cross-readout" id="sector-cal-cross-readout">—</div>
+                            </div>
+                            <div class="sector-view-bands" id="sector-view-bands" aria-hidden="true">
+                                <div class="sector-band-line sector-band-line--full sector-band-line--top" data-band="full" data-edge="top"><span class="sector-band-tag">CELO · horní</span></div>
+                                <div class="sector-band-line sector-band-line--full sector-band-line--bottom" data-band="full" data-edge="bottom"><span class="sector-band-tag">CELO · dolní</span></div>
+                                <div class="sector-band-line sector-band-line--focus sector-band-line--top" data-band="focus" data-edge="top"><span class="sector-band-tag">VÝŘEZ · horní</span></div>
+                                <div class="sector-band-line sector-band-line--focus sector-band-line--bottom" data-band="focus" data-edge="bottom"><span class="sector-band-tag">VÝŘEZ · dolní</span></div>
                             </div>
                             <div class="sector-cal-tap-layer" id="sector-cal-tap-layer" aria-hidden="true"></div>
                             <div class="sector-tech-screen" id="radio-display-screen">
@@ -1009,14 +1015,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e117';
+        window.PATRAC_BUILD = '20260723e118';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e117"></script>
-    <script src="src/app/02-quests.js?v=20260723e117"></script>
-    <script src="src/app/03-map.js?v=20260723e117"></script>
-    <script src="src/app/04-game.js?v=20260723e117"></script>
+    <script src="src/app/01-globals.js?v=20260723e118"></script>
+    <script src="src/app/02-quests.js?v=20260723e118"></script>
+    <script src="src/app/03-map.js?v=20260723e118"></script>
+    <script src="src/app/04-game.js?v=20260723e118"></script>
 </body>
 </html>
