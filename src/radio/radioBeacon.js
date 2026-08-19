@@ -130,8 +130,8 @@ export function liveBeaconToPayload(docId, data) {
     };
 }
 
-export function applyLiveBeaconSnapshot(docs, mySenderId) {
-    var next = {};
+export function applyLiveBeaconSnapshot(docs, mySenderId, opts) {
+    opts = opts || {};
     var incoming = [];
     var i;
     mySenderId = String(mySenderId || '').trim().toLowerCase();
@@ -141,15 +141,11 @@ export function applyLiveBeaconSnapshot(docs, mySenderId) {
         var payload = row.payload || liveBeaconToPayload(row.id, row.data);
         if (!payload) continue;
         var sid = String(payload.senderId || '').trim().toLowerCase();
-        if (mySenderId && sid && sid === mySenderId) continue;
+        /* Vlastní TX na TOMTO zařízení nepřidávej do remote (mapa už má local_).
+           Stejný účet na druhém telefonu (localActive=false) maják uvidí. */
+        if (mySenderId && sid && sid === mySenderId && opts.localActive) continue;
         if (!registerRemoteBeacon(payload)) continue;
-        var rid = payload.senderId || payload.id;
-        next[rid] = true;
         incoming.push(payload);
-    }
-    for (var id in _remote) {
-        if (!Object.prototype.hasOwnProperty.call(_remote, id)) continue;
-        if (!next[id]) delete _remote[id];
     }
     return incoming;
 }

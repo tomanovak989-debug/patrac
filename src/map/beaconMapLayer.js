@@ -1,14 +1,12 @@
 /**
  * Mapová vrstva — radarový beacon (vlastní i cizí).
+ * Jen pin + CSS radar; bez metrových Leaflet kruhů.
  */
 var _map = null;
 var _layer = null;
 var _markers = {};
-var _rings = {};
 var _pendingRefresh = false;
 var _pendingPanLocal = false;
-
-var RING_METERS = [100, 280, 600];
 
 function clearMarkers() {
     var id;
@@ -17,23 +15,9 @@ function clearMarkers() {
         try { _layer && _layer.removeLayer(_markers[id]); } catch (e) {}
     }
     _markers = {};
-    for (id in _rings) {
-        if (!Object.prototype.hasOwnProperty.call(_rings, id)) continue;
-        removeRings(id);
-    }
-    _rings = {};
 }
 
-function removeRings(id) {
-    var group = _rings[id];
-    if (!group || !_layer) return;
-    var i;
-    for (i = 0; i < group.length; i++) {
-        try { _layer.removeLayer(group[i]); } catch (e) {}
-    }
-    delete _rings[id];
-}
-
+/** Ukotvení = střed boxu = GPS bod (vlny rostou kolem středu, neposouvají anchor). */
 function beaconIcon(isLocal) {
     return window.L.divIcon({
         className: 'map-beacon-marker-wrap',
@@ -44,8 +28,8 @@ function beaconIcon(isLocal) {
             '<span class="map-beacon-core"></span>' +
             '<span class="map-beacon-emoji">📡</span>' +
             '</div>',
-        iconSize: [96, 96],
-        iconAnchor: [48, 78]
+        iconSize: [64, 64],
+        iconAnchor: [32, 32]
     });
 }
 
@@ -66,33 +50,6 @@ function panToBeaconList(list, preferLocal) {
     try {
         _map.setView([Number(target.lat), Number(target.lng)], Math.max(_map.getZoom() || 14, 15), { animate: true });
     } catch (e) {}
-}
-
-function upsertRings(id, lat, lng, isLocal) {
-    var color = isLocal ? '#ffcc33' : '#ff5533';
-    if (_rings[id] && _rings[id].length) {
-        var j;
-        for (j = 0; j < _rings[id].length; j++) {
-            try { _rings[id][j].setLatLng([lat, lng]); } catch (e) {}
-        }
-        return;
-    }
-    var group = [];
-    var r;
-    for (r = 0; r < RING_METERS.length; r++) {
-        var circle = window.L.circle([lat, lng], {
-            radius: RING_METERS[r],
-            color: color,
-            weight: r === 0 ? 3 : 2,
-            opacity: 0.95 - r * 0.2,
-            fillColor: color,
-            fillOpacity: 0.1,
-            interactive: false
-        });
-        circle.addTo(_layer);
-        group.push(circle);
-    }
-    _rings[id] = group;
 }
 
 function collectBeaconList() {
@@ -154,7 +111,6 @@ export function refreshBeaconMapLayer(panToLocal) {
         var lng = Number(b.lng);
         var isLocal = !!b.isLocal || String(b.id).indexOf('local_') === 0;
         seen[b.id] = true;
-        upsertRings(b.id, lat, lng, isLocal);
         if (_markers[b.id]) {
             _markers[b.id].setLatLng([lat, lng]);
             continue;
@@ -176,7 +132,6 @@ export function refreshBeaconMapLayer(panToLocal) {
         if (!seen[mid]) {
             try { _layer.removeLayer(_markers[mid]); } catch (e2) {}
             delete _markers[mid];
-            removeRings(mid);
         }
     }
     if (panToLocal && list.length) panToBeaconList(list, true);

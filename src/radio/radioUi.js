@@ -2689,7 +2689,9 @@ function ingestIncomingPayload(payload) {
 
 function applyLiveBeaconsFromCloud(docs) {
     var c = getCtx();
-    var incoming = applyLiveBeaconSnapshot(docs, c.userId);
+    var incoming = applyLiveBeaconSnapshot(docs, c.userId, {
+        localActive: !!(beaconActive && beaconActive.active)
+    });
     var seenSenders = {};
     var i;
     for (i = 0; i < incoming.length; i++) {
@@ -2706,11 +2708,6 @@ function applyLiveBeaconsFromCloud(docs) {
             recordEntry(beaconEntry);
             radioIncomingFeedback(SIGNAL_WEAK);
         }
-    }
-    for (var oldKey in beaconInboxNoted) {
-        if (!Object.prototype.hasOwnProperty.call(beaconInboxNoted, oldKey)) continue;
-        var oldSid = String(oldKey).split('_')[0];
-        if (oldSid && !seenSenders[oldSid]) delete beaconInboxNoted[oldKey];
     }
     notifyBeaconMap(!!(incoming.length || (beaconActive && beaconActive.active)));
     renderDisplay();
