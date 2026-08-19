@@ -308,19 +308,39 @@ function beaconLiveId(senderId) {
 }
 
 async function resolveBeaconSenderId(preferred) {
+    var authUser = await ensureRadioAuth(true);
+    try { await ensurePatracUserDoc(authUser); } catch (e0) {}
     var fromSession = beaconLiveId(preferred);
+    if (!fromSession && typeof localStorage !== 'undefined') {
+        fromSession = beaconLiveId(localStorage.getItem('patrac_session'));
+    }
+    var fromUsers = '';
     try {
-        var authUser = await ensureRadioAuth(true);
-        if (!authUser || !authUser.uid) return fromSession;
-        var snap = await getDoc(doc(getDb(), 'users', authUser.uid));
-        if (snap.exists()) {
-            var fromUsers = String((snap.data() || {}).patracUserId || '').trim();
-            if (fromUsers) return fromUsers;
+        if (authUser && authUser.uid) {
+            var snap = await getDoc(doc(getDb(), 'users', authUser.uid));
+            if (snap.exists()) {
+                fromUsers = beaconLiveId((snap.data() || {}).patracUserId);
+            }
         }
     } catch (e) {
         console.warn('[radioService] resolve beacon sender', e);
     }
-    return fromSession;
+    var id = fromUsers || fromSession;
+    if (!id) {
+        throw new Error('Chybí patracUserId ve users/{uid} — odhlás se a přihlas znovu.');
+    }
+    /* Sjednoť users.patracUserId s ID beacon dokumentu (malá písmena). */
+    if (authUser && authUser.uid && fromUsers !== id) {
+        try {
+            await setDoc(doc(getDb(), 'users', authUser.uid), {
+                patracUserId: id,
+                updatedAt: Date.now()
+            }, { merge: true });
+        } catch (e2) {
+            console.warn('[radioService] sync patracUserId', e2);
+        }
+    }
+    return id;
 }
 
 export async function upsertRadioBeaconLive(beacon) {

@@ -129,16 +129,12 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    /* Stejná úroveň jako radio_feed — stačí přihlášení + patracUserId.
+       Přísná shoda beaconId/senderId padala na velikosti písmen. */
     match /radio_beacons/{beaconId} {
       allow read: if isSignedIn();
-      /* Doc id = patracUserId; senderId musí sedět (stejná hodnota jako users/{uid}.patracUserId). */
-      allow create, update: if isSignedIn()
-        && patracUserId() != ''
-        && beaconId == patracUserId()
-        && request.resource.data.senderId == patracUserId();
-      allow delete: if isSignedIn()
-        && patracUserId() != ''
-        && beaconId == patracUserId();
+      allow create, update: if isSignedIn() && patracUserId() != '';
+      allow delete: if isSignedIn() && patracUserId() != '';
     }
 
     match /entries/{entryId} {
