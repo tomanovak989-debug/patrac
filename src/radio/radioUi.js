@@ -1550,6 +1550,21 @@ function getBeaconLatLng() {
 }
 
 function notifyBeaconMap(panToLocal) {
+    if (beaconActive && beaconActive.active &&
+        isFinite(Number(beaconActive.lat)) && isFinite(Number(beaconActive.lng))) {
+        window._patracLocalBeacon = {
+            id: 'local_' + (beaconActive.senderId || 'me'),
+            lat: Number(beaconActive.lat),
+            lng: Number(beaconActive.lng),
+            frequency: beaconActive.frequency || '',
+            label: beaconActive.label || 'Můj beacon',
+            active: true,
+            isLocal: true
+        };
+    } else {
+        window._patracLocalBeacon = null;
+    }
+    syncMapBeaconHud();
     if (typeof window.patracRefreshBeaconMap === 'function') {
         try { window.patracRefreshBeaconMap(!!panToLocal); } catch (e) {}
         if (window._patracBeaconMapPending) {
@@ -1561,6 +1576,26 @@ function notifyBeaconMap(panToLocal) {
     window._patracBeaconMapPending = window._patracBeaconMapPending || { refresh: false, pan: false };
     window._patracBeaconMapPending.refresh = true;
     if (panToLocal) window._patracBeaconMapPending.pan = true;
+}
+
+function syncMapBeaconHud() {
+    var mapEl = el('map');
+    if (!mapEl) return;
+    var hud = el('map-beacon-hud');
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'map-beacon-hud';
+        mapEl.appendChild(hud);
+    }
+    if (beaconActive && beaconActive.active) {
+        hud.className = 'map-beacon-hud is-on';
+        hud.textContent = '📡 BEACON ZAPNUTÝ';
+        hud.style.display = 'block';
+    } else {
+        hud.className = 'map-beacon-hud';
+        hud.textContent = '';
+        hud.style.display = 'none';
+    }
 }
 
 export function flushPendingBeaconMapRefresh() {
@@ -1588,12 +1623,12 @@ async function transmitBeaconPulse(skipTxFx) {
         beaconActive.lng = pos.lng;
     }
     beaconActive.comCode = c.comCode || '';
+    notifyBeaconMap(false);
     try {
         await upsertRadioBeaconLive(beaconActive);
     } catch (err) {
         console.warn('[beacon] live pulse', err);
-        notifyBeaconMap(false);
-        return;
+        /* Lokální maják běží dál i bez cloud live. */
     }
     var pulseText = String(beaconActive.text || '').trim() || 'BEACON';
     var basePayload = buildBeaconPayload(Object.assign({}, beaconActive, { text: pulseText }), {
@@ -1674,23 +1709,19 @@ async function startBeacon(opts) {
     setTimeout(function() { notifyBeaconMap(true); }, 800);
     renderDisplay();
 
-    var cloudOk = false;
     try {
         await upsertRadioBeaconLive(beaconActive);
-        cloudOk = true;
     } catch (err) {
         console.warn('[beacon] live start', err);
-        alert('Beacon běží na tvé mapě, ale cloud sdílení selhalo: ' +
+        alert('Beacon běží lokálně. Cloud zápis selhal: ' +
             ((err && err.message) ? err.message : 'permissions') +
-            '\nDruhý telefon ho neuvidí, dokud neopraviš Firestore rules / přihlášení.');
+            '\nZkus odhlášení/přihlášení. Druhý telefon zatím spoléhá na SMS puls.');
     }
     startBeaconRepeatTimer();
-    if (cloudOk) {
-        refreshSubscriptions();
-        transmitBeaconPulse(false).catch(function(err) {
-            console.warn('[beacon] pulse start', err);
-        });
-    }
+    refreshSubscriptions();
+    transmitBeaconPulse(false).catch(function(err) {
+        console.warn('[beacon] pulse start', err);
+    });
     notifyBeaconMap(true);
     renderDisplay();
 }
@@ -2826,12 +2857,15 @@ function refreshSubscriptions() {
         frequencies: collectListenFrequencies(),
         backfillRecentMs: 45000
     }).then(function() {
-        return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud);
+        var c = getCtx();
+        return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud, { comCode: c.comCode || '' });
     }).then(function() {
         renderDisplay();
     }).catch(function(err) {
         console.warn('[radioUi] radio listen subscribe', err);
-        subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud).catch(function(e2) {
+        subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud, {
+            comCode: (getCtx().comCode || '')
+        }).catch(function(e2) {
             console.warn('[radioUi] beacon live subscribe', e2);
         });
         renderDisplay();
