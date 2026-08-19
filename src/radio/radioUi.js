@@ -1588,7 +1588,13 @@ async function transmitBeaconPulse(skipTxFx) {
         beaconActive.lng = pos.lng;
     }
     beaconActive.comCode = c.comCode || '';
-    await upsertRadioBeaconLive(beaconActive);
+    try {
+        await upsertRadioBeaconLive(beaconActive);
+    } catch (err) {
+        console.warn('[beacon] live pulse', err);
+        notifyBeaconMap(false);
+        return;
+    }
     var pulseText = String(beaconActive.text || '').trim() || 'BEACON';
     var basePayload = buildBeaconPayload(Object.assign({}, beaconActive, { text: pulseText }), {
         skipTxFx: !!skipTxFx,
@@ -1662,23 +1668,30 @@ async function startBeacon(opts) {
         startedAt: Date.now()
     };
     saveLocalBeacon(c.comCode || '', beaconActive);
+    /* Mapa odesílatele hned — nezávisle na cloud permissions. */
+    notifyBeaconMap(true);
+    setTimeout(function() { notifyBeaconMap(true); }, 200);
+    setTimeout(function() { notifyBeaconMap(true); }, 800);
+    renderDisplay();
+
+    var cloudOk = false;
     try {
         await upsertRadioBeaconLive(beaconActive);
+        cloudOk = true;
     } catch (err) {
         console.warn('[beacon] live start', err);
-        beaconActive = null;
-        clearLocalBeacon(c.comCode || '');
-        alert('Beacon TX selhal: ' + ((err && err.message) ? err.message : 'zkontroluj přihlášení'));
-        renderDisplay();
-        return;
+        alert('Beacon běží na tvé mapě, ale cloud sdílení selhalo: ' +
+            ((err && err.message) ? err.message : 'permissions') +
+            '\nDruhý telefon ho neuvidí, dokud neopraviš Firestore rules / přihlášení.');
     }
-    refreshSubscriptions();
-    transmitBeaconPulse(false).catch(function(err) {
-        console.warn('[beacon] pulse start', err);
-    });
     startBeaconRepeatTimer();
+    if (cloudOk) {
+        refreshSubscriptions();
+        transmitBeaconPulse(false).catch(function(err) {
+            console.warn('[beacon] pulse start', err);
+        });
+    }
     notifyBeaconMap(true);
-    setTimeout(function() { notifyBeaconMap(true); }, 250);
     renderDisplay();
 }
 
@@ -3609,9 +3622,15 @@ export function initRadioCommsSystem(options) {
         refreshSubscriptions();
     }
     window.patracGetMapBeacons = function() {
-        refreshBeaconActiveFromStorage();
+        /* Preferuj běžící paměť — storage jen když beacon ještě není v RAM. */
+        if (!(beaconActive && beaconActive.active)) {
+            refreshBeaconActiveFromStorage();
+        }
         var c = getCtx();
         return getMapBeacons(c.comCode || '', beaconActive);
+    };
+    window.patracHasLocalBeacon = function() {
+        return !!(beaconActive && beaconActive.active);
     };
     notifyBeaconMap(false);
     flushPendingBeaconMapRefresh();

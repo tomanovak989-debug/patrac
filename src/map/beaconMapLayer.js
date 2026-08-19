@@ -1,25 +1,25 @@
 /**
  * Mapová vrstva — radarový beacon (vlastní i cizí).
+ * Lokální maják musí být vidět i bez cloud TX.
  */
 var _map = null;
 var _layer = null;
 var _markers = {};
 var _rings = {};
-var _blinkOn = true;
-var _blinkTimer = null;
 var _pendingRefresh = false;
 var _pendingPanLocal = false;
 
-var RING_METERS = [180, 480, 1100];
+var RING_METERS = [120, 320, 700];
 
 function ensureBeaconPane(mapObj) {
-    if (!mapObj || !mapObj.createPane) return;
+    if (!mapObj || !mapObj.createPane) return 'markerPane';
     if (!mapObj.getPane('beaconPane')) {
         mapObj.createPane('beaconPane');
         var pane = mapObj.getPane('beaconPane');
-        pane.style.zIndex = 850;
-        pane.style.pointerEvents = 'auto';
+        pane.style.zIndex = 900;
+        pane.style.pointerEvents = 'none';
     }
+    return 'beaconPane';
 }
 
 function clearMarkers() {
@@ -48,14 +48,16 @@ function removeRings(id) {
 
 function beaconIcon(isLocal) {
     return window.L.divIcon({
-        className: 'map-beacon-marker-wrap',
-        html: '<div class="map-beacon-pin' + (isLocal ? ' is-local' : '') + '">' +
-            '<span class="map-beacon-radar"></span>' +
-            '<span class="map-beacon-radar map-beacon-radar-delay"></span>' +
+        className: 'map-beacon-marker-wrap leaflet-interactive',
+        html: '<div class="map-beacon-pin' + (isLocal ? ' is-local' : ' is-remote') + '" aria-hidden="true">' +
+            '<span class="map-beacon-wave"></span>' +
+            '<span class="map-beacon-wave map-beacon-wave-2"></span>' +
+            '<span class="map-beacon-wave map-beacon-wave-3"></span>' +
+            '<span class="map-beacon-core"></span>' +
             '<span class="map-beacon-emoji">📡</span>' +
             '</div>',
-        iconSize: [72, 72],
-        iconAnchor: [36, 66]
+        iconSize: [96, 96],
+        iconAnchor: [48, 78]
     });
 }
 
@@ -65,25 +67,21 @@ function panToBeaconList(list, preferLocal) {
     var i;
     if (preferLocal) {
         for (i = 0; i < list.length; i++) {
-            if (list[i] && list[i].isLocal) {
-                target = list[i];
-                break;
-            }
-            if (list[i] && String(list[i].id || '').indexOf('local_') === 0) {
+            if (list[i] && (list[i].isLocal || String(list[i].id || '').indexOf('local_') === 0)) {
                 target = list[i];
                 break;
             }
         }
     }
     if (!target) target = list[0];
-    if (!target || !isFinite(target.lat) || !isFinite(target.lng)) return;
+    if (!target || !isFinite(Number(target.lat)) || !isFinite(Number(target.lng))) return;
     try {
-        _map.setView([target.lat, target.lng], Math.max(_map.getZoom() || 14, 15), { animate: true });
+        _map.setView([Number(target.lat), Number(target.lng)], Math.max(_map.getZoom() || 14, 15), { animate: true });
     } catch (e) {}
 }
 
-function upsertRings(id, lat, lng, isLocal) {
-    var color = isLocal ? '#ff9a1a' : '#ff4d2a';
+function upsertRings(id, lat, lng, isLocal, paneName) {
+    var color = isLocal ? '#ffcc33' : '#ff5533';
     if (_rings[id] && _rings[id].length) {
         var j;
         for (j = 0; j < _rings[id].length; j++) {
@@ -98,11 +96,12 @@ function upsertRings(id, lat, lng, isLocal) {
             radius: RING_METERS[r],
             color: color,
             weight: r === 0 ? 3 : 2,
-            opacity: 0.85 - r * 0.18,
+            opacity: 0.9 - r * 0.2,
             fillColor: color,
-            fillOpacity: 0.07,
-            pane: 'beaconPane',
-            interactive: false
+            fillOpacity: 0.08,
+            pane: paneName || 'overlayPane',
+            interactive: false,
+            className: 'map-beacon-ring'
         });
         circle.addTo(_layer);
         group.push(circle);
@@ -117,31 +116,6 @@ export function initBeaconMapLayer(map) {
     if (!_layer) {
         _layer = window.L.layerGroup();
         _layer.addTo(_map);
-    }
-    if (!_blinkTimer) {
-        _blinkTimer = setInterval(function() {
-            _blinkOn = !_blinkOn;
-            var id;
-            for (id in _markers) {
-                if (!Object.prototype.hasOwnProperty.call(_markers, id)) continue;
-                var el = _markers[id].getElement && _markers[id].getElement();
-                if (!el) continue;
-                var emoji = el.querySelector('.map-beacon-emoji');
-                if (emoji) emoji.style.opacity = _blinkOn ? '1' : '0.45';
-            }
-            for (id in _rings) {
-                if (!Object.prototype.hasOwnProperty.call(_rings, id)) continue;
-                var group = _rings[id] || [];
-                var i;
-                for (i = 0; i < group.length; i++) {
-                    try {
-                        group[i].setStyle({
-                            opacity: _blinkOn ? (0.9 - i * 0.2) : (0.35 - i * 0.08)
-                        });
-                    } catch (e2) {}
-                }
-            }
-        }, 700);
     }
     if (_pendingRefresh) {
         _pendingRefresh = false;
@@ -158,14 +132,16 @@ export function refreshBeaconMapLayer(panToLocal) {
         if (panToLocal) _pendingPanLocal = true;
         return;
     }
-    ensureBeaconPane(_map);
+    var paneName = ensureBeaconPane(_map);
     if (!_layer) {
         _layer = window.L.layerGroup();
         _layer.addTo(_map);
     }
     var list = [];
     if (typeof window.patracGetMapBeacons === 'function') {
-        try { list = window.patracGetMapBeacons() || []; } catch (e) {}
+        try { list = window.patracGetMapBeacons() || []; } catch (e) {
+            console.warn('[beaconMap] get beacons', e);
+        }
     }
     var seen = {};
     var i;
@@ -176,28 +152,30 @@ export function refreshBeaconMapLayer(panToLocal) {
         var lng = Number(b.lng);
         var isLocal = !!b.isLocal || String(b.id).indexOf('local_') === 0;
         seen[b.id] = true;
-        upsertRings(b.id, lat, lng, isLocal);
+        upsertRings(b.id, lat, lng, isLocal, paneName);
         if (_markers[b.id]) {
             _markers[b.id].setLatLng([lat, lng]);
+            try { _markers[b.id].setZIndexOffset(2500); } catch (e2) {}
             continue;
         }
         var marker = window.L.marker([lat, lng], {
             icon: beaconIcon(isLocal),
             interactive: true,
             keyboard: false,
-            pane: 'beaconPane',
-            zIndexOffset: 1600
+            pane: paneName,
+            zIndexOffset: 2500,
+            riseOnHover: true
         });
         var label = b.label || (isLocal ? 'Můj beacon' : 'BEACON');
         var freq = b.frequency ? (' · ' + b.frequency + ' MHz') : '';
-        marker.bindPopup('<b>📡 ' + label + '</b>' + freq);
+        marker.bindPopup('<b>📡 ' + label + '</b>' + freq + (isLocal ? '<br>Lokální maják' : ''));
         marker.addTo(_layer);
         _markers[b.id] = marker;
     }
     for (var mid in _markers) {
         if (!Object.prototype.hasOwnProperty.call(_markers, mid)) continue;
         if (!seen[mid]) {
-            try { _layer.removeLayer(_markers[mid]); } catch (e2) {}
+            try { _layer.removeLayer(_markers[mid]); } catch (e3) {}
             delete _markers[mid];
             removeRings(mid);
         }
@@ -206,10 +184,6 @@ export function refreshBeaconMapLayer(panToLocal) {
 }
 
 export function destroyBeaconMapLayer() {
-    if (_blinkTimer) {
-        clearInterval(_blinkTimer);
-        _blinkTimer = null;
-    }
     clearMarkers();
     if (_layer && _map) {
         try { _map.removeLayer(_layer); } catch (e) {}
