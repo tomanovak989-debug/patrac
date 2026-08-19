@@ -6,7 +6,7 @@ import { collection, collectionGroup, addDoc, setDoc, deleteDoc, doc, getDoc, on
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth, ensurePatracUserDoc, normalizePatracUserId } from '../services/authService.js';
 import { ensureFirebaseAuth } from '../lib/firebase.js';
-import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
+import { frequencyChannelId, normalizeFrequency, EMERGENCY_FREQUENCY } from './radioBand.js';
 
 var channelUnsubs = {};
 var radioListenStatus = { state: 'idle', detail: '', at: 0 };
@@ -358,7 +358,7 @@ export async function upsertRadioBeaconLive(beacon) {
         lng: Number(beacon.lng),
         originLat: Number(beacon.lat),
         originLng: Number(beacon.lng),
-        frequency: normalizeFrequency(beacon.frequency) || '',
+        frequency: normalizeFrequency(EMERGENCY_FREQUENCY),
         text: String(beacon.text || 'BEACON').slice(0, 80),
         messageType: 'beacon',
         startedAt: Number(beacon.startedAt) || Date.now(),

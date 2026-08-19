@@ -1,13 +1,14 @@
 /**
- * BEACON — opakované vysílání SMS/PTT na celé pásmo 400–470 MHz, vždy PT (bez šifry).
- * SMS: mřížka 1 MHz + komunita + naladěný kanál. PTT: rotace po pásmu každý puls.
+ * BEACON — SOS volání o pomoc.
+ * Pevný kanál BEACON_SOS_FREQUENCY (450.000) — všechny vysílačky ho vždy poslouchají.
+ * Live stav: radio_beacons (globálně). Pulzy: SMS/PTT na SOS frekvenci (PT, bez šifry).
  */
 import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms.js';
-import { BAND_MIN_MHZ, BAND_MAX_MHZ, EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
-import { bandScanStepCount, frequencyAtBandIndex } from './radioAutoscan.js';
+import { EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
 
 export var BEACON_REPEAT_MS = 18000;
-export var BEACON_BURST_STEP_MHZ = 1;
+/** Pevný SOS kanál majáku — default poslech na všech vysílačkách. */
+export var BEACON_SOS_FREQUENCY = EMERGENCY_FREQUENCY;
 export var BEACON_HUB = 'hub';
 export var BEACON_CONFIRM = 'confirm';
 export var BEACON_PTT_ARM = 'ptt_arm';
@@ -22,13 +23,12 @@ function addFreq(set, list, value) {
     list.push(f);
 }
 
-/** Frekvence pro SMS beacon — komunita, naladěný kanál, nouzový + kraj pásma. */
+/** Frekvence pro beacon TX — vždy SOS kanál (+ volitelně naladěný/komunita jako záloha). */
 export function beaconBroadcastFrequencies(opts) {
     opts = opts || {};
     var set = {};
     var list = [];
-    addFreq(set, list, EMERGENCY_FREQUENCY);
-    addFreq(set, list, BAND_MIN_MHZ);
+    addFreq(set, list, BEACON_SOS_FREQUENCY);
     if (opts.comCode) addFreq(set, list, communityFrequencyFromCode(opts.comCode));
     if (opts.tunedFrequency) addFreq(set, list, opts.tunedFrequency);
     if (opts.extras && opts.extras.length) {
@@ -38,16 +38,9 @@ export function beaconBroadcastFrequencies(opts) {
     return list;
 }
 
-/** PTT beacon — jedna frekvence na puls, postupně celé pásmo. */
+/** PTT beacon — také pevný SOS kanál (volání o pomoc musí dorazit spolehlivě). */
 export function nextBeaconBroadcastFrequency(beacon) {
-    if (!beacon) return normalizeFrequency(BAND_MIN_MHZ);
-    var total = bandScanStepCount();
-    var idx = beacon.bandIndex != null ? beacon.bandIndex : 0;
-    if (idx < 0) idx = 0;
-    if (idx >= total) idx = idx % total;
-    var freq = frequencyAtBandIndex(idx);
-    beacon.bandIndex = (idx + 1) % total;
-    return freq;
+    return normalizeFrequency(BEACON_SOS_FREQUENCY);
 }
 
 function storageKey(comCode) {
@@ -161,7 +154,7 @@ export function registerRemoteBeacon(payload) {
         id: id,
         lat: Number(lat),
         lng: Number(lng),
-        frequency: normalizeFrequency(payload.frequency),
+        frequency: normalizeFrequency(payload.frequency) || BEACON_SOS_FREQUENCY,
         encryptionKey: normalizeEncryptionKey(payload.encryptionKey || ''),
         label: payload.senderName || payload.label || 'Beacon',
         messageType: payload.messageType,
@@ -190,7 +183,7 @@ export function getMapBeacons(comCode, localBeacon) {
             id: 'local_' + (localBeacon.senderId || 'me'),
             lat: localBeacon.lat,
             lng: localBeacon.lng,
-            frequency: localBeacon.frequency,
+            frequency: localBeacon.frequency || BEACON_SOS_FREQUENCY,
             label: localBeacon.label || 'Můj beacon',
             active: true,
             isLocal: true
@@ -204,7 +197,7 @@ export function getMapBeacons(comCode, localBeacon) {
             id: b.id,
             lat: b.lat,
             lng: b.lng,
-            frequency: b.frequency,
+            frequency: b.frequency || BEACON_SOS_FREQUENCY,
             label: b.label || 'Beacon',
             active: b.active !== false
         });
@@ -292,13 +285,11 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
 
     if (session.screen === BEACON_CONFIRM) {
         var kind = session.pendingType === 'ptt' ? 'PTT' : 'SMS';
-        var bandLine = session.pendingType === 'ptt'
-            ? 'PT · rotace po pásmu'
-            : 'PT · pásmo + komunita';
+        var bandLine = 'SOS · ' + BEACON_SOS_FREQUENCY + ' MHz';
         lines = [
             'SPUSTIT ' + kind + ' BEACON',
             bandLine,
-            'Bez šifry · otevřený provoz',
+            'Bez šifry · všichni v dosahu',
             String(session.pendingText || '').slice(0, 18),
             'Opakuje se do vypnutí',
             ''
@@ -325,7 +316,7 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     lines.push('');
     lines.push('');
     if (localBeacon && localBeacon.active) {
-        lines[4] = '● VYSÍLÁ · ' + (localBeacon.messageType === 'ptt' ? 'PTT' : 'SMS');
+        lines[4] = '● SOS ' + BEACON_SOS_FREQUENCY;
         lines[5] = (isFinite(localBeacon.lat) ? 'GPS OK · ' : 'GPS? · ') + String(localBeacon.text || '').slice(0, 14);
     }
     focusLine = items.length ? session.focusIndex - start : -1;
@@ -347,7 +338,7 @@ export function buildBeaconPayload(beacon, extras) {
         text: beacon.text,
         pttAudio: beacon.pttAudio || '',
         pttMime: beacon.pttMime || '',
-        frequency: beacon.frequency,
+        frequency: BEACON_SOS_FREQUENCY,
         encryptionKey: '',
         beaconBandcast: true,
         originLat: beacon.lat,

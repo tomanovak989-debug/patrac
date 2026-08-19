@@ -100,7 +100,6 @@ import {
     SCAN_RUNNING,
     SCAN_LOCKED
 } from './radioAutoscan.js';
-import { BAND_MIN_MHZ } from './radioBand.js';
 import {
     createBeaconSession,
     loadLocalBeacon,
@@ -115,9 +114,9 @@ import {
     BEACON_CONFIRM,
     BEACON_PTT_ARM,
     BEACON_REPEAT_MS,
+    BEACON_SOS_FREQUENCY,
     buildBeaconPayload,
-    beaconBroadcastFrequencies,
-    nextBeaconBroadcastFrequency
+    beaconBroadcastFrequencies
 } from './radioBeacon.js';
 import {
     createCommsState,
@@ -1282,7 +1281,7 @@ function renderDisplay() {
         if (k) k.textContent = standbyLines.line2;
         if (p) {
             if (beaconActive && beaconActive.active) {
-                p.textContent = '● BEACON · ' + (beaconActive.messageType === 'ptt' ? 'PTT' : 'SMS');
+                p.textContent = '● SOS ' + BEACON_SOS_FREQUENCY;
             } else {
                 p.textContent = standbyLines.line3;
             }
@@ -1589,7 +1588,7 @@ function syncMapBeaconHud() {
     }
     if (beaconActive && beaconActive.active) {
         hud.className = 'map-beacon-hud is-on';
-        hud.textContent = '📡 BEACON ZAPNUTÝ';
+        hud.textContent = '📡 SOS ' + BEACON_SOS_FREQUENCY;
         hud.style.display = 'block';
     } else {
         hud.className = 'map-beacon-hud';
@@ -1623,37 +1622,40 @@ async function transmitBeaconPulse(skipTxFx) {
         beaconActive.lng = pos.lng;
     }
     beaconActive.comCode = c.comCode || '';
+    beaconActive.frequency = BEACON_SOS_FREQUENCY;
     notifyBeaconMap(false);
     try {
         await upsertRadioBeaconLive(beaconActive);
     } catch (err) {
         console.warn('[beacon] live pulse', err);
-        /* Lokální maják běží dál i bez cloud live. */
     }
     var pulseText = String(beaconActive.text || '').trim() || 'BEACON';
     var basePayload = buildBeaconPayload(Object.assign({}, beaconActive, { text: pulseText }), {
         skipTxFx: !!skipTxFx,
         isBeaconRepeat: !!skipTxFx
     });
+    /* Vždy SOS kanál; u SMS přidej i naladěný/komunitu jako zálohu. */
     var freqs = beaconActive.messageType === 'ptt'
-        ? [nextBeaconBroadcastFrequency(beaconActive)]
+        ? [BEACON_SOS_FREQUENCY]
         : beaconBroadcastFrequencies({
             comCode: c.comCode || '',
-            tunedFrequency: state.frequency || '',
-            extras: beaconActive.frequency ? [beaconActive.frequency] : []
-        }).slice(0, 4);
+            tunedFrequency: state.frequency || ''
+        });
     var sends = [];
     var i;
     for (i = 0; i < freqs.length; i++) {
         sends.push(transmitMessage(pulseText, Object.assign({}, basePayload, {
             frequency: freqs[i],
             encryptionKey: '',
+            messageType: 'beacon',
             originLat: beaconActive.lat,
             originLng: beaconActive.lng,
-            skipNotebook: true,
-            skipTxFx: true
+            skipNotebook: i > 0 || !!skipTxFx,
+            skipTxFx: true,
+            pttAudio: i === 0 ? (beaconActive.pttAudio || '') : '',
+            pttMime: i === 0 ? (beaconActive.pttMime || '') : ''
         })).catch(function(err) {
-            console.warn('[beacon] pulse freq', err);
+            console.warn('[beacon] pulse freq', freqs[i], err);
         }));
     }
     await Promise.all(sends);
@@ -1690,7 +1692,7 @@ async function startBeacon(opts) {
         active: true,
         lat: pos.lat,
         lng: pos.lng,
-        frequency: normalizeFrequency(state.frequency) || normalizeFrequency(BAND_MIN_MHZ),
+        frequency: BEACON_SOS_FREQUENCY,
         encryptionKey: '',
         messageType: opts.messageType || 'sms',
         text: String(opts.text || '').trim() || 'BEACON',
@@ -2819,19 +2821,11 @@ function bindRadioAuthRefresh() {
 function collectListenFrequencies() {
     var c = getCtx();
     var freqs = collectTunedFrequencies(state).slice();
+    /* Pevný SOS maják — vždy v poslechu na všech vysílačkách. */
+    freqs.unshift(BEACON_SOS_FREQUENCY);
     var comFreq = communityFrequencyFromCode(c.comCode);
     if (comFreq) freqs.push(comFreq);
-    var broadcast = beaconBroadcastFrequencies({
-        comCode: c.comCode,
-        tunedFrequency: normalizeFrequency(state.frequency)
-    });
     var i;
-    for (i = 0; i < broadcast.length; i++) freqs.push(broadcast[i]);
-    /* Mřížka 5 MHz — spolehlivý poslech i bez radio_feed indexu */
-    var mhz;
-    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += 5) {
-        freqs.push(normalizeFrequency(mhz));
-    }
     var seen = {};
     var uniq = [];
     for (i = 0; i < freqs.length; i++) {

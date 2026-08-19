@@ -122,7 +122,7 @@ export function refreshBeaconMapLayer(panToLocal) {
             zIndexOffset: 3000
         });
         var label = b.label || (isLocal ? 'Můj beacon' : 'BEACON');
-        var freq = b.frequency ? (' · ' + b.frequency + ' MHz') : '';
+        var freq = b.frequency ? (' · SOS ' + b.frequency + ' MHz') : ' · SOS';
         marker.bindPopup('<b>📡 ' + label + '</b>' + freq);
         marker.addTo(_layer);
         _markers[b.id] = marker;
