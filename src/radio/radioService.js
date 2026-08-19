@@ -2,7 +2,7 @@
  * Rádiové zprávy ve Firestore — kanál = frekvence (freq-first).
  * Cesta: radio_freq/{f_400025}/messages/{msgId}
  */
-import { collection, collectionGroup, addDoc, setDoc, deleteDoc, doc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, setDoc, deleteDoc, doc, getDoc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
 import { ensurePatracAuth, ensurePatracUserDoc, normalizePatracUserId } from '../services/authService.js';
 import { ensureFirebaseAuth } from '../lib/firebase.js';
@@ -307,9 +307,24 @@ function beaconLiveId(senderId) {
     return id ? id.slice(0, 120) : '';
 }
 
+async function resolveBeaconSenderId(preferred) {
+    var fromSession = beaconLiveId(preferred);
+    try {
+        var authUser = await ensureRadioAuth(true);
+        if (!authUser || !authUser.uid) return fromSession;
+        var snap = await getDoc(doc(getDb(), 'users', authUser.uid));
+        if (snap.exists()) {
+            var fromUsers = String((snap.data() || {}).patracUserId || '').trim();
+            if (fromUsers) return fromUsers;
+        }
+    } catch (e) {
+        console.warn('[radioService] resolve beacon sender', e);
+    }
+    return fromSession;
+}
+
 export async function upsertRadioBeaconLive(beacon) {
-    await ensureRadioAuth(true);
-    var id = beaconLiveId(beacon && beacon.senderId);
+    var id = await resolveBeaconSenderId(beacon && beacon.senderId);
     if (!id) throw new Error('Beacon vyžaduje přihlášení (chybí user id).');
     if (beacon.lat == null || beacon.lng == null ||
         !isFinite(Number(beacon.lat)) || !isFinite(Number(beacon.lng))) {
@@ -325,20 +340,18 @@ export async function upsertRadioBeaconLive(beacon) {
         frequency: normalizeFrequency(beacon.frequency) || '',
         text: String(beacon.text || 'BEACON').slice(0, 80),
         messageType: 'beacon',
-        pttAudio: beacon.pttAudio || '',
-        pttMime: beacon.pttMime || '',
         active: true,
-        startedAt: beacon.startedAt || Date.now(),
+        startedAt: Number(beacon.startedAt) || Date.now(),
         updatedAt: Date.now(),
-        comCode: beacon.comCode || ''
+        comCode: String(beacon.comCode || '')
     };
-    await setDoc(doc(getDb(), 'radio_beacons', id), payload);
+    /* PTT audio neukládat do live doc — zbytečně velké a rules/limits. */
+    await setDoc(doc(getDb(), 'radio_beacons', id), payload, { merge: true });
     return { id: id, ...payload };
 }
 
 export async function clearRadioBeaconLive(senderId) {
-    await ensureRadioAuth(true);
-    var id = beaconLiveId(senderId);
+    var id = await resolveBeaconSenderId(senderId);
     if (!id) return;
     try {
         await deleteDoc(doc(getDb(), 'radio_beacons', id));
