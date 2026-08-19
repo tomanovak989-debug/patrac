@@ -2855,14 +2855,12 @@ function refreshSubscriptions() {
         backfillRecentMs: 45000
     }).then(function() {
         var c = getCtx();
-        return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud, { comCode: c.comCode || '' });
+        return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud);
     }).then(function() {
         renderDisplay();
     }).catch(function(err) {
         console.warn('[radioUi] radio listen subscribe', err);
-        subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud, {
-            comCode: (getCtx().comCode || '')
-        }).catch(function(e2) {
+        subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud).catch(function(e2) {
             console.warn('[radioUi] beacon live subscribe', e2);
         });
         renderDisplay();

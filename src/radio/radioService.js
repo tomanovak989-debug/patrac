@@ -363,24 +363,27 @@ export async function upsertRadioBeaconLive(beacon) {
         messageType: 'beacon',
         startedAt: Number(beacon.startedAt) || Date.now(),
         updatedAt: Date.now(),
-        comCode: String(beacon.comCode || '')
+        comCode: String(beacon.comCode || ''),
+        globalDistress: true
     };
-    /* players/{id} — update povolen vlastníkovi (na rozdíl od radio_beacons). */
     var authUser = null;
     try { authUser = await ensureRadioAuth(true); } catch (e0) {}
-    var playerPayload = {
-        userId: id,
-        comCode: live.comCode || null,
-        beaconLive: live,
-        updatedAt: Date.now()
-    };
-    if (authUser && authUser.uid) playerPayload.firebaseUid = authUser.uid;
-    await setDoc(doc(getDb(), 'players', id), playerPayload, { merge: true });
-    /* Záloha: mirror do radio_beacons (když rules sedí). Neblokuje při fail. */
+
+    /* Primární: globální kolekce — vidí všichni přihlášení (i jiné komunity). */
+    await setDoc(doc(getDb(), 'radio_beacons', id), live, { merge: true });
+
+    /* Volitelně i players (vlastní profil) — neblokuje cross-community. */
     try {
-        await setDoc(doc(getDb(), 'radio_beacons', id), live, { merge: true });
+        var playerPayload = {
+            userId: id,
+            comCode: live.comCode || null,
+            beaconLive: live,
+            updatedAt: Date.now()
+        };
+        if (authUser && authUser.uid) playerPayload.firebaseUid = authUser.uid;
+        await setDoc(doc(getDb(), 'players', id), playerPayload, { merge: true });
     } catch (e) {
-        console.warn('[radioService] radio_beacons mirror', e);
+        console.warn('[radioService] players beaconLive', e);
     }
     return { id: id, ...live };
 }
@@ -394,22 +397,31 @@ export async function clearRadioBeaconLive(senderId) {
     }
     if (!id) return;
     try {
+        await deleteDoc(doc(getDb(), 'radio_beacons', id));
+    } catch (err) {
+        try {
+            await setDoc(doc(getDb(), 'radio_beacons', id), {
+                active: false,
+                updatedAt: Date.now()
+            }, { merge: true });
+        } catch (err2) {
+            console.warn('[radioService] clear radio_beacons', err2);
+        }
+    }
+    try {
         await setDoc(doc(getDb(), 'players', id), {
             beaconLive: { active: false, updatedAt: Date.now() },
             updatedAt: Date.now()
         }, { merge: true });
-    } catch (err) {
-        console.warn('[radioService] clear player beaconLive', err);
-    }
-    try {
-        await deleteDoc(doc(getDb(), 'radio_beacons', id));
-    } catch (err2) {
-        console.warn('[radioService] clear beacon live', err2);
+    } catch (err3) {
+        console.warn('[radioService] clear player beaconLive', err3);
     }
 }
 
-export function subscribeRadioBeaconsLive(onSnapshotAll, opts) {
-    opts = opts || {};
+/**
+ * Globální poslech majáků — všechny aktivní radio_beacons (SOS napříč komunitami).
+ */
+export function subscribeRadioBeaconsLive(onSnapshotAll) {
     if (channelUnsubs.__beacons_live__) {
         try { channelUnsubs.__beacons_live__(); } catch (e) {}
         delete channelUnsubs.__beacons_live__;
@@ -425,114 +437,35 @@ export function subscribeRadioBeaconsLive(onSnapshotAll, opts) {
     if (!onSnapshotAll) return Promise.resolve();
 
     return ensureRadioAuth(false).then(function() {
-        var comCode = String(opts.comCode || '').trim().toUpperCase();
-        var memberUnsubs = [];
-        var latestById = {};
-        var watched = {};
-
-        function emit() {
+        channelUnsubs.__beacons_live__ = onSnapshot(collection(getDb(), 'radio_beacons'), function(snap) {
             var docs = [];
-            var id;
-            for (id in latestById) {
-                if (!Object.prototype.hasOwnProperty.call(latestById, id)) continue;
-                docs.push(latestById[id]);
-            }
-            onSnapshotAll(docs);
-        }
-
-        function upsertLive(userId, live, fallbackName) {
-            userId = normalizePatracUserId(userId);
-            if (!userId || !live || live.active === false) {
-                if (userId) delete latestById[userId];
-                emit();
-                return;
-            }
-            latestById[userId] = {
-                id: userId,
-                data: {
-                    senderId: live.senderId || userId,
-                    senderName: live.senderName || fallbackName || 'Beacon',
-                    lat: live.lat,
-                    lng: live.lng,
-                    originLat: live.originLat != null ? live.originLat : live.lat,
-                    originLng: live.originLng != null ? live.originLng : live.lng,
-                    frequency: live.frequency || '',
-                    text: live.text || 'BEACON',
-                    messageType: 'beacon',
-                    startedAt: live.startedAt || 0,
-                    updatedAt: live.updatedAt || Date.now(),
-                    comCode: live.comCode || ''
-                }
-            };
-            emit();
-        }
-
-        function watchPlayer(userId) {
-            var raw = String(userId || '').trim();
-            var norm = normalizePatracUserId(raw);
-            var ids = [];
-            if (raw) ids.push(raw);
-            if (norm && norm !== raw) ids.push(norm);
-            var i;
-            for (i = 0; i < ids.length; i++) {
-                (function(pid) {
-                    if (watched[pid]) return;
-                    watched[pid] = true;
-                    var unsub = onSnapshot(doc(getDb(), 'players', pid), function(snap) {
-                        if (!snap.exists()) {
-                            delete latestById[normalizePatracUserId(pid)];
-                            emit();
-                            return;
-                        }
-                        var data = snap.data() || {};
-                        upsertLive(pid, data.beaconLive, data.name || data.playerName);
-                    }, function(err) {
-                        console.warn('[radioService] player beacon watch', pid, err);
-                    });
-                    memberUnsubs.push(unsub);
-                })(ids[i]);
-            }
-        }
-
-        function clearMemberWatches() {
-            var i;
-            for (i = 0; i < memberUnsubs.length; i++) {
-                try { memberUnsubs[i](); } catch (e4) {}
-            }
-            memberUnsubs = [];
-            watched = {};
-        }
-
-        channelUnsubs.__beacons_players__ = function() {
-            clearMemberWatches();
-        };
-
-        /* Vždy poslouchat radio_beacons (když rules dovolí). */
-        channelUnsubs.__beacons_feed__ = onSnapshot(collection(getDb(), 'radio_beacons'), function(snap) {
             snap.forEach(function(docSnap) {
                 var data = docSnap.data() || {};
                 if (data.active === false) return;
-                upsertLive(docSnap.id || data.senderId, data, data.senderName);
+                if (data.lat == null && data.originLat == null) return;
+                docs.push({
+                    id: docSnap.id,
+                    data: {
+                        senderId: data.senderId || docSnap.id,
+                        senderName: data.senderName || 'Beacon',
+                        lat: data.lat != null ? data.lat : data.originLat,
+                        lng: data.lng != null ? data.lng : data.originLng,
+                        originLat: data.originLat != null ? data.originLat : data.lat,
+                        originLng: data.originLng != null ? data.originLng : data.lng,
+                        frequency: data.frequency || '',
+                        text: data.text || 'BEACON',
+                        messageType: 'beacon',
+                        startedAt: data.startedAt || 0,
+                        updatedAt: data.updatedAt || Date.now(),
+                        comCode: data.comCode || '',
+                        globalDistress: true
+                    }
+                });
             });
+            onSnapshotAll(docs);
         }, function(err) {
-            console.warn('[radioService] radio_beacons subscribe', err);
+            console.warn('[radioService] radio_beacons global subscribe', err);
+            onSnapshotAll([]);
         });
-
-        if (comCode) {
-            channelUnsubs.__beacons_live__ = onSnapshot(doc(getDb(), 'communities', comCode), function(snap) {
-                clearMemberWatches();
-                if (!snap.exists()) {
-                    emit();
-                    return;
-                }
-                var members = (snap.data() || {}).members || [];
-                var i;
-                for (i = 0; i < members.length; i++) watchPlayer(members[i]);
-            }, function(err) {
-                console.warn('[radioService] community beacon members', err);
-            });
-        } else {
-            channelUnsubs.__beacons_live__ = function() {};
-        }
     });
 }

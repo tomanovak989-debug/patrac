@@ -129,8 +129,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    /* Stejná úroveň jako radio_feed — stačí přihlášení + patracUserId.
-       Přísná shoda beaconId/senderId padala na velikosti písmen. */
+    /* Globální SOS maják — čte/píše každý přihlášený hráč (i mimo komunitu). */
     match /radio_beacons/{beaconId} {
       allow read: if isSignedIn();
       allow create, update: if isSignedIn() && patracUserId() != '';
