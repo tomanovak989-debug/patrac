@@ -156,18 +156,22 @@ export async function ensurePatracAuth() {
     return user;
 }
 
-/** Firestore rules pro TX vyžadují users/{firebaseUid}.patracUserId — doplní chybějící záznam. */
-export async function ensurePatracUserDoc(user) {
+/**
+ * Doplní users/{firebaseUid}.patracUserId (některá rules / owner checky to pořád chtějí).
+ * preferredUserId — např. session z getCtx(), když localStorage chybí.
+ */
+export async function ensurePatracUserDoc(user, preferredUserId) {
     user = user || getAuthInstance().currentUser;
     if (!user || user.isAnonymous) return null;
-    var userId = normalizePatracUserId(
-        typeof localStorage !== 'undefined' ? localStorage.getItem('patrac_session') : ''
-    );
+    var userId = normalizePatracUserId(preferredUserId || '') ||
+        normalizePatracUserId(
+            typeof localStorage !== 'undefined' ? localStorage.getItem('patrac_session') : ''
+        );
     if (!userId) return user;
     var ref = doc(getDb(), USERS_COLLECTION, user.uid);
     var snap = await getDoc(ref);
-    var cur = snap.exists() ? (snap.data().patracUserId || '') : '';
-    if (cur === userId) return user;
+    var cur = snap.exists() ? normalizePatracUserId((snap.data() || {}).patracUserId || '') : '';
+    if (cur === userId && snap.exists()) return user;
     await setDoc(ref, {
         patracUserId: userId,
         updatedAt: Date.now()

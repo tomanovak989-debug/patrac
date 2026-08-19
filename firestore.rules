@@ -113,27 +113,25 @@ service cloud.firestore {
 
     match /radio_channels/{channelId}/messages/{msgId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && patracUserId() != '';
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
     match /radio_freq/{freqId}/messages/{msgId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && patracUserId() != '';
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
     match /radio_feed/{msgId} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn() && patracUserId() != '';
+      allow create: if isSignedIn();
       allow update, delete: if false;
     }
 
-    /* Globální SOS maják — čte/píše každý přihlášený hráč (i mimo komunitu). */
+    /* Globální SOS maják — stačí Firebase Auth (bez users.patracUserId). */
     match /radio_beacons/{beaconId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && patracUserId() != '';
-      allow delete: if isSignedIn() && patracUserId() != '';
+      allow read, create, update, delete: if isSignedIn();
     }
 
     match /entries/{entryId} {

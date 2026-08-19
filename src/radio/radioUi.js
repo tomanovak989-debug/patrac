@@ -1614,7 +1614,7 @@ function stopBeaconRepeatTimer() {
 }
 
 async function transmitBeaconPulse(skipTxFx) {
-    if (!beaconActive || !beaconActive.active) return;
+    if (!beaconActive || !beaconActive.active) return { liveOk: true, smsOk: true, errors: [] };
     var c = getCtx();
     var pos = getBeaconLatLng();
     if (pos && isFinite(pos.lat) && isFinite(pos.lng)) {
@@ -1624,10 +1624,14 @@ async function transmitBeaconPulse(skipTxFx) {
     beaconActive.comCode = c.comCode || '';
     beaconActive.frequency = BEACON_SOS_FREQUENCY;
     notifyBeaconMap(false);
+    var errors = [];
+    var liveOk = true;
     try {
         await upsertRadioBeaconLive(beaconActive);
     } catch (err) {
+        liveOk = false;
         console.warn('[beacon] live pulse', err);
+        errors.push('LIVE: ' + ((err && err.message) ? err.message : 'permissions'));
     }
     var pulseText = String(beaconActive.text || '').trim() || 'BEACON';
     var basePayload = buildBeaconPayload(Object.assign({}, beaconActive, { text: pulseText }), {
@@ -1641,26 +1645,34 @@ async function transmitBeaconPulse(skipTxFx) {
             comCode: c.comCode || '',
             tunedFrequency: state.frequency || ''
         });
-    var sends = [];
+    var smsOk = true;
     var i;
     for (i = 0; i < freqs.length; i++) {
-        sends.push(transmitMessage(pulseText, Object.assign({}, basePayload, {
-            frequency: freqs[i],
-            encryptionKey: '',
-            messageType: 'beacon',
-            originLat: beaconActive.lat,
-            originLng: beaconActive.lng,
-            skipNotebook: i > 0 || !!skipTxFx,
-            skipTxFx: true,
-            pttAudio: i === 0 ? (beaconActive.pttAudio || '') : '',
-            pttMime: i === 0 ? (beaconActive.pttMime || '') : ''
-        })).catch(function(err) {
+        try {
+            await transmitMessage(pulseText, Object.assign({}, basePayload, {
+                frequency: freqs[i],
+                encryptionKey: '',
+                messageType: 'beacon',
+                originLat: beaconActive.lat,
+                originLng: beaconActive.lng,
+                skipNotebook: i > 0 || !!skipTxFx,
+                skipTxFx: true,
+                isBeaconRepeat: !!skipTxFx,
+                reportSendError: !skipTxFx && i === 0,
+                pttAudio: i === 0 ? (beaconActive.pttAudio || '') : '',
+                pttMime: i === 0 ? (beaconActive.pttMime || '') : ''
+            }));
+        } catch (err) {
+            smsOk = false;
             console.warn('[beacon] pulse freq', freqs[i], err);
-        }));
+            if (!skipTxFx && i === 0) {
+                errors.push('SMS ' + freqs[i] + ': ' + ((err && err.message) ? err.message : 'fail'));
+            }
+        }
     }
-    await Promise.all(sends);
     saveLocalBeacon(c.comCode || '', beaconActive);
     notifyBeaconMap(false);
+    return { liveOk: liveOk, smsOk: smsOk, errors: errors };
 }
 
 function startBeaconRepeatTimer() {
@@ -1715,15 +1727,31 @@ async function startBeacon(opts) {
         await upsertRadioBeaconLive(beaconActive);
     } catch (err) {
         console.warn('[beacon] live start', err);
-        alert('Beacon běží lokálně. Cloud zápis selhal: ' +
-            ((err && err.message) ? err.message : 'permissions') +
-            '\nZkus odhlášení/přihlášení. Druhý telefon zatím spoléhá na SMS puls.');
+        window._patracBeaconLiveErr = (err && err.message) ? err.message : 'permissions';
     }
     startBeaconRepeatTimer();
     refreshSubscriptions();
-    transmitBeaconPulse(false).catch(function(err) {
+    var pulseResult = null;
+    try {
+        pulseResult = await transmitBeaconPulse(false);
+    } catch (err) {
         console.warn('[beacon] pulse start', err);
-    });
+        pulseResult = { liveOk: false, smsOk: false, errors: [String(err && err.message || err)] };
+    }
+    var liveFail = !!(window._patracBeaconLiveErr) || (pulseResult && pulseResult.liveOk === false);
+    var smsFail = pulseResult && pulseResult.smsOk === false;
+    if (liveFail || smsFail) {
+        var parts = [];
+        if (window._patracBeaconLiveErr) parts.push('LIVE: ' + window._patracBeaconLiveErr);
+        if (pulseResult && pulseResult.errors && pulseResult.errors.length) {
+            parts = parts.concat(pulseResult.errors);
+        } else if (smsFail) {
+            parts.push('SMS puls selhal (permissions / Auth).');
+        }
+        alert('Beacon běží lokálně, cloud neprošel:\n' + parts.join('\n') +
+            '\n\nNutné: Firebase Console → Firestore → Rules → Publish (rules z repa).');
+    }
+    window._patracBeaconLiveErr = '';
     notifyBeaconMap(true);
     renderDisplay();
 }
@@ -2935,9 +2963,12 @@ async function transmitMessage(text, extras) {
         }
     } catch (err) {
         console.warn('[radioUi] send', err);
-        if (!extras.isBeaconRepeat && !extras.skipTxFx) {
+        if (extras.reportSendError || (!extras.isBeaconRepeat && !extras.skipTxFx)) {
             var msg = (err && err.message) ? String(err.message) : 'Neznámá chyba';
+            if (extras.reportSendError) throw err;
             alert('Vysílání selhalo: ' + msg + '\n(Přihlas se znovu — Firebase Auth.)');
+        } else if (extras.messageType === 'beacon' && !extras.isBeaconRepeat) {
+            throw err;
         }
     }
 }

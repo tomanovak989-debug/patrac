@@ -33,7 +33,12 @@ async function ensureRadioAuth(requirePatrac) {
 }
 
 export async function sendRadioTransmission(payload) {
-    await ensureRadioAuth(true);
+    var authUser = await ensureRadioAuth(true);
+    try {
+        await ensurePatracUserDoc(authUser, payload && payload.senderId);
+    } catch (eDoc) {
+        console.warn('[radioService] ensurePatracUserDoc before TX', eDoc);
+    }
     var freq = normalizeFrequency(payload && payload.frequency);
     var channelId = (payload && payload.channelId) || frequencyChannelId(freq);
     if (!freq || !channelId) {
@@ -309,10 +314,17 @@ function beaconLiveId(senderId) {
 
 async function resolveBeaconSenderId(preferred) {
     var authUser = await ensureRadioAuth(true);
-    try { await ensurePatracUserDoc(authUser); } catch (e0) {}
+    if (!authUser || authUser.isAnonymous) {
+        throw new Error('Nejsi přihlášen ve Firebase Auth (anonymní účet). Odhlás se a přihlas znovu.');
+    }
     var fromSession = beaconLiveId(preferred);
     if (!fromSession && typeof localStorage !== 'undefined') {
         fromSession = beaconLiveId(localStorage.getItem('patrac_session'));
+    }
+    try {
+        await ensurePatracUserDoc(authUser, fromSession);
+    } catch (e0) {
+        console.warn('[radioService] ensurePatracUserDoc', e0);
     }
     var fromUsers = '';
     try {
@@ -327,9 +339,8 @@ async function resolveBeaconSenderId(preferred) {
     }
     var id = fromUsers || fromSession;
     if (!id) {
-        throw new Error('Chybí patracUserId ve users/{uid} — odhlás se a přihlas znovu.');
+        throw new Error('Chybí patracUserId — odhlás se a přihlas znovu.');
     }
-    /* Sjednoť users.patracUserId s ID beacon dokumentu (malá písmena). */
     if (authUser && authUser.uid && fromUsers !== id) {
         try {
             await setDoc(doc(getDb(), 'users', authUser.uid), {
@@ -370,7 +381,19 @@ export async function upsertRadioBeaconLive(beacon) {
     try { authUser = await ensureRadioAuth(true); } catch (e0) {}
 
     /* Primární: globální kolekce — vidí všichni přihlášení (i jiné komunity). */
-    await setDoc(doc(getDb(), 'radio_beacons', id), live, { merge: true });
+    try {
+        await setDoc(doc(getDb(), 'radio_beacons', id), live, { merge: true });
+    } catch (err) {
+        var code = err && err.code ? String(err.code) : '';
+        var msg = err && err.message ? String(err.message) : 'permissions';
+        if (code.indexOf('permission') >= 0 || /insufficient|permission/i.test(msg)) {
+            throw new Error(
+                'Missing or insufficient permissions na radio_beacons. ' +
+                'V Firebase Console → Firestore → Rules musí být publikovaná pravidla s match /radio_beacons (stačí isSignedIn).'
+            );
+        }
+        throw err;
+    }
 
     /* Volitelně i players (vlastní profil) — neblokuje cross-community. */
     try {
