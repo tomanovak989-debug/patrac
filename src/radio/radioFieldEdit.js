@@ -101,9 +101,9 @@ export function finalizeT9Session(session) {
     if (!session) return;
     clearT9Timer(session);
     if (session.t9Key) {
-        session.cursor = Math.min(session.cursor + 1, textMaxLen(session));
         session.t9Key = null;
         session.t9Index = 0;
+        session.cursor = normalizeTextValue(session.text).length;
     }
 }
 
@@ -178,6 +178,7 @@ function applyLetterCase(ch) {
 }
 
 function toggleLastLetterCase(session) {
+    finalizeT9Session(session);
     var text = normalizeTextValue(session.text);
     if (!text.length) return false;
     var pos = session.cursor > 0 ? session.cursor - 1 : text.length - 1;
@@ -185,7 +186,7 @@ function toggleLastLetterCase(session) {
     if (!/[a-zA-Z]/.test(ch)) return false;
     var toggled = ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
     session.text = text.slice(0, pos) + toggled + text.slice(pos + 1);
-    session.cursor = Math.max(session.cursor, pos + 1);
+    session.cursor = pos + 1;
     return true;
 }
 
@@ -279,22 +280,34 @@ function buildTextHtml(session) {
     var maxLen = textMaxLen(session);
     var html = '';
     var i;
-    if (!text.length && session.digitMode) {
-        return digitSpan('_', true, true);
+    if (!session.digitMode) {
+        for (i = 0; i < text.length; i++) html += charSpan(text.charAt(i));
+        return html;
     }
+    if (!text.length) return cursorSpan();
     for (i = 0; i < text.length; i++) {
-        html += digitSpan(text.charAt(i), session.digitMode && session.cursor === i, true);
+        if (session.cursor === i) html += cursorSpan();
+        html += charSpan(text.charAt(i));
     }
-    if (session.digitMode && session.cursor >= text.length && text.length < maxLen) {
-        html += digitSpan('_', true, true);
-    }
+    if (session.cursor >= text.length && text.length < maxLen) html += cursorSpan();
     return html;
 }
 
-function digitSpan(ch, active, underline) {
+function cursorSpan() {
+    return '<span class="radio-edit-cursor-mark">_</span>';
+}
+
+function charSpan(ch) {
     var cls = 'radio-edit-char';
-    if (active && underline) cls += ' radio-edit-cursor';
-    else if (active) cls += ' radio-edit-blink';
+    if (ch === ' ') cls += ' radio-edit-space';
+    var shown = ch === ' ' ? ' ' : escapeHtml(ch);
+    return '<span class="' + cls + '">' + shown + '</span>';
+}
+
+function digitSpan(ch, active, underline) {
+    if (active && underline) return cursorSpan();
+    var cls = 'radio-edit-char';
+    if (active) cls += ' radio-edit-blink';
     return '<span class="' + cls + '">' + escapeHtml(ch) + '</span>';
 }
 
@@ -403,8 +416,8 @@ export function handleFieldEditInput(session, action, char, opts) {
                 session.cursor = Math.min(session.cursor, text.length);
             }
             if (char === '0') {
-                finalizeT9Session(session);
                 if (opts.longPress) {
+                    finalizeT9Session(session);
                     insertTextChar(session, '0');
                     return true;
                 }
@@ -426,13 +439,18 @@ export function handleFieldEditInput(session, action, char, opts) {
 }
 
 function deleteTextChar(session) {
-    finalizeT9Session(session);
+    clearT9Timer(session);
+    if (session.t9Key) {
+        session.t9Key = null;
+        session.t9Index = 0;
+    }
     var text = normalizeTextValue(session.text);
     if (!text.length) return false;
     var pos = session.cursor;
     if (pos <= 0) return false;
-    session.text = text.slice(0, pos - 1) + text.slice(pos);
-    session.cursor = pos - 1;
+    var deleteAt = pos - 1;
+    session.text = text.slice(0, deleteAt) + text.slice(pos);
+    session.cursor = deleteAt;
     return true;
 }
 

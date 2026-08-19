@@ -1733,6 +1733,15 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     min-width: 0.55em;
     text-align: center;
 }
+.sector-tech-screen.is-field-edit .radio-edit-space {
+    min-width: 0.22em;
+}
+.sector-tech-screen.is-field-edit .radio-edit-cursor-mark {
+    display: inline-block;
+    min-width: 0;
+    padding: 0;
+    animation: radio-edit-blink 0.75s step-end infinite;
+}
 .sector-tech-screen.is-field-edit .radio-edit-cursor {
     text-decoration: underline;
     text-decoration-thickness: 2px;

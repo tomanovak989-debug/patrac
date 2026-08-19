@@ -195,6 +195,7 @@ var receptionElev = {
 var radioOs = createRadioOsState();
 var fieldEditSession = null;
 var fieldEditKeyLongFired = false;
+var fieldEditPunctFired = false;
 var clrLongFired = false;
 var clrLongTimer = null;
 var presetEditDraft = null;
@@ -2930,6 +2931,7 @@ function bindRadioKeyT9() {
         if (key === '*' || key === '#') {
             e.preventDefault();
             e.stopPropagation();
+            fieldEditPunctFired = true;
             handleFieldEditAction('char', key);
         }
         clearHold();
@@ -3145,6 +3147,11 @@ function bindKeypad() {
                     if (/^[0-9]$/.test(editKey) || editKey === '*' || editKey === '#') {
                         e.preventDefault();
                         e.stopPropagation();
+                        if (fieldEditPunctFired) {
+                            fieldEditPunctFired = false;
+                            fieldEditKeyLongFired = false;
+                            return;
+                        }
                         if (!fieldEditKeyLongFired) {
                             handleFieldEditAction('char', editKey);
                         }
