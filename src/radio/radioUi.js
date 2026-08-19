@@ -1533,6 +1533,7 @@ function handleAutoscanClose() {
 }
 
 function refreshBeaconActiveFromStorage() {
+    if (beaconActive && beaconActive.active) return beaconActive;
     var c = getCtx();
     beaconActive = loadLocalBeacon(c.comCode || '');
     return beaconActive;
@@ -1616,6 +1617,7 @@ async function transmitBeaconPulse(skipTxFx) {
     }
     await Promise.all(sends);
     saveLocalBeacon(c.comCode || '', beaconActive);
+    notifyBeaconMap(false);
 }
 
 function startBeaconRepeatTimer() {
@@ -1676,6 +1678,7 @@ async function startBeacon(opts) {
     });
     startBeaconRepeatTimer();
     notifyBeaconMap(true);
+    setTimeout(function() { notifyBeaconMap(true); }, 250);
     renderDisplay();
 }
 
@@ -2665,7 +2668,7 @@ function applyLiveBeaconsFromCloud(docs) {
         var oldSid = String(oldKey).split('_')[0];
         if (oldSid && !seenSenders[oldSid]) delete beaconInboxNoted[oldKey];
     }
-    notifyBeaconMap(incoming.length > 0);
+    notifyBeaconMap(!!(incoming.length || (beaconActive && beaconActive.active)));
     renderDisplay();
 }
 

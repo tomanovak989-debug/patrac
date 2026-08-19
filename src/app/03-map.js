@@ -2074,6 +2074,9 @@ function setMapToolsVisible(show) {
         if (map) setTimeout(function() {
             map.invalidateSize();
             ensureMapTouchPan();
+            if (typeof window.patracRefreshBeaconMap === 'function') {
+                window.patracRefreshBeaconMap(true);
+            }
         }, 150);
     } else {
         resetMapBearingRotation();

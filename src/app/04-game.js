@@ -3018,6 +3018,9 @@ function switchMainTab(tab, element) {
                 refreshMapLayerStack();
                 reloadAllMapPoints();
                 if (!userMarker) startGeolocation();
+                if (typeof window.patracRefreshBeaconMap === 'function') {
+                    window.patracRefreshBeaconMap(true);
+                }
             }
         }, 150);
     } else {

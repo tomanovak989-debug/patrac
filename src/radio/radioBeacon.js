@@ -196,7 +196,8 @@ export function getMapBeacons(comCode, localBeacon) {
             lng: localBeacon.lng,
             frequency: localBeacon.frequency,
             label: localBeacon.label || 'Můj beacon',
-            active: true
+            active: true,
+            isLocal: true
         });
     }
     for (var id in _remote) {

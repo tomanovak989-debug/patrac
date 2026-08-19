@@ -993,11 +993,46 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 .data-admin-check { cursor: pointer; }
 
-.map-beacon-marker-wrap { background: transparent; border: none; }
-.map-beacon-marker {
-    font-size: 22px; line-height: 1; text-align: center;
-    filter: drop-shadow(0 0 6px rgba(255, 136, 0, 0.9));
-    transition: opacity 0.15s ease;
+.map-beacon-marker-wrap {
+    background: transparent !important;
+    border: none !important;
+}
+.map-beacon-pin {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    pointer-events: none;
+}
+.map-beacon-emoji {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 4px;
+    text-align: center;
+    font-size: 28px;
+    line-height: 1;
+    filter: drop-shadow(0 0 8px rgba(255, 154, 26, 1));
+}
+.map-beacon-radar {
+    position: absolute;
+    left: 50%;
+    top: 48px;
+    width: 18px;
+    height: 18px;
+    margin: -9px 0 0 -9px;
+    border: 2px solid rgba(255, 154, 26, 0.95);
+    border-radius: 50%;
+    animation: map-beacon-radar-pulse 1.5s ease-out infinite;
+}
+.map-beacon-radar-delay {
+    animation-delay: 0.75s;
+}
+.map-beacon-pin.is-local .map-beacon-radar {
+    border-color: rgba(255, 210, 70, 0.95);
+}
+@keyframes map-beacon-radar-pulse {
+    0% { transform: scale(0.35); opacity: 0.95; }
+    100% { transform: scale(3.4); opacity: 0; }
 }
 .bottom-action-bar .action-tab { font-size: var(--text-xxs); padding: 0 4px; letter-spacing: 0.02em; }
 #btn-center-shelter { display: none; }
