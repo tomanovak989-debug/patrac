@@ -22,7 +22,7 @@ function addFreq(set, list, value) {
     list.push(f);
 }
 
-/** Frekvence pro SMS beacon — priorita: komunita, naladěný kanál, mřížka 5 MHz. */
+/** Frekvence pro SMS beacon — komunita, naladěný kanál, nouzový + kraj pásma. */
 export function beaconBroadcastFrequencies(opts) {
     opts = opts || {};
     var set = {};
@@ -34,10 +34,6 @@ export function beaconBroadcastFrequencies(opts) {
     if (opts.extras && opts.extras.length) {
         var i;
         for (i = 0; i < opts.extras.length; i++) addFreq(set, list, opts.extras[i]);
-    }
-    var mhz;
-    for (mhz = BAND_MIN_MHZ; mhz <= BAND_MAX_MHZ + 0.001; mhz += 5) {
-        addFreq(set, list, mhz);
     }
     return list;
 }
@@ -107,27 +103,82 @@ export function clearLocalBeacon(comCode) {
     try { localStorage.removeItem(storageKey(comCode)); } catch (e) {}
 }
 
+export function beaconLiveDocId(userId) {
+    var id = String(userId || '').trim().replace(/[\/#\[\]]/g, '_');
+    return id ? id.slice(0, 120) : '';
+}
+
+export function liveBeaconToPayload(docId, data) {
+    if (!data) return null;
+    var lat = data.lat != null ? data.lat : data.originLat;
+    var lng = data.lng != null ? data.lng : data.originLng;
+    return {
+        id: 'beaconlive_' + (docId || data.senderId || ''),
+        senderId: data.senderId || docId || '',
+        senderName: data.senderName || data.label || 'Beacon',
+        messageType: 'beacon',
+        originLat: lat,
+        originLng: lng,
+        frequency: data.frequency,
+        encryptionKey: '',
+        text: data.text || 'BEACON',
+        pttAudio: data.pttAudio || '',
+        pttMime: data.pttMime || '',
+        timestamp: data.updatedAt || data.startedAt || Date.now(),
+        startedAt: data.startedAt || 0,
+        live: true
+    };
+}
+
+export function applyLiveBeaconSnapshot(docs, mySenderId) {
+    var next = {};
+    var incoming = [];
+    var i;
+    mySenderId = String(mySenderId || '').trim().toLowerCase();
+    for (i = 0; i < (docs || []).length; i++) {
+        var row = docs[i];
+        if (!row) continue;
+        var payload = row.payload || liveBeaconToPayload(row.id, row.data);
+        if (!payload) continue;
+        var sid = String(payload.senderId || '').trim().toLowerCase();
+        if (mySenderId && sid && sid === mySenderId) continue;
+        if (!registerRemoteBeacon(payload)) continue;
+        var rid = payload.senderId || payload.id;
+        next[rid] = true;
+        incoming.push(payload);
+    }
+    for (var id in _remote) {
+        if (!Object.prototype.hasOwnProperty.call(_remote, id)) continue;
+        if (!next[id]) delete _remote[id];
+    }
+    return incoming;
+}
+
 export function registerRemoteBeacon(payload) {
     if (!payload || payload.messageType !== 'beacon') return false;
-    if (payload.originLat == null || payload.originLng == null) return false;
-    if (!isFinite(Number(payload.originLat)) || !isFinite(Number(payload.originLng))) return false;
+    var lat = payload.originLat != null ? payload.originLat : payload.lat;
+    var lng = payload.originLng != null ? payload.originLng : payload.lng;
+    if (lat == null || lng == null) return false;
+    if (!isFinite(Number(lat)) || !isFinite(Number(lng))) return false;
     var id = payload.senderId || payload.id || ('beacon_' + payload.timestamp);
     _remote[id] = {
         id: id,
-        lat: Number(payload.originLat),
-        lng: Number(payload.originLng),
+        lat: Number(lat),
+        lng: Number(lng),
         frequency: normalizeFrequency(payload.frequency),
         encryptionKey: normalizeEncryptionKey(payload.encryptionKey || ''),
-        label: payload.senderName || 'Beacon',
+        label: payload.senderName || payload.label || 'Beacon',
         messageType: payload.messageType,
-        updatedAt: payload.timestamp || Date.now(),
+        updatedAt: Date.now(),
+        startedAt: payload.startedAt || payload.timestamp || Date.now(),
+        text: payload.text || '',
         active: true
     };
     return true;
 }
 
 export function pruneRemoteBeacons(maxAgeMs) {
-    maxAgeMs = maxAgeMs || BEACON_REPEAT_MS * 3;
+    maxAgeMs = maxAgeMs || BEACON_REPEAT_MS * 6;
     var now = Date.now();
     for (var id in _remote) {
         if (!Object.prototype.hasOwnProperty.call(_remote, id)) continue;

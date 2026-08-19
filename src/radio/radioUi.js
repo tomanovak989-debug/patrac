@@ -48,7 +48,7 @@ import {
     deleteNoteById,
     countUnreadInbox
 } from './radioComms.js';
-import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, getRadioListenStatus } from './radioService.js';
+import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, getRadioListenStatus, upsertRadioBeaconLive, clearRadioBeaconLive, subscribeRadioBeaconsLive } from './radioService.js';
 import { getFirebaseAuth } from '../lib/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -107,6 +107,7 @@ import {
     saveLocalBeacon,
     clearLocalBeacon,
     registerRemoteBeacon,
+    applyLiveBeaconSnapshot,
     getMapBeacons,
     getFocusedBeaconAction,
     clampBeaconFocus,
@@ -205,6 +206,7 @@ var beaconSession = null;
 var beaconActive = null;
 var beaconRepeatTimer = null;
 var beaconPttPending = false;
+var beaconInboxNoted = {};
 var commsSession = null;
 var standbyUi = createStandbyUiState();
 var pttSession = createPttSession();
@@ -1584,25 +1586,33 @@ async function transmitBeaconPulse(skipTxFx) {
         beaconActive.lat = pos.lat;
         beaconActive.lng = pos.lng;
     }
-    var basePayload = buildBeaconPayload(beaconActive, { skipTxFx: !!skipTxFx, isBeaconRepeat: !!skipTxFx });
+    beaconActive.comCode = c.comCode || '';
+    await upsertRadioBeaconLive(beaconActive);
+    var pulseText = String(beaconActive.text || '').trim() || 'BEACON';
+    var basePayload = buildBeaconPayload(Object.assign({}, beaconActive, { text: pulseText }), {
+        skipTxFx: !!skipTxFx,
+        isBeaconRepeat: !!skipTxFx
+    });
     var freqs = beaconActive.messageType === 'ptt'
         ? [nextBeaconBroadcastFrequency(beaconActive)]
         : beaconBroadcastFrequencies({
             comCode: c.comCode || '',
             tunedFrequency: state.frequency || '',
             extras: beaconActive.frequency ? [beaconActive.frequency] : []
-        });
+        }).slice(0, 4);
     var sends = [];
     var i;
     for (i = 0; i < freqs.length; i++) {
-        sends.push(transmitMessage(beaconActive.text, Object.assign({}, basePayload, {
+        sends.push(transmitMessage(pulseText, Object.assign({}, basePayload, {
             frequency: freqs[i],
             encryptionKey: '',
             originLat: beaconActive.lat,
             originLng: beaconActive.lng,
-            skipNotebook: !!skipTxFx || i > 0,
-            skipTxFx: skipTxFx || i > 0
-        })));
+            skipNotebook: true,
+            skipTxFx: true
+        })).catch(function(err) {
+            console.warn('[beacon] pulse freq', err);
+        }));
     }
     await Promise.all(sends);
     saveLocalBeacon(c.comCode || '', beaconActive);
@@ -1619,7 +1629,15 @@ function startBeaconRepeatTimer() {
 
 async function startBeacon(opts) {
     opts = opts || {};
+    if (ctx.isLocalOnly && ctx.isLocalOnly()) {
+        alert('Beacon nejde v offline režimu operátora. Přihlas se jako hráč.');
+        return;
+    }
     var c = getCtx();
+    if (!c.userId) {
+        alert('Beacon potřebuje přihlášení. Obnov stránku a přihlas se.');
+        return;
+    }
     var pos = getBeaconLatLng();
     if (!pos || !isFinite(pos.lat) || !isFinite(pos.lng)) {
         alert('Beacon potřebuje GPS (NOSIČ). Zapni polohu v prohlížeči a počkej na fix.');
@@ -1632,19 +1650,29 @@ async function startBeacon(opts) {
         frequency: normalizeFrequency(state.frequency) || normalizeFrequency(BAND_MIN_MHZ),
         encryptionKey: '',
         messageType: opts.messageType || 'sms',
-        text: opts.text || '',
+        text: String(opts.text || '').trim() || 'BEACON',
         pttAudio: opts.pttAudio || '',
         pttMime: opts.pttMime || '',
         label: c.playerName || 'Beacon',
         senderId: c.userId || '',
+        comCode: c.comCode || '',
         bandIndex: 0,
         startedAt: Date.now()
     };
     saveLocalBeacon(c.comCode || '', beaconActive);
+    try {
+        await upsertRadioBeaconLive(beaconActive);
+    } catch (err) {
+        console.warn('[beacon] live start', err);
+        beaconActive = null;
+        clearLocalBeacon(c.comCode || '');
+        alert('Beacon TX selhal: ' + ((err && err.message) ? err.message : 'zkontroluj přihlášení'));
+        renderDisplay();
+        return;
+    }
     refreshSubscriptions();
-    await transmitBeaconPulse(false).catch(function(err) {
-        console.warn('[beacon] start', err);
-        alert('Beacon TX selhal: ' + ((err && err.message) ? err.message : 'zkontroluj přihlášení a GPS'));
+    transmitBeaconPulse(false).catch(function(err) {
+        console.warn('[beacon] pulse start', err);
     });
     startBeaconRepeatTimer();
     notifyBeaconMap(true);
@@ -1654,6 +1682,12 @@ async function startBeacon(opts) {
 function stopBeacon() {
     stopBeaconRepeatTimer();
     var c = getCtx();
+    var senderId = (beaconActive && beaconActive.senderId) || (c && c.userId) || '';
+    if (senderId) {
+        clearRadioBeaconLive(senderId).catch(function(err) {
+            console.warn('[beacon] live stop', err);
+        });
+    }
     clearLocalBeacon(c.comCode || '');
     beaconActive = null;
     refreshSubscriptions();
@@ -2606,6 +2640,35 @@ function ingestIncomingPayload(payload) {
     seenMessageIds[payload.id] = true;
 }
 
+function applyLiveBeaconsFromCloud(docs) {
+    var c = getCtx();
+    var incoming = applyLiveBeaconSnapshot(docs, c.userId);
+    var seenSenders = {};
+    var i;
+    for (i = 0; i < incoming.length; i++) {
+        var payload = incoming[i];
+        var sid = String(payload.senderId || payload.id || '');
+        seenSenders[sid] = true;
+        var noteKey = sid + '_' + String(payload.startedAt || '');
+        if (!beaconInboxNoted[noteKey]) {
+            beaconInboxNoted[noteKey] = true;
+            var beaconEntry = createIncomingEntry(Object.assign({}, payload, {
+                id: 'beaconlive_' + noteKey,
+                text: '[BEACON] ' + String(payload.text || 'BEACON').slice(0, 72)
+            }), c);
+            recordEntry(beaconEntry);
+            radioIncomingFeedback(SIGNAL_WEAK);
+        }
+    }
+    for (var oldKey in beaconInboxNoted) {
+        if (!Object.prototype.hasOwnProperty.call(beaconInboxNoted, oldKey)) continue;
+        var oldSid = String(oldKey).split('_')[0];
+        if (oldSid && !seenSenders[oldSid]) delete beaconInboxNoted[oldKey];
+    }
+    notifyBeaconMap(incoming.length > 0);
+    renderDisplay();
+}
+
 function ingestIncomingBeacon(payload, c) {
     var registered = registerRemoteBeacon(payload);
     if (registered) notifyBeaconMap(true);
@@ -2701,7 +2764,7 @@ function bindRadioAuthRefresh() {
     if (radioAuthUnsub) return;
     try {
         radioAuthUnsub = onAuthStateChanged(getFirebaseAuth(), function(user) {
-            if (!state || !user || user.isAnonymous) return;
+            if (!state) return;
             refreshSubscriptions();
         });
     } catch (e) {
@@ -2747,9 +2810,14 @@ function refreshSubscriptions() {
         frequencies: collectListenFrequencies(),
         backfillRecentMs: 45000
     }).then(function() {
+        return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud);
+    }).then(function() {
         renderDisplay();
     }).catch(function(err) {
         console.warn('[radioUi] radio listen subscribe', err);
+        subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud).catch(function(e2) {
+            console.warn('[radioUi] beacon live subscribe', e2);
+        });
         renderDisplay();
     });
 }

@@ -2,9 +2,9 @@
  * Rádiové zprávy ve Firestore — kanál = frekvence (freq-first).
  * Cesta: radio_freq/{f_400025}/messages/{msgId}
  */
-import { collection, collectionGroup, addDoc, setDoc, doc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import { collection, collectionGroup, addDoc, setDoc, deleteDoc, doc, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import { getDb } from '../lib/firebase.js';
-import { ensurePatracAuth, ensurePatracUserDoc } from '../services/authService.js';
+import { ensurePatracAuth, ensurePatracUserDoc, normalizePatracUserId } from '../services/authService.js';
 import { ensureFirebaseAuth } from '../lib/firebase.js';
 import { frequencyChannelId, normalizeFrequency } from './radioBand.js';
 
@@ -300,4 +300,71 @@ export async function subscribeRadioListen(onMessage, opts) {
     } else {
         setRadioListenStatus('error', 'žádný kanál');
     }
+}
+
+function beaconLiveId(senderId) {
+    var id = normalizePatracUserId(senderId);
+    return id ? id.slice(0, 120) : '';
+}
+
+export async function upsertRadioBeaconLive(beacon) {
+    await ensureRadioAuth(true);
+    var id = beaconLiveId(beacon && beacon.senderId);
+    if (!id) throw new Error('Beacon vyžaduje přihlášení (chybí user id).');
+    if (beacon.lat == null || beacon.lng == null ||
+        !isFinite(Number(beacon.lat)) || !isFinite(Number(beacon.lng))) {
+        throw new Error('Beacon potřebuje GPS.');
+    }
+    var payload = {
+        senderId: id,
+        senderName: String(beacon.label || beacon.senderName || 'Beacon'),
+        lat: Number(beacon.lat),
+        lng: Number(beacon.lng),
+        originLat: Number(beacon.lat),
+        originLng: Number(beacon.lng),
+        frequency: normalizeFrequency(beacon.frequency) || '',
+        text: String(beacon.text || 'BEACON').slice(0, 80),
+        messageType: 'beacon',
+        pttAudio: beacon.pttAudio || '',
+        pttMime: beacon.pttMime || '',
+        active: true,
+        startedAt: beacon.startedAt || Date.now(),
+        updatedAt: Date.now(),
+        comCode: beacon.comCode || ''
+    };
+    await setDoc(doc(getDb(), 'radio_beacons', id), payload);
+    return { id: id, ...payload };
+}
+
+export async function clearRadioBeaconLive(senderId) {
+    await ensureRadioAuth(true);
+    var id = beaconLiveId(senderId);
+    if (!id) return;
+    try {
+        await deleteDoc(doc(getDb(), 'radio_beacons', id));
+    } catch (err) {
+        console.warn('[radioService] clear beacon live', err);
+    }
+}
+
+export function subscribeRadioBeaconsLive(onSnapshotAll) {
+    if (channelUnsubs.__beacons_live__) {
+        try { channelUnsubs.__beacons_live__(); } catch (e) {}
+        delete channelUnsubs.__beacons_live__;
+    }
+    if (!onSnapshotAll) return Promise.resolve();
+    return ensureRadioAuth(false).then(function() {
+        var col = collection(getDb(), 'radio_beacons');
+        channelUnsubs.__beacons_live__ = onSnapshot(col, function(snap) {
+            var docs = [];
+            snap.forEach(function(docSnap) {
+                var data = docSnap.data() || {};
+                if (data.active === false) return;
+                docs.push({ id: docSnap.id, data: data });
+            });
+            onSnapshotAll(docs);
+        }, function(err) {
+            console.warn('[radioService] radio_beacons subscribe', err);
+        });
+    });
 }
