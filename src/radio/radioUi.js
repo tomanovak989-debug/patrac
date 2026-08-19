@@ -154,9 +154,7 @@ import {
 } from './radioShortcuts.js';
 import {
     createMenuDialState,
-    appendMenuDialDigit,
     clearMenuDial,
-    menuDialPreview,
     planMenuDialCommit
 } from './radioMenuDial.js';
 import {
@@ -726,6 +724,21 @@ function getBindableShortcutContext() {
     if (leaf === 'autoscan') {
         return bindingFromAutoscan(autoscanSession);
     }
+    if (leaf === 'beacon') {
+        ensureBeaconSession();
+        refreshBeaconActiveFromStorage();
+        var beaconAction = getFocusedBeaconAction(beaconSession, beaconActive);
+        if (beaconAction && beaconAction.id === 'beacon_sms') {
+            return { action: 'beacon:open', label: 'BEACON · SMS' };
+        }
+        if (beaconAction && beaconAction.id === 'beacon_ptt') {
+            return { action: 'beacon:open', label: 'BEACON · PTT' };
+        }
+        if (beaconAction && beaconAction.id === 'beacon_stop') {
+            return { action: 'beacon:open', label: 'BEACON · STOP' };
+        }
+        return { action: 'beacon:open', label: 'BEACON' };
+    }
     return bindingFromMenuItem(getFocusedMenuItem(radioOs, state));
 }
 
@@ -764,7 +777,7 @@ function isQuickKeyId(keyId) {
 function tryExecuteQuickKey(keyId) {
     if (!isQuickKeyId(keyId)) return false;
     if (isFieldEditActive(fieldEditSession)) return false;
-    if (!isStandbyScreen() && !isRadioOsActive(radioOs)) return false;
+    if (!isStandbyScreen()) return false;
     return executeQuickKey(keyId);
 }
 
@@ -928,6 +941,7 @@ function clearMenuDialIfActive() {
 }
 
 function executeQuickKey(keyId) {
+    if (!isStandbyScreen()) return false;
     var binding = getQuickKeyBinding(state, keyId);
     if (!binding || !binding.action) return false;
     clearMenuDial(menuDial);
@@ -1006,38 +1020,50 @@ function executeQuickKey(keyId) {
     return false;
 }
 
-/** Číslice v menu: rychlá volba > okamžitá položka (root) > sekvenční buffer. */
-function handleMenuKeypadDigit(keyId) {
-    if (isCommsMenuContext() && commsSession.screen === COMMS_HUB && /^[1-5]$/.test(keyId)) {
+function handleBeaconDigit(digit) {
+    var session = ensureBeaconSession();
+    refreshBeaconActiveFromStorage();
+    if (session.screen !== BEACON_HUB) return;
+    var items = clampBeaconFocus(session, beaconActive);
+    var idx = parseInt(digit, 10) - 1;
+    if (idx < 0 || idx >= items.length) return;
+    session.focusIndex = idx;
+    renderDisplay();
+}
+
+/** Číslice v menu/submenu — výběr řádku podle čísla. Rychlé volby jen z úvodní obrazovky. */
+function handleMenuDigitNavigation(keyId) {
+    if (!isRadioOsActive(radioOs) || !/^[0-9]$/.test(keyId)) return;
+
+    var leaf = radioOs.menuPath && radioOs.menuPath.length
+        ? radioOs.menuPath[radioOs.menuPath.length - 1]
+        : '';
+
+    if (leaf === 'comms') {
         handleCommsDigit(keyId);
         return;
     }
-
-    if (isQuickKeyId(keyId)) {
-        var binding = getQuickKeyBinding(state, keyId);
-        if (binding && binding.action) {
-            executeQuickKey(keyId);
-            return;
-        }
-    }
-
-    if (isRadioOsActive(radioOs) && /^[0-9]$/.test(keyId) && !isCommsMenuContext()) {
-        if (!radioOs.menuPath || !radioOs.menuPath.length) {
-            var digitResult = executeMenuDigit(radioOs, state, keyId);
-            if (digitResult && digitResult.changed) {
-                clearMenuDial(menuDial);
-                applyRadioOsEffect(digitResult);
-                renderDisplay();
-                return;
-            }
-            appendMenuDialDigit(menuDial, keyId);
-            renderDisplay();
-        }
+    if (leaf === 'beacon') {
+        handleBeaconDigit(keyId);
         return;
     }
 
+    var digitResult = executeMenuDigit(radioOs, state, keyId);
+    if (digitResult && digitResult.changed) {
+        clearMenuDial(menuDial);
+        applyRadioOsEffect(digitResult);
+        renderDisplay();
+    }
+}
+
+function handleMenuKeypadDigit(keyId) {
     if (isStandbyScreen() && isQuickKeyId(keyId)) {
         tryExecuteQuickKey(keyId);
+        return;
+    }
+
+    if (isRadioOsActive(radioOs) && /^[0-9]$/.test(keyId)) {
+        handleMenuDigitNavigation(keyId);
     }
 }
 
@@ -1298,12 +1324,7 @@ function renderDisplay() {
             f.style.color = '';
         }
         setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
-        var dialPreview = menuDialPreview(menuDial);
-        if (dialPreview && buf && !isCommsMenuContext()) buf.textContent = dialPreview;
-        else if (dialPreview && !isCommsMenuContext()) {
-            var bufRow = el('radio-display-buffer');
-            if (bufRow) bufRow.textContent = dialPreview;
-        }
+        if (buf) buf.textContent = '';
         if (ch) {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;

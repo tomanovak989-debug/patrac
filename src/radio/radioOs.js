@@ -24,8 +24,8 @@ var RADIO_MENU = [
 ];
 
 var SETTINGS_MENU = [
-    { id: 'settings_sounds', label: 'ZVUKY', action: 'submenu:sounds' },
-    { id: 'settings_quickkeys', label: 'RYCHLÉ VOLBY', action: 'submenu:quickkeys' }
+    { id: 'settings_sounds', label: '1 · ZVUKY', action: 'submenu:sounds' },
+    { id: 'settings_quickkeys', label: '2 · RYCHLÉ VOLBY', action: 'submenu:quickkeys' }
 ];
 
 var SOUND_FIELDS = ['key', 'ring', 'message'];
@@ -133,7 +133,7 @@ function buildSoundSettingsLines(os, radioState) {
     var i;
     for (i = 0; i < SOUND_FIELDS.length; i++) {
         var field = SOUND_FIELDS[i];
-        lines.push(SOUND_LABELS[field] + '   ' + prefs[field]);
+        lines.push((i + 1) + ' ' + SOUND_LABELS[field] + '   ' + prefs[field]);
     }
     while (lines.length < 6) lines.push('');
     return lines;
@@ -164,9 +164,9 @@ function buildQuickKeysHelpLines(radioState) {
     radioState = radioState || {};
     var keys = radioState.quickKeys || {};
     var lines = [
-        'Podrž P1/P2/1–9',
-        'na položce menu 3 s',
-        '',
+        'Podrž 1–9/P1/P2',
+        'v menu = zkratka',
+        'z úvodní obrazovky',
         '',
         '',
         ''
@@ -194,7 +194,7 @@ export function getFocusedMenuItem(os, radioState) {
     return items[os.focusIndex] || null;
 }
 
-/** @returns {{ changed: boolean, effect?: string, slot?: number }} */
+/** @returns {{ changed: boolean, effect?: string, slot?: number, field?: number }} */
 export function executeMenuDigit(os, radioState, digit) {
     if (!os || !digit) return { changed: false };
     digit = String(digit);
@@ -209,6 +209,40 @@ export function executeMenuDigit(os, radioState, digit) {
         os.presetFieldFocus = 0;
         os.focusIndex = slot - 1;
         return { changed: true, effect: 'preset_detail_open', slot: slot };
+    }
+
+    if (leaf === 'settings') {
+        var settingIdx = parseInt(digit, 10) - 1;
+        if (settingIdx === 0) {
+            os.menuPath.push('sounds');
+            os.soundFieldFocus = 0;
+            os.focusIndex = 0;
+            return { changed: true };
+        }
+        if (settingIdx === 1) {
+            os.menuPath.push('quickkeys');
+            os.focusIndex = 0;
+            return { changed: true };
+        }
+        return { changed: false };
+    }
+
+    if (leaf === 'sounds') {
+        var soundIdx = parseInt(digit, 10) - 1;
+        if (soundIdx >= 0 && soundIdx < SOUND_FIELDS.length) {
+            os.soundFieldFocus = soundIdx;
+            return { changed: true };
+        }
+        return { changed: false };
+    }
+
+    if (leaf === 'detail') {
+        var fieldIdx = parseInt(digit, 10) - 1;
+        if (fieldIdx >= 0 && fieldIdx < 3) {
+            os.presetFieldFocus = fieldIdx;
+            return { changed: true };
+        }
+        return { changed: false };
     }
 
     if (!os.menuPath.length) {
@@ -227,9 +261,9 @@ function buildPresetDetailLines(draft) {
     var freq = draft.frequency || '---.---';
     var key = draft.encryptionKey ? draft.encryptionKey : '—';
     return [
-        'NÁZEV  ' + name,
-        'F       ' + freq,
-        'ŠIFRA   ' + key,
+        '1 NÁZEV  ' + name,
+        '2 F       ' + freq,
+        '3 ŠIFRA   ' + key,
         '',
         '',
         ''
