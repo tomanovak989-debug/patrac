@@ -74,6 +74,13 @@ import {
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
 import { applyDisplayTypography } from './radioHitmap.js';
+import {
+    syncBattery,
+    formatStandbyClockLine,
+    formatBatteryPercent,
+    toggleBatteryCharging,
+    stopBatteryCharging
+} from './radioBattery.js';
 import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback, radioKeypadPttDown, radioKeypadPttUp } from './radioFeedback.js';
 import {
     createRadioOsState,
@@ -202,6 +209,7 @@ var clrLongTimer = null;
 var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
+var batteryTimer = null;
 var beaconSession = null;
 var beaconActive = null;
 var beaconRepeatTimer = null;
@@ -1128,9 +1136,51 @@ function handleFieldEditAction(action, char, opts) {
     return false;
 }
 
+function updateChargeButtonUi() {
+    var btn = el('sector-view-charge');
+    if (!btn || !state) return;
+    var canCharge = state.operatingMode === 'off';
+    btn.classList.toggle('is-active', canCharge && !!state.batteryCharging);
+    btn.classList.toggle('is-disabled', !canCharge);
+    btn.setAttribute('aria-disabled', canCharge ? 'false' : 'true');
+}
+
+function bindChargeControl() {
+    var btn = el('sector-view-charge');
+    if (!btn || btn._radioChargeBound) return;
+    btn._radioChargeBound = true;
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!state || state.operatingMode !== 'off') return;
+        if (toggleBatteryCharging(state)) {
+            persist();
+            renderDisplay();
+        }
+    });
+}
+
+function startBatteryTimer() {
+    if (batteryTimer) return;
+    batteryTimer = setInterval(function() {
+        if (!state) return;
+        syncBattery(state, {
+            operatingMode: state.operatingMode,
+            autoscanActive: isAutoscanListening()
+        });
+        if (state.operatingMode === 'on' || state.batteryCharging) {
+            renderDisplay();
+        }
+    }, 30000);
+}
+
 function renderDisplay() {
     var c = getCtx();
     var screen = el('radio-display-screen');
+    syncBattery(state, {
+        operatingMode: state.operatingMode,
+        autoscanActive: isAutoscanListening()
+    });
     var standbyLines = buildDisplayLines(state, c);
     var scope = classifyChannel(state.frequency, state.encryptionKey, c);
     var opLabel = state.operatingMode === 'off' ? 'OFF' : 'ON';
@@ -1157,6 +1207,7 @@ function renderDisplay() {
         screen.classList.toggle('is-standby', osView.mode === 'standby' || osView.mode === 'standby_tune');
         screen.classList.toggle('is-standby-tune', osView.mode === 'standby_tune' || !!(standbyUi && standbyUi.active));
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
+        screen.classList.toggle('is-charging', osView.mode === 'off' && !!(state && state.batteryCharging));
     }
 
     var f = el('radio-display-freq');
@@ -1230,9 +1281,32 @@ function renderDisplay() {
     }
 
     if (osView.mode === 'off') {
+        if (state.batteryCharging) {
+            if (f) {
+                f.className = 'radio-display-battery-only';
+                f.textContent = formatBatteryPercent(state);
+                f.removeAttribute('title');
+            }
+            if (k) k.textContent = '';
+            if (p) p.textContent = '';
+            if (buf) buf.textContent = '';
+            clearExtraDisplayLines();
+            clearDisplayRowFocus();
+            if (ch) ch.textContent = '';
+            if (sig) sig.textContent = '';
+            if (nodeEl) {
+                nodeEl.textContent = '';
+                nodeEl.style.visibility = 'hidden';
+            }
+            if (footerWrap) footerWrap.textContent = '';
+            updateChargeButtonUi();
+            updateInputForMode();
+            requestAnimationFrame(applyDisplayTypography);
+            return;
+        }
         if (f) {
             f.className = '';
-            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
+            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only');
             f.removeAttribute('data-kind');
             f.removeAttribute('title');
         }
@@ -1246,6 +1320,7 @@ function renderDisplay() {
             nodeEl.style.visibility = 'hidden';
         }
         if (footerWrap) footerWrap.textContent = '';
+        updateChargeButtonUi();
         updateInputForMode();
         return;
     }
@@ -1256,43 +1331,47 @@ function renderDisplay() {
         var freqVal = normalizeFrequency(state.frequency) || '---.---';
         var pt = !normalizeEncryptionKey(state.encryptionKey || '');
         var gpsOk = !!(c.originLat != null && c.originLng != null);
+        var clockLine = formatStandbyClockLine(state);
         if (standbyUi.active) {
             if (f) {
                 f.className = '';
-                f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
+                f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only');
             }
             var tuneLines = [
+                clockLine,
                 freqVal + ' MHz  ' + (pt ? 'PT' : 'CT'),
                 state.encryptionKey ? ('ŠIFRA: ' + maskEncryptionKey(state.encryptionKey)) : 'BEZ ŠIFRY — otevřený kanál',
                 standbyLines.line3,
                 standbyPttActive ? '● PTT NAHRÁVÁM' : '',
-                '',
                 ''
             ];
-            setDisplayMenuLines(tuneLines, standbyUi.focusIndex);
+            setDisplayMenuLines(tuneLines, standbyUi.focusIndex + 1);
             if (ch) ch.textContent = formatDisplayStatus('RUČNÍ LADĚNÍ');
             if (footerWrap) footerWrap.textContent = 'OK edit · Zpět';
             if (sig) sig.textContent = standbyPttActive ? '● TX' : (freqVal ? '● TX/RX' : '○ STBY');
+            updateChargeButtonUi();
             return;
         }
         if (f) {
             f.className = '';
-            f.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
-            f.title = gpsOk
+            f.textContent = clockLine;
+            f.removeAttribute('title');
+            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only');
+        }
+        if (k) {
+            k.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
+            k.title = gpsOk
                 ? 'Frekvence · GPS nosič'
                 : 'Frekvence · GPS nedostupné — zapni polohu v prohlížeči';
-            f.removeAttribute('data-kind');
-            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
         }
-        if (k) k.textContent = standbyLines.line2;
+        if (buf) {
+            if (dialBuffer) buf.textContent = dialBuffer;
+            else buf.textContent = standbyLines.line2;
+        }
         if (p) {
-            if (beaconActive && beaconActive.active) {
-                p.textContent = '● SOS ' + BEACON_SOS_FREQUENCY;
-            } else {
-                p.textContent = standbyLines.line3;
-            }
+            if (beaconActive && beaconActive.active) p.textContent = '● SOS ' + BEACON_SOS_FREQUENCY;
+            else p.textContent = standbyLines.line3;
         }
-        if (buf) buf.textContent = dialBuffer;
         clearExtraDisplayLines();
         clearDisplayRowFocus();
         if (sig) {
@@ -1321,6 +1400,7 @@ function renderDisplay() {
                 foot.textContent = standbyLines.footer + rxHint;
             }
         }
+        updateChargeButtonUi();
     } else {
         var menuLines = osView.lines || ['', '', '', '', '', ''];
         if (f) {
@@ -1349,6 +1429,7 @@ function renderDisplay() {
     }
 
     updateInputForMode();
+    updateChargeButtonUi();
     requestAnimationFrame(applyDisplayTypography);
 }
 
@@ -3450,6 +3531,7 @@ function cycleOperatingMode(direction) {
     var dir = direction < 0 ? -1 : 1;
     idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
     state.operatingMode = RADIO_OPERATING_MODES[idx];
+    if (state.operatingMode === 'on') stopBatteryCharging(state);
     resetRadioOs(radioOs);
     presetEditDraft = null;
     cancelFieldEdit(fieldEditSession);
@@ -3647,6 +3729,12 @@ export function initRadioCommsSystem(options) {
 
     bindKeypad();
     bindRadioAuthRefresh();
+    bindChargeControl();
+    startBatteryTimer();
+    syncBattery(state, {
+        operatingMode: state.operatingMode,
+        autoscanActive: isAutoscanListening()
+    });
     initRadioFeedback(state && state.soundPrefs ? state.soundPrefs : null);
     setRadioSoundPrefs(state && state.soundPrefs ? state.soundPrefs : null);
     resetRadioOs(radioOs);

@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Patrick+Hand&display=swap" rel="stylesheet">
     <link rel="preload" href="src/assets/fonts/roboto-condensed/RobotoCondensed-Regular.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="preload" href="src/assets/fonts/roboto-condensed/RobotoCondensed-Bold.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="stylesheet" href="src/styles/app.css?v=20260723e143" />
+    <link rel="stylesheet" href="src/styles/app.css?v=20260723e144" />
 </head>
 <body class="theme-standard theme-dark">
 
@@ -608,6 +608,7 @@
                 </div>
                 <div class="sector-tech-viewport" id="sector-tech-viewport">
                     <div class="sector-view-controls" id="sector-view-controls" aria-label="Pohled vysílačky">
+                        <button type="button" class="sector-view-btn sector-view-btn--charge" id="sector-view-charge" title="Nabíjení (jen vypnutá vysílačka)" aria-label="Nabíjení">⚡</button>
                         <button type="button" class="sector-view-btn" id="sector-view-plus" title="Displej a klávesnice">+</button>
                         <button type="button" class="sector-view-btn" id="sector-view-minus" title="Celá vysílačka">−</button>
                     </div>
@@ -1017,14 +1018,14 @@
     </script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        window.PATRAC_BUILD = '20260723e143';
+        window.PATRAC_BUILD = '20260723e144';
         window.patracImport = function(modulePath) {
             return import('/src/' + modulePath + '?v=' + window.PATRAC_BUILD);
         };
     </script>
-    <script src="src/app/01-globals.js?v=20260723e143"></script>
-    <script src="src/app/02-quests.js?v=20260723e143"></script>
-    <script src="src/app/03-map.js?v=20260723e143"></script>
-    <script src="src/app/04-game.js?v=20260723e143"></script>
+    <script src="src/app/01-globals.js?v=20260723e144"></script>
+    <script src="src/app/02-quests.js?v=20260723e144"></script>
+    <script src="src/app/03-map.js?v=20260723e144"></script>
+    <script src="src/app/04-game.js?v=20260723e144"></script>
 </body>
 </html>

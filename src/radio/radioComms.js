@@ -135,6 +135,9 @@ export function defaultRadioState(userId, ctx) {
         dialBuffer: '',
         activePresetSlot: 1,
         operatingMode: 'on',
+        batteryLevel: 100,
+        batteryUpdatedAt: Date.now(),
+        batteryCharging: false,
         soundPrefs: { key: 1, ring: 1, message: 1 },
         quickKeys: createDefaultQuickKeys(),
         presets: presets
@@ -263,6 +266,10 @@ export function loadRadioState(userId, ctx) {
         if (!parsed.keypadMode) parsed.keypadMode = 'tx';
         if (!parsed.dialBuffer) parsed.dialBuffer = '';
         parsed.operatingMode = normalizeOperatingMode(parsed.operatingMode);
+        if (typeof parsed.batteryLevel !== 'number') parsed.batteryLevel = 100;
+        parsed.batteryLevel = Math.max(0, Math.min(100, parsed.batteryLevel));
+        if (typeof parsed.batteryUpdatedAt !== 'number') parsed.batteryUpdatedAt = Date.now();
+        parsed.batteryCharging = !!parsed.batteryCharging && parsed.operatingMode === 'off';
         parsed.quickKeys = normalizeQuickKeys(parsed.quickKeys);
         if (!parsed.soundPrefs || typeof parsed.soundPrefs !== 'object') {
             parsed.soundPrefs = { key: 1, ring: 1, message: 1 };
