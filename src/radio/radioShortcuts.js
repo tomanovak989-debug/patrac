@@ -38,8 +38,44 @@ export function quickKeyBadge(keyId) {
 }
 
 export function decorateMenuLabel(label, keyId) {
-    if (!keyId) return label;
-    return label + ' \u02E2' + quickKeyBadge(keyId);
+    if (!keyId) return formatMenuDisplayLabel(label);
+    return formatMenuDisplayLabel(label) + ' \u02E2' + quickKeyBadge(keyId);
+}
+
+/** Menu/submenu: malé písmo, první písmeno velké (bez ALL CAPS). */
+export function formatMenuDisplayLabel(label) {
+    label = String(label || '');
+    if (!label) return '';
+    var badge = '';
+    var badgeMatch = label.match(/(\s[\u02E2][A-Z0-9]+)$/);
+    if (badgeMatch) {
+        badge = badgeMatch[1];
+        label = label.slice(0, label.length - badge.length);
+    }
+    var dotParts = label.split(' · ');
+    if (dotParts.length > 1) {
+        var out = [];
+        var i;
+        for (i = 0; i < dotParts.length; i++) {
+            out.push(menuSentenceCase(dotParts[i]));
+        }
+        return out.join(' · ') + badge;
+    }
+    return menuSentenceCase(label) + badge;
+}
+
+function menuSentenceCase(part) {
+    part = String(part || '').trim();
+    if (!part) return '';
+    var lead = part.match(/^([▸▶⏸●✎\d]+(?:\s+[A-ZÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ])?\s*)/);
+    var prefix = '';
+    if (lead) {
+        prefix = lead[1];
+        part = part.slice(prefix.length);
+    }
+    part = part.toLowerCase();
+    if (!part) return prefix.trim();
+    return (prefix ? prefix : '') + part.charAt(0).toUpperCase() + part.slice(1);
 }
 
 /** Najde klíč navázaný na danou akci (pro zobrazení indexu v menu). */

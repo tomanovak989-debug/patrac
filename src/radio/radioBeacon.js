@@ -5,6 +5,7 @@
  */
 import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms.js';
 import { EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
+import { formatMenuDisplayLabel } from './radioShortcuts.js';
 
 export var BEACON_REPEAT_MS = 18000;
 /** Pevný SOS kanál majáku — default poslech na všech vysílačkách. */
@@ -311,7 +312,7 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     var i;
     for (i = 0; i < 4; i++) {
         var idx = start + i;
-        lines.push(idx < items.length ? items[idx].label : '');
+        lines.push(idx < items.length ? formatMenuDisplayLabel(items[idx].label) : '');
     }
     lines.push('');
     lines.push('');
