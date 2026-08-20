@@ -39,7 +39,7 @@ export function quickKeyBadge(keyId) {
 
 export function decorateMenuLabel(label, keyId) {
     if (!keyId) return formatMenuDisplayLabel(label);
-    return formatMenuDisplayLabel(label) + ' \u02E2' + quickKeyBadge(keyId);
+    return formatMenuDisplayLabel(label) + ' ' + quickKeyBadge(keyId);
 }
 
 /** Menu/submenu: malé písmo, první písmeno velké (bez ALL CAPS). */
@@ -47,7 +47,7 @@ export function formatMenuDisplayLabel(label) {
     label = String(label || '');
     if (!label) return '';
     var badge = '';
-    var badgeMatch = label.match(/(\s[\u02E2][A-Z0-9]+)$/);
+    var badgeMatch = label.match(/(\s(?:[\u02E2][A-Z0-9]+|P[12]|[1-9]))$/);
     if (badgeMatch) {
         badge = badgeMatch[1];
         label = label.slice(0, label.length - badge.length);
