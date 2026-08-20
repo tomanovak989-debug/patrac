@@ -150,6 +150,7 @@ import {
     bindingFromPresetField,
     bindingFromAutoscan,
     getQuickKeyBinding,
+    formatMenuDisplayLabel,
     QUICK_KEY_IDS
 } from './radioShortcuts.js';
 import {
@@ -520,6 +521,10 @@ function scheduleLineMarquee(focusLine, fullText) {
 
 function setDisplayTextLines(lines) {
     setDisplayMenuLines(lines, -1);
+}
+
+function formatDisplayStatus(text) {
+    return formatMenuDisplayLabel(text || '');
 }
 
 function setDisplayMenuLines(lines, focusLine, lineStyles) {
@@ -1149,7 +1154,8 @@ function renderDisplay() {
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
         screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon');
-        screen.classList.toggle('is-standby', osView.mode === 'standby');
+        screen.classList.toggle('is-standby', osView.mode === 'standby' || osView.mode === 'standby_tune');
+        screen.classList.toggle('is-standby-tune', osView.mode === 'standby_tune' || !!(standbyUi && standbyUi.active));
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
     }
 
@@ -1194,7 +1200,7 @@ function renderDisplay() {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
             } else {
-                ch.textContent = editView.status || '';
+                ch.textContent = formatDisplayStatus(editView.status || '');
             }
         }
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
@@ -1264,7 +1270,7 @@ function renderDisplay() {
                 ''
             ];
             setDisplayMenuLines(tuneLines, standbyUi.focusIndex);
-            if (ch) ch.textContent = 'RUČNÍ LADĚNÍ';
+            if (ch) ch.textContent = formatDisplayStatus('RUČNÍ LADĚNÍ');
             if (footerWrap) footerWrap.textContent = 'OK edit · Zpět';
             if (sig) sig.textContent = standbyPttActive ? '● TX' : (freqVal ? '● TX/RX' : '○ STBY');
             return;
@@ -1296,7 +1302,7 @@ function renderDisplay() {
             sig.classList.toggle('is-tuned', tuned);
             sig.classList.toggle('is-standby', !tuned);
         }
-        if (ch) ch.textContent = CHANNEL_SCOPE_LABELS[scope] || 'KANÁL';
+        if (ch) ch.textContent = formatDisplayStatus(CHANNEL_SCOPE_LABELS[scope] || 'Kanál');
         if (nodeEl) {
             nodeEl.textContent = gpsOk ? 'NOSIČ' : 'GPS?';
             nodeEl.style.visibility = 'hidden';
@@ -1330,7 +1336,7 @@ function renderDisplay() {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
             } else {
-                ch.textContent = osView.status || 'MENU';
+                ch.textContent = formatDisplayStatus(osView.status || 'Menu');
             }
         }
         if (sig) {

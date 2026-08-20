@@ -1615,14 +1615,16 @@ body.sector-calibrate-on .sector-cal-rulers {
     font-weight: 400 !important;
 }
 body.theme-light .sector-tech-screen {
-    --radio-phosphor: #c8c8c8;
-    --radio-phosphor-dim: #6a6a6a;
-    --radio-phosphor-glow: rgba(200, 200, 200, 0.08);
-    --radio-phosphor-halo: rgba(200, 200, 200, 0.04);
+    --radio-phosphor: #101010;
+    --radio-phosphor-dim: #404040;
+    --radio-phosphor-glow: rgba(0, 0, 0, 0.06);
+    --radio-phosphor-halo: rgba(0, 0, 0, 0.03);
+    --radio-screen-bg: #c4c4c4;
+    --radio-screen-bg-off: #a6a6a6;
     color: var(--radio-phosphor);
     text-shadow: none;
     background: var(--radio-screen-bg);
-    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
 }
 body.theme-light .sector-tech-screen::after {
     background: transparent;
@@ -1641,14 +1643,26 @@ body.theme-light .sector-tech-screen .radio-edit-char {
 }
 body.theme-light #radio-display-freq.radio-display-freq-node.is-handset,
 body.theme-light .radio-display-node.is-handset {
-    color: #e0e0e0;
+    color: #101010;
     text-shadow: none;
 }
 body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     text-shadow: inherit;
 }
 body.theme-light .sector-tech-screen.is-field-edit .radio-edit-blink {
-    background: rgba(200, 200, 200, 0.18);
+    background: rgba(0, 0, 0, 0.14);
+}
+body.theme-light .sector-tech-screen.is-off {
+    background: var(--radio-screen-bg-off);
+    color: transparent;
+}
+.sector-tech-screen.is-menu .radio-display-status #radio-display-channel,
+.sector-tech-screen.is-preset-detail .radio-display-status #radio-display-channel,
+.sector-tech-screen.is-stub .radio-display-status #radio-display-channel,
+.sector-tech-screen.is-standby-tune .radio-display-status #radio-display-channel {
+    font-weight: 700;
+    font-size: 1.14em;
+    letter-spacing: 0.01em;
 }
 #radio-display-signal.is-tuned {
     color: var(--radio-phosphor);
@@ -1668,10 +1682,6 @@ body.theme-light #radio-display-signal.is-standby {
     background: var(--radio-screen-bg-off);
     text-shadow: none;
 }
-body.theme-light .sector-tech-screen.is-off {
-    background: #1a1a1a;
-    color: transparent;
-}
 .sector-tech-screen.is-off .radio-display-status,
 .sector-tech-screen.is-off .radio-display-main,
 .sector-tech-screen.is-off .radio-display-sub {
@@ -1685,7 +1695,8 @@ body.theme-light .sector-tech-screen.is-off {
 }
 .sector-tech-screen.is-menu .radio-display-main,
 .sector-tech-screen.is-stub .radio-display-main,
-.sector-tech-screen.is-preset-detail .radio-display-main {
+.sector-tech-screen.is-preset-detail .radio-display-main,
+.sector-tech-screen.is-standby-tune .radio-display-main {
     grid-template-rows: repeat(6, minmax(0, 1fr));
     align-content: stretch;
     gap: 0;
@@ -1721,11 +1732,12 @@ body.theme-light .sector-tech-screen.is-off {
 }
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
-.sector-tech-screen.is-preset-detail .radio-display-main > div {
+.sector-tech-screen.is-preset-detail .radio-display-main > div,
+.sector-tech-screen.is-standby-tune .radio-display-main > div {
     line-height: 0.95;
     min-height: 0;
     height: auto;
-    padding: 0;
+    padding: 0 2px 0 8px;
     margin: 0;
     align-items: center;
     font-weight: 400;
@@ -1734,6 +1746,27 @@ body.theme-light .sector-tech-screen.is-off {
     text-transform: none;
     cursor: default;
     transition: font-weight 0.08s ease;
+    gap: 0;
+}
+.sector-tech-screen.is-menu .radio-display-main > div.radio-display-row-focus,
+.sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus,
+.sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus,
+.sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus {
+    font-weight: 400 !important;
+}
+.sector-tech-screen.is-menu .radio-display-main > div.radio-display-row-focus::before,
+.sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus::before,
+.sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus::before,
+.sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus::before {
+    content: '';
+    display: block;
+    width: 2px;
+    height: 0.9em;
+    align-self: center;
+    flex-shrink: 0;
+    margin-right: 5px;
+    background: currentColor;
+    opacity: 0.95;
 }
 .sector-tech-screen.is-menu #radio-display-freq,
 .sector-tech-screen.is-menu #radio-display-key,
@@ -1755,10 +1788,13 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu .radio-display-main > div:not(:empty):hover,
 .sector-tech-screen.is-stub .radio-display-main > div:not(:empty):hover,
 .sector-tech-screen.is-preset-detail .radio-display-main > div:not(:empty):hover,
+.sector-tech-screen.is-standby-tune .radio-display-main > div:not(:empty):hover {
+    font-weight: 700 !important;
+}
 .sector-tech-screen.is-menu .radio-display-main > div.radio-display-row-focus,
 .sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus,
-.sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus {
-    font-weight: 700 !important;
+.sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus,
+.sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus {
     background: transparent !important;
     box-shadow: none !important;
     border-radius: 0;
@@ -1970,6 +2006,18 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
 /* Vysílačka — displej (MIP overlay) */
 .radio-display-zone { width: 100%; }
 .sector-tech-screen,
+.sector-tech-screen .radio-display-status,
+.sector-tech-screen .radio-display-status > span,
+.sector-tech-screen .radio-display-status > button,
+.sector-tech-screen .radio-display-main,
+.sector-tech-screen .radio-display-main > div,
+.sector-tech-screen .radio-display-sub,
+.sector-tech-screen .radio-display-edit-large,
+.sector-tech-screen .radio-edit-char,
+.radio-display-screen {
+    font-family: var(--radio-display-font) !important;
+}
+.sector-tech-screen,
 .radio-display-screen {
     width: 100%;
     min-height: 0;
@@ -2067,7 +2115,7 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     text-shadow: none;
 }
 body.theme-light .radio-display-main > div.radio-display-row-unread {
-    color: #f0f0f0;
+    color: #000000;
     font-weight: 700 !important;
     text-shadow: none;
 }
@@ -2197,16 +2245,16 @@ body.theme-light .radio-display-main > div.radio-display-row-focus {
     background:
         linear-gradient(180deg, #8a8a8a 0%, #6a6a6a 48%, #505050 100%);
 }
-body.theme-light .radio-display-screen {
-    color: #1a2a10;
-    background: linear-gradient(180deg, #d8e8a8 0%, #c8d898 100%);
-    box-shadow:
-        inset 0 2px 6px rgba(0, 0, 0, 0.12),
-        0 2px 0 rgba(255, 255, 255, 0.35);
+body.theme-light .radio-display-screen,
+body.theme-light .sector-tech-screen {
+    color: var(--radio-phosphor);
+    background: var(--radio-screen-bg);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
 }
 body.theme-light .radio-chat-input {
-    color: #1a2a10;
-    background: linear-gradient(180deg, #e4efc0 0%, #d2e0a4 100%);
+    color: var(--radio-phosphor);
+    background: #d8d8d8;
+    font-family: var(--radio-display-font, 'Patrac Roboto Condensed', sans-serif) !important;
 }
 
 /* Sešit A4 — staniční list / poznámky */
