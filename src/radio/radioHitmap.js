@@ -35,6 +35,48 @@ export function applyDisplayTypography() {
         px = Math.round(px * 1.1 * 10) / 10;
     }
     screen.style.fontSize = px + 'px';
+
+    var isStandbyView = screen.classList.contains('is-standby') || screen.classList.contains('is-standby-tune');
+    var clock = document.getElementById('radio-display-clock');
+    if (clock) {
+        if (isStandbyView && !screen.classList.contains('is-off') && !screen.classList.contains('is-charging')) {
+            clock.style.setProperty('font-size', Math.max(7, Math.round(px * 0.62 * 10) / 10) + 'px', 'important');
+            clock.style.setProperty('font-weight', '400', 'important');
+        } else {
+            clock.style.removeProperty('font-size');
+            clock.style.removeProperty('font-weight');
+        }
+    }
+    var presetRow = document.getElementById('radio-display-freq');
+    if (presetRow) {
+        if (presetRow.classList.contains('radio-display-standby-preset')) {
+            presetRow.style.setProperty('font-weight', '700', 'important');
+            presetRow.style.setProperty('font-size', px + 'px', 'important');
+        } else {
+            presetRow.style.removeProperty('font-weight');
+            presetRow.style.removeProperty('font-size');
+        }
+    }
+    var freqRow = document.getElementById('radio-display-key');
+    if (freqRow) {
+        if (freqRow.classList.contains('radio-display-standby-freq')) {
+            freqRow.style.setProperty('font-weight', '400', 'important');
+            freqRow.style.setProperty('font-size', px + 'px', 'important');
+        } else {
+            freqRow.style.removeProperty('font-weight');
+            freqRow.style.removeProperty('font-size');
+        }
+    }
+    var keyRow = document.getElementById('radio-display-buffer');
+    if (keyRow) {
+        if (keyRow.classList.contains('radio-display-standby-key')) {
+            keyRow.style.setProperty('font-weight', '400', 'important');
+            keyRow.style.setProperty('font-size', Math.max(8, Math.round(px * 0.82 * 10) / 10) + 'px', 'important');
+        } else {
+            keyRow.style.removeProperty('font-weight');
+            keyRow.style.removeProperty('font-size');
+        }
+    }
 }
 
 export function applyRadioHitmap() {
