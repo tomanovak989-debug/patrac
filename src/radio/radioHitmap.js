@@ -31,6 +31,9 @@ export function applyDisplayTypography() {
     var innerW = Math.max(8, w - 10);
     var px = Math.min(innerW / 10.5, (h / 8) * 0.9);
     px = Math.max(9, Math.round(px * 10) / 10);
+    if (screen.classList.contains('is-menu')) {
+        px = Math.round(px * 1.1 * 10) / 10;
+    }
     screen.style.fontSize = px + 'px';
 }
 

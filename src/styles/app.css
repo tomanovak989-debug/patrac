@@ -1533,22 +1533,22 @@ body.sector-calibrate-on .sector-cal-rulers {
 }
 
 @font-face {
-    font-family: 'Roboto Condensed';
-    src: url('../assets/fonts/roboto-condensed/RobotoCondensed-Regular.ttf') format('truetype');
+    font-family: 'Patrac Roboto Condensed';
+    src: url('/src/assets/fonts/roboto-condensed/RobotoCondensed-Regular.ttf') format('truetype');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
-    font-family: 'Roboto Condensed';
-    src: url('../assets/fonts/roboto-condensed/RobotoCondensed-Medium.ttf') format('truetype');
+    font-family: 'Patrac Roboto Condensed';
+    src: url('/src/assets/fonts/roboto-condensed/RobotoCondensed-Medium.ttf') format('truetype');
     font-weight: 500;
     font-style: normal;
     font-display: swap;
 }
 @font-face {
-    font-family: 'Roboto Condensed';
-    src: url('../assets/fonts/roboto-condensed/RobotoCondensed-Bold.ttf') format('truetype');
+    font-family: 'Patrac Roboto Condensed';
+    src: url('/src/assets/fonts/roboto-condensed/RobotoCondensed-Bold.ttf') format('truetype');
     font-weight: 700;
     font-style: normal;
     font-display: swap;
@@ -1556,7 +1556,7 @@ body.sector-calibrate-on .sector-cal-rulers {
 
 .sector-tech-screen {
     /* rozměry nastavuje radioHitmap.js — PNG 800×800 */
-    --radio-display-font: 'Roboto Condensed', 'Segoe UI', sans-serif;
+    --radio-display-font: 'Patrac Roboto Condensed', 'Roboto Condensed', 'Segoe UI', sans-serif;
     --radio-phosphor: #c8c8c8;
     --radio-phosphor-dim: #6a6a6a;
     --radio-phosphor-glow: rgba(200, 200, 200, 0.08);
@@ -1690,7 +1690,7 @@ body.theme-light .sector-tech-screen.is-off {
     align-content: stretch;
     gap: 0;
     margin: 0;
-    line-height: 1.12;
+    line-height: 0.95;
 }
 .sector-tech-screen.is-standby .radio-display-status {
     flex: 1 1 0;
@@ -1722,14 +1722,14 @@ body.theme-light .sector-tech-screen.is-off {
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
 .sector-tech-screen.is-preset-detail .radio-display-main > div {
-    line-height: 1.12;
+    line-height: 0.95;
     min-height: 0;
     height: auto;
     padding: 0;
     margin: 0;
     align-items: center;
     font-weight: 400;
-    font-size: 0.92em;
+    font-size: 1.06em;
     color: inherit;
     text-transform: none;
     cursor: default;
