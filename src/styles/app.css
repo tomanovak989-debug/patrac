@@ -1737,7 +1737,8 @@ body.theme-light #radio-display-signal.is-standby {
     line-height: 0.95;
     min-height: 0;
     height: auto;
-    padding: 0 2px 0 8px;
+    position: relative;
+    padding: 0 2px 0 10px;
     margin: 0;
     align-items: center;
     font-weight: 400;
@@ -1762,14 +1763,15 @@ body.theme-light #radio-display-signal.is-standby {
 .sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus::before,
 .sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus::before {
     content: '';
-    display: block;
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
     width: 2px;
     height: 0.9em;
-    align-self: center;
-    flex-shrink: 0;
-    margin-right: 5px;
     background: currentColor;
     opacity: 0.95;
+    pointer-events: none;
 }
 .sector-tech-screen.is-menu #radio-display-freq,
 .sector-tech-screen.is-menu #radio-display-key,
@@ -1793,14 +1795,6 @@ body.theme-light #radio-display-signal.is-standby {
 .sector-tech-screen.is-preset-detail .radio-display-main > div:not(:empty):hover,
 .sector-tech-screen.is-standby-tune .radio-display-main > div:not(:empty):hover {
     font-weight: 700 !important;
-}
-.sector-tech-screen.is-menu .radio-display-main > div.radio-display-row-focus,
-.sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus,
-.sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus,
-.sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus {
-    background: transparent !important;
-    box-shadow: none !important;
-    border-radius: 0;
 }
 .sector-tech-screen.is-field-edit .radio-display-status {
     flex: 1 1 0;
