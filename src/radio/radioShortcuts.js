@@ -43,7 +43,9 @@ export function quickKeyBadgeSuperscript(keyId) {
     if (keyId === 'p1') return '\u1D3E\u00B9';
     if (keyId === 'p2') return '\u1D3E\u00B2';
     var d = parseInt(keyId, 10);
-    if (d >= 1 && d <= 9) return '\u2070\u2071\u2072\u2073\u2074\u2075\u2076\u2077\u2078\u2079'.charAt(d);
+    if (d >= 1 && d <= 9) {
+        return '\u00B9\u00B2\u00B3\u2074\u2075\u2076\u2077\u2078\u2079'.charAt(d - 1);
+    }
     return quickKeyBadge(keyId);
 }
 
