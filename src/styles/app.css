@@ -1752,7 +1752,10 @@ body.theme-light #radio-display-signal.is-standby {
 .sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus,
 .sector-tech-screen.is-preset-detail .radio-display-main > div.radio-display-row-focus,
 .sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-row-focus {
-    font-weight: 400 !important;
+    font-weight: 700 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border-radius: 0;
 }
 .sector-tech-screen.is-menu .radio-display-main > div.radio-display-row-focus::before,
 .sector-tech-screen.is-stub .radio-display-main > div.radio-display-row-focus::before,
