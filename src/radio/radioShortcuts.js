@@ -37,10 +37,21 @@ export function quickKeyBadge(keyId) {
     return String(keyId).toUpperCase();
 }
 
+/** Zkratka v horním indexu (P1 → ᴾ¹, 5 → ⁵). */
+export function quickKeyBadgeSuperscript(keyId) {
+    keyId = String(keyId || '').toLowerCase();
+    if (keyId === 'p1') return '\u1D3E\u00B9';
+    if (keyId === 'p2') return '\u1D3E\u00B2';
+    var d = parseInt(keyId, 10);
+    if (d >= 1 && d <= 9) return '\u2070\u2071\u2072\u2073\u2074\u2075\u2076\u2077\u2078\u2079'.charAt(d);
+    return quickKeyBadge(keyId);
+}
+
+var QUICK_KEY_BADGE_RE = /(\s(?:[\u1D3E][\u00B9\u00B2]|[\u2071-\u2079]|[\u02E2]\s?(?:P[12]|[1-9])|[\u02E2](?:P[12]|[1-9])|P[12]|[1-9]))$/;
+
 export function decorateMenuLabel(label, keyId) {
     if (!keyId) return formatMenuDisplayLabel(label);
-    /* ˢ = index zkratky; samotná klávesa (P1, 5…) normálním písmem za mezerou. */
-    return formatMenuDisplayLabel(label) + ' \u02E2 ' + quickKeyBadge(keyId);
+    return formatMenuDisplayLabel(label) + ' ' + quickKeyBadgeSuperscript(keyId);
 }
 
 /** Menu/submenu: malé písmo, první písmeno velké (bez ALL CAPS). */
@@ -48,9 +59,7 @@ export function formatMenuDisplayLabel(label) {
     label = String(label || '');
     if (!label) return '';
     var badge = '';
-    var badgeMatch = label.match(/(\s[\u02E2]\s(?:P[12]|[1-9]))$/)
-        || label.match(/(\s[\u02E2](?:P[12]|[1-9]))$/)
-        || label.match(/(\s(?:P[12]|[1-9]))$/);
+    var badgeMatch = label.match(QUICK_KEY_BADGE_RE);
     if (badgeMatch) {
         badge = badgeMatch[1];
         label = label.slice(0, label.length - badge.length);
