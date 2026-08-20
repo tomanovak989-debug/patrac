@@ -774,12 +774,46 @@ export function buildDisplayLines(state, ctx) {
     };
 }
 
+export function formatStandbyPresetLine(state) {
+    var presets = state.presets || [];
+    var preset = resolveActivePreset(state);
+    if (preset && presets.length) {
+        var idx = findDialIndex(presets, preset.frequency, preset.slot);
+        var pos = idx >= 0 ? (idx + 1) : preset.slot;
+        return 'Preset ' + pos + '/' + presets.length + ' · ' + (preset.label || 'Kanál');
+    }
+    if (presets.length) return 'Preset · přímý zápis';
+    return 'Preset · —';
+}
+
+export function formatStandbyFrequencyLine(state) {
+    var freq = normalizeFrequency(state.frequency) || '---.---';
+    var pt = !normalizeEncryptionKey(state.encryptionKey || '');
+    return freq + ' MHz  ' + (pt ? 'PT' : 'CT');
+}
+
+export function formatStandbyEncryptionLine(state) {
+    var key = state.encryptionKey || '';
+    return key ? ('ŠIFRA: ' + maskEncryptionKey(key)) : 'BEZ ŠIFRY — otevřený kanál';
+}
+
 export function findPreset(state, slot) {
     if (!state.presets) return null;
     for (var i = 0; i < state.presets.length; i++) {
         if (state.presets[i].slot === slot) return state.presets[i];
     }
     return null;
+}
+
+/** Preset odpovídající aktuální frekvenci (a slotu), nebo null při ručním zápisu. */
+export function resolveActivePreset(state) {
+    if (!state) return null;
+    var preset = state.activePresetSlot != null ? findPreset(state, state.activePresetSlot) : null;
+    if (!preset && state.presets && state.presets.length) {
+        var di = findDialIndex(state.presets, state.frequency, null);
+        if (di >= 0) preset = state.presets[di];
+    }
+    return preset;
 }
 
 export function upsertPreset(state, slot, data) {

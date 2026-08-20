@@ -1686,10 +1686,13 @@ body.theme-light .sector-tech-screen.is-off {
     background: var(--radio-screen-bg-off);
     color: transparent;
 }
+.sector-tech-screen.is-standby-tune .radio-display-status #radio-display-channel,
+.sector-tech-screen.is-standby .radio-display-status #radio-display-channel {
+    display: none;
+}
 .sector-tech-screen.is-menu .radio-display-status #radio-display-channel,
 .sector-tech-screen.is-preset-detail .radio-display-status #radio-display-channel,
-.sector-tech-screen.is-stub .radio-display-status #radio-display-channel,
-.sector-tech-screen.is-standby-tune .radio-display-status #radio-display-channel {
+.sector-tech-screen.is-stub .radio-display-status #radio-display-channel {
     font-weight: 700;
     font-size: 1.14em;
     letter-spacing: 0.01em;
@@ -2072,6 +2075,28 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: inherit;
+}
+.radio-display-clock {
+    flex: 1 1 auto;
+    font-size: 0.68em;
+    line-height: 1.1;
+    letter-spacing: 0.03em;
+    opacity: 0.92;
+    font-variant-numeric: tabular-nums;
+}
+.sector-tech-screen.is-menu .radio-display-clock,
+.sector-tech-screen.is-field-edit .radio-display-clock,
+.sector-tech-screen.is-off .radio-display-clock,
+.sector-tech-screen.is-charging .radio-display-clock {
+    display: none;
+}
+.radio-display-standby-preset {
+    font-weight: 700;
+}
+.radio-display-standby-key {
+    font-size: 0.86em;
+    font-weight: 400;
+    opacity: 0.96;
 }
 .radio-display-node {
     appearance: none;

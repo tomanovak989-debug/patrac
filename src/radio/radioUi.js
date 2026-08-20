@@ -22,6 +22,9 @@ import {
     createIncomingEntry,
     communityFrequencyFromCode,
     getCommunityRadioKey,
+    formatStandbyPresetLine,
+    formatStandbyFrequencyLine,
+    formatStandbyEncryptionLine,
     GLOBAL_FREQUENCY,
     GLOBAL_ENCRYPTION,
     NOTEBOOK_TABS,
@@ -29,7 +32,6 @@ import {
     NOTEBOOK_LINES_PER_PAGE,
     NOTEBOOK_CHARS_PER_LINE,
     NOTEBOOK_MAX_PAGES,
-    CHANNEL_SCOPE_LABELS,
     getNotebookPageCount,
     expandPlainNotebookLines,
     getStationVisualPageCount,
@@ -48,7 +50,7 @@ import {
     deleteNoteById,
     countUnreadInbox
 } from './radioComms.js';
-import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, getRadioListenStatus, upsertRadioBeaconLive, clearRadioBeaconLive, subscribeRadioBeaconsLive } from './radioService.js';
+import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, upsertRadioBeaconLive, clearRadioBeaconLive, subscribeRadioBeaconsLive } from './radioService.js';
 import { getFirebaseAuth } from '../lib/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -76,7 +78,7 @@ import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell
 import { applyDisplayTypography } from './radioHitmap.js';
 import {
     syncBattery,
-    formatStandbyClockLine,
+    formatStandbyClockBattery,
     formatBatteryPercent,
     toggleBatteryCharging,
     stopBatteryCharging
@@ -535,6 +537,66 @@ function formatDisplayStatus(text) {
     return formatMenuDisplayLabel(text || '');
 }
 
+function isStandbyTransmitting() {
+    return !!(standbyPttActive || (pttSession && pttSession.active && isStandbyScreen()));
+}
+
+function getStandbyStatusTitle(state) {
+    return formatStandbyPresetLine(state);
+}
+
+function setStandbyClockDisplay(clockEl, state) {
+    if (!clockEl) return;
+    clockEl.textContent = formatStandbyClockBattery(state);
+}
+
+function applyStandbyMainLayout(f, k, buf, p, state, opts) {
+    opts = opts || {};
+    var presetLine = formatStandbyPresetLine(state);
+    var freqLine = formatStandbyFrequencyLine(state);
+    var encLine = formatStandbyEncryptionLine(state);
+    var gpsOk = !!opts.gpsOk;
+
+    if (f) {
+        f.className = 'radio-display-standby-preset';
+        f.textContent = presetLine;
+        f.removeAttribute('title');
+        f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only', 'radio-display-row-focus');
+    }
+    if (k) {
+        k.className = 'radio-display-standby-freq';
+        k.classList.toggle('radio-display-row-focus', opts.focusFreq === true);
+        k.textContent = (opts.focusFreq ? '▸ ' : '') + freqLine;
+        k.title = gpsOk
+            ? 'Frekvence · GPS nosič'
+            : 'Frekvence · GPS nedostupné — zapni polohu v prohlížeči';
+    }
+    if (buf) {
+        buf.className = 'radio-display-standby-key';
+        buf.classList.toggle('radio-display-row-focus', opts.focusEncrypt === true);
+        buf.textContent = (opts.focusEncrypt ? '▸ ' : '') + encLine;
+    }
+    if (p) {
+        p.className = '';
+        p.classList.remove('radio-display-row-focus');
+        if (opts.dialBuffer) p.textContent = opts.dialBuffer;
+        else if (opts.beaconSos) p.textContent = opts.beaconSos;
+        else if (opts.pttLine) p.textContent = opts.pttLine;
+        else p.textContent = '';
+    }
+}
+
+function setStandbySignalIndicator(sig) {
+    if (!sig) return;
+    if (isStandbyTransmitting()) {
+        sig.textContent = '● TX';
+        sig.classList.remove('is-tuned', 'is-standby');
+        return;
+    }
+    sig.textContent = '';
+    sig.classList.remove('is-tuned', 'is-standby');
+}
+
 function setDisplayMenuLines(lines, focusLine, lineStyles) {
     clearLineMarquee();
     lines = lines || [];
@@ -655,6 +717,15 @@ function openStandbyFieldEdit(field) {
 
 function handleStandbyInput(action) {
     if (!isStandbyScreen()) return false;
+    if (action === 'preset_prev' || action === 'preset_next') {
+        if (!standbyUi.active) return false;
+        if (cycleDialPreset(state, action === 'preset_next' ? 1 : -1)) {
+            persist();
+            refreshSubscriptions();
+            renderDisplay();
+        }
+        return true;
+    }
     if (action === 'up') {
         if (!standbyUi.active) {
             standbyUi.active = true;
@@ -1182,7 +1253,6 @@ function renderDisplay() {
         autoscanActive: isAutoscanListening()
     });
     var standbyLines = buildDisplayLines(state, c);
-    var scope = classifyChannel(state.frequency, state.encryptionKey, c);
     var opLabel = state.operatingMode === 'off' ? 'OFF' : 'ON';
     var dialBuffer = '';
     if (!isFieldEditActive(fieldEditSession) && (state.keypadMode === 'freq' || state.keypadMode === 'encrypt')) {
@@ -1190,7 +1260,7 @@ function renderDisplay() {
     }
 
     var osView = buildOsDisplayLines(radioOs, state.operatingMode, {
-        status: (CHANNEL_SCOPE_LABELS[scope] || 'KANÁL') + ' · ' + opLabel,
+        status: getStandbyStatusTitle(state) || opLabel,
         line1: standbyLines.line1,
         line2: standbyLines.line2,
         line3: standbyLines.line3,
@@ -1216,6 +1286,7 @@ function renderDisplay() {
     var foot = el('radio-display-com');
     var sig = el('radio-display-signal');
     var ch = el('radio-display-channel');
+    var clockEl = el('radio-display-clock');
     var nodeEl = el('radio-display-node');
     var buf = el('radio-display-buffer');
     var footerWrap = el('radio-display-footer');
@@ -1254,6 +1325,7 @@ function renderDisplay() {
                 ch.textContent = formatDisplayStatus(editView.status || '');
             }
         }
+        if (clockEl) clockEl.textContent = '';
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
         if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
         if (f) {
@@ -1293,6 +1365,7 @@ function renderDisplay() {
             clearExtraDisplayLines();
             clearDisplayRowFocus();
             if (ch) ch.textContent = '';
+            if (clockEl) clockEl.textContent = '';
             if (sig) sig.textContent = '';
             if (nodeEl) {
                 nodeEl.textContent = '';
@@ -1314,6 +1387,7 @@ function renderDisplay() {
         clearDisplayRowFocus();
         if (foot) foot.textContent = '';
         if (ch) ch.textContent = '';
+        if (clockEl) clockEl.textContent = '';
         if (sig) sig.textContent = '';
         if (nodeEl) {
             nodeEl.textContent = '';
@@ -1328,60 +1402,33 @@ function renderDisplay() {
     if (nodeEl) nodeEl.style.visibility = '';
 
     if (osView.mode === 'standby' || osView.mode === 'standby_tune') {
-        var freqVal = normalizeFrequency(state.frequency) || '---.---';
-        var pt = !normalizeEncryptionKey(state.encryptionKey || '');
         var gpsOk = !!(c.originLat != null && c.originLng != null);
-        var clockLine = formatStandbyClockLine(state);
+        setStandbyClockDisplay(clockEl, state);
+        if (ch) ch.textContent = '';
+        setStandbySignalIndicator(sig);
         if (standbyUi.active) {
-            if (f) {
-                f.className = '';
-                f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only');
+            applyStandbyMainLayout(f, k, buf, p, state, {
+                gpsOk: gpsOk,
+                focusFreq: standbyUi.focusIndex === 0,
+                focusEncrypt: standbyUi.focusIndex === 1,
+                dialBuffer: dialBuffer || '',
+                pttLine: standbyPttActive ? '● PTT NAHRÁVÁM' : ''
+            });
+            clearExtraDisplayLines();
+            if (nodeEl) {
+                nodeEl.textContent = '';
+                nodeEl.style.visibility = 'hidden';
             }
-            var tuneLines = [
-                clockLine,
-                freqVal + ' MHz  ' + (pt ? 'PT' : 'CT'),
-                state.encryptionKey ? ('ŠIFRA: ' + maskEncryptionKey(state.encryptionKey)) : 'BEZ ŠIFRY — otevřený kanál',
-                standbyLines.line3,
-                standbyPttActive ? '● PTT NAHRÁVÁM' : '',
-                ''
-            ];
-            setDisplayMenuLines(tuneLines, standbyUi.focusIndex + 1);
-            if (ch) ch.textContent = formatDisplayStatus('RUČNÍ LADĚNÍ');
-            if (footerWrap) footerWrap.textContent = 'OK edit · Zpět';
-            if (sig) sig.textContent = standbyPttActive ? '● TX' : (freqVal ? '● TX/RX' : '○ STBY');
+            if (footerWrap) footerWrap.textContent = '◀▶ preset · OK edit · Zpět';
             updateChargeButtonUi();
             return;
         }
-        if (f) {
-            f.className = '';
-            f.textContent = clockLine;
-            f.removeAttribute('title');
-            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only');
-        }
-        if (k) {
-            k.textContent = freqVal + ' MHz  ' + (pt ? 'PT' : 'CT');
-            k.title = gpsOk
-                ? 'Frekvence · GPS nosič'
-                : 'Frekvence · GPS nedostupné — zapni polohu v prohlížeči';
-        }
-        if (buf) {
-            if (dialBuffer) buf.textContent = dialBuffer;
-            else buf.textContent = standbyLines.line2;
-        }
-        if (p) {
-            if (beaconActive && beaconActive.active) p.textContent = '● SOS ' + BEACON_SOS_FREQUENCY;
-            else p.textContent = standbyLines.line3;
-        }
+        applyStandbyMainLayout(f, k, buf, p, state, {
+            gpsOk: gpsOk,
+            dialBuffer: dialBuffer || '',
+            beaconSos: (beaconActive && beaconActive.active) ? ('● SOS ' + BEACON_SOS_FREQUENCY) : ''
+        });
         clearExtraDisplayLines();
-        clearDisplayRowFocus();
-        if (sig) {
-            var tuned = !!normalizeFrequency(state.frequency);
-            sig.textContent = standbyPttActive ? '● TX' : (tuned ? '● TX/RX' : '○ STBY');
-            sig.style.color = '';
-            sig.classList.toggle('is-tuned', tuned);
-            sig.classList.toggle('is-standby', !tuned);
-        }
-        if (ch) ch.textContent = formatDisplayStatus(CHANNEL_SCOPE_LABELS[scope] || 'Kanál');
         if (nodeEl) {
             nodeEl.textContent = gpsOk ? 'NOSIČ' : 'GPS?';
             nodeEl.style.visibility = 'hidden';
@@ -1392,13 +1439,7 @@ function renderDisplay() {
                 footerWrap.innerHTML = '0 KEY · <span id="radio-display-com"></span>';
                 foot = el('radio-display-com');
             }
-            if (foot) {
-                var rx = getRadioListenStatus();
-                var rxHint = rx && rx.state === 'ok' ? ' · RX OK'
-                    : (rx && rx.state === 'partial' ? ' · RX kanály'
-                        : (rx && rx.state === 'error' ? ' · RX?' : ''));
-                foot.textContent = standbyLines.footer + rxHint;
-            }
+            if (foot) foot.textContent = standbyLines.footer;
         }
         updateChargeButtonUi();
     } else {
@@ -1419,6 +1460,7 @@ function renderDisplay() {
                 ch.textContent = formatDisplayStatus(osView.status || 'Menu');
             }
         }
+        if (clockEl) clockEl.textContent = '';
         if (sig) {
             sig.textContent = '';
             sig.style.color = '';
@@ -3482,6 +3524,10 @@ function bindDpadNavigation() {
             return;
         }
         if (isStandbyScreen()) {
+            if (standbyUi.active && (key === 'left' || key === 'right')) {
+                handleStandbyInput(key === 'right' ? 'preset_next' : 'preset_prev');
+                return;
+            }
             if (key === 'left' || key === 'right') {
                 if (key === 'right') handleStandbyInput('ok');
                 else handleStandbyInput('back');

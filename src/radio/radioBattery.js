@@ -51,14 +51,19 @@ export function formatBatteryPercent(state) {
     return Math.round(state.batteryLevel) + '%';
 }
 
-export function formatStandbyClockLine(state, now) {
+export function formatStandbyClockBattery(state, now) {
     now = now || new Date();
     normalizeBatteryFields(state);
     var dd = String(now.getDate()).padStart(2, '0');
     var mm = String(now.getMonth() + 1).padStart(2, '0');
     var hh = String(now.getHours()).padStart(2, '0');
     var mi = String(now.getMinutes()).padStart(2, '0');
-    return dd + '.' + mm + '. ' + hh + ':' + mi + '  ·  ' + formatBatteryPercent(state);
+    return dd + '.' + mm + '. ' + hh + ':' + mi + '  BAT ' + Math.round(state.batteryLevel) + '%';
+}
+
+/** @deprecated alias */
+export function formatStandbyClockLine(state, now) {
+    return formatStandbyClockBattery(state, now);
 }
 
 export function canStartBatteryCharging(state) {
