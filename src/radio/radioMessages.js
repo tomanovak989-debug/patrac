@@ -14,6 +14,7 @@ export var COMMS_DRAFTS = 'drafts';
 export var COMMS_AUTOSCAN = 'autoscan';
 export var COMMS_COMPOSE = 'compose';
 export var COMMS_CONFIRM = 'confirm';
+export var COMMS_DETAIL = 'detail';
 export var COMMS_TEMPLATES = 'templates';
 
 export function createCommsState() {

@@ -2254,7 +2254,7 @@ function openSnakeScreen() {
 function closeSnakeScreen() {
     stopSnakeTimer();
     snakeSession = null;
-    renderDisplay();
+    if (state) renderDisplay();
 }
 
 function handleSnakeOk() {
