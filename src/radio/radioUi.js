@@ -487,6 +487,9 @@ var DISPLAY_LINE_IDS = [
 
 var LINE_MARQUEE_HOLD_MS = 2000;
 var lineMarqueeState = null;
+var MENU_SCROLL_MS = 165;
+var menuScrollTracker = { key: '', index: -1 };
+var menuScrollAnimating = false;
 
 function escapeDisplayText(text) {
     return String(text || '')
@@ -664,8 +667,7 @@ function clearStandbyDisplayLayout(f, k, buf, p) {
     }
 }
 
-function setDisplayMenuLines(lines, focusLine, lineStyles) {
-    clearLineMarquee();
+function applyMenuLineContent(lines, focusLine, lineStyles) {
     lines = lines || [];
     focusLine = focusLine == null ? -1 : focusLine;
     lineStyles = lineStyles || [];
@@ -681,6 +683,79 @@ function setDisplayMenuLines(lines, focusLine, lineStyles) {
     if (focusLine >= 0 && focusLine < lines.length && lines[focusLine]) {
         scheduleLineMarquee(focusLine, lines[focusLine]);
     }
+}
+
+function resolveMenuScrollMeta(osView) {
+    if (!osView || osView.focusLine == null || osView.focusLine < 0) {
+        return { key: '', index: -1, animate: false };
+    }
+    if (osView.mode !== 'menu' && osView.mode !== 'comms' && osView.mode !== 'beacon' &&
+        osView.mode !== 'preset_detail' && osView.mode !== 'sound_settings') {
+        return { key: '', index: -1, animate: false };
+    }
+    var key = osView.mode + '|' + (osView.status || '');
+    var index = -1;
+    if (osView.mode === 'comms' && commsSession) index = commsSession.focusIndex;
+    else if (osView.mode === 'beacon' && beaconSession) index = beaconSession.focusIndex;
+    else if (osView.mode === 'preset_detail' && radioOs) index = radioOs.presetFieldFocus;
+    else if (osView.mode === 'sound_settings' && radioOs) index = radioOs.soundFieldFocus;
+    else if (radioOs) index = radioOs.focusIndex;
+    return { key: key, index: index, animate: true };
+}
+
+function computeMenuScrollDirection(meta) {
+    if (!meta.animate || meta.index < 0) return 0;
+    var dir = 0;
+    if (menuScrollTracker.key === meta.key && menuScrollTracker.index >= 0) {
+        if (meta.index > menuScrollTracker.index) dir = 1;
+        else if (meta.index < menuScrollTracker.index) dir = -1;
+    }
+    menuScrollTracker.key = meta.key;
+    menuScrollTracker.index = meta.index;
+    return dir;
+}
+
+function setDisplayMenuLines(lines, focusLine, lineStyles, scrollDir) {
+    clearLineMarquee();
+    scrollDir = scrollDir || 0;
+
+    if (scrollDir !== 0 && focusLine >= 0 && !menuScrollAnimating) {
+        var rows = [];
+        var i;
+        for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
+            var rowEl = el(DISPLAY_LINE_IDS[i]);
+            if (rowEl) rows.push(rowEl);
+        }
+        var lineH = rows[0] ? rows[0].offsetHeight : 0;
+        if (lineH < 6) lineH = 14;
+
+        menuScrollAnimating = true;
+        applyMenuLineContent(lines, focusLine, lineStyles);
+
+        for (i = 0; i < rows.length; i++) {
+            rows[i].style.transition = 'none';
+            rows[i].style.transform = 'translateY(' + (-scrollDir * lineH) + 'px)';
+        }
+
+        requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+                for (i = 0; i < rows.length; i++) {
+                    rows[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms ease-out';
+                    rows[i].style.transform = 'translateY(0)';
+                }
+                setTimeout(function() {
+                    for (i = 0; i < rows.length; i++) {
+                        rows[i].style.transition = '';
+                        rows[i].style.transform = '';
+                    }
+                    menuScrollAnimating = false;
+                }, MENU_SCROLL_MS + 20);
+            });
+        });
+        return;
+    }
+
+    applyMenuLineContent(lines, focusLine, lineStyles);
 }
 
 function clearDisplayRowFocus() {
@@ -1454,6 +1529,8 @@ function renderDisplay() {
     if (nodeEl) nodeEl.style.visibility = '';
 
     if (osView.mode === 'standby' || osView.mode === 'standby_tune') {
+        menuScrollTracker.key = '';
+        menuScrollTracker.index = -1;
         var gpsOk = !!(c.originLat != null && c.originLng != null);
         updateRadioStatusWidgets(state, osView);
         if (ch) ch.textContent = '';
@@ -1501,12 +1578,17 @@ function renderDisplay() {
             f.removeAttribute('data-kind');
             f.style.color = '';
         }
-        setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
+        setDisplayMenuLines(
+            menuLines,
+            osView.focusLine == null ? -1 : osView.focusLine,
+            osView.lineStyles,
+            computeMenuScrollDirection(resolveMenuScrollMeta(osView))
+        );
         if (ch) {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
             } else {
-                ch.textContent = formatDisplayStatus(osView.status || 'Menu');
+                ch.textContent = '';
             }
         }
         updateRadioStatusWidgets(state, osView);
