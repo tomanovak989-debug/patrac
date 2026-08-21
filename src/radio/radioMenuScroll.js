@@ -11,6 +11,12 @@ export function clampMenuFocus(index, count) {
     return index;
 }
 
+/** Nekonečné menu — z poslední na první a naopak. */
+export function wrapMenuFocus(index, count, delta) {
+    if (count <= 0) return 0;
+    return ((index + delta) % count + count) % count;
+}
+
 /**
  * @param {Array} items
  * @param {number} focusIndex

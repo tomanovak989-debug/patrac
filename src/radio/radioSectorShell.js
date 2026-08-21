@@ -1,7 +1,18 @@
 /**
  * SECTOR-TECH — dva pohledy (celá / displej+klávesnice), kalibrace pásem, +/- ovládání.
+ * Per-device prefs: uživatel nastaví pásma, zamkne → vodící lišty zmizí.
  */
 import { applyRadioHitmap } from './radioHitmap.js';
+import {
+    loadSectorDisplayPrefs,
+    lockSectorDisplayPrefs,
+    unlockSectorDisplayPrefs,
+    getSectorViewModeFromPrefs,
+    setSectorViewModeInPrefs,
+    getSectorBandsFromPrefs,
+    setSectorBandsInPrefs,
+    isSectorDisplayLocked
+} from './radioSectorDisplayPrefs.js';
 
 function el(id) {
     return document.getElementById(id);
@@ -11,66 +22,29 @@ var GRID_SRC = 800;
 var GRID_STEP = 50;
 var GRID_MINOR = 25;
 var BAND_MIN_GAP = 80;
-
-var VIEW_BANDS_KEY = 'patrac_sector_view_bands';
-var VIEW_MODE_KEY = 'patrac_sector_view_mode';
 var CAL_SCALE = 2.0;
 
-var DEFAULT_BANDS = {
-    full: { top: 120, bottom: 790 },
-    focus: { top: 333, bottom: 786 }
-};
-
 var viewMode = 'focus';
-var bandsCache = null;
 var dragState = null;
 
-function cloneBands(src) {
-    return {
-        full: { top: src.full.top, bottom: src.full.bottom },
-        focus: { top: src.focus.top, bottom: src.focus.bottom }
-    };
+function isRadioTabActive() {
+    return document.body.classList.contains('radio-tab-active');
 }
 
-function loadBands() {
-    if (bandsCache) return bandsCache;
-    try {
-        var raw = JSON.parse(localStorage.getItem(VIEW_BANDS_KEY));
-        if (raw && raw.full && raw.focus) {
-            bandsCache = cloneBands(raw);
-            return bandsCache;
-        }
-    } catch (e) {}
-    bandsCache = cloneBands(DEFAULT_BANDS);
-    return bandsCache;
-}
-
-function saveBands(bands) {
-    bandsCache = cloneBands(bands);
-    try { localStorage.setItem(VIEW_BANDS_KEY, JSON.stringify(bandsCache)); } catch (e) {}
-    updateBandReadout();
-}
-
-function getViewMode() {
-    try {
-        var m = localStorage.getItem(VIEW_MODE_KEY);
-        if (m === 'full' || m === 'focus') return m;
-    } catch (e) {}
-    return 'focus';
-}
-
-function setViewMode(mode) {
-    viewMode = mode === 'full' ? 'full' : 'focus';
-    try { localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch (e) {}
-    updateViewControls();
-}
-
-function isCalibrateMode() {
+function isAdminCalibrateMode() {
     try {
         if (/[?&]radioCal=1/i.test(window.location.search || '')) return true;
     } catch (e) {}
     return document.body.classList.contains('admin-mode') ||
         document.body.classList.contains('sector-calibrate');
+}
+
+function isUserSetupMode() {
+    return isRadioTabActive() && !isSectorDisplayLocked();
+}
+
+function isCalibrateMode() {
+    return isAdminCalibrateMode() || isUserSetupMode();
 }
 
 function clampY(y) {
@@ -85,6 +59,27 @@ function normalizeBand(band) {
         else bottom = top + BAND_MIN_GAP;
     }
     return { top: clampY(top), bottom: clampY(bottom) };
+}
+
+function loadBands() {
+    return getSectorBandsFromPrefs();
+}
+
+function saveBands(bands) {
+    if (isSectorDisplayLocked() && !isAdminCalibrateMode()) return;
+    setSectorBandsInPrefs(bands);
+    updateBandReadout();
+    updateSetupBarUi();
+}
+
+function getViewMode() {
+    return getSectorViewModeFromPrefs();
+}
+
+function setViewMode(mode) {
+    viewMode = mode === 'full' ? 'full' : 'focus';
+    setSectorViewModeInPrefs(viewMode);
+    updateViewControls();
 }
 
 function currentBand() {
@@ -133,8 +128,24 @@ function applyLayout(scroll) {
 function updateViewControls() {
     var plus = el('sector-view-plus');
     var minus = el('sector-view-minus');
+    var lockBtn = el('sector-view-lock');
+    var unlockBtn = el('sector-view-unlock');
     if (plus) plus.classList.toggle('is-active', viewMode === 'focus');
     if (minus) minus.classList.toggle('is-active', viewMode === 'full');
+    if (lockBtn) lockBtn.hidden = isSectorDisplayLocked() || !isUserSetupMode();
+    if (unlockBtn) unlockBtn.hidden = !isSectorDisplayLocked() || !isRadioTabActive();
+}
+
+function updateSetupBarUi() {
+    var bar = el('sector-setup-bar');
+    var locked = isSectorDisplayLocked();
+    var setup = isUserSetupMode();
+    if (bar) {
+        bar.hidden = !setup;
+        bar.setAttribute('aria-hidden', setup ? 'false' : 'true');
+    }
+    document.body.classList.toggle('sector-user-setup-on', setup);
+    updateViewControls();
 }
 
 function updateBandReadout() {
@@ -142,8 +153,8 @@ function updateBandReadout() {
     if (!node) return;
     var b = loadBands();
     node.textContent =
-        'CELO: Y ' + b.full.top + '–' + b.full.bottom +
-        ' · VÝŘEZ: Y ' + b.focus.top + '–' + b.focus.bottom;
+        'Celo: Y ' + b.full.top + '–' + b.full.bottom +
+        ' · Výřez: Y ' + b.focus.top + '–' + b.focus.bottom;
 }
 
 function positionBandLine(line, ySrc) {
@@ -167,6 +178,8 @@ function updateBandLinePositions(stage) {
 function bindViewControls() {
     var minus = el('sector-view-minus');
     var plus = el('sector-view-plus');
+    var lockBtn = el('sector-view-lock');
+    var unlockBtn = el('sector-view-unlock');
     if (!minus || !plus || minus._sectorViewBound) return;
     minus._sectorViewBound = true;
     plus._sectorViewBound = true;
@@ -183,6 +196,26 @@ function bindViewControls() {
         setViewMode('focus');
         remeasureAll();
     });
+
+    if (lockBtn && !lockBtn._sectorViewBound) {
+        lockBtn._sectorViewBound = true;
+        lockBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            lockSectorDisplayPrefs();
+            remeasureAll();
+        });
+    }
+
+    if (unlockBtn && !unlockBtn._sectorViewBound) {
+        unlockBtn._sectorViewBound = true;
+        unlockBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            unlockSectorDisplayPrefs();
+            remeasureAll();
+        });
+    }
 }
 
 function clientYToSourceY(stage, clientY) {
@@ -219,7 +252,7 @@ function bindBandLines() {
             band.bottom = Math.max(y, band.top + BAND_MIN_GAP);
         }
         bands[dragState.bandKey] = normalizeBand(band);
-        bandsCache = cloneBands(bands);
+        setSectorBandsInPrefs(bands);
         positionBandLine(dragState.line, bands[dragState.bandKey][dragState.edge]);
         updateBandReadout();
     }
@@ -276,7 +309,7 @@ function stagePxToSource(stageRect, stageMetrics, rect) {
 function rebuildCalGrid(stage) {
     var svg = stage.querySelector('.sector-cal-grid');
     if (!svg) return;
-    if (!isCalibrateMode()) {
+    if (!isAdminCalibrateMode()) {
         svg.innerHTML = '';
         svg.style.display = 'none';
         return;
@@ -342,7 +375,7 @@ function rebuildCalGrid(stage) {
 function updateViewportRulers(scroll) {
     var wrap = el('sector-cal-rulers');
     if (!wrap) return;
-    if (!isCalibrateMode()) {
+    if (!isAdminCalibrateMode()) {
         wrap.style.display = 'none';
         return;
     }
@@ -421,7 +454,7 @@ function bindCrosshair() {
     });
 
     function onPlace(clientX, clientY) {
-        if (!isCalibrateMode() || !document.body.classList.contains('sector-cross-mode')) return;
+        if (!isAdminCalibrateMode() || !document.body.classList.contains('sector-cross-mode')) return;
         var pt = clientToSource(stage, clientX, clientY);
         placeCalCross(stage, pt.x, pt.y);
     }
@@ -443,11 +476,17 @@ function updateCalibrationLabels() {
     var stage = document.querySelector('.sector-tech-stage');
     if (!stage) return;
     var on = isCalibrateMode();
+    var adminOn = isAdminCalibrateMode();
     document.body.classList.toggle('sector-calibrate-on', on);
+    document.body.classList.toggle('sector-admin-calibrate-on', adminOn);
     if (!on) setCrossMode(false);
 
-    var bar = el('sector-scale-bar');
-    if (bar) bar.style.display = on ? 'flex' : 'none';
+    var adminBar = el('sector-scale-bar');
+    if (adminBar) {
+        adminBar.style.display = adminOn ? 'flex' : 'none';
+    }
+
+    updateSetupBarUi();
 
     var bandWrap = el('sector-view-bands');
     if (bandWrap) {
@@ -476,7 +515,7 @@ function updateCalibrationLabels() {
         }
         var name = node.id || node.getAttribute('data-key') || 'screen';
         tag.textContent = name + '  ' + src.x + ',' + src.y + '  ' + src.w + '×' + src.h + 'px';
-        tag.style.display = on ? 'block' : 'none';
+        tag.style.display = adminOn ? 'block' : 'none';
     }
 }
 
@@ -506,8 +545,8 @@ export function initSectorTechShell() {
     if (!scroll || scroll._sectorBound) return;
     scroll._sectorBound = true;
 
+    loadSectorDisplayPrefs();
     viewMode = getViewMode();
-    loadBands();
     bindViewControls();
     bindBandLines();
     bindCrosshair();
@@ -537,7 +576,7 @@ export function initSectorTechShell() {
     }
 
     scroll.addEventListener('scroll', function() {
-        if (isCalibrateMode()) updateViewportRulers(scroll);
+        if (isAdminCalibrateMode()) updateViewportRulers(scroll);
     }, { passive: true });
 }
 
@@ -548,3 +587,5 @@ export function scrollSectorTechTo() {
 export function refreshSectorTechLayout() {
     remeasureAll();
 }
+
+export { isSectorDisplayLocked, lockSectorDisplayPrefs, unlockSectorDisplayPrefs };

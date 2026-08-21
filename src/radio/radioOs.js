@@ -6,8 +6,9 @@ import { buildAutoscanOsView } from './radioAutoscan.js';
 import { buildCommsOsView } from './radioMessages.js';
 import { buildBeaconOsView } from './radioBeacon.js';
 import { buildSnakeOsView } from './radioSnake.js';
-import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
-import { buildFixedCursorMenuLines, MENU_CURSOR_ROW } from './radioMenuScroll.js';
+import { formatMenuDisplayLabel } from './radioShortcuts.js';
+import { buildFixedCursorMenuLines, MENU_CURSOR_ROW, wrapMenuFocus } from './radioMenuScroll.js';
+import { menuIconForItem } from './radioMenuIcons.js';
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
 export var SCREEN_STUB = 'stub';
@@ -15,17 +16,17 @@ export var SCREEN_STUB = 'stub';
 var PRESET_SLOTS = 15;
 
 var RADIO_MENU = [
-    { id: 'radio_comms', label: '1 · ZPRÁVY', action: 'screen:comms', shortcutAction: 'menu:comms' },
-    { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
-    { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
-    { id: 'radio_beacon', label: '4 · BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
-    { id: 'radio_snake', label: '5 · SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' },
-    { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
+    { id: 'radio_comms', label: 'ZPRÁVY', action: 'screen:comms', shortcutAction: 'menu:comms' },
+    { id: 'radio_presets', label: 'PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
+    { id: 'radio_autoscan', label: 'AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
+    { id: 'radio_beacon', label: 'BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
+    { id: 'radio_snake', label: 'SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' },
+    { id: 'radio_settings', label: 'NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
 ];
 
 var SETTINGS_MENU = [
-    { id: 'settings_sounds', label: '1 · ZVUKY', action: 'submenu:sounds' },
-    { id: 'settings_quickkeys', label: '2 · RYCHLÉ VOLBY', action: 'submenu:quickkeys' }
+    { id: 'settings_sounds', label: 'ZVUKY', action: 'submenu:sounds' },
+    { id: 'settings_quickkeys', label: 'RYCHLÉ VOLBY', action: 'submenu:quickkeys' }
 ];
 
 var SOUND_FIELDS = ['key', 'ring', 'message'];
@@ -72,8 +73,8 @@ function clampFocus(index, count) {
 
 export function presetSlotLabel(slot, radioState) {
     var p = radioState ? findPreset(radioState, slot) : null;
-    if (p && p.label) return slot + ' ' + p.label;
-    return slot + ' PRÁZDNÝ';
+    if (p && p.label) return p.label;
+    return 'Prázdný kanál';
 }
 
 export function createPresetDraft(slot, radioState) {
@@ -133,7 +134,7 @@ function buildSoundSettingsLines(os, radioState) {
     var i;
     for (i = 0; i < SOUND_FIELDS.length; i++) {
         var field = SOUND_FIELDS[i];
-        items.push((i + 1) + ' ' + SOUND_LABELS[field] + '   ' + prefs[field]);
+        items.push(SOUND_LABELS[field] + '   ' + prefs[field]);
     }
     return buildFixedCursorMenuLines(items, os.soundFieldFocus, function(item) { return item; });
 }
@@ -165,8 +166,8 @@ function buildQuickKeysHelpLines(radioState) {
     var keys = radioState.quickKeys || {};
     var lines = [
         'Podrž 1–9/P1/P2',
-        'v menu = zkratka',
         'z úvodní obrazovky',
+        '= rychlá volba',
         '',
         '',
         ''
@@ -183,10 +184,9 @@ function buildQuickKeysHelpLines(radioState) {
     return lines;
 }
 
-function decorateItemLabel(item, radioState) {
+function decorateItemLabel(item) {
     if (!item) return '';
-    var key = findQuickKeyForAction(radioState, item.shortcutAction || item.action);
-    return decorateMenuLabel(item.label || '', key);
+    return formatMenuDisplayLabel(item.label || '');
 }
 
 export function getFocusedMenuItem(os, radioState) {
@@ -361,11 +361,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
         if (action === 'up') {
-            os.soundFieldFocus = clampFocus(os.soundFieldFocus - 1, SOUND_FIELDS.length);
+            os.soundFieldFocus = wrapMenuFocus(os.soundFieldFocus, SOUND_FIELDS.length, -1);
             return { changed: true };
         }
         if (action === 'down') {
-            os.soundFieldFocus = clampFocus(os.soundFieldFocus + 1, SOUND_FIELDS.length);
+            os.soundFieldFocus = wrapMenuFocus(os.soundFieldFocus, SOUND_FIELDS.length, 1);
             return { changed: true };
         }
         if (action === 'left' || action === 'right') {
@@ -379,11 +379,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail') {
         if (action === 'up') {
-            os.presetFieldFocus = clampFocus(os.presetFieldFocus - 1, 3);
+            os.presetFieldFocus = wrapMenuFocus(os.presetFieldFocus, 3, -1);
             return { changed: true };
         }
         if (action === 'down') {
-            os.presetFieldFocus = clampFocus(os.presetFieldFocus + 1, 3);
+            os.presetFieldFocus = wrapMenuFocus(os.presetFieldFocus, 3, 1);
             return { changed: true };
         }
         if (action === 'ok' || action === 'right') {
@@ -400,11 +400,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     if (os.screen === SCREEN_MENU) {
         var menuItems = getCurrentMenuItems(os, radioState);
         if (action === 'up') {
-            os.focusIndex = clampFocus(os.focusIndex - 1, menuItems.length);
+            os.focusIndex = wrapMenuFocus(os.focusIndex, menuItems.length, -1);
             return { changed: true };
         }
         if (action === 'down') {
-            os.focusIndex = clampFocus(os.focusIndex + 1, menuItems.length);
+            os.focusIndex = wrapMenuFocus(os.focusIndex, menuItems.length, 1);
             return { changed: true };
         }
         if (action === 'ok' || action === 'right') {
@@ -485,9 +485,9 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail' && draft) {
         var presetView = buildFixedCursorMenuLines([
-            '1 NÁZEV  ' + (draft.label || ('Kanál ' + draft.slot)),
-            '2 F       ' + (draft.frequency || '---.---'),
-            '3 ŠIFRA   ' + (draft.encryptionKey ? draft.encryptionKey : '—')
+            'NÁZEV  ' + (draft.label || ('Kanál ' + draft.slot)),
+            'F       ' + (draft.frequency || '---.---'),
+            'ŠIFRA   ' + (draft.encryptionKey ? draft.encryptionKey : '—')
         ], os.presetFieldFocus, function(item) { return item; });
         presetView.mode = 'preset_detail';
         presetView.status = menuStatusLabel(os, radioState, draft);
@@ -543,8 +543,9 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     var items = getCurrentMenuItems(os, radioState);
+    var focusedItem = items[os.focusIndex] || null;
     var menuView = buildFixedCursorMenuLines(items, os.focusIndex, function(item) {
-        return decorateItemLabel(item, radioState);
+        return decorateItemLabel(item);
     });
 
     return {
@@ -552,7 +553,8 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         status: menuStatusLabel(os, radioState, draft),
         lines: menuView.lines,
         focusLine: menuView.focusLine,
-        footer: 'Čísla · OK · Zpět',
+        menuIcon: menuIconForItem(focusedItem),
+        footer: 'OK · Zpět',
         buffer: ''
     };
 }

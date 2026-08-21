@@ -2,8 +2,9 @@
  * SMS — hub, seznamy, compose, detail, potvrzení odeslání.
  */
 import { findPreset, normalizeFrequency, formatTime } from './radioComms.js';
-import { decorateMenuLabel, findQuickKeyForAction, formatMenuDisplayLabel } from './radioShortcuts.js';
+import { formatMenuDisplayLabel } from './radioShortcuts.js';
 import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
+import { menuIconForItem } from './radioMenuIcons.js';
 
 var DISPLAY_LINES = 6;
 var LINE_CHARS = 18;
@@ -141,23 +142,10 @@ function formatEntryLine(entry, radioState) {
     return { text: line, bold: bold };
 }
 
-function commsActionId(item) {
-    if (!item || item.type !== 'action') return null;
-    if (item.id === 'new_sms') return 'comms:new_sms';
-    if (item.id === 'inbox') return 'comms:inbox';
-    if (item.id === 'outbox') return 'comms:outbox';
-    if (item.id === 'drafts') return 'comms:drafts';
-    if (item.id === 'autoscan') return 'comms:autoscan';
-    if (item.id === 'send_yes') return 'comms:send';
-    return null;
-}
-
 function formatItem(item, radioState) {
     if (!item) return { text: '', bold: false };
     if (item.label) {
-        var actionId = commsActionId(item);
-        var key = actionId && radioState ? findQuickKeyForAction(radioState, actionId) : null;
-        return { text: key ? decorateMenuLabel(item.label, key) : formatMenuDisplayLabel(item.label), bold: false };
+        return { text: formatMenuDisplayLabel(item.label), bold: false };
     }
     if (item.type === 'draft') {
         return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };
@@ -176,12 +164,12 @@ function pushFormattedLine(lines, lineStyles, formatted) {
 
 function hubItems() {
     return [
-        { type: 'action', id: 'new_sms', label: '1 · NOVÁ SMS', digit: '1' },
-        { type: 'action', id: 'inbox', label: '2 · PŘIJATÉ', digit: '2' },
-        { type: 'action', id: 'outbox', label: '3 · ODESLANÉ', digit: '3' },
-        { type: 'action', id: 'drafts', label: '4 · KONCEPTY', digit: '4' },
-        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN (spustit)', digit: '5' },
-        { type: 'action', id: 'templates', label: '6 · ŠABLONY', digit: '6' }
+        { type: 'action', id: 'new_sms', label: 'NOVÁ SMS' },
+        { type: 'action', id: 'inbox', label: 'PŘIJATÉ' },
+        { type: 'action', id: 'outbox', label: 'ODESLANÉ' },
+        { type: 'action', id: 'drafts', label: 'KONCEPTY' },
+        { type: 'action', id: 'autoscan', label: 'AUTOSKEN (spustit)' },
+        { type: 'action', id: 'templates', label: 'ŠABLONY' }
     ];
 }
 
@@ -376,7 +364,7 @@ export function buildCommsOsView(session, notebook, radioState) {
 
     if (session.screen === COMMS_HUB) {
         status = 'ZPRÁVY';
-        footer = 'Čísla · OK · Zpět';
+        footer = 'OK · Zpět';
     } else if (session.screen === COMMS_INBOX) {
         status = 'PŘIJATÉ';
         footer = 'OK detail · Zpět';
@@ -397,12 +385,15 @@ export function buildCommsOsView(session, notebook, radioState) {
         footer = 'OK · Zpět';
     }
 
+    var focusedCommsItem = items.length ? items[session.focusIndex] : null;
+
     return {
         mode: 'comms',
         status: status,
         lines: lines,
         lineStyles: lineStyles,
         focusLine: focusLine,
+        menuIcon: menuIconForItem(focusedCommsItem),
         footer: footer,
         buffer: ''
     };

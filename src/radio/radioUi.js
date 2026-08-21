@@ -79,10 +79,13 @@ import { applyDisplayTypography } from './radioHitmap.js';
 import {
     syncBattery,
     formatStandbyClockBattery,
+    formatDisplayClockLine,
     formatBatteryPercent,
     toggleBatteryCharging,
     stopBatteryCharging
 } from './radioBattery.js';
+import { radioIconUrl } from './radioMenuIcons.js';
+import { wrapMenuFocus } from './radioMenuScroll.js';
 import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback, radioKeypadPttDown, radioKeypadPttUp } from './radioFeedback.js';
 import {
     createRadioOsState,
@@ -93,8 +96,7 @@ import {
     createPresetDraft,
     savePresetDraft,
     getFocusedMenuItem,
-    getMenuItems,
-    executeMenuDigit
+    getMenuItems
 } from './radioOs.js';
 import {
     createAutoscanState,
@@ -133,7 +135,6 @@ import {
     getFocusedCommsAction,
     commsBackScreen,
     formatChannelTarget,
-    hubActionFromDigit,
     COMMS_HUB,
     COMMS_INBOX,
     COMMS_OUTBOX,
@@ -558,6 +559,39 @@ function getStandbyStatusTitle(state) {
 function setStandbyClockDisplay(clockEl, state) {
     if (!clockEl) return;
     clockEl.textContent = formatStandbyClockBattery(state);
+}
+
+function updateRadioStatusWidgets(state, osView) {
+    var clockEl = el('radio-display-clock');
+    var batteryWrap = el('radio-display-battery');
+    var batteryPct = el('radio-display-battery-pct');
+    var batteryBg = el('radio-display-battery-bg');
+    var menuIconWrap = el('radio-display-menu-icon');
+    var menuIconImg = el('radio-display-menu-icon-img');
+    var autoscanActive = !!(autoscanSession && autoscanSession.status === SCAN_RUNNING);
+
+    syncBattery(state, { operatingMode: state.operatingMode, autoscanActive: autoscanActive });
+
+    if (clockEl) clockEl.textContent = formatDisplayClockLine(state);
+
+    if (batteryPct) batteryPct.textContent = String(Math.round(state.batteryLevel));
+    if (batteryBg) batteryBg.src = radioIconUrl('battery-empty.png');
+
+    if (batteryWrap) {
+        batteryWrap.hidden = state.operatingMode === 'off' && !state.batteryCharging;
+    }
+
+    var iconFile = osView && osView.menuIcon ? osView.menuIcon : null;
+    var showMenuIcon = !!(iconFile && isRadioOsActive(radioOs) && osView && osView.mode !== 'standby' && osView.mode !== 'standby_tune');
+    if (menuIconWrap && menuIconImg) {
+        if (showMenuIcon) {
+            menuIconWrap.hidden = false;
+            menuIconImg.src = radioIconUrl(iconFile);
+        } else {
+            menuIconWrap.hidden = true;
+            menuIconImg.removeAttribute('src');
+        }
+    }
 }
 
 function applyStandbyMainLayout(f, k, buf, p, state, opts) {
@@ -1163,50 +1197,9 @@ function executeQuickKey(keyId) {
     return false;
 }
 
-function handleBeaconDigit(digit) {
-    var session = ensureBeaconSession();
-    refreshBeaconActiveFromStorage();
-    if (session.screen !== BEACON_HUB) return;
-    var items = clampBeaconFocus(session, beaconActive);
-    var idx = parseInt(digit, 10) - 1;
-    if (idx < 0 || idx >= items.length) return;
-    session.focusIndex = idx;
-    renderDisplay();
-}
-
-/** Číslice v menu/submenu — výběr řádku podle čísla. Rychlé volby jen z úvodní obrazovky. */
-function handleMenuDigitNavigation(keyId) {
-    if (!isRadioOsActive(radioOs) || !/^[0-9]$/.test(keyId)) return;
-
-    var leaf = radioOs.menuPath && radioOs.menuPath.length
-        ? radioOs.menuPath[radioOs.menuPath.length - 1]
-        : '';
-
-    if (leaf === 'comms') {
-        handleCommsDigit(keyId);
-        return;
-    }
-    if (leaf === 'beacon') {
-        handleBeaconDigit(keyId);
-        return;
-    }
-
-    var digitResult = executeMenuDigit(radioOs, state, keyId);
-    if (digitResult && digitResult.changed) {
-        clearMenuDial(menuDial);
-        applyRadioOsEffect(digitResult);
-        renderDisplay();
-    }
-}
-
 function handleMenuKeypadDigit(keyId) {
     if (isStandbyScreen() && isQuickKeyId(keyId)) {
         tryExecuteQuickKey(keyId);
-        return;
-    }
-
-    if (isRadioOsActive(radioOs) && /^[0-9]$/.test(keyId)) {
-        handleMenuDigitNavigation(keyId);
     }
 }
 
@@ -1383,7 +1376,7 @@ function renderDisplay() {
                 ch.textContent = formatDisplayStatus(editView.status || '');
             }
         }
-        if (clockEl) clockEl.textContent = '';
+        updateRadioStatusWidgets(state, null);
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
         if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
         clearStandbyDisplayLayout(f, k, buf, p);
@@ -1462,7 +1455,7 @@ function renderDisplay() {
 
     if (osView.mode === 'standby' || osView.mode === 'standby_tune') {
         var gpsOk = !!(c.originLat != null && c.originLng != null);
-        setStandbyClockDisplay(clockEl, state);
+        updateRadioStatusWidgets(state, osView);
         if (ch) ch.textContent = '';
         setStandbySignalIndicator(sig);
         if (standbyUi.active) {
@@ -1516,7 +1509,7 @@ function renderDisplay() {
                 ch.textContent = formatDisplayStatus(osView.status || 'Menu');
             }
         }
-        if (clockEl) clockEl.textContent = '';
+        updateRadioStatusWidgets(state, osView);
         if (sig) {
             sig.textContent = '';
             sig.style.color = '';
@@ -2065,8 +2058,9 @@ async function finishBeaconPttRecord() {
 function handleBeaconUp() {
     var session = ensureBeaconSession();
     if (session.screen === BEACON_CONFIRM) return;
-    clampBeaconFocus(session, beaconActive);
-    session.focusIndex = Math.max(0, session.focusIndex - 1);
+    var items = clampBeaconFocus(session, beaconActive);
+    if (!items.length) return;
+    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, -1);
     renderDisplay();
 }
 
@@ -2075,7 +2069,7 @@ function handleBeaconDown() {
     if (session.screen === BEACON_CONFIRM) return;
     var items = clampBeaconFocus(session, beaconActive);
     if (!items.length) return;
-    session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
+    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, 1);
     renderDisplay();
 }
 
@@ -2305,8 +2299,9 @@ function cancelStandbyPtt() {
 function handleCommsUp() {
     var session = ensureCommsSession();
     if (session.screen === COMMS_COMPOSE) return;
-    clampCommsFocus(session, notebook);
-    session.focusIndex = Math.max(0, session.focusIndex - 1);
+    var items = clampCommsFocus(session, notebook);
+    if (!items.length) return;
+    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, -1);
     renderDisplay();
 }
 
@@ -2315,7 +2310,7 @@ function handleCommsDown() {
     if (session.screen === COMMS_COMPOSE) return;
     var items = clampCommsFocus(session, notebook);
     if (!items.length) return;
-    session.focusIndex = Math.min(items.length - 1, session.focusIndex + 1);
+    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, 1);
     renderDisplay();
 }
 
@@ -2413,14 +2408,6 @@ function handleCommsOk() {
 
     if (session.screen === COMMS_COMPOSE && !isFieldEditActive(fieldEditSession)) {
         openCommsCompose('');
-    }
-}
-
-function handleCommsDigit(digit) {
-    var session = ensureCommsSession();
-    if (session.screen === COMMS_HUB) {
-        var hubId = hubActionFromDigit(digit);
-        if (hubId) openCommsAction(hubId);
     }
 }
 

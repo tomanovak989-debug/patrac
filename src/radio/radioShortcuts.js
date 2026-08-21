@@ -60,6 +60,7 @@ export function decorateMenuLabel(label, keyId) {
 export function formatMenuDisplayLabel(label) {
     label = String(label || '');
     if (!label) return '';
+    label = label.replace(/^\d+\s*[·.]?\s*/, '');
     var badge = '';
     var badgeMatch = label.match(QUICK_KEY_BADGE_RE);
     if (badgeMatch) {

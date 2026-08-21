@@ -1218,6 +1218,47 @@ body.radio-tab-active .sector-view-controls {
     font-size: calc(44px * 0.28);
     line-height: 1.05;
 }
+.sector-view-btn--lock {
+    font-size: calc(44px * 0.26);
+    line-height: 1.05;
+    border-color: rgba(255, 230, 0, 0.65);
+    color: #ffe600;
+}
+.sector-view-btn--unlock {
+    font-size: calc(44px * 0.28);
+    line-height: 1.05;
+}
+.sector-view-btn[hidden] {
+    display: none !important;
+}
+.sector-setup-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    background: rgba(8, 18, 10, 0.92);
+    border-bottom: 1px solid rgba(120, 255, 102, 0.35);
+    font-size: var(--text-xs);
+    color: #78ff66;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+body.sector-user-setup-on .sector-setup-bar {
+    display: flex;
+}
+.sector-setup-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    letter-spacing: 0.03em;
+    opacity: 0.92;
+}
+.sector-setup-bar .sector-band-readout {
+    flex-shrink: 0;
+    font: bold 10px 'IBM Plex Mono', monospace;
+    color: #b8ffb0;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
 .sector-view-btn.is-disabled {
     opacity: 0.38;
     cursor: not-allowed;
@@ -1264,6 +1305,9 @@ body.sector-calibrate-on .sector-scale-bar {
     z-index: 510;
     display: flex !important;
     margin: 0;
+}
+body.sector-user-setup-on:not(.sector-admin-calibrate-on) .sector-tech-scroll {
+    overflow-y: auto;
 }
 .sector-scale-bar label { flex-shrink: 0; letter-spacing: 0.06em; }
 .sector-scale-bar input[type="range"] { flex: 1; min-width: 0; }
@@ -1766,10 +1810,82 @@ body.theme-light #radio-display-signal.is-standby {
     font-variant-numeric: tabular-nums;
 }
 .sector-tech-screen.is-menu .radio-display-clock,
-.sector-tech-screen.is-field-edit .radio-display-clock,
+.sector-tech-screen.is-preset-detail .radio-display-clock,
+.sector-tech-screen.is-stub .radio-display-clock,
+.sector-tech-screen.is-field-edit .radio-display-clock {
+    display: block !important;
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.62em !important;
+    font-weight: 400 !important;
+    line-height: 1.05;
+    letter-spacing: 0.03em;
+    opacity: 0.9;
+    font-variant-numeric: tabular-nums;
+}
 .sector-tech-screen.is-off .radio-display-clock,
 .sector-tech-screen.is-charging .radio-display-clock {
     display: none !important;
+}
+.radio-display-status-widgets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+.radio-display-menu-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid rgba(120, 200, 120, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: rgba(0, 0, 0, 0.22);
+}
+.radio-display-menu-icon[hidden] {
+    display: none !important;
+}
+.radio-display-menu-icon img {
+    width: 13px;
+    height: 13px;
+    object-fit: contain;
+    filter: brightness(0) saturate(100%) invert(78%) sepia(12%) saturate(1200%) hue-rotate(72deg) brightness(95%);
+}
+.radio-display-battery-widget {
+    position: relative;
+    width: 26px;
+    height: 14px;
+    flex-shrink: 0;
+}
+.radio-display-battery-widget[hidden] {
+    display: none !important;
+}
+.radio-display-battery-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    filter: brightness(0) saturate(100%) invert(78%) sepia(12%) saturate(1200%) hue-rotate(72deg) brightness(95%);
+}
+.radio-display-battery-pct {
+    position: absolute;
+    left: 0;
+    right: 3px;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.42em;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
 }
 .sector-tech-screen.is-standby .radio-display-main > div.radio-display-standby-preset,
 .sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-standby-preset,
