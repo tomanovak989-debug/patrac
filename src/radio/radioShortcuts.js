@@ -112,6 +112,7 @@ export function bindingFromCommsItem(item, session) {
         if (item.id === 'outbox') return { action: 'comms:outbox', label: 'ODESLANÉ' };
         if (item.id === 'drafts') return { action: 'comms:drafts', label: 'KONCEPTY' };
         if (item.id === 'autoscan') return { action: 'comms:autoscan', label: 'AUTOSKEN' };
+        if (item.id === 'templates') return { action: 'comms:templates', label: 'ŠABLONY' };
         if (item.id === 'send_yes') return { action: 'comms:send', label: 'ODESLAT' };
     }
     if (item.type === 'msg' && item.entry) {

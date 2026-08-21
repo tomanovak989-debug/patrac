@@ -14,7 +14,7 @@ export var COMMS_DRAFTS = 'drafts';
 export var COMMS_AUTOSCAN = 'autoscan';
 export var COMMS_COMPOSE = 'compose';
 export var COMMS_CONFIRM = 'confirm';
-export var COMMS_DETAIL = 'detail';
+export var COMMS_TEMPLATES = 'templates';
 
 export function createCommsState() {
     return {
@@ -178,7 +178,8 @@ function hubItems() {
         { type: 'action', id: 'inbox', label: '2 · PŘIJATÉ', digit: '2' },
         { type: 'action', id: 'outbox', label: '3 · ODESLANÉ', digit: '3' },
         { type: 'action', id: 'drafts', label: '4 · KONCEPTY', digit: '4' },
-        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN (spustit)', digit: '5' }
+        { type: 'action', id: 'autoscan', label: '5 · AUTOSKEN (spustit)', digit: '5' },
+        { type: 'action', id: 'templates', label: '6 · ŠABLONY', digit: '6' }
     ];
 }
 
@@ -238,6 +239,9 @@ export function getCommsItems(session, notebook) {
         }
         return scanItems;
     }
+    if (session.screen === COMMS_TEMPLATES) {
+        return [{ type: 'empty', label: '(šablony — brzy)' }];
+    }
     return [];
 }
 
@@ -263,6 +267,17 @@ export function buildCommsOsView(session, notebook, radioState) {
     var focusLine = -1;
     var i;
     var start;
+
+    if (session.screen === COMMS_TEMPLATES) {
+        return {
+            mode: 'comms',
+            status: 'ŠABLONY',
+            lines: ['— brzy —', '', '', '', '', ''],
+            focusLine: -1,
+            footer: 'Zpět',
+            buffer: ''
+        };
+    }
 
     if (session.screen === COMMS_COMPOSE) {
         lines = [
@@ -379,6 +394,9 @@ export function buildCommsOsView(session, notebook, radioState) {
     } else if (session.screen === COMMS_AUTOSCAN) {
         status = 'AUTOSKEN';
         footer = 'OK detail · Zpět';
+    } else if (session.screen === COMMS_TEMPLATES) {
+        status = 'ŠABLONY';
+        footer = 'Zpět';
     } else {
         status = 'SMS';
         footer = 'OK · Zpět';
@@ -404,6 +422,7 @@ export function commsBackScreen(session) {
         session.detailEntry = null;
         return session.detailReturn || COMMS_INBOX;
     }
+    if (session.screen === COMMS_TEMPLATES) return COMMS_HUB;
     return COMMS_HUB;
 }
 
@@ -418,6 +437,7 @@ export function hubActionFromDigit(digit) {
     if (digit === '3') return 'outbox';
     if (digit === '4') return 'drafts';
     if (digit === '5') return 'autoscan';
+    if (digit === '6') return 'templates';
     return null;
 }
 

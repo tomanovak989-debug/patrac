@@ -50,7 +50,7 @@ function parsePathForContext(path, menuPath) {
 
     if (leaf === 'comms') {
         var hub = parseInt(path.charAt(0), 10);
-        if (hub >= 1 && hub <= 5) steps.push({ type: 'comms_hub', value: hub });
+        if (hub >= 1 && hub <= 6) steps.push({ type: 'comms_hub', value: hub });
         return { steps: steps, rest: path.slice(1) };
     }
 
@@ -87,6 +87,7 @@ export function planMenuDialCommit(dial, os) {
             else if (item.action === 'submenu:settings') simulatedPath.push('settings');
             else if (item.action === 'screen:comms') simulatedPath.push('comms');
             else if (item.action === 'screen:autoscan') simulatedPath.push('autoscan');
+            else if (item.action === 'screen:snake') simulatedPath.push('snake');
             else break;
         } else break;
     }

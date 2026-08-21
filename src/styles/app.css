@@ -1807,6 +1807,14 @@ body.theme-light #radio-display-signal.is-standby {
     grid-template-rows: repeat(6, minmax(0, 1fr));
     margin: 0;
 }
+.sector-tech-screen.is-snake .radio-display-main > div {
+    font-family: var(--radio-display-font) !important;
+    font-weight: 400 !important;
+    font-size: 1.02em !important;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    padding-left: 4px;
+}
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
 .sector-tech-screen.is-preset-detail .radio-display-main > div,

@@ -36,7 +36,10 @@ export function applyDisplayTypography() {
     }
     screen.style.fontSize = px + 'px';
 
-    var isStandbyView = screen.classList.contains('is-standby') || screen.classList.contains('is-standby-tune');
+    var isStandbyView = (screen.classList.contains('is-standby') || screen.classList.contains('is-standby-tune'))
+        && !screen.classList.contains('is-menu')
+        && !screen.classList.contains('is-snake')
+        && !screen.classList.contains('is-stub');
     var clock = document.getElementById('radio-display-clock');
     if (clock) {
         if (isStandbyView && !screen.classList.contains('is-off') && !screen.classList.contains('is-charging')) {

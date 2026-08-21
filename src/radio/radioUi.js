@@ -142,6 +142,7 @@ import {
     COMMS_COMPOSE,
     COMMS_CONFIRM,
     COMMS_DETAIL,
+    COMMS_TEMPLATES,
     markCommsEntryRead,
     appendAutoscanCapture,
     markAutoscanCaptureRead
@@ -152,6 +153,13 @@ import {
     clampStandbyFocus,
     buildStandbyDisplay
 } from './radioStandby.js';
+import {
+    createSnakeState,
+    resetSnakeState,
+    snakeSetDirection,
+    snakeTick,
+    SNAKE_TICK_MS
+} from './radioSnake.js';
 import {
     bindQuickKey,
     bindingFromMenuItem,
@@ -212,6 +220,8 @@ var presetEditDraft = null;
 var autoscanSession = null;
 var autoscanTimer = null;
 var batteryTimer = null;
+var snakeSession = null;
+var snakeTimer = null;
 var beaconSession = null;
 var beaconActive = null;
 var beaconRepeatTimer = null;
@@ -597,6 +607,29 @@ function setStandbySignalIndicator(sig) {
     sig.classList.remove('is-tuned', 'is-standby');
 }
 
+function clearStandbyDisplayLayout(f, k, buf, p) {
+    var rows = [f, k, buf, p];
+    var i;
+    for (i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (!row) continue;
+        row.className = '';
+        row.classList.remove(
+            'radio-display-standby-preset',
+            'radio-display-standby-freq',
+            'radio-display-standby-key',
+            'radio-display-row-focus',
+            'radio-display-freq-node',
+            'is-handset',
+            'is-fallback',
+            'radio-display-battery-only'
+        );
+        row.removeAttribute('title');
+        row.style.removeProperty('font-weight');
+        row.style.removeProperty('font-size');
+    }
+}
+
 function setDisplayMenuLines(lines, focusLine, lineStyles) {
     clearLineMarquee();
     lines = lines || [];
@@ -968,6 +1001,22 @@ function applyRadioOsEffect(result) {
         handleCommsOk();
         return true;
     }
+    if (result.effect === 'snake_open') {
+        openSnakeScreen();
+        return true;
+    }
+    if (result.effect === 'snake_close') {
+        closeSnakeScreen();
+        return true;
+    }
+    if (result.effect === 'snake_dir') {
+        if (snakeSession && snakeSetDirection(snakeSession, result.dir)) renderDisplay();
+        return true;
+    }
+    if (result.effect === 'snake_ok') {
+        handleSnakeOk();
+        return true;
+    }
     renderDisplay();
     return true;
 }
@@ -1069,7 +1118,7 @@ function executeQuickKey(keyId) {
             return true;
         }
     }
-    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts' || action === 'comms:autoscan') {
+    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts' || action === 'comms:autoscan' || action === 'comms:templates') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
         radioOs.menuPath = ['comms'];
@@ -1079,9 +1128,17 @@ function executeQuickKey(keyId) {
             'comms:inbox': 'inbox',
             'comms:outbox': 'outbox',
             'comms:drafts': 'drafts',
-            'comms:autoscan': 'autoscan'
+            'comms:autoscan': 'autoscan',
+            'comms:templates': 'templates'
         };
         openCommsAction(map[action]);
+        return true;
+    }
+    if (action === 'snake:open') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['snake'];
+        openSnakeScreen();
         return true;
     }
     if (action === 'menu:settings') {
@@ -1269,11 +1326,12 @@ function renderDisplay() {
         buffer: dialBuffer
     }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive, {
         pttRecording: !!(beaconPttPending || (pttSession && pttSession.active && isBeaconMenuOpen()))
-    });
+    }, snakeSession);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon' || osView.mode === 'snake');
+        screen.classList.toggle('is-snake', osView.mode === 'snake');
         screen.classList.toggle('is-standby', osView.mode === 'standby' || osView.mode === 'standby_tune');
         screen.classList.toggle('is-standby-tune', osView.mode === 'standby_tune' || !!(standbyUi && standbyUi.active));
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
@@ -1328,6 +1386,7 @@ function renderDisplay() {
         if (clockEl) clockEl.textContent = '';
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
         if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
+        clearStandbyDisplayLayout(f, k, buf, p);
         if (f) {
             f.innerHTML = editView.freqHtml || editView.keyHtml || '';
             f.className = 'radio-display-edit-large';
@@ -1444,12 +1503,9 @@ function renderDisplay() {
         updateChargeButtonUi();
     } else {
         var menuLines = osView.lines || ['', '', '', '', '', ''];
+        clearStandbyDisplayLayout(f, k, buf, p);
         if (f) {
-            f.className = '';
-            f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback');
             f.removeAttribute('data-kind');
-            f.removeAttribute('title');
-            f.style.fontWeight = '';
             f.style.color = '';
         }
         setDisplayMenuLines(menuLines, osView.focusLine == null ? -1 : osView.focusLine, osView.lineStyles);
@@ -2154,7 +2210,56 @@ function openCommsAction(actionId) {
     } else if (actionId === 'autoscan') {
         openRadioAutoscanScreen(false);
         return;
+    } else if (actionId === 'templates') {
+        session.screen = COMMS_TEMPLATES;
+        session.focusIndex = 0;
     }
+    renderDisplay();
+}
+
+function ensureSnakeSession() {
+    if (!snakeSession) snakeSession = createSnakeState();
+    return snakeSession;
+}
+
+function stopSnakeTimer() {
+    if (snakeTimer) {
+        clearInterval(snakeTimer);
+        snakeTimer = null;
+    }
+}
+
+function startSnakeTimer() {
+    stopSnakeTimer();
+    snakeTimer = setInterval(function() {
+        if (!snakeSession || !isSnakeMenuOpen()) {
+            stopSnakeTimer();
+            return;
+        }
+        if (snakeSession.alive) snakeTick(snakeSession);
+        renderDisplay();
+    }, SNAKE_TICK_MS);
+}
+
+function isSnakeMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'snake');
+}
+
+function openSnakeScreen() {
+    snakeSession = createSnakeState();
+    startSnakeTimer();
+    renderDisplay();
+}
+
+function closeSnakeScreen() {
+    stopSnakeTimer();
+    snakeSession = null;
+    renderDisplay();
+}
+
+function handleSnakeOk() {
+    if (!snakeSession) return;
+    if (!snakeSession.alive) resetSnakeState(snakeSession);
     renderDisplay();
 }
 
@@ -3569,6 +3674,7 @@ var RADIO_OPERATING_MODES = ['off', 'on'];
 function cycleOperatingMode(direction) {
     haltAutoscan(true);
     autoscanSession = null;
+    closeSnakeScreen();
     cancelStandbyPtt();
     standbyUi = createStandbyUiState();
     var cur = normalizeOperatingMode(state.operatingMode);

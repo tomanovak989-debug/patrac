@@ -5,6 +5,7 @@ import { findPreset, upsertPreset, clearPreset } from './radioComms.js';
 import { buildAutoscanOsView } from './radioAutoscan.js';
 import { buildCommsOsView } from './radioMessages.js';
 import { buildBeaconOsView } from './radioBeacon.js';
+import { buildSnakeOsView } from './radioSnake.js';
 import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
 
 export var SCREEN_STANDBY = 'standby';
@@ -19,7 +20,7 @@ var RADIO_MENU = [
     { id: 'radio_presets', label: '2 · PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
     { id: 'radio_autoscan', label: '3 · AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
     { id: 'radio_beacon', label: '4 · BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
-    { id: 'radio_templates', label: '5 · ŠABLONY', action: 'stub', shortcutAction: 'stub:templates' },
+    { id: 'radio_snake', label: '5 · SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' },
     { id: 'radio_settings', label: '6 · NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
 ];
 
@@ -157,6 +158,7 @@ function menuStatusLabel(os, radioState, draft) {
     if (leaf === 'quickkeys') return 'RYCHLÉ VOLBY';
     if (leaf === 'autoscan') return 'AUTOSKEN';
     if (leaf === 'comms') return 'ZPRÁVY';
+    if (leaf === 'snake') return 'SNAKE';
     return 'MENU';
 }
 
@@ -324,6 +326,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
         if (os.menuPath[os.menuPath.length - 1] === 'comms') {
             return { changed: true, effect: 'comms_back' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'snake') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'snake_close' };
+        }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
             var prevSlot = os.selectedSlot;
             os.menuPath.pop();
@@ -335,6 +341,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             resetRadioOs(os);
             return { changed: true };
         }
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'snake') {
+        if (action === 'up' || action === 'down' || action === 'left' || action === 'right') {
+            return { changed: true, effect: 'snake_dir', dir: action };
+        }
+        if (action === 'ok') return { changed: true, effect: 'snake_ok' };
         return { changed: false };
     }
 
@@ -444,6 +458,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.menuPath.push('beacon');
                 return { changed: true, effect: 'beacon_open' };
             }
+            if (pick.action === 'screen:snake') {
+                os.menuPath.push('snake');
+                return { changed: true, effect: 'snake_open' };
+            }
             if (pick.action === 'preset_detail') {
                 os.selectedSlot = pick.slot;
                 os.menuPath.push('detail');
@@ -460,7 +478,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState, snakeSession) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -525,6 +543,10 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     if (os.menuPath[os.menuPath.length - 1] === 'beacon') {
         return buildBeaconOsView(beaconSession, radioState, localBeacon, beaconUiState);
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'snake') {
+        return buildSnakeOsView(snakeSession);
     }
 
     if (os.screen === SCREEN_STUB) {
