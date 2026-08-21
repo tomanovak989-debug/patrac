@@ -94,7 +94,7 @@ function buildPresetSlotItems(radioState) {
         items.push({
             id: 'preset_' + slot,
             slot: slot,
-            label: presetSlotLabel(slot, radioState),
+            label: slot + ' · ' + presetSlotLabel(slot, radioState),
             action: 'preset_detail',
             shortcutAction: 'preset:' + slot
         });

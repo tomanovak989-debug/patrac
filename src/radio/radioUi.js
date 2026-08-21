@@ -1603,7 +1603,6 @@ function renderDisplay() {
             f.style.color = '';
         }
         if (osView.mode === 'snake') {
-            hideSnakeBoard();
             if (osView.useBoard && snakeSession && snakeSession.alive) {
                 setDisplayMenuLines(['', '', '', '', '', ''], -1);
                 renderSnakeBoard(snakeSession);
@@ -2334,6 +2333,7 @@ var snakeBoardReady = false;
 
 function buildSnakeBoardDom(board) {
     board.textContent = '';
+    snakeBoardReady = false;
     var score = document.createElement('div');
     score.className = 'radio-snake-score';
     score.id = 'radio-snake-score';
