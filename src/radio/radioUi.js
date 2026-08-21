@@ -737,48 +737,44 @@ function setDisplayMenuLines(lines, focusLine, lineStyles, lineIcons, scrollDir)
         var i;
         for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
             var rowEl = el(DISPLAY_LINE_IDS[i]);
-            if (rowEl) {
-                rows.push(rowEl);
-                slides.push(getRowSlide(rowEl) || rowEl);
-            }
+            if (rowEl) rows.push(rowEl);
         }
+
+        applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
+
+        for (i = 0; i < rows.length; i++) {
+            slides.push(getRowSlide(rows[i]) || rows[i]);
+        }
+
         var lineH = rows[0] ? rows[0].offsetHeight : 0;
         if (lineH < 6) lineH = 14;
 
         if (!slides.length || !getRowSlide(rows[0])) {
-            applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
             return;
         }
 
         menuScrollAnimating = true;
 
         for (i = 0; i < slides.length; i++) {
-            slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
-            slides[i].style.transform = 'translateY(' + (-scrollDir * lineH) + 'px)';
+            slides[i].style.transition = 'none';
+            slides[i].style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
         }
 
-        setTimeout(function() {
-            applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
-            for (i = 0; i < slides.length; i++) {
-                slides[i].style.transition = 'none';
-                slides[i].style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
-            }
+        requestAnimationFrame(function() {
             requestAnimationFrame(function() {
-                requestAnimationFrame(function() {
+                for (i = 0; i < slides.length; i++) {
+                    slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
+                    slides[i].style.transform = 'translateY(0)';
+                }
+                setTimeout(function() {
                     for (i = 0; i < slides.length; i++) {
-                        slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
-                        slides[i].style.transform = 'translateY(0)';
+                        slides[i].style.transition = '';
+                        slides[i].style.transform = '';
                     }
-                    setTimeout(function() {
-                        for (i = 0; i < slides.length; i++) {
-                            slides[i].style.transition = '';
-                            slides[i].style.transform = '';
-                        }
-                        menuScrollAnimating = false;
-                    }, MENU_SCROLL_MS + 24);
-                });
+                    menuScrollAnimating = false;
+                }, MENU_SCROLL_MS + 24);
             });
-        }, MENU_SCROLL_MS);
+        });
         return;
     }
 
@@ -2336,6 +2332,20 @@ function openCommsAction(actionId) {
 
 var snakeBoardReady = false;
 
+function buildSnakeBoardDom(board) {
+    board.textContent = '';
+    var score = document.createElement('div');
+    score.className = 'radio-snake-score';
+    score.id = 'radio-snake-score';
+    var frame = document.createElement('div');
+    frame.className = 'radio-snake-frame';
+    var inner = document.createElement('div');
+    inner.className = 'radio-snake-board-inner';
+    frame.appendChild(inner);
+    board.appendChild(score);
+    board.appendChild(frame);
+}
+
 function ensureSnakeBoard() {
     var main = el('radio-display-main');
     if (!main) return null;
@@ -2346,10 +2356,12 @@ function ensureSnakeBoard() {
         board.className = 'radio-snake-board';
         board.hidden = true;
         board.setAttribute('aria-hidden', 'true');
-        var inner = document.createElement('div');
-        inner.className = 'radio-snake-board-inner';
-        board.appendChild(inner);
+        buildSnakeBoardDom(board);
         main.appendChild(board);
+        snakeBoardReady = false;
+    } else if (!board.querySelector('.radio-snake-score')) {
+        buildSnakeBoardDom(board);
+        snakeBoardReady = false;
     }
     var innerEl = board.querySelector('.radio-snake-board-inner');
     if (innerEl && !snakeBoardReady) {
@@ -2372,17 +2384,34 @@ function hideSnakeBoard() {
     }
 }
 
+function snakeHeadDirClass(dir) {
+    if (!dir) return '';
+    if (dir.x === 1) return ' is-dir-right';
+    if (dir.x === -1) return ' is-dir-left';
+    if (dir.y === -1) return ' is-dir-up';
+    if (dir.y === 1) return ' is-dir-down';
+    return '';
+}
+
 function renderSnakeBoard(session) {
     var board = ensureSnakeBoard();
     if (!board) return;
+    var scoreEl = el('radio-snake-score');
+    if (scoreEl) {
+        scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0');
+    }
     var innerEl = board.querySelector('.radio-snake-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;
     var grid = buildSnakeCellGrid(session);
+    var dirClass = snakeHeadDirClass(session.dir || session.nextDir);
     var i;
     for (i = 0; i < grid.length && i < cells.length; i++) {
         var kind = grid[i] || '';
-        cells[i].className = kind ? ('radio-snake-cell is-' + kind) : 'radio-snake-cell';
+        var cls = 'radio-snake-cell';
+        if (kind) cls += ' is-' + kind;
+        if (kind === 'head') cls += dirClass;
+        cells[i].className = cls;
     }
     board.hidden = false;
     board.removeAttribute('aria-hidden');

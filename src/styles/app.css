@@ -1970,14 +1970,38 @@ body.theme-light #radio-display-signal.is-standby {
     position: absolute;
     inset: 0;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     justify-content: center;
     pointer-events: none;
     z-index: 2;
-    padding: 0 1px;
+    padding: 0 2px;
+    box-sizing: border-box;
 }
 .radio-snake-board[hidden] {
     display: none !important;
+}
+.radio-snake-score {
+    flex: 0 0 auto;
+    text-align: center;
+    font-size: 0.62em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    line-height: 1.15;
+    padding-bottom: 2px;
+    font-variant-numeric: tabular-nums;
+    color: var(--radio-phosphor);
+}
+.radio-snake-frame {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--radio-phosphor);
+    box-shadow: inset 0 0 0 1px rgba(200, 200, 200, 0.1);
+    padding: 2px;
+    box-sizing: border-box;
 }
 .radio-snake-board-inner {
     height: 100%;
@@ -1999,20 +2023,57 @@ body.theme-light #radio-display-signal.is-standby {
     background: var(--radio-phosphor);
     box-shadow: 0 0 2px var(--radio-phosphor-glow);
 }
-.radio-snake-cell.is-head {
+.radio-snake-cell.is-food-big {
     background: var(--radio-phosphor);
+    box-shadow: 0 0 3px var(--radio-phosphor-glow);
+}
+.radio-snake-cell.is-head {
+    position: relative;
+    background: var(--radio-phosphor);
+    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+    z-index: 1;
+}
+.radio-snake-cell.is-head::after {
+    content: '';
+    position: absolute;
+    width: 34%;
+    height: 34%;
+    background: var(--radio-screen-bg);
+    border-radius: 1px;
+    pointer-events: none;
+}
+.radio-snake-cell.is-head.is-dir-right::after {
+    right: 14%;
+    top: 33%;
+}
+.radio-snake-cell.is-head.is-dir-left::after {
+    left: 14%;
+    top: 33%;
+}
+.radio-snake-cell.is-head.is-dir-up::after {
+    top: 14%;
+    left: 33%;
+}
+.radio-snake-cell.is-head.is-dir-down::after {
+    bottom: 14%;
+    left: 33%;
+    top: auto;
 }
 .radio-snake-cell.is-body {
     background: var(--radio-phosphor);
-    opacity: 0.72;
+    opacity: 0.55;
 }
 body.theme-light .radio-snake-cell {
     background: rgba(0, 0, 0, 0.04);
 }
 body.theme-light .radio-snake-cell.is-food,
+body.theme-light .radio-snake-cell.is-food-big,
 body.theme-light .radio-snake-cell.is-head,
 body.theme-light .radio-snake-cell.is-body {
     background: var(--radio-phosphor);
+}
+body.theme-light .radio-snake-cell.is-head::after {
+    background: var(--radio-screen-bg);
 }
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
