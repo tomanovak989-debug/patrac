@@ -22,10 +22,14 @@ function cloneBands(src) {
 
 function normalizePrefs(raw) {
     if (!raw || !raw.bands || !raw.bands.full || !raw.bands.focus) return null;
+    var mult = parseFloat(raw.scaleMultiplier);
+    if (!isFinite(mult)) mult = 1;
+    mult = Math.max(0.65, Math.min(1.35, mult));
     return {
         locked: !!raw.locked,
         viewMode: raw.viewMode === 'full' ? 'full' : 'focus',
-        bands: cloneBands(raw.bands)
+        bands: cloneBands(raw.bands),
+        scaleMultiplier: mult
     };
 }
 
@@ -50,7 +54,8 @@ function migrateLegacyPrefs() {
     return {
         locked: hadLegacy,
         viewMode: viewMode,
-        bands: bands
+        bands: bands,
+        scaleMultiplier: 1
     };
 }
 
@@ -111,5 +116,17 @@ export function getSectorBandsFromPrefs() {
 export function setSectorBandsInPrefs(bands) {
     var prefs = loadSectorDisplayPrefs();
     prefs.bands = cloneBands(bands);
+    return saveSectorDisplayPrefs(prefs);
+}
+
+export function getSectorScaleMultiplier() {
+    return loadSectorDisplayPrefs().scaleMultiplier;
+}
+
+export function adjustSectorScaleMultiplier(delta) {
+    var prefs = loadSectorDisplayPrefs();
+    var mult = prefs.scaleMultiplier + delta;
+    mult = Math.max(0.65, Math.min(1.35, mult));
+    prefs.scaleMultiplier = Math.round(mult * 100) / 100;
     return saveSectorDisplayPrefs(prefs);
 }
