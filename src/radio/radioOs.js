@@ -543,9 +543,10 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     var items = getCurrentMenuItems(os, radioState);
-    var focusedItem = items[os.focusIndex] || null;
     var menuView = buildFixedCursorMenuLines(items, os.focusIndex, function(item) {
         return decorateItemLabel(item);
+    }, function(item) {
+        return menuIconForItem(item);
     });
 
     return {
@@ -553,7 +554,8 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         status: menuStatusLabel(os, radioState, draft),
         lines: menuView.lines,
         focusLine: menuView.focusLine,
-        menuIcon: menuIconForItem(focusedItem),
+        lineStyles: menuView.lineStyles,
+        lineIcons: menuView.lineIcons,
         footer: 'OK · Zpět',
         buffer: ''
     };

@@ -159,7 +159,9 @@ import {
     resetSnakeState,
     snakeSetDirection,
     snakeTick,
-    SNAKE_TICK_MS
+    buildSnakeCellGrid,
+    SNAKE_TICK_MS,
+    SNAKE_CELL_COUNT
 } from './radioSnake.js';
 import {
     bindQuickKey,
@@ -487,7 +489,7 @@ var DISPLAY_LINE_IDS = [
 
 var LINE_MARQUEE_HOLD_MS = 2000;
 var lineMarqueeState = null;
-var MENU_SCROLL_MS = 165;
+var MENU_SCROLL_MS = 240;
 var menuScrollTracker = { key: '', index: -1 };
 var menuScrollAnimating = false;
 
@@ -519,11 +521,17 @@ function isCommsMarqueeScreen() {
 
 function startLineMarquee(row, fullText) {
     if (!row || !fullText) return;
-    row.textContent = fullText;
-    if (row.scrollWidth <= row.clientWidth + 2) return;
+    var textEl = row.querySelector('.radio-display-row-text');
+    if (!textEl) {
+        row.textContent = fullText;
+        textEl = row;
+    } else {
+        textEl.textContent = fullText;
+    }
+    if (textEl.scrollWidth <= textEl.clientWidth + 2) return;
     var duration = Math.max(2.8, (fullText.length * 0.11));
     row.classList.add('radio-display-row-marquee-active');
-    row.innerHTML = '<span class="radio-display-line-inner" style="--marquee-duration:' + duration.toFixed(2) + 's;--marquee-shift:' + (row.scrollWidth - row.clientWidth) + 'px">' +
+    textEl.innerHTML = '<span class="radio-display-line-inner" style="--marquee-duration:' + duration.toFixed(2) + 's;--marquee-shift:' + (textEl.scrollWidth - textEl.clientWidth) + 'px">' +
         escapeDisplayText(fullText) + '</span>';
 }
 
@@ -569,8 +577,6 @@ function updateRadioStatusWidgets(state, osView) {
     var batteryWrap = el('radio-display-battery');
     var batteryPct = el('radio-display-battery-pct');
     var batteryBg = el('radio-display-battery-bg');
-    var menuIconWrap = el('radio-display-menu-icon');
-    var menuIconImg = el('radio-display-menu-icon-img');
     var autoscanActive = !!(autoscanSession && autoscanSession.status === SCAN_RUNNING);
 
     syncBattery(state, { operatingMode: state.operatingMode, autoscanActive: autoscanActive });
@@ -582,18 +588,6 @@ function updateRadioStatusWidgets(state, osView) {
 
     if (batteryWrap) {
         batteryWrap.hidden = state.operatingMode === 'off' && !state.batteryCharging;
-    }
-
-    var iconFile = osView && osView.menuIcon ? osView.menuIcon : null;
-    var showMenuIcon = !!(iconFile && isRadioOsActive(radioOs) && osView && osView.mode !== 'standby' && osView.mode !== 'standby_tune');
-    if (menuIconWrap && menuIconImg) {
-        if (showMenuIcon) {
-            menuIconWrap.hidden = false;
-            menuIconImg.src = radioIconUrl(iconFile);
-        } else {
-            menuIconWrap.hidden = true;
-            menuIconImg.removeAttribute('src');
-        }
     }
 }
 
@@ -667,15 +661,32 @@ function clearStandbyDisplayLayout(f, k, buf, p) {
     }
 }
 
-function applyMenuLineContent(lines, focusLine, lineStyles) {
+function buildMenuRowHtml(text, iconFile) {
+    var parts = '<div class="radio-display-row-slide">';
+    if (iconFile) {
+        parts += '<img class="radio-display-row-icon" src="' + escapeDisplayText(radioIconUrl(iconFile)) + '" alt="" draggable="false">';
+    }
+    parts += '<span class="radio-display-row-text">' + escapeDisplayText(text || '') + '</span></div>';
+    return parts;
+}
+
+function getRowSlide(row) {
+    if (!row) return null;
+    return row.querySelector('.radio-display-row-slide');
+}
+
+function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
     lines = lines || [];
     focusLine = focusLine == null ? -1 : focusLine;
     lineStyles = lineStyles || [];
-    for (var i = 0; i < DISPLAY_LINE_IDS.length; i++) {
+    lineIcons = lineIcons || [];
+    var i;
+    for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
         var row = el(DISPLAY_LINE_IDS[i]);
         if (!row) continue;
         var text = i < lines.length ? (lines[i] || '') : '';
-        row.textContent = text;
+        var iconFile = i < lineIcons.length ? lineIcons[i] : null;
+        row.innerHTML = buildMenuRowHtml(text, iconFile);
         row.classList.remove('radio-display-row-marquee-active');
         row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
         row.classList.toggle('radio-display-row-focus', i === focusLine);
@@ -715,47 +726,63 @@ function computeMenuScrollDirection(meta) {
     return dir;
 }
 
-function setDisplayMenuLines(lines, focusLine, lineStyles, scrollDir) {
+function setDisplayMenuLines(lines, focusLine, lineStyles, lineIcons, scrollDir) {
     clearLineMarquee();
     scrollDir = scrollDir || 0;
+    lineIcons = lineIcons || [];
 
     if (scrollDir !== 0 && focusLine >= 0 && !menuScrollAnimating) {
         var rows = [];
+        var slides = [];
         var i;
         for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
             var rowEl = el(DISPLAY_LINE_IDS[i]);
-            if (rowEl) rows.push(rowEl);
+            if (rowEl) {
+                rows.push(rowEl);
+                slides.push(getRowSlide(rowEl) || rowEl);
+            }
         }
         var lineH = rows[0] ? rows[0].offsetHeight : 0;
         if (lineH < 6) lineH = 14;
 
-        menuScrollAnimating = true;
-        applyMenuLineContent(lines, focusLine, lineStyles);
-
-        for (i = 0; i < rows.length; i++) {
-            rows[i].style.transition = 'none';
-            rows[i].style.transform = 'translateY(' + (-scrollDir * lineH) + 'px)';
+        if (!slides.length || !getRowSlide(rows[0])) {
+            applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
+            return;
         }
 
-        requestAnimationFrame(function() {
+        menuScrollAnimating = true;
+
+        for (i = 0; i < slides.length; i++) {
+            slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
+            slides[i].style.transform = 'translateY(' + (-scrollDir * lineH) + 'px)';
+        }
+
+        setTimeout(function() {
+            applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
+            for (i = 0; i < slides.length; i++) {
+                slides[i].style.transition = 'none';
+                slides[i].style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
+            }
             requestAnimationFrame(function() {
-                for (i = 0; i < rows.length; i++) {
-                    rows[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms ease-out';
-                    rows[i].style.transform = 'translateY(0)';
-                }
-                setTimeout(function() {
-                    for (i = 0; i < rows.length; i++) {
-                        rows[i].style.transition = '';
-                        rows[i].style.transform = '';
+                requestAnimationFrame(function() {
+                    for (i = 0; i < slides.length; i++) {
+                        slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
+                        slides[i].style.transform = 'translateY(0)';
                     }
-                    menuScrollAnimating = false;
-                }, MENU_SCROLL_MS + 20);
+                    setTimeout(function() {
+                        for (i = 0; i < slides.length; i++) {
+                            slides[i].style.transition = '';
+                            slides[i].style.transform = '';
+                        }
+                        menuScrollAnimating = false;
+                    }, MENU_SCROLL_MS + 24);
+                });
             });
-        });
+        }, MENU_SCROLL_MS);
         return;
     }
 
-    applyMenuLineContent(lines, focusLine, lineStyles);
+    applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
 }
 
 function clearDisplayRowFocus() {
@@ -1480,6 +1507,7 @@ function renderDisplay() {
     }
 
     if (osView.mode === 'off') {
+        hideSnakeBoard();
         if (state.batteryCharging) {
             if (f) {
                 f.className = 'radio-display-battery-only';
@@ -1578,12 +1606,25 @@ function renderDisplay() {
             f.removeAttribute('data-kind');
             f.style.color = '';
         }
-        setDisplayMenuLines(
-            menuLines,
-            osView.focusLine == null ? -1 : osView.focusLine,
-            osView.lineStyles,
-            computeMenuScrollDirection(resolveMenuScrollMeta(osView))
-        );
+        if (osView.mode === 'snake') {
+            hideSnakeBoard();
+            if (osView.useBoard && snakeSession && snakeSession.alive) {
+                setDisplayMenuLines(['', '', '', '', '', ''], -1);
+                renderSnakeBoard(snakeSession);
+            } else {
+                hideSnakeBoard();
+                setDisplayMenuLines(menuLines, -1);
+            }
+        } else {
+            hideSnakeBoard();
+            setDisplayMenuLines(
+                menuLines,
+                osView.focusLine == null ? -1 : osView.focusLine,
+                osView.lineStyles,
+                osView.lineIcons,
+                computeMenuScrollDirection(resolveMenuScrollMeta(osView))
+            );
+        }
         if (ch) {
             if (shortcutBindNotice) {
                 ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
@@ -2293,6 +2334,60 @@ function openCommsAction(actionId) {
     renderDisplay();
 }
 
+var snakeBoardReady = false;
+
+function ensureSnakeBoard() {
+    var main = el('radio-display-main');
+    if (!main) return null;
+    var board = el('radio-snake-board');
+    if (!board) {
+        board = document.createElement('div');
+        board.id = 'radio-snake-board';
+        board.className = 'radio-snake-board';
+        board.hidden = true;
+        board.setAttribute('aria-hidden', 'true');
+        var inner = document.createElement('div');
+        inner.className = 'radio-snake-board-inner';
+        board.appendChild(inner);
+        main.appendChild(board);
+    }
+    var innerEl = board.querySelector('.radio-snake-board-inner');
+    if (innerEl && !snakeBoardReady) {
+        var i;
+        for (i = 0; i < SNAKE_CELL_COUNT; i++) {
+            var cell = document.createElement('div');
+            cell.className = 'radio-snake-cell';
+            innerEl.appendChild(cell);
+        }
+        snakeBoardReady = true;
+    }
+    return board;
+}
+
+function hideSnakeBoard() {
+    var board = el('radio-snake-board');
+    if (board) {
+        board.hidden = true;
+        board.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function renderSnakeBoard(session) {
+    var board = ensureSnakeBoard();
+    if (!board) return;
+    var innerEl = board.querySelector('.radio-snake-board-inner');
+    if (!innerEl) return;
+    var cells = innerEl.children;
+    var grid = buildSnakeCellGrid(session);
+    var i;
+    for (i = 0; i < grid.length && i < cells.length; i++) {
+        var kind = grid[i] || '';
+        cells[i].className = kind ? ('radio-snake-cell is-' + kind) : 'radio-snake-cell';
+    }
+    board.hidden = false;
+    board.removeAttribute('aria-hidden');
+}
+
 function ensureSnakeSession() {
     if (!snakeSession) snakeSession = createSnakeState();
     return snakeSession;
@@ -2330,6 +2425,7 @@ function openSnakeScreen() {
 function closeSnakeScreen() {
     stopSnakeTimer();
     snakeSession = null;
+    hideSnakeBoard();
     if (state) renderDisplay();
 }
 

@@ -1849,36 +1849,15 @@ body.theme-light #radio-display-signal.is-standby {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 3px;
     flex-shrink: 0;
     margin-left: auto;
 }
-.radio-display-menu-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    border: 1px solid rgba(200, 200, 200, 0.55);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    flex-shrink: 0;
-    background: rgba(0, 0, 0, 0.18);
-}
-.radio-display-menu-icon[hidden] {
-    display: none !important;
-}
-.radio-display-menu-icon img {
-    width: 32px;
-    height: 32px;
-    object-fit: contain;
-    filter: brightness(0) saturate(0%) invert(82%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%);
-}
 .radio-display-battery-widget {
     position: relative;
-    width: 38px;
-    height: 20px;
+    width: 44px;
+    height: 23px;
     flex-shrink: 0;
+    color: var(--radio-phosphor);
 }
 .radio-display-battery-widget[hidden] {
     display: none !important;
@@ -1888,18 +1867,19 @@ body.theme-light #radio-display-signal.is-standby {
     height: 100%;
     object-fit: contain;
     display: block;
-    filter: brightness(0) saturate(100%) invert(78%) sepia(12%) saturate(1200%) hue-rotate(72deg) brightness(95%);
+    filter: brightness(0) saturate(0%) invert(79%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%);
+    opacity: 0.95;
 }
 .radio-display-battery-pct {
     position: absolute;
     left: 0;
-    right: 4px;
+    right: 5px;
     top: 0;
     bottom: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.52em;
+    font-size: 0.54em;
     font-weight: 700;
     line-height: 1;
     letter-spacing: -0.05em;
@@ -1907,11 +1887,33 @@ body.theme-light #radio-display-signal.is-standby {
     color: #111;
     pointer-events: none;
 }
+.radio-display-row-slide {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    width: 100%;
+    will-change: transform;
+}
+.radio-display-row-icon {
+    width: 0.95em;
+    height: 0.95em;
+    flex-shrink: 0;
+    object-fit: contain;
+    filter: brightness(0) saturate(0%) invert(79%) sepia(0%) saturate(0%) hue-rotate(0deg) brightness(95%);
+    opacity: 0.92;
+}
+.radio-display-row-text {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
 .sector-tech-screen.is-preset-detail .radio-display-main > div {
-    transition: transform 0.16s ease-out;
-    will-change: transform;
+    overflow: hidden;
 }
 .sector-tech-screen.is-standby .radio-display-main > div.radio-display-standby-preset,
 .sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-standby-preset,
@@ -1949,13 +1951,68 @@ body.theme-light #radio-display-signal.is-standby {
     grid-template-rows: repeat(6, minmax(0, 1fr));
     margin: 0;
 }
+.sector-tech-screen.is-snake .radio-display-main {
+    position: relative;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    align-content: stretch;
+    gap: 0;
+    margin: 0;
+}
 .sector-tech-screen.is-snake .radio-display-main > div {
     font-family: var(--radio-display-font) !important;
     font-weight: 400 !important;
-    font-size: 0.92em !important;
+    font-size: 1.06em !important;
     letter-spacing: 0.02em;
-    line-height: 1;
-    padding-left: 2px;
+    line-height: 0.95;
+    padding-left: 10px;
+}
+.radio-snake-board {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 2;
+    padding: 0 1px;
+}
+.radio-snake-board[hidden] {
+    display: none !important;
+}
+.radio-snake-board-inner {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    aspect-ratio: 1;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(12, 1fr);
+    gap: 1px;
+}
+.radio-snake-cell {
+    min-width: 0;
+    min-height: 0;
+    border-radius: 0;
+    background: rgba(200, 200, 200, 0.04);
+}
+.radio-snake-cell.is-food {
+    background: var(--radio-phosphor);
+    box-shadow: 0 0 2px var(--radio-phosphor-glow);
+}
+.radio-snake-cell.is-head {
+    background: var(--radio-phosphor);
+}
+.radio-snake-cell.is-body {
+    background: var(--radio-phosphor);
+    opacity: 0.72;
+}
+body.theme-light .radio-snake-cell {
+    background: rgba(0, 0, 0, 0.04);
+}
+body.theme-light .radio-snake-cell.is-food,
+body.theme-light .radio-snake-cell.is-head,
+body.theme-light .radio-snake-cell.is-body {
+    background: var(--radio-phosphor);
 }
 .sector-tech-screen.is-menu .radio-display-main > div,
 .sector-tech-screen.is-stub .radio-display-main > div,
@@ -2350,9 +2407,10 @@ body.theme-light .radio-display-main > div.radio-display-row-unread {
     font-weight: 700 !important;
     text-shadow: none;
 }
-body.theme-light .radio-display-main > div.radio-display-row-focus {
-    background: transparent;
-    box-shadow: none;
+body.theme-light .radio-display-battery-bg,
+body.theme-light .radio-display-row-icon {
+    filter: brightness(0);
+    opacity: 0.92;
 }
 .radio-display-sub {
     flex: 1 1 0;

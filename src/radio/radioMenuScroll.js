@@ -1,5 +1,6 @@
 /**
  * Menu s pevným kurzorem uprostřed displeje — ↑/↓ posouvá položky, ne kurzor.
+ * Seznam vizuálně opakuje (nad první je poslední).
  */
 export var MENU_VISIBLE_LINES = 6;
 export var MENU_CURSOR_ROW = 2;
@@ -17,22 +18,30 @@ export function wrapMenuFocus(index, count, delta) {
     return ((index + delta) % count + count) % count;
 }
 
+function wrapItemIndex(index, count) {
+    if (count <= 0) return -1;
+    return ((index % count) + count) % count;
+}
+
 /**
  * @param {Array} items
  * @param {number} focusIndex
  * @param {function(item, index): string|{text:string,bold?:boolean}} labelFn
+ * @param {function(item, index): string|null} [iconFn] — název souboru ikony
  */
-export function buildFixedCursorMenuLines(items, focusIndex, labelFn) {
+export function buildFixedCursorMenuLines(items, focusIndex, labelFn, iconFn) {
     items = items || [];
-    focusIndex = clampMenuFocus(focusIndex, items.length);
-    var start = focusIndex - MENU_CURSOR_ROW;
+    var count = items.length;
+    focusIndex = clampMenuFocus(focusIndex, count);
     var lines = [];
     var lineStyles = [];
+    var lineIcons = [];
     var i;
 
     for (i = 0; i < MENU_VISIBLE_LINES; i++) {
-        var idx = start + i;
-        if (idx >= 0 && idx < items.length) {
+        var offset = i - MENU_CURSOR_ROW;
+        var idx = count ? wrapItemIndex(focusIndex + offset, count) : -1;
+        if (idx >= 0) {
             var entry = labelFn(items[idx], idx);
             if (entry && typeof entry === 'object') {
                 lines.push(entry.text || '');
@@ -41,15 +50,18 @@ export function buildFixedCursorMenuLines(items, focusIndex, labelFn) {
                 lines.push(String(entry || ''));
                 lineStyles.push(false);
             }
+            lineIcons.push(iconFn ? iconFn(items[idx], idx) : null);
         } else {
             lines.push('');
             lineStyles.push(false);
+            lineIcons.push(null);
         }
     }
 
     return {
         lines: lines,
         lineStyles: lineStyles,
-        focusLine: items.length ? MENU_CURSOR_ROW : -1
+        lineIcons: lineIcons,
+        focusLine: count ? MENU_CURSOR_ROW : -1
     };
 }

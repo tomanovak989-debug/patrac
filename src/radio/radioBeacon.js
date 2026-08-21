@@ -7,6 +7,7 @@ import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms
 import { EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
 import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
+import { menuIconForItem } from './radioMenuIcons.js';
 
 export var BEACON_REPEAT_MS = 18000;
 /** Pevný SOS kanál majáku — default poslech na všech vysílačkách. */
@@ -309,6 +310,8 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     var items = clampBeaconFocus(session, localBeacon);
     var hubView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
         return formatMenuDisplayLabel(item.label);
+    }, function(item) {
+        return menuIconForItem(item);
     });
     lines = hubView.lines;
     if (localBeacon && localBeacon.active) {
@@ -321,6 +324,8 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
         mode: 'beacon',
         status: status,
         lines: lines,
+        lineStyles: hubView.lineStyles,
+        lineIcons: hubView.lineIcons,
         focusLine: focusLine,
         footer: footer,
         buffer: ''

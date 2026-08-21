@@ -1,5 +1,5 @@
 /**
- * Ikony menu — Garmin Instinct styl (kolečko vpravo nahoře).
+ * Ikony menu — inline před textem položky.
  */
 export var RADIO_ICON_DIR = 'src/assets/icons/radio/';
 

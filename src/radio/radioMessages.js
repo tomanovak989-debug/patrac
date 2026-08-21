@@ -255,6 +255,7 @@ export function buildCommsOsView(session, notebook, radioState) {
     var footer;
     var status;
     var focusLine = -1;
+    var lineIcons = [];
     var i;
     var start;
 
@@ -293,6 +294,8 @@ export function buildCommsOsView(session, notebook, radioState) {
         items = clampCommsFocus(session, notebook);
         var confirmView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
             return formatItem(item, radioState);
+        }, function(item) {
+            return menuIconForItem(item);
         });
         confirmView.lines[0] = 'ODESLAT?';
         confirmView.lines[1] = target.line + ' · "' + preview + '"';
@@ -301,6 +304,7 @@ export function buildCommsOsView(session, notebook, radioState) {
             status: 'POTVRzení TX',
             lines: confirmView.lines,
             lineStyles: confirmView.lineStyles,
+            lineIcons: confirmView.lineIcons,
             focusLine: confirmView.focusLine,
             footer: 'OK · Zpět',
             buffer: ''
@@ -357,9 +361,12 @@ export function buildCommsOsView(session, notebook, radioState) {
     items = clampCommsFocus(session, notebook);
     var listView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
         return formatItem(item, radioState);
+    }, function(item) {
+        return menuIconForItem(item);
     });
     lines = listView.lines;
     lineStyles = listView.lineStyles;
+    lineIcons = listView.lineIcons;
     focusLine = listView.focusLine;
 
     if (session.screen === COMMS_HUB) {
@@ -385,15 +392,13 @@ export function buildCommsOsView(session, notebook, radioState) {
         footer = 'OK · Zpět';
     }
 
-    var focusedCommsItem = items.length ? items[session.focusIndex] : null;
-
     return {
         mode: 'comms',
         status: status,
         lines: lines,
         lineStyles: lineStyles,
+        lineIcons: lineIcons,
         focusLine: focusLine,
-        menuIcon: menuIconForItem(focusedCommsItem),
         footer: footer,
         buffer: ''
     };

@@ -1,16 +1,11 @@
 /**
- * Snake — mini hra ve stylu Nokia 3310 na LCD vysílačky.
- * Mřížka 12×12 (6 řádků displeje × 2 herní řádky na řádek).
+ * Snake — mini hra na LCD vysílačky.
+ * Logická mřížka 12×12, vykreslení přes CSS grid (čtvercové buňky, ne znaky).
  */
 export var SNAKE_TICK_MS = 195;
 export var SNAKE_W = 12;
 export var SNAKE_H = 12;
-export var SNAKE_DISPLAY_LINES = 6;
-
-var HALF_TOP = '\u2580';
-var HALF_BOT = '\u2584';
-var FULL = '\u2588';
-var EMPTY = '\u00b7';
+export var SNAKE_CELL_COUNT = SNAKE_W * SNAKE_H;
 
 export function createSnakeState() {
     var cx = 6;
@@ -82,51 +77,29 @@ function spawnFood(session) {
     return { x: 0, y: 0 };
 }
 
-function cellChar(grid, x, y) {
-    if (y < 0 || y >= SNAKE_H || x < 0 || x >= SNAKE_W) return 0;
-    return grid[y * SNAKE_W + x] || 0;
+function cellIndex(x, y) {
+    return y * SNAKE_W + x;
 }
 
-function setCell(grid, x, y, val) {
-    if (y < 0 || y >= SNAKE_H || x < 0 || x >= SNAKE_W) return;
-    grid[y * SNAKE_W + x] = val;
-}
-
-function mergeHalfChars(top, bot) {
-    if (top && bot) return FULL;
-    if (top) return HALF_TOP;
-    if (bot) return HALF_BOT;
-    return EMPTY;
-}
-
-function renderSnakeGrid(session) {
+/**
+ * @returns {string[]} — '' | 'food' | 'head' | 'body' pro každou buňku mřížky
+ */
+export function buildSnakeCellGrid(session) {
     var grid = [];
     var i;
-    for (i = 0; i < SNAKE_W * SNAKE_H; i++) grid[i] = 0;
+    for (i = 0; i < SNAKE_CELL_COUNT; i++) grid[i] = '';
 
-    if (session.food) {
-        setCell(grid, session.food.x, session.food.y, 2);
+    if (session && session.food) {
+        grid[cellIndex(session.food.x, session.food.y)] = 'food';
     }
-    for (i = 0; i < session.snake.length; i++) {
-        var seg = session.snake[i];
-        setCell(grid, seg.x, seg.y, i === 0 ? 3 : 1);
-    }
-
-    var lines = [];
-    var dy;
-    for (dy = 0; dy < SNAKE_DISPLAY_LINES; dy++) {
-        var rowTop = dy * 2;
-        var rowBot = rowTop + 1;
-        var line = '';
-        var x;
-        for (x = 0; x < SNAKE_W; x++) {
-            var top = cellChar(grid, x, rowTop);
-            var bot = cellChar(grid, x, rowBot);
-            line += mergeHalfChars(!!top, !!bot);
+    if (session && session.snake) {
+        for (i = 0; i < session.snake.length; i++) {
+            var seg = session.snake[i];
+            var idx = cellIndex(seg.x, seg.y);
+            grid[idx] = i === 0 ? 'head' : 'body';
         }
-        lines.push(line);
     }
-    return lines;
+    return grid;
 }
 
 export function snakeTick(session) {
@@ -157,14 +130,16 @@ export function snakeTick(session) {
 
 export function buildSnakeOsView(session) {
     session = session || createSnakeState();
-    var lines = renderSnakeGrid(session);
     var footer = 'Směr · Zpět';
     var status = 'SNAKE · ' + (session.score || 0);
+    var lines = ['', '', '', '', '', ''];
+    var useBoard = !!session.alive;
 
     if (!session.alive) {
         lines = ['', '  KONEC', '  SKÓRE ' + (session.score || 0), '  OK = nová', '', ''];
         footer = 'OK restart · Zpět';
         status = 'SNAKE · KONEC';
+        useBoard = false;
     }
 
     return {
@@ -173,6 +148,7 @@ export function buildSnakeOsView(session) {
         lines: lines,
         focusLine: -1,
         footer: footer,
-        buffer: ''
+        buffer: '',
+        useBoard: useBoard
     };
 }
