@@ -3,6 +3,7 @@
  */
 import { findPreset, normalizeFrequency, formatTime } from './radioComms.js';
 import { decorateMenuLabel, findQuickKeyForAction, formatMenuDisplayLabel } from './radioShortcuts.js';
+import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
 
 var DISPLAY_LINES = 6;
 var LINE_CHARS = 18;
@@ -301,29 +302,18 @@ export function buildCommsOsView(session, notebook, radioState) {
 
     if (session.screen === COMMS_CONFIRM) {
         var preview = String(session.pendingText || '').slice(0, 16);
-        lines = [
-            'ODESLAT?',
-            target.line,
-            '"' + preview + '"',
-            '',
-            '',
-            ''
-        ];
         items = clampCommsFocus(session, notebook);
-        for (i = 0; i < DISPLAY_LINES; i++) {
-            if (i < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[i], radioState));
-            else {
-                lines.push('');
-                lineStyles.push(false);
-            }
-        }
-        focusLine = session.focusIndex;
+        var confirmView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+            return formatItem(item, radioState);
+        });
+        confirmView.lines[0] = 'ODESLAT?';
+        confirmView.lines[1] = target.line + ' · "' + preview + '"';
         return {
             mode: 'comms',
             status: 'POTVRzení TX',
-            lines: lines,
-            lineStyles: lineStyles,
-            focusLine: focusLine,
+            lines: confirmView.lines,
+            lineStyles: confirmView.lineStyles,
+            focusLine: confirmView.focusLine,
             footer: 'OK · Zpět',
             buffer: ''
         };
@@ -355,11 +345,21 @@ export function buildCommsOsView(session, notebook, radioState) {
             ];
         }
         items = clampCommsFocus(session, notebook);
-        focusLine = session.focusIndex;
+        lineStyles = [false, false, false, false, false, false];
+        var actionStart = isPtt ? 3 : 4;
+        for (i = 0; i < items.length; i++) {
+            if (actionStart + i < DISPLAY_LINES) {
+                var actionFormatted = formatItem(items[i], radioState);
+                lines[actionStart + i] = actionFormatted.text || '';
+                lineStyles[actionStart + i] = !!actionFormatted.bold;
+            }
+        }
+        focusLine = items.length ? actionStart + session.focusIndex : -1;
         return {
             mode: 'comms',
             status: isScanCapture ? 'AUTOSKEN · DETAIL' : (isPtt ? 'PTT · DETAIL' : 'SMS · DETAIL'),
             lines: lines,
+            lineStyles: lineStyles,
             focusLine: focusLine,
             footer: 'OK · Zpět',
             buffer: ''
@@ -367,18 +367,12 @@ export function buildCommsOsView(session, notebook, radioState) {
     }
 
     items = clampCommsFocus(session, notebook);
-    start = 0;
-    if (session.focusIndex >= DISPLAY_LINES) start = session.focusIndex - DISPLAY_LINES + 1;
-    if (start + DISPLAY_LINES > items.length) start = Math.max(0, items.length - DISPLAY_LINES);
-    for (i = 0; i < DISPLAY_LINES; i++) {
-        var idx = start + i;
-        if (idx < items.length) pushFormattedLine(lines, lineStyles, formatItem(items[idx], radioState));
-        else {
-            lines.push('');
-            lineStyles.push(false);
-        }
-    }
-    focusLine = items.length ? session.focusIndex - start : -1;
+    var listView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+        return formatItem(item, radioState);
+    });
+    lines = listView.lines;
+    lineStyles = listView.lineStyles;
+    focusLine = listView.focusLine;
 
     if (session.screen === COMMS_HUB) {
         status = 'ZPRÁVY';

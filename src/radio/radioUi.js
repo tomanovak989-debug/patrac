@@ -1010,7 +1010,7 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'snake_dir') {
-        if (snakeSession && snakeSetDirection(snakeSession, result.dir)) renderDisplay();
+        if (snakeSession) snakeSetDirection(snakeSession, result.dir);
         return true;
     }
     if (result.effect === 'snake_ok') {

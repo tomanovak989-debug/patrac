@@ -1,13 +1,20 @@
 /**
  * Snake — mini hra ve stylu Nokia 3310 na LCD vysílačky.
+ * Mřížka 12×12 (6 řádků displeje × 2 herní řádky na řádek).
  */
-export var SNAKE_TICK_MS = 175;
-export var SNAKE_W = 10;
-export var SNAKE_H = 6;
+export var SNAKE_TICK_MS = 195;
+export var SNAKE_W = 12;
+export var SNAKE_H = 12;
+export var SNAKE_DISPLAY_LINES = 6;
+
+var HALF_TOP = '\u2580';
+var HALF_BOT = '\u2584';
+var FULL = '\u2588';
+var EMPTY = '\u00b7';
 
 export function createSnakeState() {
-    var cx = 5;
-    var cy = 3;
+    var cx = 6;
+    var cy = 6;
     return {
         snake: [
             { x: cx, y: cy },
@@ -16,9 +23,10 @@ export function createSnakeState() {
         ],
         dir: { x: 1, y: 0 },
         nextDir: { x: 1, y: 0 },
-        food: { x: 8, y: 1 },
+        food: { x: 9, y: 3 },
         score: 0,
-        alive: true
+        alive: true,
+        lastDirAt: 0
     };
 }
 
@@ -31,6 +39,7 @@ export function resetSnakeState(session) {
     session.food = fresh.food;
     session.score = 0;
     session.alive = true;
+    session.lastDirAt = 0;
     return session;
 }
 
@@ -40,6 +49,8 @@ function isOpposite(a, b) {
 
 export function snakeSetDirection(session, action) {
     if (!session || !session.alive) return false;
+    var now = Date.now();
+    if (session.lastDirAt && now - session.lastDirAt < 40) return false;
     var cur = session.nextDir || session.dir;
     var next = null;
     if (action === 'up') next = { x: 0, y: -1 };
@@ -48,12 +59,14 @@ export function snakeSetDirection(session, action) {
     else if (action === 'right') next = { x: 1, y: 0 };
     if (!next || isOpposite(cur, next)) return false;
     session.nextDir = next;
+    session.lastDirAt = now;
     return true;
 }
 
-function cellOccupied(session, x, y) {
+function cellOccupied(session, x, y, ignoreTail) {
+    var limit = session.snake.length - (ignoreTail ? 1 : 0);
     var i;
-    for (i = 0; i < session.snake.length; i++) {
+    for (i = 0; i < limit; i++) {
         if (session.snake[i].x === x && session.snake[i].y === y) return true;
     }
     return false;
@@ -61,35 +74,57 @@ function cellOccupied(session, x, y) {
 
 function spawnFood(session) {
     var tries = 0;
-    while (tries++ < 200) {
+    while (tries++ < 300) {
         var x = Math.floor(Math.random() * SNAKE_W);
         var y = Math.floor(Math.random() * SNAKE_H);
-        if (!cellOccupied(session, x, y)) return { x: x, y: y };
+        if (!cellOccupied(session, x, y, false)) return { x: x, y: y };
     }
     return { x: 0, y: 0 };
 }
 
-function setChar(row, x, ch) {
-    return row.slice(0, x) + ch + row.slice(x + 1);
+function cellChar(grid, x, y) {
+    if (y < 0 || y >= SNAKE_H || x < 0 || x >= SNAKE_W) return 0;
+    return grid[y * SNAKE_W + x] || 0;
+}
+
+function setCell(grid, x, y, val) {
+    if (y < 0 || y >= SNAKE_H || x < 0 || x >= SNAKE_W) return;
+    grid[y * SNAKE_W + x] = val;
+}
+
+function mergeHalfChars(top, bot) {
+    if (top && bot) return FULL;
+    if (top) return HALF_TOP;
+    if (bot) return HALF_BOT;
+    return EMPTY;
 }
 
 function renderSnakeGrid(session) {
-    var lines = [];
-    var y;
-    for (y = 0; y < SNAKE_H; y++) {
-        var row = '';
-        var x;
-        for (x = 0; x < SNAKE_W; x++) row += '·';
-        lines.push(row);
-    }
-    if (session.food) {
-        lines[session.food.y] = setChar(lines[session.food.y], session.food.x, '*');
-    }
+    var grid = [];
     var i;
+    for (i = 0; i < SNAKE_W * SNAKE_H; i++) grid[i] = 0;
+
+    if (session.food) {
+        setCell(grid, session.food.x, session.food.y, 2);
+    }
     for (i = 0; i < session.snake.length; i++) {
         var seg = session.snake[i];
-        if (seg.y < 0 || seg.y >= SNAKE_H || seg.x < 0 || seg.x >= SNAKE_W) continue;
-        lines[seg.y] = setChar(lines[seg.y], seg.x, i === 0 ? 'O' : 'o');
+        setCell(grid, seg.x, seg.y, i === 0 ? 3 : 1);
+    }
+
+    var lines = [];
+    var dy;
+    for (dy = 0; dy < SNAKE_DISPLAY_LINES; dy++) {
+        var rowTop = dy * 2;
+        var rowBot = rowTop + 1;
+        var line = '';
+        var x;
+        for (x = 0; x < SNAKE_W; x++) {
+            var top = cellChar(grid, x, rowTop);
+            var bot = cellChar(grid, x, rowBot);
+            line += mergeHalfChars(!!top, !!bot);
+        }
+        lines.push(line);
     }
     return lines;
 }
@@ -105,12 +140,9 @@ export function snakeTick(session) {
         return true;
     }
 
-    var i;
-    for (i = 0; i < session.snake.length; i++) {
-        if (session.snake[i].x === nh.x && session.snake[i].y === nh.y) {
-            session.alive = false;
-            return true;
-        }
+    if (cellOccupied(session, nh.x, nh.y, true)) {
+        session.alive = false;
+        return true;
     }
 
     session.snake.unshift(nh);

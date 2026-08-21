@@ -6,6 +6,7 @@
 import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms.js';
 import { EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
+import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
 
 export var BEACON_REPEAT_MS = 18000;
 /** Pevný SOS kanál majáku — default poslech na všech vysílačkách. */
@@ -306,21 +307,15 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     }
 
     var items = clampBeaconFocus(session, localBeacon);
-    var start = 0;
-    if (session.focusIndex >= 4) start = session.focusIndex - 3;
-    if (start + 4 > items.length) start = Math.max(0, items.length - 4);
-    var i;
-    for (i = 0; i < 4; i++) {
-        var idx = start + i;
-        lines.push(idx < items.length ? formatMenuDisplayLabel(items[idx].label) : '');
-    }
-    lines.push('');
-    lines.push('');
+    var hubView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+        return formatMenuDisplayLabel(item.label);
+    });
+    lines = hubView.lines;
     if (localBeacon && localBeacon.active) {
         lines[4] = '● SOS ' + BEACON_SOS_FREQUENCY;
         lines[5] = (isFinite(localBeacon.lat) ? 'GPS OK · ' : 'GPS? · ') + String(localBeacon.text || '').slice(0, 14);
     }
-    focusLine = items.length ? session.focusIndex - start : -1;
+    focusLine = hubView.focusLine;
 
     return {
         mode: 'beacon',

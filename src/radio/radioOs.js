@@ -7,13 +7,12 @@ import { buildCommsOsView } from './radioMessages.js';
 import { buildBeaconOsView } from './radioBeacon.js';
 import { buildSnakeOsView } from './radioSnake.js';
 import { decorateMenuLabel, findQuickKeyForAction } from './radioShortcuts.js';
-
+import { buildFixedCursorMenuLines, MENU_CURSOR_ROW } from './radioMenuScroll.js';
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
 export var SCREEN_STUB = 'stub';
 
 var PRESET_SLOTS = 15;
-var MENU_LINES = 6;
 
 var RADIO_MENU = [
     { id: 'radio_comms', label: '1 · ZPRÁVY', action: 'screen:comms', shortcutAction: 'menu:comms' },
@@ -130,14 +129,13 @@ function cycleSoundPref(radioState, field, delta) {
 
 function buildSoundSettingsLines(os, radioState) {
     var prefs = getSoundPrefs(radioState);
-    var lines = [];
+    var items = [];
     var i;
     for (i = 0; i < SOUND_FIELDS.length; i++) {
         var field = SOUND_FIELDS[i];
-        lines.push((i + 1) + ' ' + SOUND_LABELS[field] + '   ' + prefs[field]);
+        items.push((i + 1) + ' ' + SOUND_LABELS[field] + '   ' + prefs[field]);
     }
-    while (lines.length < 6) lines.push('');
-    return lines;
+    return buildFixedCursorMenuLines(items, os.soundFieldFocus, function(item) { return item; });
 }
 
 function getCurrentMenuItems(os, radioState) {
@@ -255,21 +253,6 @@ export function executeMenuDigit(os, radioState, digit) {
     }
 
     return { changed: false };
-}
-
-function buildPresetDetailLines(draft) {
-    if (!draft) return ['', '', '', '', '', ''];
-    var name = draft.label || ('Kanál ' + draft.slot);
-    var freq = draft.frequency || '---.---';
-    var key = draft.encryptionKey ? draft.encryptionKey : '—';
-    return [
-        '1 NÁZEV  ' + name,
-        '2 F       ' + freq,
-        '3 ŠIFRA   ' + key,
-        '',
-        '',
-        ''
-    ];
 }
 
 /**
@@ -501,25 +484,26 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail' && draft) {
-        return {
-            mode: 'preset_detail',
-            status: menuStatusLabel(os, radioState, draft),
-            lines: buildPresetDetailLines(draft),
-            focusLine: os.presetFieldFocus,
-            footer: 'OK · OK · Zpět',
-            buffer: ''
-        };
+        var presetView = buildFixedCursorMenuLines([
+            '1 NÁZEV  ' + (draft.label || ('Kanál ' + draft.slot)),
+            '2 F       ' + (draft.frequency || '---.---'),
+            '3 ŠIFRA   ' + (draft.encryptionKey ? draft.encryptionKey : '—')
+        ], os.presetFieldFocus, function(item) { return item; });
+        presetView.mode = 'preset_detail';
+        presetView.status = menuStatusLabel(os, radioState, draft);
+        presetView.footer = 'OK · OK · Zpět';
+        presetView.buffer = '';
+        return presetView;
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
-        return {
-            mode: 'sound_settings',
-            status: menuStatusLabel(os, radioState, draft),
-            lines: buildSoundSettingsLines(os, radioState),
-            focusLine: os.soundFieldFocus,
-            footer: '←→ varianta · Zpět',
-            buffer: ''
-        };
+        var soundView = buildSoundSettingsLines(os, radioState);
+        soundView.mode = 'sound_settings';
+        soundView.status = menuStatusLabel(os, radioState, draft);
+        soundView.focusLine = MENU_CURSOR_ROW;
+        soundView.footer = '←→ varianta · Zpět';
+        soundView.buffer = '';
+        return soundView;
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'quickkeys') {
@@ -559,21 +543,15 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     var items = getCurrentMenuItems(os, radioState);
-    var lines = [];
-    var start = 0;
-    if (os.focusIndex >= MENU_LINES) start = os.focusIndex - MENU_LINES + 1;
-    if (start + MENU_LINES > items.length) start = Math.max(0, items.length - MENU_LINES);
-
-    for (var i = 0; i < MENU_LINES; i++) {
-        var idx = start + i;
-        lines.push(idx < items.length ? decorateItemLabel(items[idx], radioState) : '');
-    }
+    var menuView = buildFixedCursorMenuLines(items, os.focusIndex, function(item) {
+        return decorateItemLabel(item, radioState);
+    });
 
     return {
         mode: 'menu',
         status: menuStatusLabel(os, radioState, draft),
-        lines: lines,
-        focusLine: os.focusIndex - start,
+        lines: menuView.lines,
+        focusLine: menuView.focusLine,
         footer: 'Čísla · OK · Zpět',
         buffer: ''
     };
