@@ -394,9 +394,17 @@ function setCell(grid, x, y, val) {
 
 function headHitsBody(session, nx, ny) {
     var cells = segmentCells(nx, ny);
+    var ignoreTail = (session.growPending || 0) <= 0;
+    var lastIndex = session.snake.length - 1;
     var c;
+    var i;
     for (c = 0; c < cells.length; c++) {
-        if (cellOccupied(session, cells[c][0], cells[c][1], true)) return true;
+        var px = cells[c][0];
+        var py = cells[c][1];
+        for (i = 1; i < session.snake.length; i++) {
+            if (ignoreTail && i === lastIndex) continue;
+            if (pointOccupiedBySegment(session, px, py, i)) return true;
+        }
     }
     return false;
 }
