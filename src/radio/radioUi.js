@@ -164,7 +164,10 @@ import {
     SNAKE_TICK_MS,
     SNAKE_CELL_COUNT,
     SNAKE_W,
-    SNAKE_H
+    SNAKE_H,
+    snakeLevel,
+    snakeTickMs,
+    bonusBlinkPhase
 } from './radioSnake.js';
 import {
     createArkanoidState,
@@ -244,6 +247,7 @@ var autoscanTimer = null;
 var batteryTimer = null;
 var snakeSession = null;
 var snakeTimer = null;
+var snakeTimerMs = null;
 var arkanoidSession = null;
 var arkanoidTimer = null;
 var decoderSession = null;
@@ -2476,15 +2480,17 @@ function snakeEatPulse() {
 function buildSnakeBoardDom(board) {
     board.textContent = '';
     snakeBoardReady = false;
-    var score = document.createElement('div');
-    score.className = 'radio-app-score radio-snake-score';
-    score.id = 'radio-snake-score';
+    var hud = document.createElement('div');
+    hud.className = 'radio-snake-hud';
+    hud.innerHTML = '<span class="radio-snake-hud-score" id="radio-snake-score">0000</span>' +
+        '<span class="radio-snake-hud-lv" id="radio-snake-level">1</span>' +
+        '<span class="radio-snake-hud-prog" id="radio-snake-progress"></span>';
     var frame = document.createElement('div');
-    frame.className = 'radio-app-frame radio-snake-frame';
+    frame.className = 'radio-app-frame radio-snake-frame is-nokia';
     var inner = document.createElement('div');
     inner.className = 'radio-app-board-inner radio-snake-board-inner';
     frame.appendChild(inner);
-    board.appendChild(score);
+    board.appendChild(hud);
     board.appendChild(frame);
 }
 
@@ -2516,7 +2522,7 @@ function ensureSnakeBoard() {
         buildSnakeBoardDom(board);
         main.appendChild(board);
         snakeBoardReady = false;
-    } else if (!board.querySelector('.radio-app-score')) {
+    } else if (!board.querySelector('.radio-snake-hud')) {
         buildSnakeBoardDom(board);
         snakeBoardReady = false;
     }
@@ -2642,15 +2648,24 @@ function renderSnakeBoard(session) {
     var board = ensureSnakeBoard();
     if (!board) return;
     var scoreEl = el('radio-snake-score');
+    var levelEl = el('radio-snake-level');
+    var progEl = el('radio-snake-progress');
     if (scoreEl) {
-        scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0');
+        scoreEl.textContent = String(session.score || 0).padStart(4, '0');
+    }
+    if (levelEl) {
+        levelEl.textContent = String(snakeLevel(session));
+    }
+    if (progEl) {
+        progEl.textContent = String(session.levelFoodsEaten || 0) + '/' + String(session.foodsToClear || 6);
     }
     showSnakeBoard(board);
     sizeSnakeBoardInner(board);
+    ensureSnakeTimer();
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;
-    var grid = buildSnakeCellGrid(session);
+    var grid = buildSnakeCellGrid(session, { bonusBlink: bonusBlinkPhase(session) });
     var dirClass = snakeHeadDirClass(session.dir || session.nextDir);
     var i;
     for (i = 0; i < grid.length && i < cells.length; i++) {
@@ -2672,10 +2687,18 @@ function stopSnakeTimer() {
         clearInterval(snakeTimer);
         snakeTimer = null;
     }
+    snakeTimerMs = null;
 }
 
-function startSnakeTimer() {
+function ensureSnakeTimer() {
+    if (!snakeSession || !isSnakeMenuOpen()) {
+        stopSnakeTimer();
+        return;
+    }
+    var ms = snakeTickMs(snakeSession);
+    if (snakeTimer && snakeTimerMs === ms) return;
     stopSnakeTimer();
+    snakeTimerMs = ms;
     snakeTimer = setInterval(function() {
         if (!snakeSession || !isSnakeMenuOpen()) {
             stopSnakeTimer();
@@ -2683,10 +2706,14 @@ function startSnakeTimer() {
         }
         if (snakeSession.alive) {
             var tickResult = snakeTick(snakeSession);
-            if (tickResult === 'ate') snakeEatPulse();
+            if (tickResult === 'ate' || tickResult === 'level') snakeEatPulse();
         }
         renderDisplay();
-    }, SNAKE_TICK_MS);
+    }, ms);
+}
+
+function startSnakeTimer() {
+    ensureSnakeTimer();
 }
 
 function isSnakeMenuOpen() {

@@ -2099,9 +2099,70 @@ body.theme-light #radio-display-signal.is-standby {
     display: grid;
     gap: 0;
 }
-.radio-app-board-inner,
 .radio-snake-board-inner {
+    aspect-ratio: 84 / 48;
+}
+.radio-app-board-inner,
+.radio-arkanoid-board-inner {
     aspect-ratio: 1;
+}
+.sector-tech-screen.is-snake .radio-snake-frame.is-nokia {
+    border: 1px solid var(--radio-phosphor);
+    box-shadow: inset 0 0 0 1px rgba(200, 200, 200, 0.18);
+    padding: 1px;
+    background: rgba(200, 200, 200, 0.03);
+}
+.radio-snake-hud {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 0;
+    padding: 0 3px 2px;
+    border-bottom: 1px solid var(--radio-phosphor);
+    box-sizing: border-box;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.14em;
+    font-size: 0.58em;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--radio-phosphor);
+}
+.radio-snake-hud-score {
+    min-width: 4.2em;
+    text-align: left;
+}
+.radio-snake-hud-lv {
+    min-width: 1.2em;
+    text-align: right;
+    opacity: 0.92;
+}
+.radio-snake-hud-lv::before {
+    content: '▣';
+    margin-right: 0.25em;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+.radio-snake-hud-prog {
+    margin-left: auto;
+    padding-left: 0.35em;
+    opacity: 0.78;
+    font-size: 0.92em;
+    letter-spacing: 0.06em;
+}
+.radio-snake-cell.is-wall {
+    background: var(--radio-phosphor);
+    opacity: 0.82;
+}
+.radio-snake-cell.is-bonus {
+    background: var(--radio-phosphor);
+    opacity: 1;
+}
+.radio-snake-cell.is-bonus-blink {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--radio-phosphor);
+    opacity: 0.35;
 }
 .radio-app-cell,
 .radio-snake-cell,
@@ -2109,33 +2170,29 @@ body.theme-light #radio-display-signal.is-standby {
     min-width: 0;
     min-height: 0;
     border-radius: 0;
-    background: rgba(200, 200, 200, 0.04);
+    background: transparent;
 }
-.radio-arkanoid-cell.is-brick {
+.radio-snake-cell.is-border {
     background: var(--radio-phosphor);
-    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+    opacity: 0.95;
 }
-.radio-arkanoid-cell.is-paddle {
-    background: var(--radio-phosphor);
-    box-shadow: 0 0 2px var(--radio-phosphor-glow);
-}
-.radio-arkanoid-cell.is-ball {
-    background: var(--radio-phosphor);
-    border-radius: 50%;
-    box-shadow: 0 0 3px var(--radio-phosphor-glow);
-}
-.radio-snake-cell.is-food {
-    background: var(--radio-phosphor);
-    box-shadow: 0 0 2px var(--radio-phosphor-glow);
-}
+.radio-snake-cell.is-food,
 .radio-snake-cell.is-food-big {
     background: var(--radio-phosphor);
-    box-shadow: 0 0 3px var(--radio-phosphor-glow);
+    opacity: 1;
+}
+.radio-snake-cell.is-body-a {
+    background: var(--radio-phosphor);
+    opacity: 1;
+}
+.radio-snake-cell.is-body-b {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px rgba(200, 200, 200, 0.55);
 }
 .radio-snake-cell.is-head {
     position: relative;
     background: var(--radio-phosphor);
-    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+    box-shadow: none;
     z-index: 1;
 }
 .radio-snake-cell.is-head::after {
@@ -2164,9 +2221,18 @@ body.theme-light #radio-display-signal.is-standby {
     left: 33%;
     top: auto;
 }
-.radio-snake-cell.is-body {
+.radio-arkanoid-cell.is-brick {
     background: var(--radio-phosphor);
     box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+}
+.radio-arkanoid-cell.is-paddle {
+    background: var(--radio-phosphor);
+    box-shadow: 0 0 2px var(--radio-phosphor-glow);
+}
+.radio-arkanoid-cell.is-ball {
+    background: var(--radio-phosphor);
+    border-radius: 50%;
+    box-shadow: 0 0 3px var(--radio-phosphor-glow);
 }
 body.theme-light .radio-app-cell,
 body.theme-light .radio-snake-cell,
@@ -2178,11 +2244,15 @@ body.theme-light .radio-arkanoid-cell.is-paddle,
 body.theme-light .radio-arkanoid-cell.is-ball {
     background: var(--radio-phosphor);
 }
+body.theme-light .radio-snake-cell.is-body-a,
+body.theme-light .radio-snake-cell.is-head,
 body.theme-light .radio-snake-cell.is-food,
 body.theme-light .radio-snake-cell.is-food-big,
-body.theme-light .radio-snake-cell.is-head,
-body.theme-light .radio-snake-cell.is-body {
+body.theme-light .radio-snake-cell.is-border {
     background: var(--radio-phosphor);
+}
+body.theme-light .radio-snake-cell.is-body-b {
+    background: transparent;
 }
 body.theme-light .radio-snake-cell.is-head::after {
     background: var(--radio-screen-bg);
