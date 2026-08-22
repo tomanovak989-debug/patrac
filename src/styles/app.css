@@ -1328,6 +1328,14 @@ body.sector-calibrate-on .sector-scale-bar {
 }
 body.sector-user-setup-on:not(.sector-admin-calibrate-on) .sector-tech-scroll {
     overflow-y: auto;
+    scroll-padding-top: 44px;
+    scroll-padding-bottom: 60px;
+}
+body.sector-user-setup-on:not(.sector-admin-calibrate-on) .sector-band-line::after {
+    top: -18px;
+}
+body.sector-user-setup-on:not(.sector-admin-calibrate-on) .sector-band-tag {
+    top: -28px;
 }
 .sector-scale-bar label { flex-shrink: 0; letter-spacing: 0.06em; }
 .sector-scale-bar input[type="range"] { flex: 1; min-width: 0; }

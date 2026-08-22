@@ -11,8 +11,6 @@ import {
     setSectorViewModeInPrefs,
     getSectorBandsFromPrefs,
     setSectorBandsInPrefs,
-    getSectorScaleMultiplier,
-    adjustSectorScaleMultiplier,
     isSectorDisplayLocked
 } from './radioSectorDisplayPrefs.js';
 
@@ -25,8 +23,8 @@ var GRID_STEP = 50;
 var GRID_MINOR = 25;
 var BAND_MIN_GAP = 80;
 var CAL_SCALE = 2.0;
-var SCALE_MIN = 0.55;
-var SCALE_MAX = 6.5;
+var SETUP_SCROLL_PAD_TOP = 40;
+var SETUP_SCROLL_PAD_BOTTOM = 56;
 
 var viewMode = 'focus';
 var dragState = null;
@@ -91,37 +89,27 @@ function currentBand() {
     return normalizeBand(bands[viewMode] || bands.focus);
 }
 
-function computeScaleForBand(scroll, band, mode) {
+function computeScaleForBand(scroll, band) {
     var viewH = scroll.clientHeight;
-    var viewW = scroll.clientWidth || window.innerWidth || 360;
     if (viewH < 40) viewH = 240;
-    if (viewW < 40) viewW = 360;
-
     var regionH = Math.max(BAND_MIN_GAP, band.bottom - band.top);
-    var scaleForHeight = (viewH * GRID_SRC) / (regionH * viewW);
-    var scale = scaleForHeight;
-
-    /* Celý pohled: nezabírat víc než šířku obrazovky (PC letterbox). */
-    if (mode === 'full') {
-        scale = Math.min(scaleForHeight, 1);
-    }
-
-    scale *= getSectorScaleMultiplier();
-
-    return Math.max(SCALE_MIN, Math.min(SCALE_MAX, scale));
+    var vw = window.innerWidth || scroll.clientWidth || 360;
+    var scale = (viewH * GRID_SRC) / (regionH * vw);
+    return Math.max(1.4, Math.min(6.5, scale));
 }
 
 function applyViewLayout(scroll) {
     var shell = scroll.closest('.sector-tech-shell');
     if (!shell) return CAL_SCALE;
     var band = currentBand();
-    var scale = computeScaleForBand(scroll, band, viewMode);
+    var scale = computeScaleForBand(scroll, band);
     shell.style.setProperty('--sector-img-scale', scale.toFixed(3));
 
     var stage = scroll.querySelector('.sector-tech-stage');
     if (stage) {
         var stageH = stage.offsetHeight;
-        scroll.scrollTop = Math.max(0, (band.top / GRID_SRC) * stageH - 2);
+        var padTop = isUserSetupMode() ? SETUP_SCROLL_PAD_TOP : 2;
+        scroll.scrollTop = Math.max(0, (band.top / GRID_SRC) * stageH - padTop);
     }
     updateViewControls();
     return scale;
@@ -133,7 +121,7 @@ function applyCalLayout(scroll) {
 }
 
 function applyLayout(scroll) {
-    if (isCalibrateMode()) {
+    if (isAdminCalibrateMode()) {
         applyCalLayout(scroll);
         return CAL_SCALE;
     }
@@ -145,14 +133,10 @@ function updateViewControls() {
     var minus = el('sector-view-minus');
     var lockBtn = el('sector-view-lock');
     var unlockBtn = el('sector-view-unlock');
-    var zoomOutBtn = el('sector-scale-minus');
-    var zoomInBtn = el('sector-scale-plus');
     if (plus) plus.classList.toggle('is-active', viewMode === 'focus');
     if (minus) minus.classList.toggle('is-active', viewMode === 'full');
     if (lockBtn) lockBtn.hidden = isSectorDisplayLocked() || !isUserSetupMode();
     if (unlockBtn) unlockBtn.hidden = !isSectorDisplayLocked() || !isRadioTabActive();
-    if (zoomOutBtn) zoomOutBtn.hidden = isSectorDisplayLocked() || !isUserSetupMode();
-    if (zoomInBtn) zoomInBtn.hidden = isSectorDisplayLocked() || !isUserSetupMode();
 }
 
 function updateSetupBarUi() {
@@ -171,11 +155,9 @@ function updateBandReadout() {
     var node = el('sector-band-readout');
     if (!node) return;
     var b = loadBands();
-    var mult = getSectorScaleMultiplier();
     node.textContent =
         'Celo: Y ' + b.full.top + '–' + b.full.bottom +
-        ' · Výřez: Y ' + b.focus.top + '–' + b.focus.bottom +
-        ' · Zoom ' + Math.round(mult * 100) + '%';
+        ' · Výřez: Y ' + b.focus.top + '–' + b.focus.bottom;
 }
 
 function positionBandLine(line, ySrc) {
@@ -201,8 +183,6 @@ function bindViewControls() {
     var plus = el('sector-view-plus');
     var lockBtn = el('sector-view-lock');
     var unlockBtn = el('sector-view-unlock');
-    var zoomOutBtn = el('sector-scale-minus');
-    var zoomInBtn = el('sector-scale-plus');
     if (!minus || !plus || minus._sectorViewBound) return;
     minus._sectorViewBound = true;
     plus._sectorViewBound = true;
@@ -236,30 +216,6 @@ function bindViewControls() {
             e.preventDefault();
             e.stopPropagation();
             unlockSectorDisplayPrefs();
-            remeasureAll();
-        });
-    }
-
-    if (zoomOutBtn && !zoomOutBtn._sectorViewBound) {
-        zoomOutBtn._sectorViewBound = true;
-        zoomOutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isUserSetupMode()) return;
-            adjustSectorScaleMultiplier(-0.05);
-            updateBandReadout();
-            remeasureAll();
-        });
-    }
-
-    if (zoomInBtn && !zoomInBtn._sectorViewBound) {
-        zoomInBtn._sectorViewBound = true;
-        zoomInBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!isUserSetupMode()) return;
-            adjustSectorScaleMultiplier(0.05);
-            updateBandReadout();
             remeasureAll();
         });
     }
@@ -582,7 +538,7 @@ function remeasureAll() {
     if (!scroll) return;
     applyRadioHitmap();
     measureStage(scroll);
-    if (!isCalibrateMode()) {
+    if (!isAdminCalibrateMode()) {
         applyViewLayout(scroll);
     }
 }
