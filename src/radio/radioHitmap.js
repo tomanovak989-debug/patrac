@@ -80,6 +80,32 @@ export function applyDisplayTypography() {
             keyRow.style.removeProperty('font-size');
         }
     }
+
+    applyBatteryChrome(px);
+}
+
+/** Baterie + nabíjení — stejná px báze jako displej (ne fixní CSS px). */
+function applyBatteryChrome(px) {
+    var w = Math.round(px * 3.15 * 10) / 10;
+    var h = Math.round(px * 1.64 * 10) / 10;
+    var iw = Math.round(px * 4.15 * 10) / 10;
+    var ih = Math.round(px * 2.14 * 10) / 10;
+    var gap = Math.round(px * 0.55 * 10) / 10;
+    var widget = document.getElementById('radio-display-battery');
+    if (widget) {
+        widget.style.width = w + 'px';
+        widget.style.height = h + 'px';
+    }
+    var icons = document.querySelectorAll('.radio-display-charge-icon');
+    var i;
+    for (i = 0; i < icons.length; i++) {
+        icons[i].style.width = iw + 'px';
+        icons[i].style.height = ih + 'px';
+    }
+    var wraps = document.querySelectorAll('.radio-display-charge-wrap');
+    for (i = 0; i < wraps.length; i++) {
+        wraps[i].style.gap = gap + 'px';
+    }
 }
 
 export function applyRadioHitmap() {

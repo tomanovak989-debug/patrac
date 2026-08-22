@@ -2,7 +2,7 @@
  * SECTOR-TECH — dva pohledy (celá / displej+klávesnice), kalibrace pásem, +/- ovládání.
  * Per-device prefs: uživatel nastaví pásma, zamkne → vodící lišty zmizí.
  */
-import { applyRadioHitmap } from './radioHitmap.js';
+import { applyRadioHitmap, applyDisplayTypography } from './radioHitmap.js';
 import {
     loadSectorDisplayPrefs,
     lockSectorDisplayPrefs,
@@ -541,6 +541,7 @@ function remeasureAll() {
     if (!isAdminCalibrateMode()) {
         applyViewLayout(scroll);
     }
+    requestAnimationFrame(applyDisplayTypography);
 }
 
 export function initSectorTechShell() {
@@ -580,6 +581,7 @@ export function initSectorTechShell() {
 
     scroll.addEventListener('scroll', function() {
         if (isAdminCalibrateMode()) updateViewportRulers(scroll);
+        requestAnimationFrame(applyDisplayTypography);
     }, { passive: true });
 }
 
