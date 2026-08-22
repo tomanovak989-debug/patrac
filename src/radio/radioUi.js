@@ -164,6 +164,20 @@ import {
     SNAKE_CELL_COUNT
 } from './radioSnake.js';
 import {
+    createArkanoidState,
+    resetArkanoidState,
+    arkanoidMovePaddle,
+    arkanoidTick,
+    arkanoidOk,
+    buildArkanoidCellGrid,
+    ARK_TICK_MS,
+    ARK_CELL_COUNT
+} from './radioArkanoid.js';
+import {
+    createDecoderState,
+    resetDecoderState
+} from './radioDecoder.js';
+import {
     bindQuickKey,
     bindingFromMenuItem,
     bindingFromCommsItem,
@@ -225,6 +239,9 @@ var autoscanTimer = null;
 var batteryTimer = null;
 var snakeSession = null;
 var snakeTimer = null;
+var arkanoidSession = null;
+var arkanoidTimer = null;
+var decoderSession = null;
 var beaconSession = null;
 var beaconActive = null;
 var beaconRepeatTimer = null;
@@ -1144,10 +1161,40 @@ function applyRadioOsEffect(result) {
     }
     if (result.effect === 'snake_dir') {
         if (snakeSession) snakeSetDirection(snakeSession, result.dir);
+        renderDisplay();
         return true;
     }
     if (result.effect === 'snake_ok') {
         handleSnakeOk();
+        return true;
+    }
+    if (result.effect === 'arkanoid_open') {
+        openArkanoidScreen();
+        return true;
+    }
+    if (result.effect === 'arkanoid_close') {
+        closeArkanoidScreen();
+        return true;
+    }
+    if (result.effect === 'arkanoid_paddle') {
+        if (arkanoidSession) arkanoidMovePaddle(arkanoidSession, result.dir);
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'arkanoid_ok') {
+        handleArkanoidOk();
+        return true;
+    }
+    if (result.effect === 'decoder_open') {
+        openDecoderScreen();
+        return true;
+    }
+    if (result.effect === 'decoder_close') {
+        closeDecoderScreen();
+        return true;
+    }
+    if (result.effect === 'decoder_ok') {
+        handleDecoderOk();
         return true;
     }
     renderDisplay();
@@ -1189,11 +1236,11 @@ function executeMenuDialCommit() {
                 radioOs.focusIndex = sidx;
                 applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
             }
-        } else if (step.type === 'games') {
-            var gamesItems = getCurrentGamesItems();
-            var gidx = step.value - 1;
-            if (gidx >= 0 && gidx < gamesItems.length) {
-                radioOs.focusIndex = gidx;
+        } else if (step.type === 'apps') {
+            var appsItems = getCurrentAppsItems();
+            var aidx = step.value - 1;
+            if (aidx >= 0 && aidx < appsItems.length) {
+                radioOs.focusIndex = aidx;
                 applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
             }
         }
@@ -1208,9 +1255,11 @@ function getCurrentSettingsItems() {
     ];
 }
 
-function getCurrentGamesItems() {
+function getCurrentAppsItems() {
     return [
-        { action: 'screen:snake' }
+        { action: 'screen:snake' },
+        { action: 'screen:arkanoid' },
+        { action: 'screen:decoder' }
     ];
 }
 
@@ -1282,14 +1331,28 @@ function executeQuickKey(keyId) {
     if (action === 'snake:open') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
-        radioOs.menuPath = ['games', 'snake'];
+        radioOs.menuPath = ['apps', 'snake'];
         openSnakeScreen();
         return true;
     }
-    if (action === 'menu:games') {
+    if (action === 'arkanoid:open') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
-        radioOs.menuPath = ['games'];
+        radioOs.menuPath = ['apps', 'arkanoid'];
+        openArkanoidScreen();
+        return true;
+    }
+    if (action === 'decoder:open') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['apps', 'decoder'];
+        openDecoderScreen();
+        return true;
+    }
+    if (action === 'menu:apps') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['apps'];
         radioOs.focusIndex = 0;
         renderDisplay();
         return true;
@@ -1438,12 +1501,14 @@ function renderDisplay() {
         buffer: dialBuffer
     }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive, {
         pttRecording: !!(beaconPttPending || (pttSession && pttSession.active && isBeaconMenuOpen()))
-    }, snakeSession);
+    }, snakeSession, arkanoidSession, decoderSession);
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
-        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon' || osView.mode === 'snake');
+        screen.classList.toggle('is-menu', osView.mode === 'menu' || osView.mode === 'stub' || osView.mode === 'preset_detail' || osView.mode === 'sound_settings' || osView.mode === 'autoscan' || osView.mode === 'comms' || osView.mode === 'beacon' || osView.mode === 'snake' || osView.mode === 'arkanoid' || osView.mode === 'decoder');
         screen.classList.toggle('is-snake', osView.mode === 'snake');
+        screen.classList.toggle('is-arkanoid', osView.mode === 'arkanoid');
+        screen.classList.toggle('is-decoder', osView.mode === 'decoder');
         screen.classList.toggle('is-standby', osView.mode === 'standby' || osView.mode === 'standby_tune');
         screen.classList.toggle('is-standby-tune', osView.mode === 'standby_tune' || !!(standbyUi && standbyUi.active));
         screen.classList.toggle('is-preset-detail', osView.mode === 'preset_detail' || osView.mode === 'sound_settings');
@@ -1520,7 +1585,7 @@ function renderDisplay() {
     }
 
     if (osView.mode === 'off') {
-        hideSnakeBoard();
+        hideAppBoards();
         if (state.batteryCharging) {
             if (f) {
                 f.className = 'radio-display-battery-only';
@@ -1622,13 +1687,23 @@ function renderDisplay() {
         if (osView.mode === 'snake') {
             if (osView.useBoard && snakeSession && snakeSession.alive) {
                 setDisplayMenuLines(['', '', '', '', '', ''], -1);
+                hideArkanoidBoard();
                 renderSnakeBoard(snakeSession);
             } else {
+                hideAppBoards();
+                setDisplayMenuLines(menuLines, -1);
+            }
+        } else if (osView.mode === 'arkanoid') {
+            if (osView.useBoard && arkanoidSession && arkanoidSession.alive) {
+                setDisplayMenuLines(['', '', '', '', '', ''], -1);
                 hideSnakeBoard();
+                renderArkanoidBoard(arkanoidSession);
+            } else {
+                hideAppBoards();
                 setDisplayMenuLines(menuLines, -1);
             }
         } else {
-            hideSnakeBoard();
+            hideAppBoards();
             setDisplayMenuLines(
                 menuLines,
                 osView.focusLine == null ? -1 : osView.focusLine,
@@ -2344,7 +2419,6 @@ function openCommsAction(actionId) {
 }
 
 var snakeBoardReady = false;
-var snakeBoardLockedSize = 0;
 
 function snakeEatPulse() {
     if (navigator.vibrate) {
@@ -2356,12 +2430,27 @@ function buildSnakeBoardDom(board) {
     board.textContent = '';
     snakeBoardReady = false;
     var score = document.createElement('div');
-    score.className = 'radio-snake-score';
+    score.className = 'radio-app-score radio-snake-score';
     score.id = 'radio-snake-score';
     var frame = document.createElement('div');
-    frame.className = 'radio-snake-frame';
+    frame.className = 'radio-app-frame radio-snake-frame';
     var inner = document.createElement('div');
-    inner.className = 'radio-snake-board-inner';
+    inner.className = 'radio-app-board-inner radio-snake-board-inner';
+    frame.appendChild(inner);
+    board.appendChild(score);
+    board.appendChild(frame);
+}
+
+function buildArkanoidBoardDom(board) {
+    board.textContent = '';
+    arkanoidBoardReady = false;
+    var score = document.createElement('div');
+    score.className = 'radio-app-score radio-arkanoid-score';
+    score.id = 'radio-arkanoid-score';
+    var frame = document.createElement('div');
+    frame.className = 'radio-app-frame radio-arkanoid-frame';
+    var inner = document.createElement('div');
+    inner.className = 'radio-app-board-inner radio-arkanoid-board-inner';
     frame.appendChild(inner);
     board.appendChild(score);
     board.appendChild(frame);
@@ -2374,22 +2463,22 @@ function ensureSnakeBoard() {
     if (!board) {
         board = document.createElement('div');
         board.id = 'radio-snake-board';
-        board.className = 'radio-snake-board';
+        board.className = 'radio-snake-board radio-app-board';
         board.hidden = true;
         board.setAttribute('aria-hidden', 'true');
         buildSnakeBoardDom(board);
         main.appendChild(board);
         snakeBoardReady = false;
-    } else if (!board.querySelector('.radio-snake-score')) {
+    } else if (!board.querySelector('.radio-app-score')) {
         buildSnakeBoardDom(board);
         snakeBoardReady = false;
     }
-    var innerEl = board.querySelector('.radio-snake-board-inner');
+    var innerEl = board.querySelector('.radio-app-board-inner');
     if (innerEl && !snakeBoardReady) {
         var i;
         for (i = 0; i < SNAKE_CELL_COUNT; i++) {
             var cell = document.createElement('div');
-            cell.className = 'radio-snake-cell';
+            cell.className = 'radio-app-cell radio-snake-cell';
             innerEl.appendChild(cell);
         }
         snakeBoardReady = true;
@@ -2405,6 +2494,51 @@ function hideSnakeBoard() {
     }
 }
 
+var arkanoidBoardReady = false;
+
+function ensureArkanoidBoard() {
+    var main = el('radio-display-main');
+    if (!main) return null;
+    var board = el('radio-arkanoid-board');
+    if (!board) {
+        board = document.createElement('div');
+        board.id = 'radio-arkanoid-board';
+        board.className = 'radio-arkanoid-board radio-app-board';
+        board.hidden = true;
+        board.setAttribute('aria-hidden', 'true');
+        buildArkanoidBoardDom(board);
+        main.appendChild(board);
+        arkanoidBoardReady = false;
+    } else if (!board.querySelector('.radio-app-score')) {
+        buildArkanoidBoardDom(board);
+        arkanoidBoardReady = false;
+    }
+    var innerEl = board.querySelector('.radio-app-board-inner');
+    if (innerEl && !arkanoidBoardReady) {
+        var i;
+        for (i = 0; i < ARK_CELL_COUNT; i++) {
+            var cell = document.createElement('div');
+            cell.className = 'radio-app-cell radio-arkanoid-cell';
+            innerEl.appendChild(cell);
+        }
+        arkanoidBoardReady = true;
+    }
+    return board;
+}
+
+function hideArkanoidBoard() {
+    var board = el('radio-arkanoid-board');
+    if (board) {
+        board.hidden = true;
+        board.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function hideAppBoards() {
+    hideSnakeBoard();
+    hideArkanoidBoard();
+}
+
 function snakeHeadDirClass(dir) {
     if (!dir) return '';
     if (dir.x === 1) return ' is-dir-right';
@@ -2414,22 +2548,11 @@ function snakeHeadDirClass(dir) {
     return '';
 }
 
-function sizeSnakeBoardInner(board, force) {
-    var inner = board && board.querySelector('.radio-snake-board-inner');
+function sizeSnakeBoardInner(board) {
+    var inner = board && board.querySelector('.radio-app-board-inner');
     if (!inner) return;
-    if (snakeBoardLockedSize > 0 && !force) {
-        inner.style.width = snakeBoardLockedSize + 'px';
-        inner.style.height = snakeBoardLockedSize + 'px';
-        return;
-    }
-    var frame = board.querySelector('.radio-snake-frame');
-    if (!frame) return;
-    var fr = frame.getBoundingClientRect();
-    var size = Math.floor(Math.min(fr.width - 6, fr.height - 6));
-    if (size < 48) size = 48;
-    snakeBoardLockedSize = size;
-    inner.style.width = size + 'px';
-    inner.style.height = size + 'px';
+    inner.style.width = '';
+    inner.style.height = '';
 }
 
 function renderSnakeBoard(session) {
@@ -2441,8 +2564,8 @@ function renderSnakeBoard(session) {
     }
     board.hidden = false;
     board.removeAttribute('aria-hidden');
-    sizeSnakeBoardInner(board, snakeBoardLockedSize === 0);
-    var innerEl = board.querySelector('.radio-snake-board-inner');
+    sizeSnakeBoardInner(board);
+    var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;
     var grid = buildSnakeCellGrid(session);
@@ -2450,7 +2573,7 @@ function renderSnakeBoard(session) {
     var i;
     for (i = 0; i < grid.length && i < cells.length; i++) {
         var kind = grid[i] || '';
-        var cls = 'radio-snake-cell';
+        var cls = 'radio-app-cell radio-snake-cell';
         if (kind) cls += ' is-' + kind;
         if (kind === 'head') cls += dirClass;
         cells[i].className = cls;
@@ -2489,7 +2612,6 @@ function isSnakeMenuOpen() {
 }
 
 function openSnakeScreen() {
-    snakeBoardLockedSize = 0;
     snakeSession = createSnakeState();
     startSnakeTimer();
     renderDisplay();
@@ -2498,7 +2620,6 @@ function openSnakeScreen() {
 function closeSnakeScreen() {
     stopSnakeTimer();
     snakeSession = null;
-    snakeBoardLockedSize = 0;
     hideSnakeBoard();
     if (state) renderDisplay();
 }
@@ -2507,6 +2628,109 @@ function handleSnakeOk() {
     if (!snakeSession) return;
     if (!snakeSession.alive) resetSnakeState(snakeSession);
     renderDisplay();
+}
+
+function renderArkanoidBoard(session) {
+    var board = ensureArkanoidBoard();
+    if (!board) return;
+    var scoreEl = el('radio-arkanoid-score');
+    if (scoreEl) {
+        scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0') +
+            ' · ŽIVOT ' + String(session.lives || 0);
+    }
+    board.hidden = false;
+    board.removeAttribute('aria-hidden');
+    var innerEl = board.querySelector('.radio-app-board-inner');
+    if (!innerEl) return;
+    var cells = innerEl.children;
+    var grid = buildArkanoidCellGrid(session);
+    var i;
+    for (i = 0; i < grid.length && i < cells.length; i++) {
+        var kind = grid[i] || '';
+        var cls = 'radio-app-cell radio-arkanoid-cell';
+        if (kind) cls += ' is-' + kind;
+        cells[i].className = cls;
+    }
+}
+
+function ensureArkanoidSession() {
+    if (!arkanoidSession) arkanoidSession = createArkanoidState();
+    return arkanoidSession;
+}
+
+function stopArkanoidTimer() {
+    if (arkanoidTimer) {
+        clearInterval(arkanoidTimer);
+        arkanoidTimer = null;
+    }
+}
+
+function startArkanoidTimer() {
+    stopArkanoidTimer();
+    arkanoidTimer = setInterval(function() {
+        if (!arkanoidSession || !isArkanoidMenuOpen()) {
+            stopArkanoidTimer();
+            return;
+        }
+        if (arkanoidSession.alive && !arkanoidSession.waiting) {
+            arkanoidTick(arkanoidSession);
+        }
+        renderDisplay();
+    }, ARK_TICK_MS);
+}
+
+function isArkanoidMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'arkanoid');
+}
+
+function openArkanoidScreen() {
+    arkanoidSession = createArkanoidState();
+    startArkanoidTimer();
+    renderDisplay();
+}
+
+function closeArkanoidScreen() {
+    stopArkanoidTimer();
+    arkanoidSession = null;
+    hideArkanoidBoard();
+    if (state) renderDisplay();
+}
+
+function handleArkanoidOk() {
+    if (!arkanoidSession) return;
+    if (!arkanoidSession.alive) {
+        resetArkanoidState(arkanoidSession);
+        startArkanoidTimer();
+    } else {
+        arkanoidOk(arkanoidSession);
+    }
+    renderDisplay();
+}
+
+function ensureDecoderSession() {
+    if (!decoderSession) decoderSession = createDecoderState();
+    return decoderSession;
+}
+
+function openDecoderScreen() {
+    decoderSession = createDecoderState();
+    renderDisplay();
+}
+
+function closeDecoderScreen() {
+    decoderSession = null;
+    renderDisplay();
+}
+
+function handleDecoderOk() {
+    if (!decoderSession) return;
+    renderDisplay();
+}
+
+function closeAppScreens() {
+    closeSnakeScreen();
+    closeArkanoidScreen();
+    closeDecoderScreen();
 }
 
 async function finishStandbyPtt() {
@@ -3968,7 +4192,7 @@ var RADIO_OPERATING_MODES = ['off', 'on'];
 function cycleOperatingMode(direction) {
     haltAutoscan(true);
     autoscanSession = null;
-    closeSnakeScreen();
+    closeAppScreens();
     cancelStandbyPtt();
     standbyUi = createStandbyUiState();
     var cur = normalizeOperatingMode(state.operatingMode);

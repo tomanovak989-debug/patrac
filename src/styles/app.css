@@ -1963,50 +1963,56 @@ body.theme-light #radio-display-signal.is-standby {
     grid-template-rows: repeat(6, minmax(0, 1fr));
     margin: 0;
 }
-.sector-tech-screen.is-snake .radio-display-main > div:not(#radio-snake-board) {
+.sector-tech-screen.is-snake .radio-display-main > div:not(#radio-snake-board),
+.sector-tech-screen.is-arkanoid .radio-display-main > div:not(#radio-arkanoid-board) {
+    display: none !important;
     opacity: 0;
     pointer-events: none;
 }
-.sector-tech-screen.is-snake .radio-display-main {
+.sector-tech-screen.is-snake .radio-display-main,
+.sector-tech-screen.is-arkanoid .radio-display-main {
     position: relative;
-    grid-template-rows: repeat(6, minmax(0, 1fr));
-    align-content: stretch;
-    gap: 0;
+    display: flex;
+    flex: 6 6 0;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
     margin: 0;
+    padding: 0;
 }
-.sector-tech-screen.is-snake .radio-display-main > div:not(#radio-snake-board) {
-    font-family: var(--radio-display-font) !important;
-    font-weight: 400 !important;
-    font-size: 1.06em !important;
-    letter-spacing: 0.02em;
-    line-height: 0.95;
-    padding-left: 10px;
-}
-#radio-snake-board {
+#radio-snake-board,
+#radio-arkanoid-board {
     opacity: 1 !important;
-    padding: 0 !important;
-    /* .radio-display-main > div nastavuje display:flex — bez override skóre a mřížka stojí vedle sebe */
-    display: grid !important;
-    grid-template-rows: auto minmax(0, 1fr) !important;
-    grid-template-columns: 1fr !important;
+    padding: 0 2px !important;
+    position: absolute !important;
+    inset: 0 !important;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
     align-items: stretch !important;
+    align-content: stretch !important;
+    justify-content: flex-start !important;
     white-space: normal !important;
     overflow: hidden !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    width: 100% !important;
 }
-.radio-snake-board {
-    position: absolute;
-    inset: 0;
+.radio-snake-board,
+.radio-arkanoid-board,
+.radio-app-board {
     pointer-events: none;
     z-index: 4;
-    padding: 1px 2px 0;
-    box-sizing: border-box;
     color: var(--radio-phosphor);
 }
-.radio-snake-board[hidden] {
+.radio-snake-board[hidden],
+.radio-arkanoid-board[hidden] {
     display: none !important;
 }
-.radio-snake-score {
-    grid-row: 1;
+.radio-app-score,
+.radio-snake-score,
+.radio-arkanoid-score {
+    flex: 0 0 auto;
     width: 100%;
     min-width: 0;
     text-align: center;
@@ -2014,17 +2020,17 @@ body.theme-light #radio-display-signal.is-standby {
     font-weight: 700;
     letter-spacing: 0.12em;
     line-height: 1.15;
-    padding: 0 2px 2px;
+    padding: 0 2px 3px;
     font-variant-numeric: tabular-nums;
     color: var(--radio-phosphor);
-    flex-shrink: 0;
 }
-.radio-snake-frame {
-    grid-row: 2;
+.radio-app-frame,
+.radio-snake-frame,
+.radio-arkanoid-frame {
+    flex: 1 1 0;
     min-height: 0;
     min-width: 0;
     width: 100%;
-    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2033,18 +2039,49 @@ body.theme-light #radio-display-signal.is-standby {
     padding: 2px;
     box-sizing: border-box;
 }
+.radio-app-board-inner,
 .radio-snake-board-inner {
-    flex-shrink: 0;
+    aspect-ratio: 1;
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
     display: grid;
     grid-template-columns: repeat(12, 1fr);
     grid-template-rows: repeat(12, 1fr);
     gap: 1px;
 }
-.radio-snake-cell {
+.radio-arkanoid-board-inner {
+    aspect-ratio: 12 / 11;
+    width: auto;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(11, 1fr);
+    gap: 1px;
+}
+.radio-app-cell,
+.radio-snake-cell,
+.radio-arkanoid-cell {
     min-width: 0;
     min-height: 0;
     border-radius: 0;
     background: rgba(200, 200, 200, 0.04);
+}
+.radio-arkanoid-cell.is-brick {
+    background: var(--radio-phosphor);
+    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+}
+.radio-arkanoid-cell.is-paddle {
+    background: var(--radio-phosphor);
+    box-shadow: 0 0 2px var(--radio-phosphor-glow);
+}
+.radio-arkanoid-cell.is-ball {
+    background: var(--radio-phosphor);
+    border-radius: 50%;
+    box-shadow: 0 0 3px var(--radio-phosphor-glow);
 }
 .radio-snake-cell.is-food {
     background: var(--radio-phosphor);
@@ -2090,8 +2127,15 @@ body.theme-light #radio-display-signal.is-standby {
     background: var(--radio-phosphor);
     box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
 }
-body.theme-light .radio-snake-cell {
+body.theme-light .radio-app-cell,
+body.theme-light .radio-snake-cell,
+body.theme-light .radio-arkanoid-cell {
     background: rgba(0, 0, 0, 0.04);
+}
+body.theme-light .radio-arkanoid-cell.is-brick,
+body.theme-light .radio-arkanoid-cell.is-paddle,
+body.theme-light .radio-arkanoid-cell.is-ball {
+    background: var(--radio-phosphor);
 }
 body.theme-light .radio-snake-cell.is-food,
 body.theme-light .radio-snake-cell.is-food-big,

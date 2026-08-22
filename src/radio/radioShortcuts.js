@@ -152,11 +152,17 @@ export function bindingFromMenuItem(item) {
     if (item.action === 'submenu:presets') {
         return { action: 'menu:presets', label: 'PRESETY' };
     }
-    if (item.action === 'submenu:games') {
-        return { action: 'menu:games', label: 'HRY' };
+    if (item.action === 'submenu:apps') {
+        return { action: 'menu:apps', label: 'APLIKACE' };
     }
     if (item.action === 'screen:snake') {
         return { action: 'snake:open', label: 'SNAKE' };
+    }
+    if (item.action === 'screen:arkanoid') {
+        return { action: 'arkanoid:open', label: 'ARKANOID' };
+    }
+    if (item.action === 'screen:decoder') {
+        return { action: 'decoder:open', label: 'DEŠIFRÁTOR' };
     }
     if (item.action === 'preset_detail' && item.slot) {
         return { action: 'preset:' + item.slot, label: 'P' + item.slot };

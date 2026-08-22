@@ -6,6 +6,8 @@ import { buildAutoscanOsView } from './radioAutoscan.js';
 import { buildCommsOsView } from './radioMessages.js';
 import { buildBeaconOsView } from './radioBeacon.js';
 import { buildSnakeOsView } from './radioSnake.js';
+import { buildArkanoidOsView } from './radioArkanoid.js';
+import { buildDecoderOsView } from './radioDecoder.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
 import { buildFixedCursorMenuLines, MENU_CURSOR_ROW, wrapMenuFocus } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
@@ -20,12 +22,14 @@ var RADIO_MENU = [
     { id: 'radio_presets', label: 'PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
     { id: 'radio_autoscan', label: 'AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
     { id: 'radio_beacon', label: 'BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
-    { id: 'radio_games', label: 'HRY', action: 'submenu:games', shortcutAction: 'menu:games' },
+    { id: 'radio_apps', label: 'APLIKACE', action: 'submenu:apps', shortcutAction: 'menu:apps' },
     { id: 'radio_settings', label: 'NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
 ];
 
-var GAMES_MENU = [
-    { id: 'game_snake', label: 'SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' }
+var APPS_MENU = [
+    { id: 'app_snake', label: 'SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' },
+    { id: 'app_arkanoid', label: 'ARKANOID', action: 'screen:arkanoid', shortcutAction: 'arkanoid:open' },
+    { id: 'app_decoder', label: 'DEŠIFRÁTOR', action: 'screen:decoder', shortcutAction: 'decoder:open' }
 ];
 
 var SETTINGS_MENU = [
@@ -148,7 +152,7 @@ function getCurrentMenuItems(os, radioState) {
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return buildPresetSlotItems(radioState);
     if (leaf === 'settings') return SETTINGS_MENU;
-    if (leaf === 'games') return GAMES_MENU;
+    if (leaf === 'apps') return APPS_MENU;
     return getMenuItems();
 }
 
@@ -158,12 +162,14 @@ function menuStatusLabel(os, radioState, draft) {
     if (leaf === 'presets') return 'PRESETY';
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
     if (leaf === 'settings') return 'NASTAVENÍ';
-    if (leaf === 'games') return 'HRY';
+    if (leaf === 'apps') return 'APLIKACE';
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
     if (leaf === 'quickkeys') return 'RYCHLÉ VOLBY';
     if (leaf === 'autoscan') return 'AUTOSKEN';
     if (leaf === 'comms') return 'ZPRÁVY';
     if (leaf === 'snake') return 'SNAKE';
+    if (leaf === 'arkanoid') return 'ARKANOID';
+    if (leaf === 'decoder') return 'DEŠIFRÁTOR';
     return 'MENU';
 }
 
@@ -233,11 +239,19 @@ export function executeMenuDigit(os, radioState, digit) {
         return { changed: false };
     }
 
-    if (leaf === 'games') {
-        var gameIdx = parseInt(digit, 10) - 1;
-        if (gameIdx === 0) {
+    if (leaf === 'apps') {
+        var appIdx = parseInt(digit, 10) - 1;
+        if (appIdx === 0) {
             os.menuPath.push('snake');
             return { changed: true, effect: 'snake_open' };
+        }
+        if (appIdx === 1) {
+            os.menuPath.push('arkanoid');
+            return { changed: true, effect: 'arkanoid_open' };
+        }
+        if (appIdx === 2) {
+            os.menuPath.push('decoder');
+            return { changed: true, effect: 'decoder_open' };
         }
         return { changed: false };
     }
@@ -328,6 +342,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             os.menuPath.pop();
             return { changed: true, effect: 'snake_close' };
         }
+        if (os.menuPath[os.menuPath.length - 1] === 'arkanoid') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'arkanoid_close' };
+        }
+        if (os.menuPath[os.menuPath.length - 1] === 'decoder') {
+            os.menuPath.pop();
+            return { changed: true, effect: 'decoder_close' };
+        }
         if (os.screen === SCREEN_MENU && os.menuPath.length) {
             var prevSlot = os.selectedSlot;
             os.menuPath.pop();
@@ -339,6 +361,19 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             resetRadioOs(os);
             return { changed: true };
         }
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'arkanoid') {
+        if (action === 'left' || action === 'right') {
+            return { changed: true, effect: 'arkanoid_paddle', dir: action };
+        }
+        if (action === 'ok') return { changed: true, effect: 'arkanoid_ok' };
+        return { changed: false };
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'decoder') {
+        if (action === 'ok') return { changed: true, effect: 'decoder_ok' };
         return { changed: false };
     }
 
@@ -435,8 +470,8 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.focusIndex = 0;
                 return { changed: true };
             }
-            if (pick.action === 'submenu:games') {
-                os.menuPath.push('games');
+            if (pick.action === 'submenu:apps') {
+                os.menuPath.push('apps');
                 os.focusIndex = 0;
                 return { changed: true };
             }
@@ -465,6 +500,14 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
                 os.menuPath.push('snake');
                 return { changed: true, effect: 'snake_open' };
             }
+            if (pick.action === 'screen:arkanoid') {
+                os.menuPath.push('arkanoid');
+                return { changed: true, effect: 'arkanoid_open' };
+            }
+            if (pick.action === 'screen:decoder') {
+                os.menuPath.push('decoder');
+                return { changed: true, effect: 'decoder_open' };
+            }
             if (pick.action === 'preset_detail') {
                 os.selectedSlot = pick.slot;
                 os.menuPath.push('detail');
@@ -481,7 +524,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState, snakeSession) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState, snakeSession, arkanoidSession, decoderSession) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -551,6 +594,14 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
 
     if (os.menuPath[os.menuPath.length - 1] === 'snake') {
         return buildSnakeOsView(snakeSession);
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'arkanoid') {
+        return buildArkanoidOsView(arkanoidSession);
+    }
+
+    if (os.menuPath[os.menuPath.length - 1] === 'decoder') {
+        return buildDecoderOsView(decoderSession, notebook);
     }
 
     if (os.screen === SCREEN_STUB) {
