@@ -2021,12 +2021,14 @@ body.theme-light #radio-display-signal.is-standby {
 }
 #radio-snake-board,
 #radio-arkanoid-board {
-    opacity: 1 !important;
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
     padding: 0 2px !important;
     position: absolute !important;
     inset: 0 !important;
     box-sizing: border-box;
-    display: flex !important;
     flex-direction: column !important;
     align-items: stretch !important;
     align-content: stretch !important;
@@ -2037,19 +2039,25 @@ body.theme-light #radio-display-signal.is-standby {
     height: 100% !important;
     width: 100% !important;
 }
+.sector-tech-screen.is-snake #radio-snake-board.is-visible,
+.sector-tech-screen.is-arkanoid #radio-arkanoid-board.is-visible {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+}
+.sector-tech-screen:not(.is-snake) #radio-snake-board,
+.sector-tech-screen:not(.is-arkanoid) #radio-arkanoid-board {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
 .radio-snake-board,
 .radio-arkanoid-board,
 .radio-app-board {
     pointer-events: none;
     z-index: 4;
     color: var(--radio-phosphor);
-}
-.radio-app-board:not(.is-visible),
-.radio-snake-board:not(.is-visible),
-.radio-arkanoid-board:not(.is-visible),
-.radio-snake-board[hidden],
-.radio-arkanoid-board[hidden] {
-    display: none !important;
 }
 .radio-app-score,
 .radio-snake-score,

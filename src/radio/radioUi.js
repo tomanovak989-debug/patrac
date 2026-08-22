@@ -1563,6 +1563,11 @@ function renderDisplay() {
         screen.classList.toggle('is-charging', osView.mode === 'off' && !!(state && state.batteryCharging));
     }
 
+    var showSnake = osView.mode === 'snake' && osView.useBoard && snakeSession && snakeSession.alive;
+    var showArkanoid = osView.mode === 'arkanoid' && osView.useBoard && arkanoidSession && arkanoidSession.alive;
+    if (!showSnake) hideSnakeBoard();
+    if (!showArkanoid) hideArkanoidBoard();
+
     var f = el('radio-display-freq');
     var k = el('radio-display-key');
     var p = el('radio-display-preset');
@@ -2554,6 +2559,7 @@ function hideSnakeBoard() {
         board.hidden = true;
         board.setAttribute('aria-hidden', 'true');
         board.classList.remove('is-visible');
+        board.style.display = 'none';
     }
 }
 
@@ -2563,7 +2569,24 @@ function hideArkanoidBoard() {
         board.hidden = true;
         board.setAttribute('aria-hidden', 'true');
         board.classList.remove('is-visible');
+        board.style.display = 'none';
     }
+}
+
+function showSnakeBoard(board) {
+    if (!board) return;
+    board.hidden = false;
+    board.removeAttribute('aria-hidden');
+    board.classList.add('is-visible');
+    board.style.display = '';
+}
+
+function showArkanoidBoard(board) {
+    if (!board) return;
+    board.hidden = false;
+    board.removeAttribute('aria-hidden');
+    board.classList.add('is-visible');
+    board.style.display = '';
 }
 
 var arkanoidBoardReady = false;
@@ -2622,9 +2645,7 @@ function renderSnakeBoard(session) {
     if (scoreEl) {
         scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0');
     }
-    board.hidden = false;
-    board.removeAttribute('aria-hidden');
-    board.classList.add('is-visible');
+    showSnakeBoard(board);
     sizeSnakeBoardInner(board);
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
@@ -2696,12 +2717,11 @@ function renderArkanoidBoard(session) {
     if (!board) return;
     var scoreEl = el('radio-arkanoid-score');
     if (scoreEl) {
-        scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0') +
-            ' · ŽIVOT ' + String(session.lives || 0);
+        scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(4, '0') +
+            ' · LV' + String(session.level || 1) +
+            ' · ○' + String(session.balls ? session.balls.length : 0);
     }
-    board.hidden = false;
-    board.removeAttribute('aria-hidden');
-    board.classList.add('is-visible');
+    showArkanoidBoard(board);
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;

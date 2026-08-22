@@ -1,32 +1,21 @@
 /**
- * Arkanoid — klasický breakout na LCD vysílačky (jemná mřížka 48×44).
- * ◀▶ posun pálky, plynulý míč s dílčími souřadnicemi.
+ * Arkanoid — mřížka 48×48, prvek 1× → 2×2 buňky.
+ * Levely se zvyšující rychlostí, každých 5 cihel +1 míč, konec až padnou všechny.
  */
 export var ARK_TICK_MS = 33;
 export var ARK_W = 48;
-export var ARK_H = 44;
+export var ARK_H = 48;
+export var ARK_UNIT = 2;
 export var ARK_CELL_COUNT = ARK_W * ARK_H;
-export var ARK_PADDLE_W = 12;
-export var ARK_PADDLE_STEP = 4;
+export var ARK_PADDLE_W = 24;
+export var ARK_PADDLE_STEP = 8;
+export var ARK_PADDLE_H = 2;
 export var ARK_BRICK_ROWS = 6;
-export var ARK_BALL_R = 0.45;
-
-export function createArkanoidState() {
-    var session = {
-        paddleX: 18,
-        ballX: 23.5,
-        ballY: 39.5,
-        velX: 0.065,
-        velY: -0.072,
-        bricks: buildInitialBricks(),
-        score: 0,
-        lives: 3,
-        alive: true,
-        waiting: true
-    };
-    syncWaitingBall(session);
-    return session;
-}
+export var ARK_BRICK_COLS = ARK_W / ARK_UNIT;
+export var ARK_BALL_R = 0.9;
+export var ARK_BASE_VX = 0.13;
+export var ARK_BASE_VY = 0.144;
+export var ARK_BRICKS_PER_BALL = 5;
 
 function buildInitialBricks() {
     var rows = [];
@@ -34,28 +23,69 @@ function buildInitialBricks() {
     var x;
     for (y = 0; y < ARK_BRICK_ROWS; y++) {
         var row = [];
-        for (x = 0; x < ARK_W; x++) row.push(true);
+        for (x = 0; x < ARK_BRICK_COLS; x++) row.push(true);
         rows.push(row);
     }
     return rows;
 }
 
-function syncWaitingBall(session) {
-    session.ballX = session.paddleX + (ARK_PADDLE_W / 2);
-    session.ballY = ARK_H - 3.5;
+function speedMult(session) {
+    return Math.max(1, session.level || 1);
+}
+
+function scaledVelX(session, sign) {
+    return (sign >= 0 ? 1 : -1) * ARK_BASE_VX * speedMult(session);
+}
+
+function scaledVelY(session) {
+    return -ARK_BASE_VY * speedMult(session);
+}
+
+function createBall(session, waiting, velSign) {
+    return {
+        x: session.paddleX + (ARK_PADDLE_W / 2),
+        y: ARK_H - 5,
+        velX: scaledVelX(session, velSign == null ? 1 : velSign),
+        velY: scaledVelY(session),
+        waiting: !!waiting
+    };
+}
+
+export function createArkanoidState() {
+    var session = {
+        paddleX: 12,
+        balls: [createBall({ paddleX: 12, level: 1 }, true, 1)],
+        bricks: buildInitialBricks(),
+        score: 0,
+        level: 1,
+        bricksBroken: 0,
+        alive: true,
+        waiting: true
+    };
+    syncWaitingBalls(session);
+    return session;
+}
+
+function syncWaitingBalls(session) {
+    var i;
+    var spread = 0;
+    for (i = 0; i < session.balls.length; i++) {
+        if (!session.balls[i].waiting) continue;
+        session.balls[i].x = session.paddleX + (ARK_PADDLE_W / 2) + spread;
+        session.balls[i].y = ARK_H - 5;
+        spread += 1.4;
+    }
 }
 
 export function resetArkanoidState(session) {
     if (!session) return createArkanoidState();
     var fresh = createArkanoidState();
     session.paddleX = fresh.paddleX;
-    session.ballX = fresh.ballX;
-    session.ballY = fresh.ballY;
-    session.velX = fresh.velX;
-    session.velY = fresh.velY;
+    session.balls = fresh.balls;
     session.bricks = fresh.bricks;
     session.score = 0;
-    session.lives = 3;
+    session.level = 1;
+    session.bricksBroken = 0;
     session.alive = true;
     session.waiting = true;
     return session;
@@ -69,20 +99,30 @@ export function arkanoidMovePaddle(session, dir) {
     if (next > ARK_W - ARK_PADDLE_W) next = ARK_W - ARK_PADDLE_W;
     if (next === session.paddleX) return false;
     session.paddleX = next;
-    if (session.waiting) syncWaitingBall(session);
+    if (session.waiting) syncWaitingBalls(session);
     return true;
 }
 
-function brickAt(session, x, y) {
-    if (!session.bricks || y < 0 || y >= session.bricks.length) return false;
-    if (x < 0 || x >= ARK_W) return false;
-    return !!session.bricks[y][x];
+function brickAt(session, bx, by) {
+    if (!session.bricks || by < 0 || by >= session.bricks.length) return false;
+    if (bx < 0 || bx >= ARK_BRICK_COLS) return false;
+    return !!session.bricks[by][bx];
 }
 
-function clearBrick(session, x, y) {
-    if (!brickAt(session, x, y)) return false;
-    session.bricks[y][x] = false;
+function clearBrickAtCell(session, cx, cy) {
+    var bx = Math.floor(cx / ARK_UNIT);
+    var by = Math.floor(cy / ARK_UNIT);
+    if (!brickAt(session, bx, by)) return false;
+    session.bricks[by][bx] = false;
     session.score = (session.score || 0) + 10;
+    session.bricksBroken = (session.bricksBroken || 0) + 1;
+    if (session.bricksBroken % ARK_BRICKS_PER_BALL === 0) {
+        var sign = session.balls.length % 2 === 0 ? 1 : -1;
+        var nb = createBall(session, session.waiting, sign);
+        if (!session.waiting) nb.waiting = false;
+        session.balls.push(nb);
+        if (session.waiting) syncWaitingBalls(session);
+    }
     return true;
 }
 
@@ -91,17 +131,35 @@ function remainingBricks(session) {
     var y;
     var x;
     for (y = 0; y < session.bricks.length; y++) {
-        for (x = 0; x < ARK_W; x++) {
+        for (x = 0; x < ARK_BRICK_COLS; x++) {
             if (session.bricks[y][x]) n++;
         }
     }
     return n;
 }
 
-function launchBall(session) {
+function launchBalls(session) {
     session.waiting = false;
-    session.velX = session.velX >= 0 ? 0.065 : -0.065;
-    session.velY = -0.072;
+    var i;
+    for (i = 0; i < session.balls.length; i++) {
+        if (!session.balls[i].waiting) continue;
+        session.balls[i].waiting = false;
+        session.balls[i].velX = scaledVelX(session, i % 2 === 0 ? 1 : -1);
+        session.balls[i].velY = scaledVelY(session);
+    }
+}
+
+function nextLevel(session) {
+    session.level = (session.level || 1) + 1;
+    session.bricks = buildInitialBricks();
+    session.waiting = true;
+    var i;
+    for (i = 0; i < session.balls.length; i++) {
+        session.balls[i].waiting = true;
+        session.balls[i].velX = scaledVelX(session, i % 2 === 0 ? 1 : -1);
+        session.balls[i].velY = scaledVelY(session);
+    }
+    syncWaitingBalls(session);
 }
 
 export function arkanoidOk(session) {
@@ -111,82 +169,105 @@ export function arkanoidOk(session) {
         return true;
     }
     if (session.waiting) {
-        launchBall(session);
+        launchBalls(session);
         return true;
     }
     return false;
 }
 
-function reflectFromPaddle(session) {
+function reflectFromPaddle(session, ball) {
     var center = session.paddleX + (ARK_PADDLE_W / 2);
-    var hit = (session.ballX - center) / (ARK_PADDLE_W / 2);
+    var hit = (ball.x - center) / (ARK_PADDLE_W / 2);
     if (hit < -1) hit = -1;
     if (hit > 1) hit = 1;
-    session.velX = hit * 0.085;
-    session.velY = -Math.abs(session.velY);
-    session.ballY = ARK_H - 4.2;
+    ball.velX = hit * 0.17 * speedMult(session);
+    ball.velY = -Math.abs(ball.velY);
+    ball.y = ARK_H - 6;
 }
 
-function hitBrick(session, bx, by) {
-    if (by < 0 || by >= ARK_BRICK_ROWS) return false;
-    if (!clearBrick(session, bx, by)) return false;
-    return true;
-}
+function tickBall(session, ball) {
+    if (ball.waiting) return null;
 
-export function arkanoidTick(session) {
-    if (!session || !session.alive || session.waiting) return false;
+    ball.x += ball.velX;
+    ball.y += ball.velY;
 
-    session.ballX += session.velX;
-    session.ballY += session.velY;
-
-    if (session.ballX < ARK_BALL_R) {
-        session.ballX = ARK_BALL_R;
-        session.velX = Math.abs(session.velX);
-    } else if (session.ballX > ARK_W - 1 - ARK_BALL_R) {
-        session.ballX = ARK_W - 1 - ARK_BALL_R;
-        session.velX = -Math.abs(session.velX);
+    if (ball.x < ARK_BALL_R) {
+        ball.x = ARK_BALL_R;
+        ball.velX = Math.abs(ball.velX);
+    } else if (ball.x > ARK_W - 1 - ARK_BALL_R) {
+        ball.x = ARK_W - 1 - ARK_BALL_R;
+        ball.velX = -Math.abs(ball.velX);
     }
 
-    if (session.ballY < ARK_BALL_R) {
-        session.ballY = ARK_BALL_R;
-        session.velY = Math.abs(session.velY);
+    if (ball.y < ARK_BALL_R) {
+        ball.y = ARK_BALL_R;
+        ball.velY = Math.abs(ball.velY);
     }
 
-    var bx = Math.round(session.ballX);
-    var by = Math.round(session.ballY);
+    var bx = Math.round(ball.x);
+    var by = Math.round(ball.y);
+    var brickRowCells = ARK_BRICK_ROWS * ARK_UNIT;
 
-    if (by < ARK_BRICK_ROWS && hitBrick(session, bx, by)) {
-        session.velY = Math.abs(session.velY);
+    if (by < brickRowCells && clearBrickAtCell(session, bx, by)) {
+        ball.velY = Math.abs(ball.velY);
         if (remainingBricks(session) === 0) {
-            session.alive = false;
-            return 'win';
+            nextLevel(session);
+            return 'level';
         }
         return 'hit';
     }
 
-    var paddleY = ARK_H - 2;
-    if (session.ballY >= paddleY - 1.2 &&
-        session.ballY <= paddleY + 1.5 &&
-        session.ballX >= session.paddleX - 0.5 &&
-        session.ballX <= session.paddleX + ARK_PADDLE_W + 0.5 &&
-        session.velY > 0) {
-        reflectFromPaddle(session);
+    var paddleY = ARK_H - ARK_PADDLE_H - 1;
+    if (ball.y >= paddleY - 1.5 &&
+        ball.y <= paddleY + ARK_PADDLE_H + 1.5 &&
+        ball.x >= session.paddleX - 0.5 &&
+        ball.x <= session.paddleX + ARK_PADDLE_W + 0.5 &&
+        ball.velY > 0) {
+        reflectFromPaddle(session, ball);
         return 'paddle';
     }
 
-    if (session.ballY > ARK_H + 1) {
-        session.lives = (session.lives || 1) - 1;
-        if (session.lives <= 0) {
-            session.alive = false;
-            return 'lose';
-        }
-        session.waiting = true;
-        syncWaitingBall(session);
-        session.velY = -0.072;
-        return 'life';
+    if (ball.y > ARK_H + 1) return 'lost';
+
+    return true;
+}
+
+export function arkanoidTick(session) {
+    if (!session || !session.alive) return false;
+    if (session.waiting) return false;
+    if (!session.balls || !session.balls.length) {
+        session.alive = false;
+        return 'lose';
+    }
+
+    var aliveBalls = [];
+    var i;
+    var result;
+    for (i = 0; i < session.balls.length; i++) {
+        result = tickBall(session, session.balls[i]);
+        if (result === 'lost') continue;
+        aliveBalls.push(session.balls[i]);
+    }
+    session.balls = aliveBalls;
+
+    if (!session.balls.length) {
+        session.alive = false;
+        return 'lose';
     }
 
     return true;
+}
+
+function fillBrickBlock(grid, bx, by, val) {
+    var dx;
+    var dy;
+    var px = bx * ARK_UNIT;
+    var py = by * ARK_UNIT;
+    for (dy = 0; dy < ARK_UNIT; dy++) {
+        for (dx = 0; dx < ARK_UNIT; dx++) {
+            setCell(grid, px + dx, py + dy, val);
+        }
+    }
 }
 
 function fillCircle(grid, cx, cy, r, val) {
@@ -212,18 +293,25 @@ export function buildArkanoidCellGrid(session) {
     var y;
     var x;
     for (y = 0; y < ARK_BRICK_ROWS; y++) {
-        for (x = 0; x < ARK_W; x++) {
-            if (brickAt(session, x, y)) setCell(grid, x, y, 'brick');
+        for (x = 0; x < ARK_BRICK_COLS; x++) {
+            if (brickAt(session, x, y)) fillBrickBlock(grid, x, y, 'brick');
         }
     }
 
-    var py = ARK_H - 2;
+    var py = ARK_H - ARK_PADDLE_H - 1;
     for (x = session.paddleX; x < session.paddleX + ARK_PADDLE_W; x++) {
-        setCell(grid, x, py, 'paddle');
-        setCell(grid, x, py - 1, 'paddle');
+        var dy;
+        for (dy = 0; dy < ARK_PADDLE_H; dy++) {
+            setCell(grid, x, py + dy, 'paddle');
+        }
     }
 
-    fillCircle(grid, session.ballX, session.ballY, ARK_BALL_R + 0.15, 'ball');
+    if (session.balls) {
+        for (i = 0; i < session.balls.length; i++) {
+            var ball = session.balls[i];
+            fillCircle(grid, ball.x, ball.y, ARK_BALL_R + 0.15, 'ball');
+        }
+    }
 
     return grid;
 }
@@ -238,18 +326,28 @@ function setCell(grid, x, y, val) {
     if (!grid[idx] || val === 'ball') grid[idx] = val;
 }
 
+function activeBallCount(session) {
+    if (!session.balls) return 0;
+    var n = 0;
+    var i;
+    for (i = 0; i < session.balls.length; i++) {
+        if (!session.balls[i].waiting) n++;
+    }
+    return n;
+}
+
 export function buildArkanoidOsView(session) {
     session = session || createArkanoidState();
     var footer = session.waiting ? '◀▶ pálka · OK vystřelit' : '◀▶ · Zpět';
-    var status = 'ARKANOID';
+    var lv = session.level || 1;
+    var status = 'ARKANOID · LV ' + lv;
     var useBoard = !!session.alive;
 
     if (!session.alive) {
-        var won = remainingBricks(session) === 0;
         return {
             mode: 'arkanoid',
-            status: won ? 'ARKANOID · VÍTĚZSTVÍ' : 'ARKANOID · KONEC',
-            lines: ['', won ? '  VŠECHNY CIHLY!' : '  KONEC HRY', '  SKÓRE ' + (session.score || 0), '  OK = nová', '', ''],
+            status: 'ARKANOID · KONEC',
+            lines: ['', '  KONEC HRY', '  SKÓRE ' + (session.score || 0), '  LV ' + lv, '  OK = nová', ''],
             focusLine: -1,
             footer: 'OK restart · Zpět',
             buffer: '',
@@ -267,6 +365,7 @@ export function buildArkanoidOsView(session) {
         buffer: '',
         useBoard: useBoard,
         score: session.score || 0,
-        lives: session.lives || 0
+        balls: session.balls ? session.balls.length : 0,
+        activeBalls: activeBallCount(session)
     };
 }

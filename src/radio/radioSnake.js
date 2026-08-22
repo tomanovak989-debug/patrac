@@ -1,28 +1,34 @@
 /**
- * Snake — mini hra na LCD vysílačky.
- * Logická mřížka 24×24, vykreslení přes CSS grid.
- * Mlska 2×2, extra 4×4 každých 5 normálních.
+ * Snake — LCD vysílačky, mřížka 48×48.
+ * Herní prvek 1× → vykreslení 2×2 buňky. Mlska zmenšená o polovinu (1×1 / 2×2).
  */
 export var SNAKE_TICK_MS = 195;
-export var SNAKE_W = 24;
-export var SNAKE_H = 24;
+export var SNAKE_W = 48;
+export var SNAKE_H = 48;
+export var SNAKE_UNIT = 2;
 export var SNAKE_CELL_COUNT = SNAKE_W * SNAKE_H;
-export var SNAKE_FOOD_NORMAL = 2;
-export var SNAKE_FOOD_BIG = 4;
+export var SNAKE_FOOD_NORMAL = 1;
+export var SNAKE_FOOD_BIG = 2;
 export var SNAKE_BIG_EVERY = 5;
 
 function wrapCoord(value, size) {
     return ((value % size) + size) % size;
 }
 
+function segmentCells(x, y) {
+    return [
+        [x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]
+    ];
+}
+
 export function createSnakeState() {
-    var cx = 12;
-    var cy = 12;
+    var cx = 22;
+    var cy = 22;
     var session = {
         snake: [
             { x: cx, y: cy },
-            { x: cx - 1, y: cy },
-            { x: cx - 2, y: cy }
+            { x: cx - SNAKE_UNIT, y: cy },
+            { x: cx - SNAKE_UNIT * 2, y: cy }
         ],
         dir: { x: 1, y: 0 },
         nextDir: { x: 1, y: 0 },
@@ -74,24 +80,36 @@ export function snakeSetDirection(session, action) {
     return true;
 }
 
-function cellOccupied(session, x, y, ignoreTail) {
-    var limit = session.snake.length - (ignoreTail ? 1 : 0);
+function pointOccupiedBySegment(session, px, py, segIndex, segCount) {
+    var seg = session.snake[segIndex];
+    var cells = segmentCells(seg.x, seg.y);
     var i;
-    for (i = 0; i < limit; i++) {
-        if (session.snake[i].x === x && session.snake[i].y === y) return true;
+    for (i = 0; i < cells.length; i++) {
+        if (cells[i][0] === px && cells[i][1] === py) return true;
     }
     return false;
 }
 
+function cellOccupied(session, x, y, ignoreTail) {
+    var limit = session.snake.length - (ignoreTail ? 1 : 0);
+    var i;
+    for (i = 0; i < limit; i++) {
+        if (pointOccupiedBySegment(session, x, y, i, limit)) return true;
+    }
+    return false;
+}
+
+function blockInBounds(x, y, span) {
+    return x >= 0 && y >= 0 && x + span <= SNAKE_W && y + span <= SNAKE_H;
+}
+
 function rectFits(session, x, y, span) {
+    if (!blockInBounds(x, y, span)) return false;
     var dx;
     var dy;
     for (dy = 0; dy < span; dy++) {
         for (dx = 0; dx < span; dx++) {
-            var px = x + dx;
-            var py = y + dy;
-            if (px < 0 || px >= SNAKE_W || py < 0 || py >= SNAKE_H) return false;
-            if (cellOccupied(session, px, py, false)) return false;
+            if (cellOccupied(session, x + dx, y + dy, false)) return false;
         }
     }
     return true;
@@ -99,7 +117,7 @@ function rectFits(session, x, y, span) {
 
 function trySpawnFood(session, span) {
     var tries = 0;
-    while (tries++ < 800) {
+    while (tries++ < 1200) {
         var x = Math.floor(Math.random() * (SNAKE_W - span + 1));
         var y = Math.floor(Math.random() * (SNAKE_H - span + 1));
         if (rectFits(session, x, y, span)) return { x: x, y: y, span: span };
@@ -132,8 +150,23 @@ function headOnFood(session, head) {
     if (!session.food) return false;
     var food = session.food;
     var span = food.span || SNAKE_FOOD_NORMAL;
-    return head.x >= food.x && head.x < food.x + span &&
-        head.y >= food.y && head.y < food.y + span;
+    var hx1 = head.x;
+    var hy1 = head.y;
+    var hx2 = head.x + SNAKE_UNIT;
+    var hy2 = head.y + SNAKE_UNIT;
+    var fx2 = food.x + span;
+    var fy2 = food.y + span;
+    return hx1 < fx2 && hx2 > food.x && hy1 < fy2 && hy2 > food.y;
+}
+
+function fillRect(grid, x, y, span, val) {
+    var dx;
+    var dy;
+    for (dy = 0; dy < span; dy++) {
+        for (dx = 0; dx < span; dx++) {
+            setCell(grid, x + dx, y + dy, val);
+        }
+    }
 }
 
 /**
@@ -146,20 +179,14 @@ export function buildSnakeCellGrid(session) {
 
     if (session && session.food) {
         var food = session.food;
-        var span = food.span || SNAKE_FOOD_NORMAL;
-        var kind = span >= SNAKE_FOOD_BIG ? 'food-big' : 'food';
-        var dx;
-        var dy;
-        for (dy = 0; dy < span; dy++) {
-            for (dx = 0; dx < span; dx++) {
-                setCell(grid, food.x + dx, food.y + dy, kind);
-            }
-        }
+        var fspan = food.span || SNAKE_FOOD_NORMAL;
+        var kind = fspan >= SNAKE_FOOD_BIG ? 'food-big' : 'food';
+        fillRect(grid, food.x, food.y, fspan, kind);
     }
     if (session && session.snake) {
         for (i = 0; i < session.snake.length; i++) {
             var seg = session.snake[i];
-            setCell(grid, seg.x, seg.y, i === 0 ? 'head' : 'body');
+            fillRect(grid, seg.x, seg.y, SNAKE_UNIT, i === 0 ? 'head' : 'body');
         }
     }
     return grid;
@@ -170,16 +197,26 @@ function setCell(grid, x, y, val) {
     grid[cellIndex(x, y)] = val;
 }
 
+function headHitsBody(session, nx, ny) {
+    var cells = segmentCells(nx, ny);
+    var i;
+    var c;
+    for (c = 0; c < cells.length; c++) {
+        if (cellOccupied(session, cells[c][0], cells[c][1], true)) return true;
+    }
+    return false;
+}
+
 export function snakeTick(session) {
     if (!session || !session.alive) return false;
     session.dir = session.nextDir || session.dir;
     var head = session.snake[0];
     var nh = {
-        x: wrapCoord(head.x + session.dir.x, SNAKE_W),
-        y: wrapCoord(head.y + session.dir.y, SNAKE_H)
+        x: wrapCoord(head.x + session.dir.x * SNAKE_UNIT, SNAKE_W),
+        y: wrapCoord(head.y + session.dir.y * SNAKE_UNIT, SNAKE_H)
     };
 
-    if (cellOccupied(session, nh.x, nh.y, true)) {
+    if (!blockInBounds(nh.x, nh.y, SNAKE_UNIT) || headHitsBody(session, nh.x, nh.y)) {
         session.alive = false;
         return true;
     }
