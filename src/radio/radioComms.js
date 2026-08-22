@@ -774,29 +774,49 @@ export function buildDisplayLines(state, ctx) {
     };
 }
 
-export function formatStandbyPresetLine(state) {
+export function isManualStandbyTuning(state) {
+    if (!state) return false;
+    if (state.activePresetSlot == null) return true;
+    var preset = findPreset(state, state.activePresetSlot);
+    if (!preset) return true;
+    return normalizeFrequency(preset.frequency) !== normalizeFrequency(state.frequency) ||
+        normalizeEncryptionKey(preset.encryptionKey || '') !== normalizeEncryptionKey(state.encryptionKey || '');
+}
+
+export function formatStandbyPresetLine(state, opts) {
+    opts = opts || {};
+    if (opts.manualTune || isManualStandbyTuning(state)) {
+        return 'Ruční ladění';
+    }
     var presets = state.presets || [];
     var preset = resolveActivePreset(state);
     if (preset && presets.length) {
         return preset.slot + ' · ' + (preset.label || 'Kanál');
     }
-    if (presets.length) return 'přímý zápis';
+    if (presets.length) return 'Ruční ladění';
     return '—';
 }
 
 /** Úvodní obrazovka — ikona presetu jen když je aktivní kanál. */
-export function buildStandbyPresetDisplay(state) {
+export function buildStandbyPresetDisplay(state, opts) {
+    opts = opts || {};
+    if (opts.manualTune || isManualStandbyTuning(state)) {
+        return {
+            icon: 'manual-tune.png',
+            text: 'Ruční ladění'
+        };
+    }
     var presets = state.presets || [];
     var preset = resolveActivePreset(state);
     if (preset && presets.length) {
         return {
             icon: 'archive-presets.png',
-            text: formatStandbyPresetLine(state)
+            text: formatStandbyPresetLine(state, opts)
         };
     }
     return {
         icon: null,
-        text: formatStandbyPresetLine(state)
+        text: formatStandbyPresetLine(state, opts)
     };
 }
 

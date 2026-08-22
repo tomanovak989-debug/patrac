@@ -603,7 +603,7 @@ function isStandbyTransmitting() {
 }
 
 function getStandbyStatusTitle(state) {
-    return formatStandbyPresetLine(state);
+    return formatStandbyPresetLine(state, { manualTune: !!(standbyUi && standbyUi.active) });
 }
 
 function setStandbyClockDisplay(clockEl, state) {
@@ -630,7 +630,7 @@ function updateRadioStatusWidgets(state, osView) {
 
 function applyStandbyMainLayout(f, k, buf, p, state, opts) {
     opts = opts || {};
-    var presetDisplay = buildStandbyPresetDisplay(state);
+    var presetDisplay = buildStandbyPresetDisplay(state, { manualTune: !!opts.manualTune });
     var freqLine = formatStandbyFrequencyLine(state);
     var encLine = formatStandbyEncryptionLine(state);
     var gpsOk = !!opts.gpsOk;
@@ -919,7 +919,6 @@ function openStandbyFieldEdit(field) {
 function handleStandbyInput(action) {
     if (!isStandbyScreen()) return false;
     if (action === 'preset_prev' || action === 'preset_next') {
-        if (!standbyUi.active) return false;
         if (cycleDialPreset(state, action === 'preset_next' ? 1 : -1)) {
             persist();
             refreshSubscriptions();
@@ -1398,6 +1397,7 @@ function executeQuickKey(keyId) {
 }
 
 function handleMenuKeypadDigit(keyId) {
+    if (handleGamePadDigit(keyId)) return;
     if (isStandbyScreen() && isQuickKeyId(keyId)) {
         tryExecuteQuickKey(keyId);
     }
@@ -1501,7 +1501,7 @@ function applyOffChargingDisplay(f, k, buf, p, state) {
     if (f) {
         f.className = 'radio-display-charge-wrap';
         f.innerHTML = '<img class="radio-display-charge-icon" src="' +
-            escapeDisplayText(radioIconUrl('battery-empty.png')) +
+            escapeDisplayText(radioIconUrl('battery-charging.png')) +
             '" alt="" draggable="false">' +
             '<span class="radio-display-charge-pct">' + escapeDisplayText(pct) + '</span>';
         f.removeAttribute('title');
@@ -1754,7 +1754,8 @@ function renderDisplay() {
                 focusFreq: standbyUi.focusIndex === 0,
                 focusEncrypt: standbyUi.focusIndex === 1,
                 dialBuffer: dialBuffer || '',
-                pttLine: standbyPttActive ? '● PTT NAHRÁVÁM' : ''
+                pttLine: standbyPttActive ? '● PTT NAHRÁVÁM' : '',
+                manualTune: true
             });
             clearExtraDisplayLines();
             if (nodeEl) {
@@ -2783,6 +2784,24 @@ function startSnakeTimer() {
 
 function isSnakeMenuOpen() {
     return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'snake');
+}
+
+function gamePadDigitToDirection(digit) {
+    if (digit === '2') return 'up';
+    if (digit === '8') return 'down';
+    if (digit === '6') return 'left';
+    if (digit === '4') return 'right';
+    return null;
+}
+
+function handleGamePadDigit(keyId) {
+    var dir = gamePadDigitToDirection(keyId);
+    if (!dir) return false;
+    if (isSnakeMenuOpen() || isArkanoidMenuOpen()) {
+        handleRadioOsInput(dir);
+        return true;
+    }
+    return false;
 }
 
 function openSnakeScreen() {
@@ -4219,16 +4238,17 @@ function handleRadioDpadKey(key) {
         return;
     }
     if (isStandbyScreen()) {
-        if (standbyUi.active && (key === 'left' || key === 'right')) {
-            handleStandbyInput(key === 'right' ? 'preset_next' : 'preset_prev');
+        if (key === 'left' || key === 'right') {
+            if (standbyUi.active) {
+                handleStandbyInput(key === 'right' ? 'preset_next' : 'preset_prev');
+            } else if (cycleDialPreset(state, key === 'right' ? 1 : -1)) {
+                persist();
+                refreshSubscriptions();
+                renderDisplay();
+            }
             return;
         }
-        if (key === 'left' || key === 'right') {
-            if (key === 'right') handleStandbyInput('ok');
-            else handleStandbyInput('back');
-        } else {
-            handleStandbyInput(key);
-        }
+        handleStandbyInput(key);
         return;
     }
     if (isRadioOsActive(radioOs)) {
@@ -4307,6 +4327,16 @@ function bindRadioKeyboard() {
             radioKeyFeedback('key');
             handleRadioDpadKey(dpadKey);
             return;
+        }
+
+        if (/^[2468]$/.test(e.key) && (isSnakeMenuOpen() || isArkanoidMenuOpen())) {
+            var padDir = gamePadDigitToDirection(e.key);
+            if (padDir) {
+                e.preventDefault();
+                radioKeyFeedback('key');
+                handleRadioOsInput(padDir);
+                return;
+            }
         }
 
         if (e.key === 'Enter') {

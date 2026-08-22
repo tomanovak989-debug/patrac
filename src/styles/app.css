@@ -1348,8 +1348,8 @@ body.theme-light .sector-tech-screen.is-boot-black {
     min-height: 0;
 }
 .radio-boot-signal-icon {
-    width: 4.2em;
-    height: 4.2em;
+    width: 2.1em;
+    height: 2.1em;
     object-fit: contain;
     flex: 0 0 auto;
     image-rendering: pixelated;
@@ -1362,8 +1362,21 @@ body.theme-light .radio-boot-signal-icon {
 }
 .radio-boot-signal-icon.is-empty {
     display: inline-block;
-    width: 4.2em;
-    height: 4.2em;
+    width: 2.1em;
+    height: 2.1em;
+}
+.radio-boot-brand {
+    font-size: 0.82em;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-align: center;
+    line-height: 1.05;
+    min-height: 2.1em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 0.12em;
+    box-sizing: border-box;
 }
 .radio-boot-text {
     font-size: 1.12em;
@@ -1384,8 +1397,8 @@ body.theme-light .radio-boot-signal-icon {
     box-sizing: border-box;
 }
 .radio-display-charge-icon {
-    width: 4.15em;
-    height: 2.14em;
+    width: 2.35em;
+    height: 3.95em;
     object-fit: contain;
     display: block;
     flex-shrink: 0;

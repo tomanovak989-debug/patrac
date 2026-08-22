@@ -3,10 +3,10 @@
  */
 import { radioIconUrl } from './radioMenuIcons.js';
 
+export var BOOT_BRAND = 'SECTOR-TECH';
 export var BOOT_HELLO = ['HELLO .', 'HELLO ..', 'HELLO ...'];
 export var BOOT_GOODBYE = ['GOODBYE ...', 'GOODBYE ..', 'GOODBYE .'];
 export var BOOT_SIGNAL_FILES = [
-    'boot-signal-0.png',
     'boot-signal-1.png',
     'boot-signal-2.png',
     'boot-signal-3.png',
@@ -111,7 +111,7 @@ function advanceBoot(session, onFrame, onComplete) {
     }
 
     if (session.phase === 'signal') {
-        if (session.signalLevel < BOOT_SIGNAL_FILES.length - 1) {
+        if (session.signalLevel < BOOT_SIGNAL_FILES.length) {
             session.signalLevel++;
             if (onFrame) onFrame();
             schedule(session, SIGNAL_MS, function() {
@@ -133,7 +133,7 @@ export function startShutdownAnim(session, onFrame, onComplete) {
     session.active = true;
     session.direction = 'shutdown';
     session.phase = 'signal';
-    session.signalLevel = BOOT_SIGNAL_FILES.length - 1;
+    session.signalLevel = BOOT_SIGNAL_FILES.length;
     session.textStep = 0;
     if (onFrame) onFrame();
     schedule(session, SIGNAL_MS, function() {
@@ -191,33 +191,46 @@ export function getPowerAnimText(session) {
     return '';
 }
 
+export function getPowerAnimShowBrand(session) {
+    if (!session || !session.active || session.phase === 'black') return false;
+    if (session.phase === 'blink' && !session.blinkOn) return false;
+    if (session.direction === 'boot' && session.phase === 'hello') return true;
+    if (session.direction === 'shutdown' && session.phase === 'goodbye') return true;
+    if (session.phase === 'blink') return true;
+    if (session.phase === 'signal' && !session.signalLevel) return true;
+    return false;
+}
+
 export function getPowerAnimSignalFile(session) {
-    if (!session || !session.active) return BOOT_SIGNAL_FILES[0];
+    if (!session || !session.active) return null;
     if (session.phase === 'black') return null;
-    if (session.direction === 'boot' && session.phase === 'hello') {
-        return 'boot-signal-0.png';
-    }
-    if (session.direction === 'shutdown' && session.phase === 'goodbye') {
-        return 'boot-signal-0.png';
-    }
-    if (session.phase === 'blink' && !session.blinkOn) {
-        return null;
-    }
+    if (session.phase === 'blink') return null;
+    if (session.direction === 'boot' && session.phase === 'hello') return null;
+    if (session.direction === 'shutdown' && session.phase === 'goodbye') return null;
+    if (session.phase !== 'signal') return null;
     var level = session.signalLevel || 0;
-    if (level < 0) level = 0;
-    if (level >= BOOT_SIGNAL_FILES.length) level = BOOT_SIGNAL_FILES.length - 1;
-    return BOOT_SIGNAL_FILES[level];
+    if (level <= 0) return null;
+    var idx = level - 1;
+    if (idx < 0) idx = 0;
+    if (idx >= BOOT_SIGNAL_FILES.length) idx = BOOT_SIGNAL_FILES.length - 1;
+    return BOOT_SIGNAL_FILES[idx];
 }
 
 export function buildPowerAnimHtml(session, escapeFn) {
     escapeFn = escapeFn || function(v) { return String(v || ''); };
     var text = getPowerAnimText(session);
     var icon = getPowerAnimSignalFile(session);
-    var iconHtml = icon
-        ? '<img class="radio-boot-signal-icon" src="' + escapeFn(radioIconUrl(icon)) + '" alt="" draggable="false">'
-        : '<span class="radio-boot-signal-icon is-empty" aria-hidden="true"></span>';
+    var showBrand = getPowerAnimShowBrand(session);
+    var visualHtml = '';
+    if (icon) {
+        visualHtml = '<img class="radio-boot-signal-icon" src="' + escapeFn(radioIconUrl(icon)) + '" alt="" draggable="false">';
+    } else if (showBrand) {
+        visualHtml = '<div class="radio-boot-brand">' + escapeFn(BOOT_BRAND) + '</div>';
+    } else {
+        visualHtml = '<span class="radio-boot-signal-icon is-empty" aria-hidden="true"></span>';
+    }
     return '<div class="radio-boot-screen">' +
-        iconHtml +
+        visualHtml +
         '<div class="radio-boot-text">' + escapeFn(text) + '</div>' +
         '</div>';
 }

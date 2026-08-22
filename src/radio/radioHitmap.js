@@ -88,8 +88,8 @@ export function applyDisplayTypography() {
 function applyBatteryChrome(px) {
     var w = Math.round(px * 3.15 * 10) / 10;
     var h = Math.round(px * 1.64 * 10) / 10;
-    var iw = Math.round(px * 4.15 * 10) / 10;
-    var ih = Math.round(px * 2.14 * 10) / 10;
+    var iw = Math.round(px * 2.35 * 10) / 10;
+    var ih = Math.round(px * 3.95 * 10) / 10;
     var gap = Math.round(px * 0.55 * 10) / 10;
     var widget = document.getElementById('radio-display-battery');
     if (widget) {
