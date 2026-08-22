@@ -489,7 +489,7 @@ var DISPLAY_LINE_IDS = [
 
 var LINE_MARQUEE_HOLD_MS = 2000;
 var lineMarqueeState = null;
-var MENU_SCROLL_MS = 240;
+var MENU_SCROLL_MS = 280;
 var menuScrollTracker = { key: '', index: -1 };
 var menuScrollAnimating = false;
 
@@ -661,18 +661,58 @@ function clearStandbyDisplayLayout(f, k, buf, p) {
     }
 }
 
-function buildMenuRowHtml(text, iconFile) {
-    var parts = '<div class="radio-display-row-slide">';
+function buildSlideInnerHtml(text, iconFile) {
+    var parts = '';
     if (iconFile) {
         parts += '<img class="radio-display-row-icon" src="' + escapeDisplayText(radioIconUrl(iconFile)) + '" alt="" draggable="false">';
     }
-    parts += '<span class="radio-display-row-text">' + escapeDisplayText(text || '') + '</span></div>';
+    parts += '<span class="radio-display-row-text">' + escapeDisplayText(text || '') + '</span>';
     return parts;
 }
 
-function getRowSlide(row) {
+function buildMenuRowHtml(text, iconFile) {
+    return '<div class="radio-display-row-slide">' + buildSlideInnerHtml(text, iconFile) + '</div>';
+}
+
+function ensureMenuRowViewport(row) {
     if (!row) return null;
-    return row.querySelector('.radio-display-row-slide');
+    var vp = row.querySelector('.radio-display-row-viewport');
+    if (!vp) {
+        row.innerHTML = '<div class="radio-display-row-viewport">' +
+            '<div class="radio-display-row-slide"></div>' +
+            '<div class="radio-display-row-slide"></div>' +
+            '</div>';
+        row.dataset.activeSlide = '0';
+        vp = row.querySelector('.radio-display-row-viewport');
+    }
+    return vp;
+}
+
+function getMenuRowSlides(row) {
+    var vp = ensureMenuRowViewport(row);
+    if (!vp) return [];
+    return vp.querySelectorAll('.radio-display-row-slide');
+}
+
+function getActiveMenuSlide(row) {
+    var slides = getMenuRowSlides(row);
+    if (!slides.length) return null;
+    return slides[row.dataset.activeSlide === '1' ? 1 : 0];
+}
+
+function getInactiveMenuSlide(row) {
+    var slides = getMenuRowSlides(row);
+    if (slides.length < 2) return null;
+    return slides[row.dataset.activeSlide === '1' ? 0 : 1];
+}
+
+function fillMenuSlide(slide, text, iconFile) {
+    if (!slide) return;
+    slide.innerHTML = buildSlideInnerHtml(text, iconFile);
+}
+
+function getRowSlide(row) {
+    return getActiveMenuSlide(row);
 }
 
 function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
@@ -686,7 +726,13 @@ function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
         if (!row) continue;
         var text = i < lines.length ? (lines[i] || '') : '';
         var iconFile = i < lineIcons.length ? lineIcons[i] : null;
-        row.innerHTML = buildMenuRowHtml(text, iconFile);
+        ensureMenuRowViewport(row);
+        fillMenuSlide(getActiveMenuSlide(row), text, iconFile);
+        var inactive = getInactiveMenuSlide(row);
+        if (inactive) {
+            inactive.style.transition = '';
+            inactive.style.transform = '';
+        }
         row.classList.remove('radio-display-row-marquee-active');
         row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
         row.classList.toggle('radio-display-row-focus', i === focusLine);
@@ -694,6 +740,60 @@ function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
     if (focusLine >= 0 && focusLine < lines.length && lines[focusLine]) {
         scheduleLineMarquee(focusLine, lines[focusLine]);
     }
+}
+
+function animateMenuScroll(rows, lines, focusLine, lineStyles, lineIcons, scrollDir, lineH) {
+    var i;
+    menuScrollAnimating = true;
+    for (i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var text = i < lines.length ? (lines[i] || '') : '';
+        var iconFile = i < lineIcons.length ? lineIcons[i] : null;
+        ensureMenuRowViewport(row);
+        var active = getActiveMenuSlide(row);
+        var incoming = getInactiveMenuSlide(row);
+        fillMenuSlide(incoming, text, iconFile);
+        active.style.transition = 'none';
+        incoming.style.transition = 'none';
+        active.style.transform = 'translateY(0)';
+        incoming.style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
+        row.classList.remove('radio-display-row-marquee-active');
+        row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
+        row.classList.toggle('radio-display-row-focus', i === focusLine);
+    }
+    if (rows[0]) void rows[0].offsetHeight;
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            var ease = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            for (i = 0; i < rows.length; i++) {
+                var activeSlide = getActiveMenuSlide(rows[i]);
+                var incomingSlide = getInactiveMenuSlide(rows[i]);
+                activeSlide.style.transition = ease;
+                incomingSlide.style.transition = ease;
+                activeSlide.style.transform = 'translateY(' + (-scrollDir * lineH) + 'px)';
+                incomingSlide.style.transform = 'translateY(0)';
+            }
+            setTimeout(function() {
+                for (i = 0; i < rows.length; i++) {
+                    rows[i].dataset.activeSlide = rows[i].dataset.activeSlide === '1' ? '0' : '1';
+                    var parked = getInactiveMenuSlide(rows[i]);
+                    var live = getActiveMenuSlide(rows[i]);
+                    if (parked) {
+                        parked.style.transition = 'none';
+                        parked.style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
+                    }
+                    if (live) {
+                        live.style.transition = '';
+                        live.style.transform = '';
+                    }
+                }
+                menuScrollAnimating = false;
+                if (focusLine >= 0 && focusLine < lines.length && lines[focusLine]) {
+                    scheduleLineMarquee(focusLine, lines[focusLine]);
+                }
+            }, MENU_SCROLL_MS + 24);
+        });
+    });
 }
 
 function resolveMenuScrollMeta(osView) {
@@ -733,48 +833,18 @@ function setDisplayMenuLines(lines, focusLine, lineStyles, lineIcons, scrollDir)
 
     if (scrollDir !== 0 && focusLine >= 0 && !menuScrollAnimating) {
         var rows = [];
-        var slides = [];
         var i;
         for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
             var rowEl = el(DISPLAY_LINE_IDS[i]);
             if (rowEl) rows.push(rowEl);
         }
-
-        applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
-
-        for (i = 0; i < rows.length; i++) {
-            slides.push(getRowSlide(rows[i]) || rows[i]);
-        }
-
-        var lineH = rows[0] ? rows[0].offsetHeight : 0;
-        if (lineH < 6) lineH = 14;
-
-        if (!slides.length || !getRowSlide(rows[0])) {
+        if (!rows.length || !getActiveMenuSlide(rows[0])) {
+            applyMenuLineContent(lines, focusLine, lineStyles, lineIcons);
             return;
         }
-
-        menuScrollAnimating = true;
-
-        for (i = 0; i < slides.length; i++) {
-            slides[i].style.transition = 'none';
-            slides[i].style.transform = 'translateY(' + (scrollDir * lineH) + 'px)';
-        }
-
-        requestAnimationFrame(function() {
-            requestAnimationFrame(function() {
-                for (i = 0; i < slides.length; i++) {
-                    slides[i].style.transition = 'transform ' + MENU_SCROLL_MS + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
-                    slides[i].style.transform = 'translateY(0)';
-                }
-                setTimeout(function() {
-                    for (i = 0; i < slides.length; i++) {
-                        slides[i].style.transition = '';
-                        slides[i].style.transform = '';
-                    }
-                    menuScrollAnimating = false;
-                }, MENU_SCROLL_MS + 24);
-            });
-        });
+        var lineH = rows[0].offsetHeight;
+        if (lineH < 6) lineH = 14;
+        animateMenuScroll(rows, lines, focusLine, lineStyles, lineIcons, scrollDir, lineH);
         return;
     }
 
@@ -2393,6 +2463,24 @@ function snakeHeadDirClass(dir) {
     return '';
 }
 
+function sizeSnakeBoardInner(board) {
+    var frame = board && board.querySelector('.radio-snake-frame');
+    var inner = board && board.querySelector('.radio-snake-board-inner');
+    if (!frame || !inner) return;
+    var rect = frame.getBoundingClientRect();
+    var size = Math.floor(Math.min(rect.width - 4, rect.height - 4));
+    if (size < 16) {
+        var main = el('radio-display-main');
+        if (main) {
+            var mainRect = main.getBoundingClientRect();
+            size = Math.floor(Math.min(mainRect.width - 6, (mainRect.height - 14) * 0.92));
+        }
+    }
+    if (size < 16) size = 48;
+    inner.style.width = size + 'px';
+    inner.style.height = size + 'px';
+}
+
 function renderSnakeBoard(session) {
     var board = ensureSnakeBoard();
     if (!board) return;
@@ -2400,21 +2488,24 @@ function renderSnakeBoard(session) {
     if (scoreEl) {
         scoreEl.textContent = 'SKÓRE ' + String(session.score || 0).padStart(3, '0');
     }
-    var innerEl = board.querySelector('.radio-snake-board-inner');
-    if (!innerEl) return;
-    var cells = innerEl.children;
-    var grid = buildSnakeCellGrid(session);
-    var dirClass = snakeHeadDirClass(session.dir || session.nextDir);
-    var i;
-    for (i = 0; i < grid.length && i < cells.length; i++) {
-        var kind = grid[i] || '';
-        var cls = 'radio-snake-cell';
-        if (kind) cls += ' is-' + kind;
-        if (kind === 'head') cls += dirClass;
-        cells[i].className = cls;
-    }
     board.hidden = false;
     board.removeAttribute('aria-hidden');
+    requestAnimationFrame(function() {
+        sizeSnakeBoardInner(board);
+        var innerEl = board.querySelector('.radio-snake-board-inner');
+        if (!innerEl) return;
+        var cells = innerEl.children;
+        var grid = buildSnakeCellGrid(session);
+        var dirClass = snakeHeadDirClass(session.dir || session.nextDir);
+        var i;
+        for (i = 0; i < grid.length && i < cells.length; i++) {
+            var kind = grid[i] || '';
+            var cls = 'radio-snake-cell';
+            if (kind) cls += ' is-' + kind;
+            if (kind === 'head') cls += dirClass;
+            cells[i].className = cls;
+        }
+    });
 }
 
 function ensureSnakeSession() {
