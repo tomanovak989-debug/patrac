@@ -229,6 +229,14 @@ import {
 import {
     resolveActiveRadioNode
 } from './radioNodes.js';
+import {
+    createPowerAnimState,
+    isPowerAnimActive,
+    stopPowerAnim,
+    startBootAnim,
+    startShutdownAnim,
+    buildPowerAnimHtml
+} from './radioBoot.js';
 
 var ctx = {};
 var state = null;
@@ -272,6 +280,7 @@ var activeNotebookTab = 'station';
 var seenMessageIds = {};
 var flipTimer = null;
 var radioAuthUnsub = null;
+var powerAnim = createPowerAnimState();
 
 function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
@@ -891,7 +900,7 @@ function finishFieldEdit(save) {
 }
 
 function isStandbyScreen() {
-    return state && state.operatingMode !== 'off' && !isRadioOsActive(radioOs) && !isFieldEditActive(fieldEditSession);
+    return state && state.operatingMode !== 'off' && !isPowerAnimActive(powerAnim) && !isRadioOsActive(radioOs) && !isFieldEditActive(fieldEditSession);
 }
 
 function openStandbyFieldEdit(field) {
@@ -1471,6 +1480,7 @@ function syncBatteryAndApply(opts) {
 
 function forceRadioPowerOff(renderAfter) {
     if (!state || state.operatingMode === 'off') return;
+    stopPowerAnim(powerAnim);
     haltAutoscan(true);
     autoscanSession = null;
     closeAppScreens();
@@ -1500,6 +1510,39 @@ function applyOffChargingDisplay(f, k, buf, p, state) {
     if (buf) { buf.className = ''; buf.textContent = ''; buf.classList.remove('radio-display-row-focus'); }
     if (p) { p.className = ''; p.textContent = ''; p.classList.remove('radio-display-row-focus'); }
     clearExtraDisplayLines();
+}
+
+function applyPowerAnimDisplay(f, k, buf, p, screen) {
+    hideAppBoards();
+    if (screen) {
+        screen.classList.toggle('is-off', false);
+        screen.classList.toggle('is-boot', true);
+        screen.classList.toggle('is-boot-black', powerAnim.phase === 'black');
+        screen.classList.toggle('is-menu', false);
+        screen.classList.toggle('is-standby', false);
+        screen.classList.toggle('is-charging', false);
+        screen.classList.toggle('is-field-edit', false);
+    }
+    if (f) {
+        f.className = 'radio-display-boot-wrap';
+        f.innerHTML = buildPowerAnimHtml(powerAnim, escapeDisplayText);
+        f.removeAttribute('title');
+    }
+    if (k) { k.className = ''; k.textContent = ''; k.classList.remove('radio-display-row-focus'); }
+    if (buf) { buf.className = ''; buf.textContent = ''; buf.classList.remove('radio-display-row-focus'); }
+    if (p) { p.className = ''; p.textContent = ''; p.classList.remove('radio-display-row-focus'); }
+    clearExtraDisplayLines();
+    var ch = el('radio-display-channel');
+    var clockEl = el('radio-display-clock');
+    var sig = el('radio-display-signal');
+    var nodeEl = el('radio-display-node');
+    var footerWrap = el('radio-display-footer');
+    if (ch) ch.textContent = '';
+    if (clockEl) clockEl.textContent = '';
+    if (sig) { sig.textContent = ''; sig.classList.remove('is-tuned', 'is-standby'); }
+    if (nodeEl) { nodeEl.textContent = ''; nodeEl.style.visibility = 'hidden'; }
+    if (footerWrap) footerWrap.textContent = '';
+    clearDisplayRowFocus();
 }
 
 function bindChargeControl() {
@@ -1584,6 +1627,19 @@ function renderDisplay() {
     var nodeEl = el('radio-display-node');
     var buf = el('radio-display-buffer');
     var footerWrap = el('radio-display-footer');
+
+    if (isPowerAnimActive(powerAnim)) {
+        applyPowerAnimDisplay(f, k, buf, p, screen);
+        updateChargeButtonUi();
+        updateInputForMode();
+        requestAnimationFrame(applyDisplayTypography);
+        return;
+    }
+
+    if (screen) {
+        screen.classList.toggle('is-boot', false);
+        screen.classList.toggle('is-boot-black', false);
+    }
 
     if (isFieldEditActive(fieldEditSession) && state.operatingMode !== 'off') {
         var editOpts = {};
@@ -4066,7 +4122,7 @@ function bindKeypad() {
     if (grid && !grid._radioCommsBound) {
         grid._radioCommsBound = true;
         grid.addEventListener('click', function(e) {
-            if (state.operatingMode === 'off') return;
+            if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
             if (isFieldEditActive(fieldEditSession)) {
                 var editBtn = e.target.closest('.sector-hit[data-key], .radio-key[data-key]');
                 if (editBtn) {
@@ -4157,7 +4213,7 @@ function isRadioKeyboardScope() {
 
 function handleRadioDpadKey(key) {
     if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right') return;
-    if (state.operatingMode === 'off') return;
+    if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
     if (isFieldEditActive(fieldEditSession)) {
         handleFieldEditAction(key);
         return;
@@ -4181,7 +4237,7 @@ function handleRadioDpadKey(key) {
 }
 
 function handleRadioOkPress() {
-    if (state.operatingMode === 'off') return;
+    if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
     if (isFieldEditActive(fieldEditSession)) {
         if (fieldEditSession.returnTo === 'comms') {
             finishCommsCompose();
@@ -4211,7 +4267,7 @@ function handleRadioOkPress() {
 
 function handleRadioBackPress() {
     var input = el('chat-input-field');
-    if (state.operatingMode === 'off') return;
+    if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
     if (standbyPttActive) {
         cancelStandbyPtt();
         return;
@@ -4311,6 +4367,7 @@ function bindDisplayDialSwipe() {
 var RADIO_OPERATING_MODES = ['off', 'on'];
 
 function cycleOperatingMode(direction) {
+    if (isPowerAnimActive(powerAnim)) return;
     haltAutoscan(true);
     autoscanSession = null;
     closeAppScreens();
@@ -4328,13 +4385,34 @@ function cycleOperatingMode(direction) {
         renderDisplay();
         return;
     }
+    if (nextMode === 'off') {
+        resetRadioOs(radioOs);
+        presetEditDraft = null;
+        cancelFieldEdit(fieldEditSession);
+        fieldEditSession = null;
+        stopRadioSubscriptions();
+        startShutdownAnim(powerAnim, function() {
+            renderDisplay();
+        }, function() {
+            forceRadioPowerOff(true);
+        });
+        persist();
+        renderDisplay();
+        return;
+    }
     state.operatingMode = nextMode;
-    if (state.operatingMode === 'on') stopBatteryCharging(state);
+    stopBatteryCharging(state);
     resetRadioOs(radioOs);
     presetEditDraft = null;
     cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
     persist();
+    startBootAnim(powerAnim, function() {
+        renderDisplay();
+    }, function() {
+        refreshSubscriptions();
+        renderDisplay();
+    });
     renderDisplay();
 }
 
