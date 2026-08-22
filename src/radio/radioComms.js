@@ -778,12 +778,26 @@ export function formatStandbyPresetLine(state) {
     var presets = state.presets || [];
     var preset = resolveActivePreset(state);
     if (preset && presets.length) {
-        var idx = findDialIndex(presets, preset.frequency, preset.slot);
-        var pos = idx >= 0 ? (idx + 1) : preset.slot;
-        return 'Preset ' + pos + '/' + presets.length + ' · ' + (preset.label || 'Kanál');
+        return preset.slot + ' · ' + (preset.label || 'Kanál');
     }
-    if (presets.length) return 'Preset · přímý zápis';
-    return 'Preset · —';
+    if (presets.length) return 'přímý zápis';
+    return '—';
+}
+
+/** Úvodní obrazovka — ikona presetu jen když je aktivní kanál. */
+export function buildStandbyPresetDisplay(state) {
+    var presets = state.presets || [];
+    var preset = resolveActivePreset(state);
+    if (preset && presets.length) {
+        return {
+            icon: 'archive-presets.png',
+            text: formatStandbyPresetLine(state)
+        };
+    }
+    return {
+        icon: null,
+        text: formatStandbyPresetLine(state)
+    };
 }
 
 export function formatStandbyFrequencyLine(state) {

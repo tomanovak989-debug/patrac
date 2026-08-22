@@ -1974,6 +1974,11 @@ body.theme-light #radio-display-signal.is-standby {
     font-weight: 700 !important;
     font-size: 1em !important;
     line-height: 1.05;
+    overflow: hidden;
+}
+.sector-tech-screen.is-standby .radio-display-standby-preset .radio-display-row-slide,
+.sector-tech-screen.is-standby-tune .radio-display-standby-preset .radio-display-row-slide {
+    min-width: 0;
 }
 .sector-tech-screen.is-standby .radio-display-main > div.radio-display-standby-freq,
 .sector-tech-screen.is-standby-tune .radio-display-main > div.radio-display-standby-freq,

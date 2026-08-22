@@ -23,6 +23,7 @@ import {
     communityFrequencyFromCode,
     getCommunityRadioKey,
     formatStandbyPresetLine,
+    buildStandbyPresetDisplay,
     formatStandbyFrequencyLine,
     formatStandbyEncryptionLine,
     GLOBAL_FREQUENCY,
@@ -620,14 +621,14 @@ function updateRadioStatusWidgets(state, osView) {
 
 function applyStandbyMainLayout(f, k, buf, p, state, opts) {
     opts = opts || {};
-    var presetLine = formatStandbyPresetLine(state);
+    var presetDisplay = buildStandbyPresetDisplay(state);
     var freqLine = formatStandbyFrequencyLine(state);
     var encLine = formatStandbyEncryptionLine(state);
     var gpsOk = !!opts.gpsOk;
 
     if (f) {
         f.className = 'radio-display-standby-preset';
-        f.textContent = presetLine;
+        f.innerHTML = buildMenuRowHtml(presetDisplay.text, presetDisplay.icon);
         f.removeAttribute('title');
         f.classList.remove('radio-display-freq-node', 'is-handset', 'is-fallback', 'radio-display-battery-only', 'radio-display-row-focus');
     }
@@ -683,6 +684,7 @@ function clearStandbyDisplayLayout(f, k, buf, p) {
             'radio-display-battery-only'
         );
         row.removeAttribute('title');
+        row.textContent = '';
         row.style.removeProperty('font-weight');
         row.style.removeProperty('font-size');
     }
