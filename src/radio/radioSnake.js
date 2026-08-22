@@ -44,10 +44,31 @@ function wrapPlayCoord(val, min, max) {
     return min + (((val - min) % range) + range) % range;
 }
 
-function alignCoord(val, min, max) {
-    val = wrapPlayCoord(val, min, max);
+/** Kotva segmentu vždy na mřížce SNAKE_UNIT (1, 4, 7 …). */
+function snapSegmentCoord(val, min, max) {
+    var limit = max - SNAKE_UNIT + 1;
+    val = wrapPlayCoord(val, min, limit);
     var offset = (val - min) % SNAKE_UNIT;
     return val - offset;
+}
+
+function gridSteps(min, max) {
+    return Math.floor((max - min + 1) / SNAKE_UNIT);
+}
+
+function wrapSegmentCoord(val, min, max) {
+    var steps = gridSteps(min, max);
+    if (steps <= 0) return min;
+    var idx = Math.floor((val - min) / SNAKE_UNIT);
+    idx = ((idx % steps) + steps) % steps;
+    return min + idx * SNAKE_UNIT;
+}
+
+function nextSegmentPos(head, dir) {
+    return {
+        x: wrapSegmentCoord(head.x + dir.x * SNAKE_UNIT, SNAKE_PLAY_X0, SNAKE_PLAY_X1),
+        y: wrapSegmentCoord(head.y + dir.y * SNAKE_UNIT, SNAKE_PLAY_Y0, SNAKE_PLAY_Y1)
+    };
 }
 
 function wallKey(x, y) {
@@ -104,10 +125,62 @@ function applyLevel(session, levelIndex) {
 
 function defaultSnake() {
     return [
-        { x: 42, y: 24 },
-        { x: 39, y: 24 },
-        { x: 36, y: 24 }
+        { x: 40, y: 22 },
+        { x: 37, y: 22 },
+        { x: 34, y: 22 }
     ];
+}
+
+function segmentBlocksWall(session, x, y) {
+    var cells = segmentCells(x, y);
+    var i;
+    for (i = 0; i < cells.length; i++) {
+        if (isWall(session, cells[i][0], cells[i][1])) return true;
+    }
+    return false;
+}
+
+function snakeFits(session, segments) {
+    var i;
+    var j;
+    for (i = 0; i < segments.length; i++) {
+        if (segmentBlocksWall(session, segments[i].x, segments[i].y)) return false;
+        for (j = i + 1; j < segments.length; j++) {
+            if (segments[i].x === segments[j].x && segments[i].y === segments[j].y) return false;
+        }
+    }
+    return true;
+}
+
+function spawnSnakeForLevel(session) {
+    var tries = 0;
+    var anchors;
+    var i;
+    var ax;
+    var ay;
+    var xSteps = gridSteps(SNAKE_PLAY_X0, SNAKE_PLAY_X1);
+    var ySteps = gridSteps(SNAKE_PLAY_Y0, SNAKE_PLAY_Y1);
+    while (tries++ < 800) {
+        ax = SNAKE_PLAY_X0 + (2 + Math.floor(Math.random() * Math.max(1, xSteps - 2))) * SNAKE_UNIT;
+        ay = SNAKE_PLAY_Y0 + Math.floor(Math.random() * Math.max(1, ySteps)) * SNAKE_UNIT;
+        anchors = [{ x: ax, y: ay }, { x: ax - SNAKE_UNIT, y: ay }, { x: ax - SNAKE_UNIT * 2, y: ay }];
+        if (snakeFits(session, anchors)) {
+            session.snake = anchors;
+            session.dir = { x: 1, y: 0 };
+            session.nextDir = { x: 1, y: 0 };
+            return;
+        }
+    }
+    anchors = defaultSnake();
+    for (i = 0; i < anchors.length; i++) {
+        anchors[i] = {
+            x: snapSegmentCoord(anchors[i].x, SNAKE_PLAY_X0, SNAKE_PLAY_X1),
+            y: snapSegmentCoord(anchors[i].y, SNAKE_PLAY_Y0, SNAKE_PLAY_Y1)
+        };
+    }
+    session.snake = anchors;
+    session.dir = { x: 1, y: 0 };
+    session.nextDir = { x: 1, y: 0 };
 }
 
 export function createSnakeState() {
@@ -309,10 +382,9 @@ function advanceLevel(session) {
     if (next >= LEVELS.length) next = LEVELS.length - 1;
     applyLevel(session, next);
     session.tickMs = Math.max(SNAKE_TICK_MIN, (session.tickMs || SNAKE_TICK_MS) - 12);
-    session.snake = defaultSnake();
-    session.dir = { x: 1, y: 0 };
-    session.nextDir = { x: 1, y: 0 };
+    session.growPending = 0;
     session.bonus = null;
+    spawnSnakeForLevel(session);
     session.food = spawnFood(session);
 }
 
@@ -393,18 +465,13 @@ function setCell(grid, x, y, val) {
 }
 
 function headHitsBody(session, nx, ny) {
-    var cells = segmentCells(nx, ny);
     var ignoreTail = (session.growPending || 0) <= 0;
     var lastIndex = session.snake.length - 1;
-    var c;
     var i;
-    for (c = 0; c < cells.length; c++) {
-        var px = cells[c][0];
-        var py = cells[c][1];
-        for (i = 1; i < session.snake.length; i++) {
-            if (ignoreTail && i === lastIndex) continue;
-            if (pointOccupiedBySegment(session, px, py, i)) return true;
-        }
+    for (i = 1; i < session.snake.length; i++) {
+        if (ignoreTail && i === lastIndex) continue;
+        var seg = session.snake[i];
+        if (seg.x === nx && seg.y === ny) return true;
     }
     return false;
 }
@@ -425,10 +492,7 @@ export function snakeTick(session) {
 
     session.dir = session.nextDir || session.dir;
     var head = session.snake[0];
-    var nh = {
-        x: alignCoord(head.x + session.dir.x * SNAKE_UNIT, SNAKE_PLAY_X0, SNAKE_PLAY_X1),
-        y: alignCoord(head.y + session.dir.y * SNAKE_UNIT, SNAKE_PLAY_Y0, SNAKE_PLAY_Y1)
-    };
+    var nh = nextSegmentPos(head, session.dir);
 
     if (headHitsBody(session, nh.x, nh.y) || headHitsWall(session, nh.x, nh.y)) {
         session.alive = false;
@@ -446,6 +510,7 @@ export function snakeTick(session) {
         accelerate(session);
         maybeSpawnBonus(session);
         if (session.levelFoodsEaten >= (session.foodsToClear || 6)) {
+            session.snake.shift();
             advanceLevel(session);
             return 'level';
         }
