@@ -1,20 +1,23 @@
 /**
- * Snake II — Nokia 3310 LCD (84×48 bodů).
- * Prostup okraji, bludiště, statická mlska, časovaný bonus, levely, zrychlování.
+ * Snake II — LCD vysílačky (84×84 bodů, čtvercová mřížka = celý displej).
+ * Had/mlska 3×3 px beze změny. Bludiště škálované z původního Nokia 84×48 layoutu.
  */
 export var SNAKE_TICK_MS = 180;
 export var SNAKE_TICK_MIN = 68;
 export var SNAKE_W = 84;
-export var SNAKE_H = 48;
+export var SNAKE_H = 84;
 export var SNAKE_UNIT = 3;
 export var SNAKE_CELL_COUNT = SNAKE_W * SNAKE_H;
 export var SNAKE_FOOD_SPAN = 3;
 export var SNAKE_BONUS_SPAN = 3;
 
 export var SNAKE_PLAY_X0 = 1;
-export var SNAKE_PLAY_X1 = 80;
+export var SNAKE_PLAY_X1 = 81;
 export var SNAKE_PLAY_Y0 = 1;
-export var SNAKE_PLAY_Y1 = 44;
+export var SNAKE_PLAY_Y1 = 81;
+
+var DESIGN_W = 84;
+var DESIGN_H = 48;
 
 export var SNAKE_BONUS_LIFE_MS = 11000;
 export var SNAKE_BONUS_BLINK_MS = 4500;
@@ -85,30 +88,48 @@ function fillWallRect(walls, x, y, w, h) {
     }
 }
 
+function mapDesignX(x) {
+    return Math.max(SNAKE_PLAY_X0, Math.min(SNAKE_PLAY_X1,
+        Math.round(x * (SNAKE_W - 1) / (DESIGN_W - 1))));
+}
+
+function mapDesignY(y) {
+    return Math.max(SNAKE_PLAY_Y0, Math.min(SNAKE_PLAY_Y1,
+        Math.round(y * (SNAKE_H - 1) / (DESIGN_H - 1))));
+}
+
+function fillWallRectDesign(walls, x, y, w, h) {
+    var x1 = mapDesignX(x);
+    var y1 = mapDesignY(y);
+    var x2 = mapDesignX(x + w - 1);
+    var y2 = mapDesignY(y + h - 1);
+    fillWallRect(walls, x1, y1, x2 - x1 + 1, y2 - y1 + 1);
+}
+
 function buildLevelWalls(kind) {
     var walls = {};
     if (kind === 'cross') {
-        fillWallRect(walls, 39, 10, 4, 12);
-        fillWallRect(walls, 39, 32, 4, 12);
-        fillWallRect(walls, 18, 21, 14, 4);
-        fillWallRect(walls, 50, 21, 14, 4);
+        fillWallRectDesign(walls, 39, 10, 4, 12);
+        fillWallRectDesign(walls, 39, 32, 4, 12);
+        fillWallRectDesign(walls, 18, 21, 14, 4);
+        fillWallRectDesign(walls, 50, 21, 14, 4);
     } else if (kind === 'pillars') {
-        fillWallRect(walls, 12, 10, 6, 6);
-        fillWallRect(walls, 64, 10, 6, 6);
-        fillWallRect(walls, 12, 32, 6, 6);
-        fillWallRect(walls, 64, 32, 6, 6);
-        fillWallRect(walls, 36, 20, 10, 6);
+        fillWallRectDesign(walls, 12, 10, 6, 6);
+        fillWallRectDesign(walls, 64, 10, 6, 6);
+        fillWallRectDesign(walls, 12, 32, 6, 6);
+        fillWallRectDesign(walls, 64, 32, 6, 6);
+        fillWallRectDesign(walls, 36, 20, 10, 6);
     } else if (kind === 'maze') {
-        fillWallRect(walls, 15, 8, 3, 28);
-        fillWallRect(walls, 30, 16, 3, 26);
-        fillWallRect(walls, 48, 8, 3, 22);
-        fillWallRect(walls, 63, 18, 3, 24);
-        fillWallRect(walls, 24, 28, 20, 3);
+        fillWallRectDesign(walls, 15, 8, 3, 28);
+        fillWallRectDesign(walls, 30, 16, 3, 26);
+        fillWallRectDesign(walls, 48, 8, 3, 22);
+        fillWallRectDesign(walls, 63, 18, 3, 24);
+        fillWallRectDesign(walls, 24, 28, 20, 3);
     } else if (kind === 'dense') {
-        fillWallRect(walls, 20, 12, 42, 3);
-        fillWallRect(walls, 20, 24, 42, 3);
-        fillWallRect(walls, 20, 36, 42, 3);
-        fillWallRect(walls, 38, 12, 3, 27);
+        fillWallRectDesign(walls, 20, 12, 42, 3);
+        fillWallRectDesign(walls, 20, 24, 42, 3);
+        fillWallRectDesign(walls, 20, 36, 42, 3);
+        fillWallRectDesign(walls, 38, 12, 3, 27);
     }
     return walls;
 }
@@ -124,10 +145,11 @@ function applyLevel(session, levelIndex) {
 }
 
 function defaultSnake() {
+    var y = mapDesignY(22);
     return [
-        { x: 40, y: 22 },
-        { x: 37, y: 22 },
-        { x: 34, y: 22 }
+        { x: 40, y: y },
+        { x: 37, y: y },
+        { x: 34, y: y }
     ];
 }
 

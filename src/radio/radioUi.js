@@ -2641,22 +2641,11 @@ function sizeSnakeBoardInner(board) {
     var frame = board && board.querySelector('.radio-snake-frame');
     var inner = board && board.querySelector('.radio-snake-board-inner');
     if (!frame || !inner) return;
-    var pad = 4;
-    var fw = Math.max(0, frame.clientWidth - pad);
-    var fh = Math.max(0, frame.clientHeight - pad);
+    var fw = frame.clientWidth;
+    var fh = frame.clientHeight;
     if (!fw || !fh) return;
-    var ratio = SNAKE_W / SNAKE_H;
-    var w;
-    var h;
-    if (fw / fh > ratio) {
-        h = fh;
-        w = Math.floor(h * ratio);
-    } else {
-        w = fw;
-        h = Math.floor(w / ratio);
-    }
-    inner.style.width = w + 'px';
-    inner.style.height = h + 'px';
+    inner.style.width = fw + 'px';
+    inner.style.height = fh + 'px';
 }
 
 function renderSnakeBoard(session) {
