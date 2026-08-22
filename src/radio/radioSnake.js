@@ -517,8 +517,9 @@ export function snakeTick(session) {
     var nh = nextSegmentPos(head, session.dir);
 
     if (headHitsBody(session, nh.x, nh.y) || headHitsWall(session, nh.x, nh.y)) {
+        session.snake.unshift(nh);
         session.alive = false;
-        return true;
+        return 'crash';
     }
 
     session.snake.unshift(nh);
@@ -566,13 +567,14 @@ export function buildSnakeOsView(session) {
         return {
             mode: 'snake',
             status: 'SNAKE · KONEC',
-            lines: ['', '  KONEC HRY', '  SKÓRE ' + (session.score || 0), '  OK = nová', '', ''],
+            lines: ['', '', '', '', '', ''],
             focusLine: -1,
             footer: 'OK restart · Zpět',
             buffer: '',
-            useBoard: false,
+            useBoard: true,
             score: session.score || 0,
-            snakeLevel: lv
+            snakeLevel: lv,
+            crashed: true
         };
     }
 

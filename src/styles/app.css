@@ -2198,6 +2198,10 @@ body.theme-light #radio-display-signal.is-standby {
     box-shadow: none;
     z-index: 1;
 }
+.radio-snake-board.is-crashed .radio-snake-cell.is-head {
+    opacity: 0.72;
+    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
+}
 .radio-snake-cell.is-head::after {
     content: '';
     position: absolute;

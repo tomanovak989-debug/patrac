@@ -1567,7 +1567,7 @@ function renderDisplay() {
         screen.classList.toggle('is-charging', osView.mode === 'off' && !!(state && state.batteryCharging));
     }
 
-    var showSnake = osView.mode === 'snake' && osView.useBoard && snakeSession && snakeSession.alive;
+    var showSnake = osView.mode === 'snake' && osView.useBoard && snakeSession;
     var showArkanoid = osView.mode === 'arkanoid' && osView.useBoard && arkanoidSession && arkanoidSession.alive;
     if (!showSnake) hideSnakeBoard();
     if (!showArkanoid) hideArkanoidBoard();
@@ -1736,7 +1736,7 @@ function renderDisplay() {
         if (osView.mode !== 'snake' || !osView.useBoard) hideSnakeBoard();
         if (osView.mode !== 'arkanoid' || !osView.useBoard) hideArkanoidBoard();
         if (osView.mode === 'snake') {
-            if (osView.useBoard && snakeSession && snakeSession.alive) {
+            if (osView.useBoard && snakeSession) {
                 setDisplayMenuLines(['', '', '', '', '', ''], -1);
                 hideArkanoidBoard();
                 renderSnakeBoard(snakeSession);
@@ -2664,8 +2664,10 @@ function renderSnakeBoard(session) {
         progEl.textContent = String(session.levelFoodsEaten || 0) + '/' + String(session.foodsToClear || 6);
     }
     showSnakeBoard(board);
+    board.classList.toggle('is-crashed', !session.alive);
     sizeSnakeBoardInner(board);
-    ensureSnakeTimer();
+    if (session.alive) ensureSnakeTimer();
+    else stopSnakeTimer();
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;
@@ -2711,6 +2713,7 @@ function ensureSnakeTimer() {
         if (snakeSession.alive) {
             var tickResult = snakeTick(snakeSession);
             if (tickResult === 'ate' || tickResult === 'level') snakeEatPulse();
+            if (tickResult === 'crash') stopSnakeTimer();
         }
         renderDisplay();
     }, ms);
@@ -2739,7 +2742,10 @@ function closeSnakeScreen() {
 
 function handleSnakeOk() {
     if (!snakeSession) return;
-    if (!snakeSession.alive) resetSnakeState(snakeSession);
+    if (!snakeSession.alive) {
+        resetSnakeState(snakeSession);
+        startSnakeTimer();
+    }
     renderDisplay();
 }
 
