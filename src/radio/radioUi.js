@@ -2638,10 +2638,25 @@ function snakeHeadDirClass(dir) {
 }
 
 function sizeSnakeBoardInner(board) {
-    var inner = board && board.querySelector('.radio-app-board-inner');
-    if (!inner) return;
-    inner.style.width = '';
-    inner.style.height = '';
+    var frame = board && board.querySelector('.radio-snake-frame');
+    var inner = board && board.querySelector('.radio-snake-board-inner');
+    if (!frame || !inner) return;
+    var pad = 4;
+    var fw = Math.max(0, frame.clientWidth - pad);
+    var fh = Math.max(0, frame.clientHeight - pad);
+    if (!fw || !fh) return;
+    var ratio = SNAKE_W / SNAKE_H;
+    var w;
+    var h;
+    if (fw / fh > ratio) {
+        h = fh;
+        w = Math.floor(h * ratio);
+    } else {
+        w = fw;
+        h = Math.floor(w / ratio);
+    }
+    inner.style.width = w + 'px';
+    inner.style.height = h + 'px';
 }
 
 function renderSnakeBoard(session) {

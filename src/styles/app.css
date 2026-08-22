@@ -2090,7 +2090,6 @@ body.theme-light #radio-display-signal.is-standby {
     box-sizing: border-box;
 }
 .radio-app-board-inner,
-.radio-snake-board-inner,
 .radio-arkanoid-board-inner {
     width: auto;
     height: 100%;
@@ -2100,6 +2099,10 @@ body.theme-light #radio-display-signal.is-standby {
     gap: 0;
 }
 .radio-snake-board-inner {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
     aspect-ratio: 84 / 48;
 }
 .radio-app-board-inner,
