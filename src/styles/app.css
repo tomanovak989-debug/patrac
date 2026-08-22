@@ -1894,26 +1894,8 @@ body.theme-light #radio-display-signal.is-standby {
     min-width: 0;
     width: 100%;
     will-change: transform;
-}
-.sector-tech-screen.is-menu .radio-display-row-viewport,
-.sector-tech-screen.is-stub .radio-display-row-viewport,
-.sector-tech-screen.is-preset-detail .radio-display-row-viewport,
-.sector-tech-screen.is-standby-tune .radio-display-row-viewport {
-    position: relative;
-    overflow: hidden;
-    width: 100%;
-    height: 100%;
-    min-height: 0;
-}
-.sector-tech-screen.is-menu .radio-display-row-viewport > .radio-display-row-slide,
-.sector-tech-screen.is-stub .radio-display-row-viewport > .radio-display-row-slide,
-.sector-tech-screen.is-preset-detail .radio-display-row-viewport > .radio-display-row-slide,
-.sector-tech-screen.is-standby-tune .radio-display-row-viewport > .radio-display-row-slide {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    min-height: 100%;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
 }
 .radio-display-row-icon {
     width: 0.95em;
@@ -2088,7 +2070,7 @@ body.theme-light #radio-display-signal.is-standby {
 }
 .radio-snake-cell.is-body {
     background: var(--radio-phosphor);
-    opacity: 0.55;
+    box-shadow: inset 0 0 0 1px var(--radio-screen-bg);
 }
 body.theme-light .radio-snake-cell {
     background: rgba(0, 0, 0, 0.04);

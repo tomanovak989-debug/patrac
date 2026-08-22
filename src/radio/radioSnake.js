@@ -180,9 +180,9 @@ export function snakeTick(session) {
     if (headOnFood(session, nh)) {
         session.score = (session.score || 0) + 1;
         session.food = spawnFood(session);
-    } else {
-        session.snake.pop();
+        return 'ate';
     }
+    session.snake.pop();
     return true;
 }
 
