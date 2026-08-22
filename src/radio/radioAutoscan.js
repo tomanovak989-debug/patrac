@@ -172,7 +172,7 @@ export function buildAutoscanOsView(session, radioState, notebook) {
             'ZACHYCENO: ' + sessionCount + ' zpr.',
             sessionCount > 0 ? '● uloženo do paměti' : '○ bez zachycení',
             locked ? ('Poslední: ' + locked + ' MHz') : 'Poslech ukončen',
-            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : 'Seznam: KOM → 5',
+            totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : 'Menu → AUTOSKEN',
             session.hitEncrypted ? 'ŠIFROVANÝ PROVOZ' : ''
         ];
         footer = 'OK = zavřít · Zpět = menu';
@@ -184,7 +184,7 @@ export function buildAutoscanOsView(session, radioState, notebook) {
             totalSaved > 0 ? ('Uloženo celkem: ' + totalSaved + ' zpr.') : 'Zatím nic zachyceno',
             'OK = spustit poslech',
             'Po skenu: počet zachycených',
-            'KOM → 5 · AUTOSKEN = seznam'
+            'Menu → AUTOSKEN'
         ];
         footer = 'OK · Zpět';
         status = totalSaved > 0 ? ('AUTOSKEN · ' + totalSaved) : 'AUTOSKEN';

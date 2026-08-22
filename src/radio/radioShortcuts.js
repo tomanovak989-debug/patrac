@@ -112,7 +112,6 @@ export function bindingFromCommsItem(item, session) {
         if (item.id === 'inbox') return { action: 'comms:inbox', label: 'PŘIJATÉ' };
         if (item.id === 'outbox') return { action: 'comms:outbox', label: 'ODESLANÉ' };
         if (item.id === 'drafts') return { action: 'comms:drafts', label: 'KONCEPTY' };
-        if (item.id === 'autoscan') return { action: 'comms:autoscan', label: 'AUTOSKEN' };
         if (item.id === 'templates') return { action: 'comms:templates', label: 'ŠABLONY' };
         if (item.id === 'send_yes') return { action: 'comms:send', label: 'ODESLAT' };
     }
@@ -152,6 +151,12 @@ export function bindingFromMenuItem(item) {
     }
     if (item.action === 'submenu:presets') {
         return { action: 'menu:presets', label: 'PRESETY' };
+    }
+    if (item.action === 'submenu:games') {
+        return { action: 'menu:games', label: 'HRY' };
+    }
+    if (item.action === 'screen:snake') {
+        return { action: 'snake:open', label: 'SNAKE' };
     }
     if (item.action === 'preset_detail' && item.slot) {
         return { action: 'preset:' + item.slot, label: 'P' + item.slot };

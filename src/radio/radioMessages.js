@@ -3,7 +3,7 @@
  */
 import { findPreset, normalizeFrequency, formatTime } from './radioComms.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
-import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
+import { buildBoundedCursorMenuLines } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 
 var DISPLAY_LINES = 6;
@@ -168,7 +168,6 @@ function hubItems() {
         { type: 'action', id: 'inbox', label: 'PŘIJATÉ' },
         { type: 'action', id: 'outbox', label: 'ODESLANÉ' },
         { type: 'action', id: 'drafts', label: 'KONCEPTY' },
-        { type: 'action', id: 'autoscan', label: 'AUTOSKEN (spustit)' },
         { type: 'action', id: 'templates', label: 'ŠABLONY' }
     ];
 }
@@ -220,15 +219,6 @@ export function getCommsItems(session, notebook) {
     if (session.screen === COMMS_INBOX) return listItems(filterEntries(notebook, { dir: 'in' }), '(žádné přijaté)');
     if (session.screen === COMMS_OUTBOX) return listItems(filterEntries(notebook, { dir: 'out' }), '(žádné odeslané)');
     if (session.screen === COMMS_DRAFTS) return listItems(filterDrafts(notebook), '(žádné koncepty)');
-    if (session.screen === COMMS_AUTOSCAN) {
-        var captures = filterAutoscanCaptures(notebook);
-        if (!captures.length) return [{ type: 'empty', label: '(žádné zachycení)' }];
-        var scanItems = [];
-        for (i = 0; i < captures.length; i++) {
-            scanItems.push({ type: 'scan', capture: captures[i] });
-        }
-        return scanItems;
-    }
     if (session.screen === COMMS_TEMPLATES) {
         return [{ type: 'empty', label: '(šablony — brzy)' }];
     }
@@ -292,7 +282,7 @@ export function buildCommsOsView(session, notebook, radioState) {
     if (session.screen === COMMS_CONFIRM) {
         var preview = String(session.pendingText || '').slice(0, 16);
         items = clampCommsFocus(session, notebook);
-        var confirmView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+        var confirmView = buildBoundedCursorMenuLines(items, session.focusIndex, function(item) {
             return formatItem(item, radioState);
         }, function(item) {
             return menuIconForItem(item);
@@ -359,7 +349,7 @@ export function buildCommsOsView(session, notebook, radioState) {
     }
 
     items = clampCommsFocus(session, notebook);
-    var listView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+    var listView = buildBoundedCursorMenuLines(items, session.focusIndex, function(item) {
         return formatItem(item, radioState);
     }, function(item) {
         return menuIconForItem(item);
@@ -381,9 +371,6 @@ export function buildCommsOsView(session, notebook, radioState) {
     } else if (session.screen === COMMS_DRAFTS) {
         status = 'KONCEPTY';
         footer = 'OK pokračovat · Zpět';
-    } else if (session.screen === COMMS_AUTOSCAN) {
-        status = 'AUTOSKEN';
-        footer = 'OK detail · Zpět';
     } else if (session.screen === COMMS_TEMPLATES) {
         status = 'ŠABLONY';
         footer = 'Zpět';
@@ -427,8 +414,7 @@ export function hubActionFromDigit(digit) {
     if (digit === '2') return 'inbox';
     if (digit === '3') return 'outbox';
     if (digit === '4') return 'drafts';
-    if (digit === '5') return 'autoscan';
-    if (digit === '6') return 'templates';
+    if (digit === '5') return 'templates';
     return null;
 }
 

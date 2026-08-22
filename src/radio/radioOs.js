@@ -20,8 +20,12 @@ var RADIO_MENU = [
     { id: 'radio_presets', label: 'PRESETY', action: 'submenu:presets', shortcutAction: 'menu:presets' },
     { id: 'radio_autoscan', label: 'AUTOSKEN', action: 'screen:autoscan', shortcutAction: 'autoscan:start' },
     { id: 'radio_beacon', label: 'BEACON', action: 'screen:beacon', shortcutAction: 'beacon:open' },
-    { id: 'radio_snake', label: 'SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' },
+    { id: 'radio_games', label: 'HRY', action: 'submenu:games', shortcutAction: 'menu:games' },
     { id: 'radio_settings', label: 'NASTAVENÍ', action: 'submenu:settings', shortcutAction: 'menu:settings' }
+];
+
+var GAMES_MENU = [
+    { id: 'game_snake', label: 'SNAKE', action: 'screen:snake', shortcutAction: 'snake:open' }
 ];
 
 var SETTINGS_MENU = [
@@ -144,6 +148,7 @@ function getCurrentMenuItems(os, radioState) {
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return buildPresetSlotItems(radioState);
     if (leaf === 'settings') return SETTINGS_MENU;
+    if (leaf === 'games') return GAMES_MENU;
     return getMenuItems();
 }
 
@@ -153,6 +158,7 @@ function menuStatusLabel(os, radioState, draft) {
     if (leaf === 'presets') return 'PRESETY';
     if (leaf === 'detail' && draft) return 'P' + draft.slot + ' · PRESET';
     if (leaf === 'settings') return 'NASTAVENÍ';
+    if (leaf === 'games') return 'HRY';
     if (leaf === 'sounds') return 'ZVUKY · NASTAVENÍ';
     if (leaf === 'quickkeys') return 'RYCHLÉ VOLBY';
     if (leaf === 'autoscan') return 'AUTOSKEN';
@@ -223,6 +229,15 @@ export function executeMenuDigit(os, radioState, digit) {
             os.menuPath.push('quickkeys');
             os.focusIndex = 0;
             return { changed: true };
+        }
+        return { changed: false };
+    }
+
+    if (leaf === 'games') {
+        var gameIdx = parseInt(digit, 10) - 1;
+        if (gameIdx === 0) {
+            os.menuPath.push('snake');
+            return { changed: true, effect: 'snake_open' };
         }
         return { changed: false };
     }
@@ -417,6 +432,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
             }
             if (pick.action === 'submenu:settings') {
                 os.menuPath.push('settings');
+                os.focusIndex = 0;
+                return { changed: true };
+            }
+            if (pick.action === 'submenu:games') {
+                os.menuPath.push('games');
                 os.focusIndex = 0;
                 return { changed: true };
             }

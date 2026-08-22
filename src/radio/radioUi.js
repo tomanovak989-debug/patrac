@@ -85,7 +85,7 @@ import {
     stopBatteryCharging
 } from './radioBattery.js';
 import { radioIconUrl } from './radioMenuIcons.js';
-import { wrapMenuFocus } from './radioMenuScroll.js';
+import { wrapMenuFocus, clampMenuFocus } from './radioMenuScroll.js';
 import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback, radioKeypadPttDown, radioKeypadPttUp } from './radioFeedback.js';
 import {
     createRadioOsState,
@@ -518,8 +518,7 @@ function isCommsMarqueeScreen() {
     return isCommsMenuOpen() && commsSession && (
         commsSession.screen === COMMS_INBOX ||
         commsSession.screen === COMMS_OUTBOX ||
-        commsSession.screen === COMMS_DRAFTS ||
-        commsSession.screen === COMMS_AUTOSCAN
+        commsSession.screen === COMMS_DRAFTS
     );
 }
 
@@ -1190,6 +1189,13 @@ function executeMenuDialCommit() {
                 radioOs.focusIndex = sidx;
                 applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
             }
+        } else if (step.type === 'games') {
+            var gamesItems = getCurrentGamesItems();
+            var gidx = step.value - 1;
+            if (gidx >= 0 && gidx < gamesItems.length) {
+                radioOs.focusIndex = gidx;
+                applyRadioOsEffect(radioOsHandleInput(radioOs, state.operatingMode, 'ok', state));
+            }
         }
     }
     renderDisplay();
@@ -1199,6 +1205,12 @@ function getCurrentSettingsItems() {
     return [
         { action: 'submenu:sounds' },
         { action: 'submenu:quickkeys' }
+    ];
+}
+
+function getCurrentGamesItems() {
+    return [
+        { action: 'screen:snake' }
     ];
 }
 
@@ -1252,7 +1264,7 @@ function executeQuickKey(keyId) {
             return true;
         }
     }
-    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts' || action === 'comms:autoscan' || action === 'comms:templates') {
+    if (action === 'comms:new_sms' || action === 'comms:inbox' || action === 'comms:outbox' || action === 'comms:drafts' || action === 'comms:templates') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
         radioOs.menuPath = ['comms'];
@@ -1262,7 +1274,6 @@ function executeQuickKey(keyId) {
             'comms:inbox': 'inbox',
             'comms:outbox': 'outbox',
             'comms:drafts': 'drafts',
-            'comms:autoscan': 'autoscan',
             'comms:templates': 'templates'
         };
         openCommsAction(map[action]);
@@ -1271,8 +1282,16 @@ function executeQuickKey(keyId) {
     if (action === 'snake:open') {
         resetRadioOs(radioOs);
         radioOs.screen = 'menu';
-        radioOs.menuPath = ['snake'];
+        radioOs.menuPath = ['games', 'snake'];
         openSnakeScreen();
+        return true;
+    }
+    if (action === 'menu:games') {
+        resetRadioOs(radioOs);
+        radioOs.screen = 'menu';
+        radioOs.menuPath = ['games'];
+        radioOs.focusIndex = 0;
+        renderDisplay();
         return true;
     }
     if (action === 'menu:settings') {
@@ -1470,11 +1489,7 @@ function renderDisplay() {
             screen.classList.toggle('is-text-edit', editView.editType === 'text');
         }
         if (ch) {
-            if (shortcutBindNotice) {
-                ch.textContent = shortcutBindNotice.keyId + ' \u2190 ' + shortcutBindNotice.label;
-            } else {
-                ch.textContent = formatDisplayStatus(editView.status || '');
-            }
+            ch.textContent = '';
         }
         updateRadioStatusWidgets(state, null);
         if (sig) { sig.textContent = ''; sig.style.color = ''; sig.classList.remove('is-tuned', 'is-standby'); }
@@ -2321,9 +2336,6 @@ function openCommsAction(actionId) {
     } else if (actionId === 'drafts') {
         session.screen = COMMS_DRAFTS;
         session.focusIndex = 0;
-    } else if (actionId === 'autoscan') {
-        openRadioAutoscanScreen(false);
-        return;
     } else if (actionId === 'templates') {
         session.screen = COMMS_TEMPLATES;
         session.focusIndex = 0;
@@ -2410,10 +2422,10 @@ function sizeSnakeBoardInner(board, force) {
         inner.style.height = snakeBoardLockedSize + 'px';
         return;
     }
-    var main = el('radio-display-main');
-    if (!main) return;
-    var mr = main.getBoundingClientRect();
-    var size = Math.floor(Math.min(mr.width - 8, mr.height - 16));
+    var frame = board.querySelector('.radio-snake-frame');
+    if (!frame) return;
+    var fr = frame.getBoundingClientRect();
+    var size = Math.floor(Math.min(fr.width - 6, fr.height - 6));
     if (size < 48) size = 48;
     snakeBoardLockedSize = size;
     inner.style.width = size + 'px';
@@ -2541,7 +2553,7 @@ function handleCommsUp() {
     if (session.screen === COMMS_COMPOSE) return;
     var items = clampCommsFocus(session, notebook);
     if (!items.length) return;
-    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, -1);
+    session.focusIndex = clampMenuFocus(session.focusIndex - 1, items.length);
     renderDisplay();
 }
 
@@ -2550,7 +2562,7 @@ function handleCommsDown() {
     if (session.screen === COMMS_COMPOSE) return;
     var items = clampCommsFocus(session, notebook);
     if (!items.length) return;
-    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, 1);
+    session.focusIndex = clampMenuFocus(session.focusIndex + 1, items.length);
     renderDisplay();
 }
 
@@ -2593,17 +2605,7 @@ function handleCommsOk() {
         return;
     }
 
-    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX || session.screen === COMMS_AUTOSCAN) {
-        if (action && action.type === 'scan' && action.capture) {
-            if (markAutoscanCaptureRead(action.capture)) persist();
-            session.detailEntry = action.capture;
-            session.detailReturn = COMMS_AUTOSCAN;
-            session.screen = COMMS_DETAIL;
-            session.focusIndex = 0;
-            session.detailPlaying = false;
-            renderDisplay();
-            return;
-        }
+    if (session.screen === COMMS_INBOX || session.screen === COMMS_OUTBOX) {
         if (action && (action.type === 'msg' || action.type === 'draft') && (action.entry || action.draft)) {
             var entry = action.entry || action.draft;
             if (session.screen === COMMS_INBOX && action.entry) {
@@ -3647,32 +3649,7 @@ function bindKeypad() {
         ent._radioCommsBound = true;
         ent.onclick = function() {
             if (state.operatingMode === 'off') return;
-            if (isFieldEditActive(fieldEditSession)) {
-                if (fieldEditSession.returnTo === 'comms') {
-                    finishCommsCompose();
-                    return;
-                }
-                if (fieldEditSession.returnTo === 'beacon') {
-                    finishBeaconCompose();
-                    return;
-                }
-                var okResult = handleFieldEditOk(fieldEditSession);
-                if (okResult === 'done') finishFieldEdit(true);
-                else renderDisplay();
-                return;
-            }
-            if (standbyUi.active) {
-                openStandbyFieldEdit(getStandbyField(standbyUi.focusIndex));
-                return;
-            }
-            if (isRadioOsActive(radioOs)) {
-                handleRadioOsInput('ok');
-                return;
-            }
-            if (isStandbyScreen()) {
-                handleStandbyInput('ok');
-                return;
-            }
+            handleRadioOkPress();
         };
     }
 
@@ -3684,26 +3661,7 @@ function bindKeypad() {
                 clrLongFired = false;
                 return;
             }
-            if (state.operatingMode === 'off') return;
-            if (standbyPttActive) {
-                cancelStandbyPtt();
-                return;
-            }
-            if (isFieldEditActive(fieldEditSession)) {
-                handleFieldEditBackAction();
-                return;
-            }
-            if (standbyUi.active) {
-                standbyUi.active = false;
-                renderDisplay();
-                return;
-            }
-            if (handleRadioOsInput('back')) return;
-            state.dialBuffer = '';
-            state.keypadMode = 'tx';
-            if (input) input.value = '';
-            persist();
-            renderDisplay();
+            handleRadioBackPress();
         });
     }
 
@@ -3753,6 +3711,7 @@ function bindKeypad() {
 
     bindRadioDialGestures();
     bindDpadNavigation();
+    bindRadioKeyboard();
     bindRadioKeyT9();
     bindShortcutHold();
     bindClrLongPress();
@@ -3839,6 +3798,135 @@ function bindKeypad() {
     bindDisplayDialSwipe();
 }
 
+function isRadioKeyboardScope() {
+    if (!document.body.classList.contains('radio-tab-active')) return false;
+    var active = document.activeElement;
+    if (!active || active === document.body) return true;
+    if (active.closest('.sector-tech-shell') || active.closest('#radio-keypad-grid')) return true;
+    if (active.id === 'chat-input-field') return true;
+    var tag = active.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+    if (active.isContentEditable) return false;
+    return true;
+}
+
+function handleRadioDpadKey(key) {
+    if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right') return;
+    if (state.operatingMode === 'off') return;
+    if (isFieldEditActive(fieldEditSession)) {
+        handleFieldEditAction(key);
+        return;
+    }
+    if (isStandbyScreen()) {
+        if (standbyUi.active && (key === 'left' || key === 'right')) {
+            handleStandbyInput(key === 'right' ? 'preset_next' : 'preset_prev');
+            return;
+        }
+        if (key === 'left' || key === 'right') {
+            if (key === 'right') handleStandbyInput('ok');
+            else handleStandbyInput('back');
+        } else {
+            handleStandbyInput(key);
+        }
+        return;
+    }
+    if (isRadioOsActive(radioOs)) {
+        handleRadioOsInput(key);
+    }
+}
+
+function handleRadioOkPress() {
+    if (state.operatingMode === 'off') return;
+    if (isFieldEditActive(fieldEditSession)) {
+        if (fieldEditSession.returnTo === 'comms') {
+            finishCommsCompose();
+            return;
+        }
+        if (fieldEditSession.returnTo === 'beacon') {
+            finishBeaconCompose();
+            return;
+        }
+        var okResult = handleFieldEditOk(fieldEditSession);
+        if (okResult === 'done') finishFieldEdit(true);
+        else renderDisplay();
+        return;
+    }
+    if (standbyUi.active) {
+        openStandbyFieldEdit(getStandbyField(standbyUi.focusIndex));
+        return;
+    }
+    if (isRadioOsActive(radioOs)) {
+        handleRadioOsInput('ok');
+        return;
+    }
+    if (isStandbyScreen()) {
+        handleStandbyInput('ok');
+    }
+}
+
+function handleRadioBackPress() {
+    var input = el('chat-input-field');
+    if (state.operatingMode === 'off') return;
+    if (standbyPttActive) {
+        cancelStandbyPtt();
+        return;
+    }
+    if (isFieldEditActive(fieldEditSession)) {
+        handleFieldEditBackAction();
+        return;
+    }
+    if (standbyUi.active) {
+        standbyUi.active = false;
+        renderDisplay();
+        return;
+    }
+    if (handleRadioOsInput('back')) return;
+    state.dialBuffer = '';
+    state.keypadMode = 'tx';
+    if (input) input.value = '';
+    persist();
+    renderDisplay();
+}
+
+function bindRadioKeyboard() {
+    if (window._patracRadioKeyboardBound) return;
+    window._patracRadioKeyboardBound = true;
+    window.addEventListener('keydown', function(e) {
+        if (!isRadioKeyboardScope()) return;
+
+        var active = document.activeElement;
+        var dpadKey = null;
+        if (e.key === 'ArrowUp') dpadKey = 'up';
+        else if (e.key === 'ArrowDown') dpadKey = 'down';
+        else if (e.key === 'ArrowLeft') dpadKey = 'left';
+        else if (e.key === 'ArrowRight') dpadKey = 'right';
+
+        if (dpadKey) {
+            e.preventDefault();
+            radioKeyFeedback('key');
+            handleRadioDpadKey(dpadKey);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            if (active && active.id === 'chat-input-field' && !isFieldEditActive(fieldEditSession)) return;
+            e.preventDefault();
+            radioKeyFeedback('ok');
+            handleRadioOkPress();
+            return;
+        }
+
+        if (e.key === 'Backspace') {
+            if (active && active.id === 'chat-input-field' && active.value) return;
+            if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+                active.id !== 'chat-input-field') return;
+            e.preventDefault();
+            radioKeyFeedback('back');
+            handleRadioBackPress();
+        }
+    });
+}
+
 function bindDpadNavigation() {
     var zone = el('radio-dpad-zone');
     if (!zone || zone._radioOsBound) return;
@@ -3850,28 +3938,7 @@ function bindDpadNavigation() {
         if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right') return;
         e.preventDefault();
         e.stopPropagation();
-        if (state.operatingMode === 'off') return;
-        if (isFieldEditActive(fieldEditSession)) {
-            handleFieldEditAction(key);
-            return;
-        }
-        if (isStandbyScreen()) {
-            if (standbyUi.active && (key === 'left' || key === 'right')) {
-                handleStandbyInput(key === 'right' ? 'preset_next' : 'preset_prev');
-                return;
-            }
-            if (key === 'left' || key === 'right') {
-                if (key === 'right') handleStandbyInput('ok');
-                else handleStandbyInput('back');
-            } else {
-                handleStandbyInput(key);
-            }
-            return;
-        }
-        if (isRadioOsActive(radioOs)) {
-            handleRadioOsInput(key);
-            return;
-        }
+        handleRadioDpadKey(key);
     });
 }
 

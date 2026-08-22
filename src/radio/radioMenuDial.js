@@ -60,6 +60,12 @@ function parsePathForContext(path, menuPath) {
         return { steps: steps, rest: path.slice(1) };
     }
 
+    if (leaf === 'games') {
+        var g = parseInt(path.charAt(0), 10);
+        if (g >= 1) steps.push({ type: 'games', value: g });
+        return { steps: steps, rest: path.slice(1) };
+    }
+
     return { steps: steps, rest: path };
 }
 
@@ -85,6 +91,7 @@ export function planMenuDialCommit(dial, os) {
             if (!item) break;
             if (item.action === 'submenu:presets') simulatedPath.push('presets');
             else if (item.action === 'submenu:settings') simulatedPath.push('settings');
+            else if (item.action === 'submenu:games') simulatedPath.push('games');
             else if (item.action === 'screen:comms') simulatedPath.push('comms');
             else if (item.action === 'screen:autoscan') simulatedPath.push('autoscan');
             else if (item.action === 'screen:snake') simulatedPath.push('snake');

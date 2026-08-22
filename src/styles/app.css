@@ -1764,7 +1764,8 @@ body.theme-light .sector-tech-screen.is-off {
 }
 .sector-tech-screen.is-menu .radio-display-status #radio-display-channel,
 .sector-tech-screen.is-preset-detail .radio-display-status #radio-display-channel,
-.sector-tech-screen.is-stub .radio-display-status #radio-display-channel {
+.sector-tech-screen.is-stub .radio-display-status #radio-display-channel,
+.sector-tech-screen.is-field-edit .radio-display-status #radio-display-channel {
     display: none !important;
 }
 #radio-display-signal.is-tuned {
@@ -1984,13 +1985,17 @@ body.theme-light #radio-display-signal.is-standby {
 #radio-snake-board {
     opacity: 1 !important;
     padding: 0 !important;
+    /* .radio-display-main > div nastavuje display:flex — bez override skóre a mřížka stojí vedle sebe */
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    grid-template-columns: 1fr !important;
+    align-items: stretch !important;
+    white-space: normal !important;
+    overflow: hidden !important;
 }
 .radio-snake-board {
     position: absolute;
     inset: 0;
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    grid-template-columns: 1fr;
     pointer-events: none;
     z-index: 4;
     padding: 1px 2px 0;
@@ -2001,16 +2006,21 @@ body.theme-light #radio-display-signal.is-standby {
     display: none !important;
 }
 .radio-snake-score {
+    grid-row: 1;
+    width: 100%;
+    min-width: 0;
     text-align: center;
     font-size: 0.62em;
     font-weight: 700;
     letter-spacing: 0.12em;
     line-height: 1.15;
-    padding-bottom: 2px;
+    padding: 0 2px 2px;
     font-variant-numeric: tabular-nums;
     color: var(--radio-phosphor);
+    flex-shrink: 0;
 }
 .radio-snake-frame {
+    grid-row: 2;
     min-height: 0;
     min-width: 0;
     width: 100%;
