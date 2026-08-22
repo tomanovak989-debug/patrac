@@ -82,7 +82,8 @@ import {
     formatDisplayClockLine,
     formatBatteryPercent,
     toggleBatteryCharging,
-    stopBatteryCharging
+    stopBatteryCharging,
+    canPowerRadioOn
 } from './radioBattery.js';
 import { radioIconUrl } from './radioMenuIcons.js';
 import { wrapMenuFocus, clampMenuFocus } from './radioMenuScroll.js';
@@ -161,7 +162,9 @@ import {
     snakeTick,
     buildSnakeCellGrid,
     SNAKE_TICK_MS,
-    SNAKE_CELL_COUNT
+    SNAKE_CELL_COUNT,
+    SNAKE_W,
+    SNAKE_H
 } from './radioSnake.js';
 import {
     createArkanoidState,
@@ -171,7 +174,9 @@ import {
     arkanoidOk,
     buildArkanoidCellGrid,
     ARK_TICK_MS,
-    ARK_CELL_COUNT
+    ARK_CELL_COUNT,
+    ARK_W,
+    ARK_H
 } from './radioArkanoid.js';
 import {
     createDecoderState,
@@ -598,8 +603,6 @@ function updateRadioStatusWidgets(state, osView) {
     var batteryPct = el('radio-display-battery-pct');
     var batteryBg = el('radio-display-battery-bg');
     var autoscanActive = !!(autoscanSession && autoscanSession.status === SCAN_RUNNING);
-
-    syncBattery(state, { operatingMode: state.operatingMode, autoscanActive: autoscanActive });
 
     if (clockEl) clockEl.textContent = formatDisplayClockLine(state);
 
@@ -1442,10 +1445,55 @@ function handleFieldEditAction(action, char, opts) {
 function updateChargeButtonUi() {
     var btn = el('sector-view-charge');
     if (!btn || !state) return;
-    var canCharge = state.operatingMode === 'off';
+    var canCharge = state.operatingMode === 'off' && state.batteryLevel < 100;
     btn.classList.toggle('is-active', canCharge && !!state.batteryCharging);
-    btn.classList.toggle('is-disabled', !canCharge);
-    btn.setAttribute('aria-disabled', canCharge ? 'false' : 'true');
+    btn.classList.toggle('is-disabled', state.operatingMode !== 'off' || state.batteryLevel >= 100);
+    btn.setAttribute('aria-disabled', (state.operatingMode !== 'off' || state.batteryLevel >= 100) ? 'true' : 'false');
+}
+
+function syncBatteryAndApply(opts) {
+    if (!state) return null;
+    opts = opts || {
+        operatingMode: state.operatingMode,
+        autoscanActive: isAutoscanListening()
+    };
+    var result = syncBattery(state, opts);
+    if (result && result.powerOff) forceRadioPowerOff(false);
+    if (result && result.chargeComplete) persist();
+    return result;
+}
+
+function forceRadioPowerOff(renderAfter) {
+    if (!state || state.operatingMode === 'off') return;
+    haltAutoscan(true);
+    autoscanSession = null;
+    closeAppScreens();
+    cancelStandbyPtt();
+    standbyUi = createStandbyUiState();
+    state.operatingMode = 'off';
+    resetRadioOs(radioOs);
+    presetEditDraft = null;
+    cancelFieldEdit(fieldEditSession);
+    fieldEditSession = null;
+    stopRadioSubscriptions();
+    persist();
+    if (renderAfter !== false) renderDisplay();
+}
+
+function applyOffChargingDisplay(f, k, buf, p, state) {
+    var pct = formatBatteryPercent(state);
+    if (f) {
+        f.className = 'radio-display-charge-wrap';
+        f.innerHTML = '<img class="radio-display-charge-icon" src="' +
+            escapeDisplayText(radioIconUrl('battery-empty.png')) +
+            '" alt="" draggable="false">' +
+            '<span class="radio-display-charge-pct">' + escapeDisplayText(pct) + '</span>';
+        f.removeAttribute('title');
+    }
+    if (k) { k.className = ''; k.textContent = ''; k.classList.remove('radio-display-row-focus'); }
+    if (buf) { buf.className = ''; buf.textContent = ''; buf.classList.remove('radio-display-row-focus'); }
+    if (p) { p.className = ''; p.textContent = ''; p.classList.remove('radio-display-row-focus'); }
+    clearExtraDisplayLines();
 }
 
 function bindChargeControl() {
@@ -1467,7 +1515,7 @@ function startBatteryTimer() {
     if (batteryTimer) return;
     batteryTimer = setInterval(function() {
         if (!state) return;
-        syncBattery(state, {
+        syncBatteryAndApply({
             operatingMode: state.operatingMode,
             autoscanActive: isAutoscanListening()
         });
@@ -1480,7 +1528,7 @@ function startBatteryTimer() {
 function renderDisplay() {
     var c = getCtx();
     var screen = el('radio-display-screen');
-    syncBattery(state, {
+    syncBatteryAndApply({
         operatingMode: state.operatingMode,
         autoscanActive: isAutoscanListening()
     });
@@ -1587,15 +1635,7 @@ function renderDisplay() {
     if (osView.mode === 'off') {
         hideAppBoards();
         if (state.batteryCharging) {
-            if (f) {
-                f.className = 'radio-display-battery-only';
-                f.textContent = formatBatteryPercent(state);
-                f.removeAttribute('title');
-            }
-            if (k) k.textContent = '';
-            if (p) p.textContent = '';
-            if (buf) buf.textContent = '';
-            clearExtraDisplayLines();
+            applyOffChargingDisplay(f, k, buf, p, state);
             clearDisplayRowFocus();
             if (ch) ch.textContent = '';
             if (clockEl) clockEl.textContent = '';
@@ -1684,6 +1724,8 @@ function renderDisplay() {
             f.removeAttribute('data-kind');
             f.style.color = '';
         }
+        if (osView.mode !== 'snake' || !osView.useBoard) hideSnakeBoard();
+        if (osView.mode !== 'arkanoid' || !osView.useBoard) hideArkanoidBoard();
         if (osView.mode === 'snake') {
             if (osView.useBoard && snakeSession && snakeSession.alive) {
                 setDisplayMenuLines(['', '', '', '', '', ''], -1);
@@ -2474,16 +2516,36 @@ function ensureSnakeBoard() {
         snakeBoardReady = false;
     }
     var innerEl = board.querySelector('.radio-app-board-inner');
-    if (innerEl && !snakeBoardReady) {
-        var i;
-        for (i = 0; i < SNAKE_CELL_COUNT; i++) {
-            var cell = document.createElement('div');
-            cell.className = 'radio-app-cell radio-snake-cell';
-            innerEl.appendChild(cell);
-        }
+    syncSnakeBoardGrid(innerEl);
+    if (innerEl && (!snakeBoardReady || innerEl.children.length !== SNAKE_CELL_COUNT)) {
+        rebuildAppBoardCells(innerEl, SNAKE_CELL_COUNT, 'radio-app-cell radio-snake-cell');
         snakeBoardReady = true;
     }
     return board;
+}
+
+function syncSnakeBoardGrid(innerEl) {
+    if (!innerEl) return;
+    innerEl.style.gridTemplateColumns = 'repeat(' + SNAKE_W + ', 1fr)';
+    innerEl.style.gridTemplateRows = 'repeat(' + SNAKE_H + ', 1fr)';
+}
+
+function syncArkanoidBoardGrid(innerEl) {
+    if (!innerEl) return;
+    innerEl.style.gridTemplateColumns = 'repeat(' + ARK_W + ', 1fr)';
+    innerEl.style.gridTemplateRows = 'repeat(' + ARK_H + ', 1fr)';
+    innerEl.style.aspectRatio = ARK_W + ' / ' + ARK_H;
+}
+
+function rebuildAppBoardCells(innerEl, count, cellClass) {
+    if (!innerEl) return;
+    innerEl.textContent = '';
+    var i;
+    for (i = 0; i < count; i++) {
+        var cell = document.createElement('div');
+        cell.className = cellClass;
+        innerEl.appendChild(cell);
+    }
 }
 
 function hideSnakeBoard() {
@@ -2491,6 +2553,16 @@ function hideSnakeBoard() {
     if (board) {
         board.hidden = true;
         board.setAttribute('aria-hidden', 'true');
+        board.classList.remove('is-visible');
+    }
+}
+
+function hideArkanoidBoard() {
+    var board = el('radio-arkanoid-board');
+    if (board) {
+        board.hidden = true;
+        board.setAttribute('aria-hidden', 'true');
+        board.classList.remove('is-visible');
     }
 }
 
@@ -2514,24 +2586,12 @@ function ensureArkanoidBoard() {
         arkanoidBoardReady = false;
     }
     var innerEl = board.querySelector('.radio-app-board-inner');
-    if (innerEl && !arkanoidBoardReady) {
-        var i;
-        for (i = 0; i < ARK_CELL_COUNT; i++) {
-            var cell = document.createElement('div');
-            cell.className = 'radio-app-cell radio-arkanoid-cell';
-            innerEl.appendChild(cell);
-        }
+    syncArkanoidBoardGrid(innerEl);
+    if (innerEl && (!arkanoidBoardReady || innerEl.children.length !== ARK_CELL_COUNT)) {
+        rebuildAppBoardCells(innerEl, ARK_CELL_COUNT, 'radio-app-cell radio-arkanoid-cell');
         arkanoidBoardReady = true;
     }
     return board;
-}
-
-function hideArkanoidBoard() {
-    var board = el('radio-arkanoid-board');
-    if (board) {
-        board.hidden = true;
-        board.setAttribute('aria-hidden', 'true');
-    }
 }
 
 function hideAppBoards() {
@@ -2564,6 +2624,7 @@ function renderSnakeBoard(session) {
     }
     board.hidden = false;
     board.removeAttribute('aria-hidden');
+    board.classList.add('is-visible');
     sizeSnakeBoardInner(board);
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
@@ -2576,7 +2637,7 @@ function renderSnakeBoard(session) {
         var cls = 'radio-app-cell radio-snake-cell';
         if (kind) cls += ' is-' + kind;
         if (kind === 'head') cls += dirClass;
-        cells[i].className = cls;
+        if (cells[i].className !== cls) cells[i].className = cls;
     }
 }
 
@@ -2640,6 +2701,7 @@ function renderArkanoidBoard(session) {
     }
     board.hidden = false;
     board.removeAttribute('aria-hidden');
+    board.classList.add('is-visible');
     var innerEl = board.querySelector('.radio-app-board-inner');
     if (!innerEl) return;
     var cells = innerEl.children;
@@ -2649,7 +2711,7 @@ function renderArkanoidBoard(session) {
         var kind = grid[i] || '';
         var cls = 'radio-app-cell radio-arkanoid-cell';
         if (kind) cls += ' is-' + kind;
-        cells[i].className = cls;
+        if (cells[i].className !== cls) cells[i].className = cls;
     }
 }
 
@@ -4200,7 +4262,14 @@ function cycleOperatingMode(direction) {
     if (idx < 0) idx = 1;
     var dir = direction < 0 ? -1 : 1;
     idx = (idx + dir + RADIO_OPERATING_MODES.length) % RADIO_OPERATING_MODES.length;
-    state.operatingMode = RADIO_OPERATING_MODES[idx];
+    var nextMode = RADIO_OPERATING_MODES[idx];
+    if (nextMode === 'on' && !canPowerRadioOn(state)) {
+        state.operatingMode = 'off';
+        persist();
+        renderDisplay();
+        return;
+    }
+    state.operatingMode = nextMode;
     if (state.operatingMode === 'on') stopBatteryCharging(state);
     resetRadioOs(radioOs);
     presetEditDraft = null;
@@ -4401,10 +4470,13 @@ export function initRadioCommsSystem(options) {
     bindRadioAuthRefresh();
     bindChargeControl();
     startBatteryTimer();
-    syncBattery(state, {
+    syncBatteryAndApply({
         operatingMode: state.operatingMode,
         autoscanActive: isAutoscanListening()
     });
+    if (state.operatingMode === 'on' && !canPowerRadioOn(state)) {
+        forceRadioPowerOff(false);
+    }
     initRadioFeedback(state && state.soundPrefs ? state.soundPrefs : null);
     setRadioSoundPrefs(state && state.soundPrefs ? state.soundPrefs : null);
     resetRadioOs(radioOs);

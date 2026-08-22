@@ -18,32 +18,60 @@ export function normalizeBatteryFields(state) {
     state.batteryCharging = !!state.batteryCharging;
 }
 
+export function isBatteryEmpty(state) {
+    normalizeBatteryFields(state);
+    return state.batteryLevel <= 0;
+}
+
+export function canPowerRadioOn(state) {
+    normalizeBatteryFields(state);
+    return state.batteryLevel > 0;
+}
+
 /**
  * @param {object} state
  * @param {{ operatingMode?: string, autoscanActive?: boolean }} opts
- * @returns {number} aktuální %
+ * @returns {{ level: number, powerOff: boolean, chargeComplete: boolean }}
  */
 export function syncBattery(state, opts) {
     opts = opts || {};
     normalizeBatteryFields(state);
     var now = Date.now();
     var elapsed = Math.max(0, now - state.batteryUpdatedAt);
-    if (elapsed <= 0) return state.batteryLevel;
-
-    var level = state.batteryLevel;
     var mode = opts.operatingMode || 'on';
+    var level = state.batteryLevel;
+    var powerOff = false;
+    var chargeComplete = false;
 
-    if (mode === 'on') {
-        var drainPerMs = 100 / BATTERY_DISCHARGE_MS;
-        if (opts.autoscanActive) drainPerMs *= BATTERY_AUTOSCAN_DRAIN_MULT;
-        level -= elapsed * drainPerMs;
-    } else if (mode === 'off' && state.batteryCharging) {
-        level += elapsed * (100 / BATTERY_CHARGE_MS);
+    if (elapsed > 0) {
+        if (mode === 'on' && level > 0) {
+            var drainPerMs = 100 / BATTERY_DISCHARGE_MS;
+            if (opts.autoscanActive) drainPerMs *= BATTERY_AUTOSCAN_DRAIN_MULT;
+            level -= elapsed * drainPerMs;
+        } else if (mode === 'off' && state.batteryCharging && level < 100) {
+            level += elapsed * (100 / BATTERY_CHARGE_MS);
+        }
+    }
+
+    if (mode === 'on' && level <= 0) {
+        level = 0;
+        powerOff = true;
+    }
+
+    if (state.batteryCharging && level >= 100) {
+        level = 100;
+        chargeComplete = true;
+        state.batteryCharging = false;
     }
 
     state.batteryLevel = Math.max(0, Math.min(100, level));
     state.batteryUpdatedAt = now;
-    return state.batteryLevel;
+
+    return {
+        level: state.batteryLevel,
+        powerOff: powerOff,
+        chargeComplete: chargeComplete
+    };
 }
 
 export function formatBatteryPercent(state) {
@@ -72,13 +100,20 @@ export function formatStandbyClockLine(state, now) {
 }
 
 export function canStartBatteryCharging(state) {
-    return !!(state && state.operatingMode === 'off');
+    return !!(state && state.operatingMode === 'off' && state.batteryLevel < 100);
 }
 
 export function toggleBatteryCharging(state) {
-    if (!canStartBatteryCharging(state)) return false;
+    if (!canStartBatteryCharging(state) && !(state && state.operatingMode === 'off' && state.batteryCharging)) {
+        return false;
+    }
     syncBattery(state, { operatingMode: 'off', autoscanActive: false });
-    state.batteryCharging = !state.batteryCharging;
+    if (state.batteryCharging) {
+        state.batteryCharging = false;
+        return true;
+    }
+    if (state.batteryLevel >= 100) return false;
+    state.batteryCharging = true;
     return true;
 }
 

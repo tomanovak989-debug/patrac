@@ -1,28 +1,23 @@
 /**
  * Snake — mini hra na LCD vysílačky.
- * Logická mřížka 12×12, vykreslení přes CSS grid (čtvercové buňky).
- * Klasika: rámeček, skóre nahoře, větší mlska, průchod přes stěny.
+ * Logická mřížka 24×24, vykreslení přes CSS grid.
+ * Mlska 2×2, extra 4×4 každých 5 normálních.
  */
 export var SNAKE_TICK_MS = 195;
-export var SNAKE_W = 12;
-export var SNAKE_H = 12;
+export var SNAKE_W = 24;
+export var SNAKE_H = 24;
 export var SNAKE_CELL_COUNT = SNAKE_W * SNAKE_H;
-export var SNAKE_FOOD_STEP = 3;
-export var SNAKE_FOOD_MAX_SPAN = 3;
-
-export function snakeFoodSpan(score) {
-    score = score || 0;
-    var tier = Math.floor(score / SNAKE_FOOD_STEP);
-    return Math.min(SNAKE_FOOD_MAX_SPAN, 1 + tier);
-}
+export var SNAKE_FOOD_NORMAL = 2;
+export var SNAKE_FOOD_BIG = 4;
+export var SNAKE_BIG_EVERY = 5;
 
 function wrapCoord(value, size) {
     return ((value % size) + size) % size;
 }
 
 export function createSnakeState() {
-    var cx = 6;
-    var cy = 6;
+    var cx = 12;
+    var cy = 12;
     var session = {
         snake: [
             { x: cx, y: cy },
@@ -34,7 +29,10 @@ export function createSnakeState() {
         food: null,
         score: 0,
         alive: true,
-        lastDirAt: 0
+        lastDirAt: 0,
+        normalFoodEaten: 0,
+        pendingBigFood: false,
+        growPending: 0
     };
     session.food = spawnFood(session);
     return session;
@@ -50,6 +48,9 @@ export function resetSnakeState(session) {
     session.score = 0;
     session.alive = true;
     session.lastDirAt = 0;
+    session.normalFoodEaten = 0;
+    session.pendingBigFood = false;
+    session.growPending = 0;
     return session;
 }
 
@@ -98,7 +99,7 @@ function rectFits(session, x, y, span) {
 
 function trySpawnFood(session, span) {
     var tries = 0;
-    while (tries++ < 400) {
+    while (tries++ < 800) {
         var x = Math.floor(Math.random() * (SNAKE_W - span + 1));
         var y = Math.floor(Math.random() * (SNAKE_H - span + 1));
         if (rectFits(session, x, y, span)) return { x: x, y: y, span: span };
@@ -106,14 +107,21 @@ function trySpawnFood(session, span) {
     return null;
 }
 
+function nextFoodSpan(session) {
+    if (session.pendingBigFood) return SNAKE_FOOD_BIG;
+    return SNAKE_FOOD_NORMAL;
+}
+
 function spawnFood(session) {
-    var span = snakeFoodSpan(session.score || 0);
-    while (span >= 1) {
-        var placed = trySpawnFood(session, span);
+    var span = nextFoodSpan(session);
+    session.pendingBigFood = false;
+    var placed = trySpawnFood(session, span);
+    if (placed) return placed;
+    if (span > SNAKE_FOOD_NORMAL) {
+        placed = trySpawnFood(session, SNAKE_FOOD_NORMAL);
         if (placed) return placed;
-        span--;
     }
-    return { x: 0, y: 0, span: 1 };
+    return { x: 0, y: 0, span: SNAKE_FOOD_NORMAL };
 }
 
 function cellIndex(x, y) {
@@ -123,7 +131,7 @@ function cellIndex(x, y) {
 function headOnFood(session, head) {
     if (!session.food) return false;
     var food = session.food;
-    var span = food.span || snakeFoodSpan(session.score || 0);
+    var span = food.span || SNAKE_FOOD_NORMAL;
     return head.x >= food.x && head.x < food.x + span &&
         head.y >= food.y && head.y < food.y + span;
 }
@@ -138,8 +146,8 @@ export function buildSnakeCellGrid(session) {
 
     if (session && session.food) {
         var food = session.food;
-        var span = food.span || snakeFoodSpan(session.score || 0);
-        var kind = span > 1 ? 'food-big' : 'food';
+        var span = food.span || SNAKE_FOOD_NORMAL;
+        var kind = span >= SNAKE_FOOD_BIG ? 'food-big' : 'food';
         var dx;
         var dy;
         for (dy = 0; dy < span; dy++) {
@@ -178,11 +186,26 @@ export function snakeTick(session) {
 
     session.snake.unshift(nh);
     if (headOnFood(session, nh)) {
-        session.score = (session.score || 0) + 1;
+        var foodSpan = session.food.span || SNAKE_FOOD_NORMAL;
+        session.score = (session.score || 0) + (foodSpan >= SNAKE_FOOD_BIG ? 5 : 1);
+        if (foodSpan >= SNAKE_FOOD_BIG) {
+            session.growPending = (session.growPending || 0) + 3;
+            session.normalFoodEaten = 0;
+        } else {
+            session.normalFoodEaten = (session.normalFoodEaten || 0) + 1;
+            if (session.normalFoodEaten >= SNAKE_BIG_EVERY) {
+                session.pendingBigFood = true;
+                session.normalFoodEaten = 0;
+            }
+        }
         session.food = spawnFood(session);
         return 'ate';
     }
-    session.snake.pop();
+    if (session.growPending > 0) {
+        session.growPending--;
+    } else {
+        session.snake.pop();
+    }
     return true;
 }
 
