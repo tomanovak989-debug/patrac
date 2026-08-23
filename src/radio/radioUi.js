@@ -313,6 +313,23 @@ function ensureNotebookMeta() {
 /**
  * Počet řádků / znaků podle reálné velikosti listu (vyplní celý papír).
  */
+function getDisplayCharsPerLine() {
+    var row = el('radio-display-key') || el('radio-display-freq');
+    if (!row) return 18;
+    var cs = window.getComputedStyle(row);
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;font:' + cs.font;
+    probe.textContent = '0000000000';
+    document.body.appendChild(probe);
+    var tenW = probe.getBoundingClientRect().width || 60;
+    document.body.removeChild(probe);
+    var usableW = Math.max(40, row.clientWidth - 6);
+    var chars = Math.floor(usableW / Math.max(tenW / 10, 4));
+    if (chars < 12) chars = 18;
+    if (chars > 28) chars = 28;
+    return chars;
+}
+
 function getNotebookLayout() {
     var sheet = el('radio-notebook-sheet');
     var box = el('radio-notebook-lines');
@@ -1670,7 +1687,9 @@ function renderDisplay() {
         buffer: dialBuffer
     }, state, presetEditDraft, autoscanSession, commsSession, notebook, beaconSession, beaconActive, {
         pttRecording: !!(beaconPttPending || (pttSession && pttSession.active && isBeaconMenuOpen()))
-    }, snakeSession, arkanoidSession, decoderSession);
+    }, snakeSession, arkanoidSession, decoderSession, {
+        charsPerLine: getDisplayCharsPerLine()
+    });
 
     if (screen) {
         screen.classList.toggle('is-off', osView.mode === 'off');
@@ -1722,7 +1741,9 @@ function renderDisplay() {
         } else if (fieldEditSession.returnTo === 'beacon') {
             editOpts.status = 'BEACON · SMS';
         }
-        var editView = buildFieldEditView(fieldEditSession, editOpts);
+        var editView = buildFieldEditView(fieldEditSession, Object.assign({}, editOpts, {
+            multilineWrap: fieldEditSession.returnTo === 'comms' || fieldEditSession.returnTo === 'beacon'
+        }));
         if (fieldEditSession.returnTo === 'comms') {
             editView.footer = 'OK = TX · Zpět';
             editView.hint = textEditHint();
@@ -1739,6 +1760,9 @@ function renderDisplay() {
             screen.classList.toggle('is-freq-edit', editView.editType === 'freq');
             screen.classList.toggle('is-key-edit', editView.editType === 'encrypt');
             screen.classList.toggle('is-text-edit', editView.editType === 'text');
+            screen.classList.toggle('is-comms-compose', fieldEditSession.returnTo === 'comms');
+            screen.classList.toggle('is-comms-detail', false);
+            screen.classList.toggle('is-comms-confirm', false);
         }
         if (ch) {
             ch.textContent = '';
@@ -1769,6 +1793,10 @@ function renderDisplay() {
         screen.classList.toggle('is-freq-edit', false);
         screen.classList.toggle('is-key-edit', false);
         screen.classList.toggle('is-text-edit', false);
+        screen.classList.toggle('is-comms-compose', false);
+        var commsLayout = osView.layout || '';
+        screen.classList.toggle('is-comms-detail', osView.mode === 'comms' && commsLayout === 'detail');
+        screen.classList.toggle('is-comms-confirm', osView.mode === 'comms' && commsLayout === 'confirm');
     }
 
     if (osView.mode === 'off') {
@@ -3799,19 +3827,13 @@ function ingestIncomingBeacon(payload, c) {
 }
 
 function normalizeCloudMessageReception(reception) {
-    if (!reception) {
-        return { quality: SIGNAL_CLEAR, distanceKm: null, receivable: true, reason: 'cloud_fallback' };
-    }
-    /* Cloud doručil zprávu — ukaž čitelný text (špatné GPS jinak simuluje šum/mimo dosah). */
-    if (!reception.receivable || reception.quality === SIGNAL_NOISE) {
-        return {
-            quality: SIGNAL_CLEAR,
-            distanceKm: reception.distanceKm,
-            receivable: true,
-            reason: 'cloud_fallback'
-        };
-    }
-    return reception;
+    /* Firestore doručil zprávu — vždy čitelný text (propagace jen meta / vzdálenost). */
+    return {
+        quality: SIGNAL_CLEAR,
+        distanceKm: reception ? reception.distanceKm : null,
+        receivable: true,
+        reason: 'cloud_sync'
+    };
 }
 
 function ingestIncomingMessage(payload, c) {

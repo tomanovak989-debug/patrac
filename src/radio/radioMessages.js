@@ -1,13 +1,28 @@
 /**
  * SMS — hub, seznamy, compose, detail, potvrzení odeslání.
  */
-import { findPreset, normalizeFrequency, formatTime } from './radioComms.js';
+import { findPreset, normalizeFrequency, formatTime, wrapNotebookText } from './radioComms.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
 import { buildBoundedCursorMenuLines } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 
 var DISPLAY_LINES = 6;
 var LINE_CHARS = 18;
+
+function fillWrappedBodyLines(lines, startIdx, text, lineChars, maxLines) {
+    var wrapped = wrapNotebookText(String(text || ''), lineChars);
+    var i;
+    for (i = 0; i < maxLines; i++) {
+        lines[startIdx + i] = wrapped[i] || '';
+    }
+    if (wrapped.length > maxLines && maxLines > 0) {
+        var lastIdx = startIdx + maxLines - 1;
+        var last = String(lines[lastIdx] || '');
+        lines[lastIdx] = last.length >= lineChars
+            ? last.slice(0, Math.max(0, lineChars - 1)) + '…'
+            : last + '…';
+    }
+}
 
 export var COMMS_HUB = 'hub';
 export var COMMS_INBOX = 'inbox';
@@ -238,8 +253,10 @@ export function clampCommsFocus(session, notebook) {
     return items;
 }
 
-export function buildCommsOsView(session, notebook, radioState) {
+export function buildCommsOsView(session, notebook, radioState, displayOpts) {
     session = session || createCommsState();
+    displayOpts = displayOpts || {};
+    var lineChars = displayOpts.charsPerLine || LINE_CHARS;
     var target = session.pendingTarget || formatChannelTarget(radioState);
     var items;
     var lines = [];
@@ -282,7 +299,6 @@ export function buildCommsOsView(session, notebook, radioState) {
     }
 
     if (session.screen === COMMS_CONFIRM) {
-        var preview = String(session.pendingText || '').slice(0, 16);
         items = clampCommsFocus(session, notebook);
         var confirmView = buildBoundedCursorMenuLines(items, session.focusIndex, function(item) {
             return formatItem(item, radioState);
@@ -290,10 +306,12 @@ export function buildCommsOsView(session, notebook, radioState) {
             return menuIconForItem(item);
         });
         confirmView.lines[0] = 'ODESLAT?';
-        confirmView.lines[1] = target.line + ' · "' + preview + '"';
+        confirmView.lines[1] = target.line;
+        fillWrappedBodyLines(confirmView.lines, 2, session.pendingText, lineChars, 2);
         return {
             mode: 'comms',
             status: 'POTVRzení TX',
+            layout: 'confirm',
             lines: confirmView.lines,
             lineStyles: confirmView.lineStyles,
             lineIcons: confirmView.lineIcons,
@@ -317,16 +335,9 @@ export function buildCommsOsView(session, notebook, radioState) {
                 ''
             ];
         } else {
-            var body = String(e.text || '');
-            var wrapped = body.match(/.{1,18}/g) || [''];
-            lines = [
-                formatDateShort(e.ts) + ' ' + formatEntryChannelLabel(e, radioState),
-                wrapped[0] || '',
-                wrapped[1] || '',
-                wrapped[2] || '',
-                '',
-                ''
-            ];
+            lines = ['', '', '', '', '', ''];
+            lines[0] = formatDateShort(e.ts) + ' ' + formatEntryChannelLabel(e, radioState);
+            fillWrappedBodyLines(lines, 1, e.text || '', lineChars, 3);
         }
         items = clampCommsFocus(session, notebook);
         lineStyles = [false, false, false, false, false, false];
@@ -341,6 +352,7 @@ export function buildCommsOsView(session, notebook, radioState) {
         focusLine = items.length ? actionStart + session.focusIndex : -1;
         return {
             mode: 'comms',
+            layout: 'detail',
             status: isScanCapture ? 'AUTOSKEN · DETAIL' : (isPtt ? 'PTT · DETAIL' : 'SMS · DETAIL'),
             lines: lines,
             lineStyles: lineStyles,

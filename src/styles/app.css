@@ -2500,6 +2500,33 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     grid-row: 1 / span 4;
     overflow: hidden;
 }
+.sector-tech-screen.is-text-edit.is-comms-compose .radio-display-edit-large,
+.sector-tech-screen.is-text-edit.is-comms-compose .radio-display-main > div.radio-display-edit-large {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+.sector-tech-screen.is-text-edit.is-comms-compose .radio-edit-char {
+    display: inline;
+    min-width: 0;
+}
+.sector-tech-screen.is-comms-detail .radio-display-main > div,
+.sector-tech-screen.is-comms-confirm .radio-display-main > div {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    align-items: flex-start !important;
+    text-overflow: clip;
+    line-height: 1.12;
+}
+.sector-tech-screen.is-comms-detail .radio-display-row-text,
+.sector-tech-screen.is-comms-confirm .radio-display-row-text {
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
 .sector-tech-screen.is-field-edit .radio-edit-dec {
     opacity: 0.85;
     padding: 0 1px;

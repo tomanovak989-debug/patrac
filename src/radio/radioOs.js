@@ -528,7 +528,7 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     return { changed: false };
 }
 
-export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState, snakeSession, arkanoidSession, decoderSession) {
+export function buildOsDisplayLines(os, operatingMode, standby, radioState, draft, autoscanSession, commsSession, notebook, beaconSession, localBeacon, beaconUiState, snakeSession, arkanoidSession, decoderSession, displayOpts) {
     standby = standby || {};
 
     if (operatingMode === 'off') return { mode: 'off' };
@@ -589,7 +589,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'comms') {
-        return buildCommsOsView(commsSession, notebook, radioState);
+        return buildCommsOsView(commsSession, notebook, radioState, displayOpts);
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'beacon') {

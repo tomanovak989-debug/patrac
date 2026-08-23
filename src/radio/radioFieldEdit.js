@@ -282,9 +282,22 @@ function buildFreqHtml(session) {
     return html;
 }
 
-function buildTextHtml(session) {
+function buildTextHtml(session, options) {
+    options = options || {};
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
+    if (options.multilineWrap) {
+        var html = '';
+        var pos = Math.min(session.cursor, text.length);
+        if (session.digitMode) {
+            html += escapeHtml(text.slice(0, pos));
+            if (pos < text.length || text.length < maxLen) html += cursorSpan();
+            html += escapeHtml(text.slice(pos));
+        } else {
+            html = escapeHtml(text);
+        }
+        return html;
+    }
     var html = '';
     var i;
     if (!session.digitMode) {
@@ -347,7 +360,7 @@ export function buildFieldEditView(session, options) {
         mode: 'field_edit',
         editType: isKey ? 'encrypt' : 'text',
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
-        keyHtml: buildTextHtml(session),
+        keyHtml: buildTextHtml(session, { multilineWrap: !!options.multilineWrap }),
         axis: '',
         hint: session.digitMode
             ? (isKey ? encryptEditHint() : textEditHint())
