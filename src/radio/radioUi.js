@@ -4005,6 +4005,51 @@ function bindRadioKeyT9() {
     }, true);
 }
 
+function bindRadioTouchFallback() {
+    var grid = el('radio-keypad-grid');
+    if (!grid || grid._radioTouchFallbackBound) return;
+    grid._radioTouchFallbackBound = true;
+
+    function handleTap(e) {
+        if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
+        var btn = e.target.closest(
+            '#radio-key-ent, #radio-key-clr, #radio-key-mode, #radio-key-preset-dial, ' +
+            '#radio-key-main-dial, #radio-dpad-zone [data-key], .radio-key[data-key], ' +
+            '.sector-hit[data-key], .sector-hit[data-key="p1"], .sector-hit[data-key="p2"]'
+        );
+        if (!btn || !grid.contains(btn)) return;
+        if (e.type === 'touchend') e.preventDefault();
+
+        if (btn.id === 'radio-key-ent') {
+            handleRadioOkPress();
+            return;
+        }
+        if (btn.id === 'radio-key-clr') {
+            if (clrLongFired) {
+                clrLongFired = false;
+                return;
+            }
+            handleRadioBackPress();
+            return;
+        }
+        if (btn.id === 'radio-key-mode') {
+            cycleOperatingMode(1);
+            return;
+        }
+        var key = btn.getAttribute('data-key');
+        if (!key) return;
+        if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
+            handleRadioDpadKey(key);
+            return;
+        }
+        if (/^[0-9]$/.test(key) || key === 'p1' || key === 'p2') {
+            handleMenuKeypadDigit(key);
+        }
+    }
+
+    grid.addEventListener('touchend', handleTap, { passive: false });
+}
+
 function bindKeypadPointerFeedback() {
     var grid = el('radio-keypad-grid');
     if (!grid || grid._keypadPointerFb) return;
@@ -4149,6 +4194,7 @@ function bindKeypad() {
 
     bindRadioDialGestures();
     bindDpadNavigation();
+    bindRadioTouchFallback();
     bindRadioKeyboard();
     bindRadioKeyT9();
     bindShortcutHold();

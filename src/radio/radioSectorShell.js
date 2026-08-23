@@ -94,6 +94,9 @@ function computeScaleForBand(scroll, band) {
     if (viewH < 40) viewH = 240;
     var regionH = Math.max(BAND_MIN_GAP, band.bottom - band.top);
     var vw = window.innerWidth || scroll.clientWidth || 360;
+    if (window.visualViewport && window.visualViewport.width > 0) {
+        vw = window.visualViewport.width;
+    }
     var scale = (viewH * GRID_SRC) / (regionH * vw);
     return Math.max(1.4, Math.min(6.5, scale));
 }
@@ -596,10 +599,19 @@ export function initSectorTechShell() {
     if (!window._patracSectorResizeBound) {
         window._patracSectorResizeBound = true;
         var rt;
-        window.addEventListener('resize', function() {
+        function onViewportChange() {
             if (rt) clearTimeout(rt);
-            rt = setTimeout(remeasureAll, 120);
-        });
+            rt = setTimeout(function() {
+                if (isRadioTabActive()) ensureVisibleRemeasure(0);
+                else remeasureAll();
+            }, 120);
+        }
+        window.addEventListener('resize', onViewportChange);
+        window.addEventListener('orientationchange', onViewportChange);
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', onViewportChange);
+            window.visualViewport.addEventListener('scroll', onViewportChange);
+        }
     }
 
     if (!window._patracSectorAdminBound) {

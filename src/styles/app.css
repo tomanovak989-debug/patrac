@@ -1115,12 +1115,28 @@ body.radio-tab-active .hud-center-panel.hud-radio-fullwidth {
     left: 0;
     width: 100%;
     height: auto;
+    z-index: 1300;
+    touch-action: manipulation;
+}
+/* Mapové float prvky (z-index ~1000) nesmí na mobilu krást dotyky vysílačce. */
+body.radio-tab-active #map,
+body.radio-tab-active #map.leaflet-container {
+    pointer-events: none !important;
+}
+body.radio-tab-active #map-float-overlay,
+body.radio-tab-active #map-topo-ruler,
+body.radio-tab-active #map-compass,
+body.radio-tab-active #map-tool-fabs,
+body.radio-tab-active #map-zoom-controls {
+    pointer-events: none !important;
 }
 body.radio-tab-active .sector-tech-viewport {
     min-height: calc(100dvh - 82px);
+    touch-action: manipulation;
 }
 body.radio-tab-active .sector-tech-scroll {
     min-height: calc(100dvh - 82px);
+    touch-action: manipulation;
 }
 .hud-center-panel.hud-radio-fullwidth::before {
     display: none;
@@ -2547,6 +2563,16 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
     border-radius: 8px;
+}
+@media (pointer: coarse) {
+    .sector-hit::before {
+        content: '';
+        position: absolute;
+        left: -10px;
+        right: -10px;
+        top: -10px;
+        bottom: -10px;
+    }
 }
 .sector-hit-dial {
     touch-action: none;
