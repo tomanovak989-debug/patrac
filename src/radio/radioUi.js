@@ -4058,6 +4058,10 @@ function bindRadioKeyT9() {
             return;
         }
         if (key === '*' || key === '#') {
+            if (e.pointerType === 'touch') {
+                clearHold();
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
             fieldEditPunctFired = true;
@@ -4115,6 +4119,31 @@ function bindRadioTouchFallback() {
             nudgeDisplayPaint();
             return;
         }
+
+        if (isFieldEditActive(fieldEditSession)) {
+            var fkey = btn.getAttribute('data-key');
+            if (fkey === 'up' || fkey === 'down' || fkey === 'left' || fkey === 'right') {
+                handleRadioDpadKey(fkey);
+                nudgeDisplayPaint();
+                return;
+            }
+            if (/^[0-9]$/.test(fkey) || fkey === '*' || fkey === '#') {
+                if (fieldEditPunctFired) {
+                    fieldEditPunctFired = false;
+                    fieldEditKeyLongFired = false;
+                    return;
+                }
+                if (!fieldEditKeyLongFired) {
+                    handleFieldEditAction('char', fkey);
+                } else {
+                    fieldEditKeyLongFired = false;
+                }
+                nudgeDisplayPaint();
+                return;
+            }
+            return;
+        }
+
         var key = btn.getAttribute('data-key');
         if (!key) return;
         if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
