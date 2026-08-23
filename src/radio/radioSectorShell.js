@@ -89,14 +89,24 @@ function currentBand() {
     return normalizeBand(bands[viewMode] || bands.focus);
 }
 
-function computeScaleForBand(scroll, band) {
+/** Šířka layoutu — musí sedět s CSS --sector-layout-vw (stage/device). */
+function getLayoutViewportWidth() {
+    if (window.visualViewport && window.visualViewport.width > 0) {
+        return window.visualViewport.width;
+    }
+    return window.innerWidth || document.documentElement.clientWidth || 360;
+}
+
+function setLayoutViewportWidth(shell) {
+    if (!shell) return;
+    shell.style.setProperty('--sector-layout-vw', getLayoutViewportWidth().toFixed(2) + 'px');
+}
+
+function computeScaleForBand(scroll, band, layoutVw) {
     var viewH = scroll.clientHeight;
     if (viewH < 40) viewH = 240;
     var regionH = Math.max(BAND_MIN_GAP, band.bottom - band.top);
-    var vw = window.innerWidth || scroll.clientWidth || 360;
-    if (window.visualViewport && window.visualViewport.width > 0) {
-        vw = window.visualViewport.width;
-    }
+    var vw = layoutVw || getLayoutViewportWidth();
     var scale = (viewH * GRID_SRC) / (regionH * vw);
     return Math.max(1.4, Math.min(6.5, scale));
 }
@@ -110,8 +120,10 @@ function isScrollMeasurable(scroll) {
 function applyViewLayout(scroll) {
     var shell = scroll.closest('.sector-tech-shell');
     if (!shell) return CAL_SCALE;
+    var layoutVw = getLayoutViewportWidth();
+    setLayoutViewportWidth(shell);
     var band = currentBand();
-    var scale = computeScaleForBand(scroll, band);
+    var scale = computeScaleForBand(scroll, band, layoutVw);
     shell.style.setProperty('--sector-img-scale', scale.toFixed(3));
 
     var stage = scroll.querySelector('.sector-tech-stage');
@@ -128,7 +140,9 @@ function applyViewLayout(scroll) {
 
 function applyCalLayout(scroll) {
     var shell = scroll.closest('.sector-tech-shell');
-    if (shell) shell.style.setProperty('--sector-img-scale', String(CAL_SCALE));
+    if (!shell) return;
+    setLayoutViewportWidth(shell);
+    shell.style.setProperty('--sector-img-scale', String(CAL_SCALE));
 }
 
 function applyLayout(scroll) {
@@ -554,7 +568,12 @@ function remeasureAll() {
     if (!isAdminCalibrateMode()) {
         applyViewLayout(scroll);
     }
-    requestAnimationFrame(applyDisplayTypography);
+    requestAnimationFrame(function() {
+        applyDisplayTypography();
+        if (typeof window.patracRefreshRadioDisplay === 'function') {
+            try { window.patracRefreshRadioDisplay(); } catch (eRd) {}
+        }
+    });
 }
 
 /** Po zobrazení záložky Radio — opakované měření, dokud scroll nemá reálnou výšku. */

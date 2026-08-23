@@ -1652,15 +1652,15 @@ body.sector-cross-mode .sector-tech-hits {
 }
 .sector-tech-device {
     position: relative;
-    width: 100vw;
+    width: var(--sector-layout-vw, 100vw);
     overflow: hidden;
     line-height: 0;
     background: transparent;
 }
 .sector-tech-stage {
     position: relative;
-    width: calc(100vw * var(--sector-img-scale));
-    margin-left: calc((100vw - (100vw * var(--sector-img-scale))) / 2);
+    width: calc(var(--sector-layout-vw, 100vw) * var(--sector-img-scale));
+    margin-left: calc((var(--sector-layout-vw, 100vw) - (var(--sector-layout-vw, 100vw) * var(--sector-img-scale))) / 2);
 }
 .sector-tech-img {
     display: block;
@@ -1830,6 +1830,9 @@ body.sector-calibrate-on .sector-cal-rulers {
     box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.55);
     border-radius: 0;
     pointer-events: none;
+    z-index: 21;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
     -webkit-font-smoothing: antialiased;
 }
 .sector-tech-screen::after {

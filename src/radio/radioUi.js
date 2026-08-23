@@ -4010,8 +4010,15 @@ function bindRadioTouchFallback() {
     if (!grid || grid._radioTouchFallbackBound) return;
     grid._radioTouchFallbackBound = true;
 
+    function nudgeDisplayPaint() {
+        requestAnimationFrame(function() {
+            applyDisplayTypography();
+            var screen = el('radio-display-screen');
+            if (screen) void screen.offsetHeight;
+        });
+    }
+
     function handleTap(e) {
-        if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
         var btn = e.target.closest(
             '#radio-key-ent, #radio-key-clr, #radio-key-mode, #radio-key-preset-dial, ' +
             '#radio-key-main-dial, #radio-dpad-zone [data-key], .radio-key[data-key], ' +
@@ -4020,8 +4027,16 @@ function bindRadioTouchFallback() {
         if (!btn || !grid.contains(btn)) return;
         if (e.type === 'touchend') e.preventDefault();
 
+        if (btn.id === 'radio-key-mode') {
+            cycleOperatingMode(1);
+            nudgeDisplayPaint();
+            return;
+        }
+        if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
+
         if (btn.id === 'radio-key-ent') {
             handleRadioOkPress();
+            nudgeDisplayPaint();
             return;
         }
         if (btn.id === 'radio-key-clr') {
@@ -4030,20 +4045,19 @@ function bindRadioTouchFallback() {
                 return;
             }
             handleRadioBackPress();
-            return;
-        }
-        if (btn.id === 'radio-key-mode') {
-            cycleOperatingMode(1);
+            nudgeDisplayPaint();
             return;
         }
         var key = btn.getAttribute('data-key');
         if (!key) return;
         if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
             handleRadioDpadKey(key);
+            nudgeDisplayPaint();
             return;
         }
         if (/^[0-9]$/.test(key) || key === 'p1' || key === 'p2') {
             handleMenuKeypadDigit(key);
+            nudgeDisplayPaint();
         }
     }
 
@@ -4715,6 +4729,9 @@ export function initRadioCommsSystem(options) {
     window.patracRefreshSectorTech = refreshSectorTechLayout;
     window.patracEnsureRadioHitmap = function() {
         applyRadioHitmap();
+    };
+    window.patracRefreshRadioDisplay = function() {
+        renderDisplay();
     };
     window.patracRefreshRadioUnreadBadge = refreshRadioUnreadBadge;
     syncNotebookTabs();

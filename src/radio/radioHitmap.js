@@ -21,13 +21,22 @@ function applyRect(el, x, y, w, h) {
     el.style.height = r.height;
 }
 
+var displayTypoRetries = 0;
+
 /** Font displeje v px — škáluje se s reálnou velikostí panelu (zoom vysílačky). */
 export function applyDisplayTypography() {
     var screen = document.getElementById('radio-display-screen');
     if (!screen) return;
     var w = screen.clientWidth;
     var h = screen.clientHeight;
-    if (w < 8 || h < 8) return;
+    if (w < 8 || h < 8) {
+        if (displayTypoRetries < 12) {
+            displayTypoRetries++;
+            requestAnimationFrame(applyDisplayTypography);
+        }
+        return;
+    }
+    displayTypoRetries = 0;
     var innerW = Math.max(8, w - 10);
     var px = Math.min(innerW / 10.5, (h / 8) * 0.9);
     px = Math.max(9, Math.round(px * 10) / 10);
