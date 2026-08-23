@@ -1,7 +1,7 @@
 /**
  * Dešifrátor — luštění zachycených šifrovaných zpráv (5 valců A–Z).
  */
-import { formatTime } from './radioComms.js';
+import { formatTime, wrapNotebookText } from './radioComms.js';
 import {
     decryptCiphertext,
     defaultWheelKey,
@@ -71,11 +71,22 @@ function formatHubLine(entry) {
     return when + ' ' + from + ' ' + preview;
 }
 
-function wrapPreview(text, maxLen) {
-    text = String(text || '').replace(/\s+/g, ' ').trim();
+function wrapDecoderResult(text, maxLen, maxLines) {
     maxLen = maxLen || 18;
-    if (text.length <= maxLen) return text;
-    return text.slice(0, maxLen - 1) + '…';
+    maxLines = maxLines || 4;
+    var lines = wrapNotebookText(String(text || ''), maxLen);
+    var out = [];
+    var i;
+    for (i = 0; i < maxLines; i++) {
+        out.push(lines[i] || '');
+    }
+    if (lines.length > maxLines && maxLines > 0) {
+        var last = out[maxLines - 1] || '';
+        out[maxLines - 1] = last.length >= maxLen
+            ? last.slice(0, Math.max(0, maxLen - 1)) + '…'
+            : last + '…';
+    }
+    return out;
 }
 
 function buildWheelLine(wheels, wheelFocus) {
@@ -165,6 +176,7 @@ export function buildDecoderOsView(session, notebook) {
         }
         return {
             mode: 'decoder',
+            layout: 'hub',
             status: 'DEŠIFRÁTOR',
             lines: lines,
             focusLine: session.focusIndex < 4 ? session.focusIndex : -1,
@@ -173,19 +185,19 @@ export function buildDecoderOsView(session, notebook) {
         };
     }
 
-    var entry = getDecoderSelectedEntry(session, notebook);
-    var cipher = entry ? String(entry.cipherText || '') : '';
     var preview = computeDecoderPreview(session, notebook);
     session.draftOutput = preview;
+    var resultLines = wrapDecoderResult(preview, 18, 4);
 
     return {
         mode: 'decoder',
+        layout: 'workbench',
         status: 'DEŠIFRÁTOR',
         lines: [
-            wrapPreview(cipher, 18),
-            wrapPreview(cipher.slice(18), 18),
-            wrapPreview(preview, 18),
-            wrapPreview(preview.slice(18), 18),
+            resultLines[0],
+            resultLines[1],
+            resultLines[2],
+            resultLines[3],
             buildWheelLine(session.wheels, session.wheelFocus),
             CIPHER_WHEEL_ALPHABET.slice(0, 18)
         ],

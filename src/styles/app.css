@@ -2527,6 +2527,15 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     overflow-wrap: anywhere;
     text-overflow: clip;
 }
+.sector-tech-screen.is-decoder-workbench .radio-display-main > div,
+.sector-tech-screen.is-decoder-workbench .radio-display-row-text {
+    white-space: pre-wrap !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    align-items: flex-start !important;
+    text-overflow: clip;
+    line-height: 1.12;
+}
 .sector-tech-screen.is-field-edit .radio-edit-dec {
     opacity: 0.85;
     padding: 0 1px;

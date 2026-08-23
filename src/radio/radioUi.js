@@ -1763,6 +1763,7 @@ function renderDisplay() {
             screen.classList.toggle('is-comms-compose', fieldEditSession.returnTo === 'comms');
             screen.classList.toggle('is-comms-detail', false);
             screen.classList.toggle('is-comms-confirm', false);
+            screen.classList.toggle('is-decoder-workbench', false);
         }
         if (ch) {
             ch.textContent = '';
@@ -1797,6 +1798,8 @@ function renderDisplay() {
         var commsLayout = osView.layout || '';
         screen.classList.toggle('is-comms-detail', osView.mode === 'comms' && commsLayout === 'detail');
         screen.classList.toggle('is-comms-confirm', osView.mode === 'comms' && commsLayout === 'confirm');
+        var decoderLayout = osView.layout || '';
+        screen.classList.toggle('is-decoder-workbench', osView.mode === 'decoder' && decoderLayout === 'workbench');
     }
 
     if (osView.mode === 'off') {
