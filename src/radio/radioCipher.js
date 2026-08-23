@@ -1,6 +1,7 @@
 /**
  * Vigenère šifra — abeceda A–Z + 1–9 + 0 (36 znaků), klíč 5× A–Z.
- * Mezery a interpunkce projdou beze změny; v řádku klíče jsou mezery.
+ * Mezery se před šifrou nahradí tokenem 0 (šifruje se) — na drátu nejsou vidět.
+ * Po dešifrování se token 0 znovu zobrazí jako mezera.
  */
 import {
     SIGNAL_CLEAR,
@@ -14,7 +15,20 @@ export var CIPHER_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890';
 export var CIPHER_KEY_LEN = 5;
 export var CIPHER_WHEEL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
+/** Na drátu místo mezery — šifruje se jako běžný znak (skryje délku slov). */
+export var CIPHER_SPACE_CHAR = '0';
+
 var ALPHABET_LEN = CIPHER_ALPHABET.length;
+
+/** Mezery → token před šifrou. */
+export function plainToCipherChars(text) {
+    return normalizeCipherPlaintext(text).replace(/\s+/g, CIPHER_SPACE_CHAR);
+}
+
+/** Token → mezera po dešifrování (luštění podle délky slov). */
+export function cipherCharsToPlain(text) {
+    return String(text || '').split(CIPHER_SPACE_CHAR).join(' ');
+}
 
 function hashSeed(str) {
     var h = 2166136261;
@@ -69,9 +83,9 @@ function keyCharAt(key, keyIndex) {
 }
 
 export function encryptPlaintext(plaintext, key) {
-    var plain = normalizeCipherPlaintext(plaintext);
+    var plain = plainToCipherChars(plaintext);
     var k = normalizeEncryptionKey(key);
-    if (!k || k.length !== CIPHER_KEY_LEN) return plain;
+    if (!k || k.length !== CIPHER_KEY_LEN) return cipherCharsToPlain(plain);
     var out = '';
     var keyPos = 0;
     var i;
@@ -97,14 +111,14 @@ export function encryptPlaintext(plaintext, key) {
 export function decryptCiphertext(ciphertext, key) {
     var raw = normalizeCipherPlaintext(ciphertext);
     var k = normalizeEncryptionKey(key);
-    if (!k || k.length !== CIPHER_KEY_LEN) return raw;
+    if (!k || k.length !== CIPHER_KEY_LEN) return cipherCharsToPlain(raw);
     var out = '';
     var keyPos = 0;
     var i;
     for (i = 0; i < raw.length; i++) {
         var ch = raw.charAt(i);
         if (/\s/.test(ch)) {
-            out += ch;
+            out += ' ';
             continue;
         }
         var cIdx = charToIndex(ch);
@@ -121,7 +135,7 @@ export function decryptCiphertext(ciphertext, key) {
         }
         out += CIPHER_ALPHABET.charAt((cIdx - kIdx + ALPHABET_LEN) % ALPHABET_LEN);
     }
-    return out;
+    return cipherCharsToPlain(out);
 }
 
 /** Slabý signál: každý 5. znak → náhodné písmeno. Fragment: každý 3. */
@@ -248,4 +262,9 @@ export function wheelsToKey(wheels) {
         out += rotateWheelLetter(wheels[i] || 'A', 0);
     }
     return out;
+}
+
+/** Mezery viditelné na displeji dešifrátoru (NBSP). */
+export function formatDecoderDisplayText(text) {
+    return String(text || '').replace(/ /g, '\u00a0');
 }
