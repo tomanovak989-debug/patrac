@@ -10,6 +10,9 @@ export var BAND_MIN_MHZ = 400;
 export var BAND_MAX_MHZ = 470;
 export var TUNE_STEP_MHZ = 0.025;
 
+/** Sdílený mezikomunitní kanál — 400.000 MHz PT (preset „Otevřený 400“). */
+export var OPEN_CHANNEL_FREQUENCY = '400.000';
+
 /** Nouzová frekvence v pásmu (náhrada staré 121.500 mimo UHF). */
 export var EMERGENCY_FREQUENCY = '450.000';
 export var EMERGENCY_ENCRYPTION = 'SOS';
@@ -155,7 +158,7 @@ export function buildDefaultDialPresets(ctx) {
     list.push({
         slot: slot++,
         label: 'Otevřený 400',
-        frequency: normalizeFrequency(BAND_MIN_MHZ),
+        frequency: normalizeFrequency(OPEN_CHANNEL_FREQUENCY),
         encryptionKey: '',
         scope: 'private',
         dial: true

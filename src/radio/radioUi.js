@@ -31,6 +31,7 @@ import {
     formatStandbyEncryptionLine,
     GLOBAL_FREQUENCY,
     GLOBAL_ENCRYPTION,
+    OPEN_CHANNEL_FREQUENCY,
     NOTEBOOK_TABS,
     NOTEBOOK_TAB_LABELS,
     NOTEBOOK_LINES_PER_PAGE,
@@ -1829,6 +1830,11 @@ function renderDisplay() {
             dialBuffer: dialBuffer || '',
             beaconSos: (beaconActive && beaconActive.active) ? ('● SOS ' + BEACON_SOS_FREQUENCY) : ''
         });
+        var l6 = el('radio-display-line6');
+        if (l6) {
+            var onOpen = normalizeFrequency(state.frequency) === normalizeFrequency(OPEN_CHANNEL_FREQUENCY);
+            l6.textContent = onOpen ? '' : 'Mezikom: preset Otevřený 400';
+        }
         clearExtraDisplayLines();
         if (nodeEl) {
             nodeEl.textContent = gpsOk ? 'NOSIČ' : 'GPS?';
@@ -3561,21 +3567,24 @@ function resolvePayloadCipherKey(frequency) {
     return resolveListenCipherKey(state, c, frequency);
 }
 
-/** Příjem jen na naladěných / poslouchaných frekvencích (ne celé pásmo). */
+function isFrequencyInListenSet(frequency) {
+    var msgFreq = normalizeFrequency(frequency);
+    if (!msgFreq) return false;
+    var list = collectListenFrequencies();
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (normalizeFrequency(list[i]) === msgFreq) return true;
+    }
+    return false;
+}
+
+/** Příjem jen na frekvencích, které právě posloucháme. */
 function shouldAcceptIncomingPayload(payload) {
     if (!payload || state.operatingMode === 'off') return false;
-    var msgFreq = normalizeFrequency(payload.frequency);
-    if (!msgFreq) return false;
     if (isAutoscanListening()) {
-        return isAutoscanListenFrequency(msgFreq);
+        return isAutoscanListenFrequency(payload.frequency);
     }
-    var tuned = normalizeFrequency(state.frequency);
-    if (tuned && msgFreq === tuned) return true;
-    var c = getCtx();
-    var comFreq = communityFrequencyFromCode(c.comCode);
-    if (comFreq && msgFreq === comFreq) return true;
-    if (msgFreq === normalizeFrequency(BEACON_SOS_FREQUENCY)) return true;
-    return false;
+    return isFrequencyInListenSet(payload.frequency);
 }
 
 function hasRecentOutgoingEcho(payload) {
@@ -3834,6 +3843,8 @@ function bindRadioAuthRefresh() {
 function collectListenFrequencies() {
     var c = getCtx();
     var freqs = collectTunedFrequencies(state).slice();
+    /* Mezikomunitní otevřený kanál — vždy v poslechu (400.000 PT). */
+    freqs.push(OPEN_CHANNEL_FREQUENCY);
     /* Pevný SOS maják — vždy v poslechu na všech vysílačkách. */
     freqs.unshift(BEACON_SOS_FREQUENCY);
     var comFreq = communityFrequencyFromCode(c.comCode);
