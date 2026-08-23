@@ -2883,6 +2883,7 @@ function launchGame() {
 
     initPoctaModuleAsync();
     initQuestAdminAsync();
+    initSectorTechShellAsync();
     initRadioCommsAsync();
     initCloudSyncAsync();
     initDataKartaAsync();
@@ -3041,11 +3042,13 @@ function switchMainTab(tab, element) {
         document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
         if (tab === 'clan') {
             updateRadioDisplayHud();
-            if (typeof window.patracRefreshSectorTech === 'function') {
-                setTimeout(function() {
-                    try { window.patracRefreshSectorTech(); } catch (eSt) {}
-                }, 80);
-            }
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    if (typeof window.patracRefreshSectorTech === 'function') {
+                        try { window.patracRefreshSectorTech(); } catch (eSt) {}
+                    }
+                });
+            });
         }
         document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
         document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
@@ -3720,6 +3723,15 @@ function initQuestAdminAsync() {
         board.refreshQuestLineBoard();
     }).catch(function(err) {
         console.warn('[questAdmin]', err);
+    });
+}
+
+function initSectorTechShellAsync() {
+    patracImport('radio/radioSectorShell.js').then(function(mod) {
+        mod.initSectorTechShell();
+        window.patracRefreshSectorTech = mod.refreshSectorTechLayout;
+    }).catch(function(err) {
+        console.error('initSectorTechShell', err);
     });
 }
 

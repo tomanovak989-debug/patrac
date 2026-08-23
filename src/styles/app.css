@@ -1116,6 +1116,12 @@ body.radio-tab-active .hud-center-panel.hud-radio-fullwidth {
     width: 100%;
     height: auto;
 }
+body.radio-tab-active .sector-tech-viewport {
+    min-height: calc(100dvh - 82px);
+}
+body.radio-tab-active .sector-tech-scroll {
+    min-height: calc(100dvh - 82px);
+}
 .hud-center-panel.hud-radio-fullwidth::before {
     display: none;
 }
@@ -1779,7 +1785,11 @@ body.sector-calibrate-on .sector-cal-rulers {
 }
 
 .sector-tech-screen {
-    /* rozměry nastavuje radioHitmap.js — PNG 800×800 */
+    /* rozměry nastavuje radioHitmap.js — PNG 800×800; fallback než doběhne JS */
+    left: 40.125%;
+    top: 41.5%;
+    width: 19.5%;
+    height: 26%;
     --radio-display-font: 'Patrac Roboto Condensed', 'Roboto Condensed', 'Segoe UI', sans-serif;
     --radio-phosphor: #c8c8c8;
     --radio-phosphor-dim: #6a6a6a;

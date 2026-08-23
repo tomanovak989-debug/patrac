@@ -98,6 +98,12 @@ function computeScaleForBand(scroll, band) {
     return Math.max(1.4, Math.min(6.5, scale));
 }
 
+function isScrollMeasurable(scroll) {
+    if (!scroll || scroll.clientHeight < 40) return false;
+    var rect = scroll.getBoundingClientRect();
+    return rect.width > 0 && rect.height >= 40;
+}
+
 function applyViewLayout(scroll) {
     var shell = scroll.closest('.sector-tech-shell');
     if (!shell) return CAL_SCALE;
@@ -106,10 +112,12 @@ function applyViewLayout(scroll) {
     shell.style.setProperty('--sector-img-scale', scale.toFixed(3));
 
     var stage = scroll.querySelector('.sector-tech-stage');
-    if (stage) {
+    if (stage && isScrollMeasurable(scroll)) {
         var stageH = stage.offsetHeight;
-        var padTop = isUserSetupMode() ? SETUP_SCROLL_PAD_TOP : 2;
-        scroll.scrollTop = Math.max(0, (band.top / GRID_SRC) * stageH - padTop);
+        if (stageH > 0) {
+            var padTop = isUserSetupMode() ? SETUP_SCROLL_PAD_TOP : 2;
+            scroll.scrollTop = Math.max(0, (band.top / GRID_SRC) * stageH - padTop);
+        }
     }
     updateViewControls();
     return scale;
@@ -533,6 +541,8 @@ function measureStage(scroll) {
     };
 }
 
+var remeasureRetryTimer = null;
+
 function remeasureAll() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
@@ -542,6 +552,23 @@ function remeasureAll() {
         applyViewLayout(scroll);
     }
     requestAnimationFrame(applyDisplayTypography);
+}
+
+/** Po zobrazení záložky Radio — opakované měření, dokud scroll nemá reálnou výšku. */
+function ensureVisibleRemeasure(attempt) {
+    attempt = attempt || 0;
+    var scroll = el('sector-tech-scroll');
+    if (!scroll) return;
+    if (isRadioTabActive() && isScrollMeasurable(scroll)) {
+        remeasureAll();
+        return;
+    }
+    if (!isRadioTabActive() || attempt >= 16) return;
+    if (remeasureRetryTimer) clearTimeout(remeasureRetryTimer);
+    remeasureRetryTimer = setTimeout(function() {
+        remeasureRetryTimer = null;
+        ensureVisibleRemeasure(attempt + 1);
+    }, attempt < 3 ? 0 : attempt < 8 ? 60 : 140);
 }
 
 export function initSectorTechShell() {
@@ -558,8 +585,12 @@ export function initSectorTechShell() {
 
     var img = el('sector-tech-img');
     if (img) {
-        if (img.complete) remeasureAll();
-        else img.addEventListener('load', remeasureAll);
+        function onImgReady() {
+            if (isRadioTabActive()) ensureVisibleRemeasure(0);
+            else remeasureAll();
+        }
+        if (img.complete) onImgReady();
+        else img.addEventListener('load', onImgReady);
     }
 
     if (!window._patracSectorResizeBound) {
@@ -574,9 +605,20 @@ export function initSectorTechShell() {
     if (!window._patracSectorAdminBound) {
         window._patracSectorAdminBound = true;
         var obs = new MutationObserver(function() {
-            remeasureAll();
+            if (isRadioTabActive()) ensureVisibleRemeasure(0);
+            else remeasureAll();
         });
         obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    if (!window._patracSectorResizeObsBound && typeof ResizeObserver !== 'undefined') {
+        window._patracSectorResizeObsBound = true;
+        var resizeObs = new ResizeObserver(function() {
+            if (isRadioTabActive()) ensureVisibleRemeasure(0);
+        });
+        resizeObs.observe(scroll);
+        var viewport = el('sector-tech-viewport');
+        if (viewport) resizeObs.observe(viewport);
     }
 
     scroll.addEventListener('scroll', function() {
@@ -590,7 +632,8 @@ export function scrollSectorTechTo() {
 }
 
 export function refreshSectorTechLayout() {
-    remeasureAll();
+    if (isRadioTabActive()) ensureVisibleRemeasure(0);
+    else remeasureAll();
 }
 
 export { isSectorDisplayLocked, lockSectorDisplayPrefs, unlockSectorDisplayPrefs };
