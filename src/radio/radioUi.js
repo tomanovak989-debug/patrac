@@ -3798,6 +3798,22 @@ function ingestIncomingBeacon(payload, c) {
     renderDisplay();
 }
 
+function normalizeCloudMessageReception(reception) {
+    if (!reception) {
+        return { quality: SIGNAL_CLEAR, distanceKm: null, receivable: true, reason: 'cloud_fallback' };
+    }
+    /* Cloud doručil zprávu — ukaž čitelný text (špatné GPS jinak simuluje šum/mimo dosah). */
+    if (!reception.receivable || reception.quality === SIGNAL_NOISE) {
+        return {
+            quality: SIGNAL_CLEAR,
+            distanceKm: reception.distanceKm,
+            receivable: true,
+            reason: 'cloud_fallback'
+        };
+    }
+    return reception;
+}
+
 function ingestIncomingMessage(payload, c) {
     var origin = (payload.originLat != null && payload.originLng != null)
         ? { lat: payload.originLat, lng: payload.originLng }
@@ -3807,14 +3823,7 @@ function ingestIncomingMessage(payload, c) {
         encryptionKey: normalizeEncryptionKey(payload.encryptionKey || '')
     });
     schedulePathElevationPrefetch(origin);
-    if (!reception.receivable) {
-        reception = {
-            quality: SIGNAL_NOISE,
-            distanceKm: reception.distanceKm,
-            receivable: true,
-            reason: 'cloud_fallback'
-        };
-    }
+    reception = normalizeCloudMessageReception(reception);
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var myKey = resolvePayloadCipherKey(payload.frequency);
