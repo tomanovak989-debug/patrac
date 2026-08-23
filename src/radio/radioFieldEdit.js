@@ -8,7 +8,7 @@ import {
     parseFrequencyMHz,
     stepFrequency
 } from './radioBand.js';
-import { normalizeEncryptionKey } from './radioComms.js';
+import { normalizeEncryptionKey, isEmergencyFrequency } from './radioComms.js';
 
 var FREQ_DIGITS = 6;
 var TEXT_MAX = 16;
@@ -516,6 +516,7 @@ export function applyFieldEditToState(session, radioState, ctx) {
     if (session.type === 'freq') {
         var freq = normalizeFrequency(digitsToMhzString(session.digits));
         if (!freq) return false;
+        if (isEmergencyFrequency(freq)) return false;
         radioState.frequency = freq;
         radioState.activePresetSlot = null;
         return true;
@@ -531,6 +532,7 @@ export function applyFieldEditToDraft(session, draft) {
     if (!session || !draft) return false;
     var vals = readFieldEditValues(session);
     if (!vals) return false;
+    if (vals.frequency && isEmergencyFrequency(vals.frequency)) return false;
     if (vals.frequency) draft.frequency = vals.frequency;
     if (vals.text != null) {
         if (session.type === 'encrypt') draft.encryptionKey = normalizeEncryptionKey(vals.text);

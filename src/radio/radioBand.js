@@ -14,6 +14,10 @@ export var TUNE_STEP_MHZ = 0.025;
 export var EMERGENCY_FREQUENCY = '450.000';
 export var EMERGENCY_ENCRYPTION = 'SOS';
 
+export function isEmergencyFrequency(frequency) {
+    return normalizeFrequency(frequency) === normalizeFrequency(EMERGENCY_FREQUENCY);
+}
+
 /** Alias pro starší importy. */
 export var GLOBAL_FREQUENCY = EMERGENCY_FREQUENCY;
 export var GLOBAL_ENCRYPTION = EMERGENCY_ENCRYPTION;
@@ -113,19 +117,23 @@ export function channelFromCode(code, fallbackMHz) {
 
 /** Migrace uložené frekvence po změně pásma (např. stará 121.500). */
 export function migrateStoredFrequency(value, fallback) {
+    var fb = fallback || normalizeFrequency(435);
     var s = String(value == null ? '' : value).trim().replace(',', '.');
-    if (!s) return fallback || normalizeFrequency(435);
-    if (s === '121.500' || /^121\.5/.test(s)) return EMERGENCY_FREQUENCY;
+    if (!s) return fb;
+    if (s === '121.500' || /^121\.5/.test(s)) return fb;
     var n = parseFrequencyMHz(s);
-    if (!isFinite(n)) return fallback || normalizeFrequency(435);
-    if (n >= BAND_MIN_MHZ && n <= BAND_MAX_MHZ) return normalizeFrequency(s);
-    /* Mimo nové pásmo — nouzová místo tichého clampu na 400.000 */
-    return EMERGENCY_FREQUENCY;
+    if (!isFinite(n)) return fb;
+    if (n >= BAND_MIN_MHZ && n <= BAND_MAX_MHZ) {
+        var norm = normalizeFrequency(s);
+        if (isEmergencyFrequency(norm)) return fb;
+        return norm;
+    }
+    return fb;
 }
 
 /**
- * Výchozí presetové kolečko (~18 pozic): komunita, nouzová, pak „průzkumné“ kanály.
- * Hráč PRE / −+ přepíná jen tyhle pozice — ne celé pásmo po 0.025.
+ * Výchozí presetové kolečko (~18 pozic): komunita, pak „průzkumné“ kanály.
+ * Nouzová 450.000 MHz není preset — vyhrazena pro BEACON.
  */
 export function buildDefaultDialPresets(ctx) {
     ctx = ctx || {};
@@ -140,15 +148,6 @@ export function buildDefaultDialPresets(ctx) {
         frequency: normalizeFrequency(comFreq),
         encryptionKey: comKey,
         scope: 'community',
-        dial: true
-    });
-
-    list.push({
-        slot: slot++,
-        label: 'Nouzová',
-        frequency: EMERGENCY_FREQUENCY,
-        encryptionKey: EMERGENCY_ENCRYPTION,
-        scope: 'global',
         dial: true
     });
 

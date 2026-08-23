@@ -25,6 +25,7 @@ import {
     formatStandbyPresetLine,
     buildStandbyPresetDisplay,
     formatStandbyFrequencyLine,
+    isEmergencyFrequency,
     formatStandbyEncryptionLine,
     GLOBAL_FREQUENCY,
     GLOBAL_ENCRYPTION,
@@ -281,6 +282,7 @@ var seenMessageIds = {};
 var flipTimer = null;
 var radioAuthUnsub = null;
 var powerAnim = createPowerAnimState();
+var EMERGENCY_FREQ_MSG = '450.000 MHz je vyhrazena pro nouzový maják (BEACON).';
 
 function ensureNotebookMeta() {
     if (!notebook.pageIndex) notebook.pageIndex = { station: 0, notes: 0, grids: 0 };
@@ -857,6 +859,13 @@ function startFieldEdit(type, options) {
 function finishFieldEdit(save) {
     if (!fieldEditSession) return;
     var c = getCtx();
+    if (save && fieldEditSession.type === 'freq') {
+        var freqVals = readFieldEditValues(fieldEditSession);
+        if (freqVals && freqVals.frequency && isEmergencyFrequency(freqVals.frequency)) {
+            alert(EMERGENCY_FREQ_MSG);
+            save = false;
+        }
+    }
     if (save) {
         if (fieldEditSession.returnTo === 'preset_detail' && presetEditDraft) {
             applyFieldEditToDraft(fieldEditSession, presetEditDraft);
@@ -3773,6 +3782,10 @@ function refreshSubscriptions() {
 
 function saveToPresetSlot(slot) {
     var c = getCtx();
+    if (isEmergencyFrequency(state.frequency)) {
+        alert(EMERGENCY_FREQ_MSG);
+        return;
+    }
     upsertPreset(state, slot, {
         label: 'Kanál ' + slot,
         frequency: state.frequency,
@@ -3797,6 +3810,10 @@ async function transmitMessage(text, extras) {
 
     var txFreq = extras.frequency != null ? extras.frequency : state.frequency;
     var txKey = extras.encryptionKey != null ? extras.encryptionKey : state.encryptionKey;
+    if (!extras.beaconBandcast && extras.messageType !== 'beacon' && isEmergencyFrequency(txFreq)) {
+        alert(EMERGENCY_FREQ_MSG);
+        return;
+    }
     if (!txFreq) {
         alert('Nejdřív nalaď frekvenci (PRE / −+ nebo MODE → přímý zápis).');
         return;

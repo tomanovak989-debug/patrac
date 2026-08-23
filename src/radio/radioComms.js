@@ -18,7 +18,8 @@ import {
     migrateStoredFrequency,
     buildDefaultDialPresets,
     findDialIndex,
-    parseFrequencyMHz
+    parseFrequencyMHz,
+    isEmergencyFrequency
 } from './radioBand.js';
 import { createDefaultQuickKeys, normalizeQuickKeys } from './radioShortcuts.js';
 
@@ -37,7 +38,8 @@ export {
     frequencyChannelId,
     migrateStoredFrequency,
     buildDefaultDialPresets,
-    findDialIndex
+    findDialIndex,
+    isEmergencyFrequency
 };
 
 export const NOTEBOOK_TABS = ['station', 'notes', 'grids'];
@@ -234,6 +236,47 @@ export function normalizeSoundPrefs(prefs) {
     };
 }
 
+/** Odstraní nouzové presety a přeladí 450.000 MHz na komunitní kanál. */
+export function sanitizeEmergencyFromState(state, ctx) {
+    if (!state) return state;
+    ctx = ctx || {};
+    var comFreq = communityFrequencyFromCode(ctx.comCode);
+    var comKey = ctx.comCode ? getCommunityRadioKey(ctx.comCode, ctx.comName) : '';
+    if (!comFreq && state.presets && state.presets.length) {
+        for (var c = 0; c < state.presets.length; c++) {
+            if (state.presets[c].slot === 1 && !isEmergencyFrequency(state.presets[c].frequency)) {
+                comFreq = normalizeFrequency(state.presets[c].frequency);
+                comKey = state.presets[c].encryptionKey || '';
+                break;
+            }
+        }
+    }
+    if (!comFreq) comFreq = normalizeFrequency(channelFromCode(ctx.comCode, 435));
+
+    var presets = state.presets || [];
+    var cleaned = [];
+    var removedSlots = {};
+    var i;
+    for (i = 0; i < presets.length; i++) {
+        if (isEmergencyFrequency(presets[i].frequency)) {
+            removedSlots[presets[i].slot] = true;
+            continue;
+        }
+        cleaned.push(presets[i]);
+    }
+    state.presets = cleaned;
+
+    if (isEmergencyFrequency(state.frequency)) {
+        state.frequency = comFreq;
+        state.encryptionKey = comKey;
+        state.activePresetSlot = cleaned.length && cleaned[0].slot === 1 ? 1 : null;
+    } else if (state.activePresetSlot != null && removedSlots[state.activePresetSlot]) {
+        state.activePresetSlot = null;
+    }
+
+    return state;
+}
+
 export function loadRadioState(userId, ctx) {
     var key = radioStateKey(userId);
     var base = defaultRadioState(userId, ctx);
@@ -282,6 +325,8 @@ export function loadRadioState(userId, ctx) {
         var di = findDialIndex(parsed.presets, parsed.frequency, parsed.activePresetSlot);
         if (di >= 0) parsed.activePresetSlot = parsed.presets[di].slot;
         else parsed.activePresetSlot = null;
+
+        parsed = sanitizeEmergencyFromState(parsed, ctx);
 
         try { localStorage.setItem(key, JSON.stringify(parsed)); } catch (eSave) {}
         return parsed;
@@ -851,6 +896,7 @@ export function resolveActivePreset(state) {
 }
 
 export function upsertPreset(state, slot, data) {
+    if (data && isEmergencyFrequency(data.frequency)) return state;
     state.presets = state.presets || [];
     var found = false;
     for (var i = 0; i < state.presets.length; i++) {
@@ -880,7 +926,7 @@ export function clearPreset(state, slot) {
 
 export function applyPreset(state, slot) {
     var preset = findPreset(state, slot);
-    if (!preset) return false;
+    if (!preset || isEmergencyFrequency(preset.frequency)) return false;
     state.frequency = preset.frequency;
     state.encryptionKey = preset.encryptionKey || '';
     state.activePresetSlot = slot;
@@ -894,14 +940,24 @@ export function adjustFrequency(state, delta) {
     if (typeof delta === 'number' && isFinite(delta) && TUNE_STEP_MHZ > 0) {
         steps = Math.round(delta / TUNE_STEP_MHZ) || (delta < 0 ? -1 : 1);
     }
-    state.frequency = stepFrequency(state.frequency, steps);
+    var next = stepFrequency(state.frequency, steps);
+    if (isEmergencyFrequency(next)) {
+        next = stepFrequency(next, steps > 0 ? 1 : -1);
+    }
+    state.frequency = next;
     state.activePresetSlot = null;
     return state;
 }
 
+function dialablePresets(state) {
+    return (state.presets || []).filter(function(p) {
+        return p && !isEmergencyFrequency(p.frequency);
+    });
+}
+
 /** Hlavní kolečko — přepnutí na další/předchozí preset (ne krok 0.025 po pásmu). */
 export function cycleDialPreset(state, direction) {
-    var presets = state.presets || [];
+    var presets = dialablePresets(state);
     if (!presets.length) return false;
     var dir = direction < 0 ? -1 : 1;
     var idx = findDialIndex(presets, state.frequency, state.activePresetSlot);
