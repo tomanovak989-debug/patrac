@@ -103,6 +103,10 @@ export function decryptCiphertext(ciphertext, key) {
     var i;
     for (i = 0; i < raw.length; i++) {
         var ch = raw.charAt(i);
+        if (/\s/.test(ch)) {
+            out += ch;
+            continue;
+        }
         var cIdx = charToIndex(ch);
         if (cIdx < 0) {
             out += ch;

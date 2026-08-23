@@ -1,7 +1,7 @@
 /**
  * Dešifrátor — luštění zachycených šifrovaných zpráv (5 valců A–Z).
  */
-import { formatTime, wrapNotebookText } from './radioComms.js';
+import { formatTime } from './radioComms.js';
 import {
     decryptCiphertext,
     defaultWheelKey,
@@ -71,22 +71,39 @@ function formatHubLine(entry) {
     return when + ' ' + from + ' ' + preview;
 }
 
+/** Zalamování s zachováním mezer; zbytek textu = … na posledním řádku. */
 function wrapDecoderResult(text, maxLen, maxLines) {
+    text = String(text || '');
     maxLen = maxLen || 18;
-    maxLines = maxLines || 4;
-    var lines = wrapNotebookText(String(text || ''), maxLen);
-    var out = [];
-    var i;
-    for (i = 0; i < maxLines; i++) {
-        out.push(lines[i] || '');
+    maxLines = maxLines || 5;
+    var lines = [];
+    var pos = 0;
+    while (pos < text.length && lines.length < maxLines) {
+        var end = pos + maxLen;
+        if (end >= text.length) {
+            lines.push(text.slice(pos));
+            pos = text.length;
+            break;
+        }
+        var slice = text.slice(pos, end);
+        var sp = slice.lastIndexOf(' ');
+        if (sp > 0) {
+            lines.push(text.slice(pos, pos + sp));
+            pos = pos + sp + 1;
+        } else {
+            lines.push(slice);
+            pos = end;
+        }
     }
-    if (lines.length > maxLines && maxLines > 0) {
-        var last = out[maxLines - 1] || '';
-        out[maxLines - 1] = last.length >= maxLen
+    if (pos < text.length && lines.length > 0) {
+        var li = lines.length - 1;
+        var last = lines[li];
+        lines[li] = last.length >= maxLen
             ? last.slice(0, Math.max(0, maxLen - 1)) + '…'
             : last + '…';
     }
-    return out;
+    while (lines.length < maxLines) lines.push('');
+    return lines;
 }
 
 function buildWheelLine(wheels, wheelFocus) {
@@ -148,9 +165,11 @@ export function computeDecoderPreview(session, notebook) {
  * @param {object|null} session
  * @param {{ station?: Array }} [notebook]
  */
-export function buildDecoderOsView(session, notebook) {
+export function buildDecoderOsView(session, notebook, displayOpts) {
     session = session || createDecoderState();
     notebook = notebook || {};
+    displayOpts = displayOpts || {};
+    var lineChars = displayOpts.charsPerLine || 18;
 
     if (session.screen === DECODER_SCREENS.HUB) {
         var list = filterDecoderEntries(notebook);
@@ -187,7 +206,7 @@ export function buildDecoderOsView(session, notebook) {
 
     var preview = computeDecoderPreview(session, notebook);
     session.draftOutput = preview;
-    var resultLines = wrapDecoderResult(preview, 18, 4);
+    var resultLines = wrapDecoderResult(preview, lineChars, 5);
 
     return {
         mode: 'decoder',
@@ -198,11 +217,11 @@ export function buildDecoderOsView(session, notebook) {
             resultLines[1],
             resultLines[2],
             resultLines[3],
-            buildWheelLine(session.wheels, session.wheelFocus),
-            CIPHER_WHEEL_ALPHABET.slice(0, 18)
+            resultLines[4],
+            buildWheelLine(session.wheels, session.wheelFocus)
         ],
-        focusLine: 4,
-        footer: '◀▶ valec · ↑↓ otáčet · OK kopie',
+        focusLine: 5,
+        footer: '◀▶ valec · ↑↓ otáčet · OK = celá',
         buffer: wheelsToKey(session.wheels)
     };
 }

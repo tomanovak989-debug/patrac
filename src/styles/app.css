@@ -2527,6 +2527,10 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     overflow-wrap: anywhere;
     text-overflow: clip;
 }
+.sector-tech-screen.is-decoder-workbench .radio-display-main {
+    grid-template-rows: repeat(5, minmax(0, 1fr)) minmax(0, 0.72fr);
+    align-content: stretch;
+}
 .sector-tech-screen.is-decoder-workbench .radio-display-main > div,
 .sector-tech-screen.is-decoder-workbench .radio-display-row-text {
     white-space: pre-wrap !important;
@@ -2534,7 +2538,14 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     overflow-wrap: anywhere;
     align-items: flex-start !important;
     text-overflow: clip;
-    line-height: 1.12;
+    line-height: 1.08;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+.sector-tech-screen.is-decoder-workbench .radio-display-main > div:last-child {
+    align-items: center !important;
+    white-space: nowrap !important;
+    letter-spacing: 0.12em;
 }
 .sector-tech-screen.is-field-edit .radio-edit-dec {
     opacity: 0.85;

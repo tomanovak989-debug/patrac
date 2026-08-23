@@ -605,7 +605,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'decoder') {
-        return buildDecoderOsView(decoderSession, notebook);
+        return buildDecoderOsView(decoderSession, notebook, displayOpts);
     }
 
     if (os.screen === SCREEN_STUB) {
