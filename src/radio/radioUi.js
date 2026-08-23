@@ -868,6 +868,7 @@ function startFieldEdit(type, options) {
 
 function finishFieldEdit(save) {
     if (!fieldEditSession) return;
+    finalizeT9Session(fieldEditSession);
     var c = getCtx();
     if (save && fieldEditSession.type === 'freq') {
         var freqVals = readFieldEditValues(fieldEditSession);

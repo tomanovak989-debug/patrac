@@ -9,7 +9,7 @@ import {
     stepFrequency
 } from './radioBand.js';
 import { normalizeEncryptionKey, isEmergencyFrequency } from './radioComms.js';
-import { CIPHER_KEY_LEN, isValidCipherKey } from './radioCipher.js';
+import { CIPHER_KEY_LEN } from './radioCipher.js';
 
 var FREQ_DIGITS = 6;
 var TEXT_MAX = 16;
@@ -171,10 +171,16 @@ export function textEditHint() {
     return 'T9 · 0 vel/mal poslední · # mez · * .,? · Zpět maže';
 }
 
-function applyLetterCase(ch) {
+export function encryptEditHint() {
+    return 'T9 A–Z · 5 znaků · OK uloží · Zpět maže';
+}
+
+function applyLetterCase(ch, session) {
     if (ch === ' ') return ' ';
     var s = String(ch);
-    if (/^[a-zA-Z]$/.test(s)) return s.toLowerCase();
+    if (/^[a-zA-Z]$/.test(s)) {
+        return session && session.type === 'encrypt' ? s.toUpperCase() : s.toLowerCase();
+    }
     return s;
 }
 
@@ -194,7 +200,7 @@ function toggleLastLetterCase(session) {
 function insertTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var out = applyLetterCase(ch);
+    var out = applyLetterCase(ch, session);
     var pos = Math.min(session.cursor, text.length);
     text = text.slice(0, pos) + out + text.slice(pos);
     if (text.length > maxLen) text = text.slice(0, maxLen);
@@ -205,7 +211,7 @@ function insertTextChar(session, ch) {
 function replaceTextChar(session, ch) {
     var text = normalizeTextValue(session.text);
     var maxLen = textMaxLen(session);
-    var out = applyLetterCase(ch);
+    var out = applyLetterCase(ch, session);
     var pos = Math.max(0, Math.min(session.cursor, text.length - 1));
     if (!text.length) {
         text = out;
@@ -343,8 +349,10 @@ export function buildFieldEditView(session, options) {
         status: options.status || (isKey ? 'NASTAV ŠIFRU' : 'NÁZEV KANÁLU'),
         keyHtml: buildTextHtml(session),
         axis: '',
-        hint: session.digitMode ? textEditHint() : 'OK spustí kurzor',
-        footer: 'OK · Zpět maže'
+        hint: session.digitMode
+            ? (isKey ? encryptEditHint() : textEditHint())
+            : (isKey ? 'OK spustí kurzor' : 'OK spustí kurzor'),
+        footer: isKey ? 'OK · uložit' : 'OK · Zpět maže'
     };
 }
 
@@ -424,7 +432,8 @@ export function handleFieldEditInput(session, action, char, opts) {
                 }
                 return toggleLastLetterCase(session);
             }
-            if (opts.longPress && /^[0-9]$/.test(char)) return applyLiteralDigit(session, char);
+            if (/^[2-9]$/.test(char)) return applyT9Tap(session, char);
+            if (opts.longPress && /^[0-9]$/.test(char)) return applyT9Tap(session, char);
             if (char === '*') return applyPunctTap(session);
             if (char === '#') {
                 finalizeT9Session(session);
@@ -474,10 +483,15 @@ export function handleFieldEditBack(session) {
     return 'exit';
 }
 
-/** OK: kurzor vyp/zap, pak ukončení dílčí editace. */
+/** OK: kurzor vyp/zap, pak ukončení dílčí editace. Šifra = jedno OK uloží. */
 export function handleFieldEditOk(session) {
     if (!session) return null;
     finalizeT9Session(session);
+    if (session.type === 'encrypt') {
+        session.digitMode = false;
+        session.okExitPending = false;
+        return 'done';
+    }
     if (session.digitMode) {
         session.digitMode = false;
         session.okExitPending = true;
@@ -524,7 +538,7 @@ export function applyFieldEditToState(session, radioState, ctx) {
     }
     if (session.type === 'encrypt') {
         var encKey = normalizeEncryptionKey(normalizeTextValue(session.text));
-        radioState.encryptionKey = isValidCipherKey(encKey) ? encKey : '';
+        radioState.encryptionKey = encKey;
         return true;
     }
     return false;
@@ -538,8 +552,7 @@ export function applyFieldEditToDraft(session, draft) {
     if (vals.frequency) draft.frequency = vals.frequency;
     if (vals.text != null) {
         if (session.type === 'encrypt') {
-            var dk = normalizeEncryptionKey(vals.text);
-            draft.encryptionKey = isValidCipherKey(dk) ? dk : '';
+            draft.encryptionKey = normalizeEncryptionKey(vals.text);
         } else draft.label = vals.text.trim() || ('Kanál ' + draft.slot);
     }
     return true;
