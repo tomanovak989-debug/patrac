@@ -106,6 +106,21 @@ export function getCommunityRadioKey(comCode) {
     return getStoredCommunityCipher(comCode);
 }
 
+/** Klíč pro poslech/TX — naladěný stav, jinak komunitní na com frekvenci. */
+export function resolveListenCipherKey(state, ctx, frequency) {
+    ctx = ctx || {};
+    state = state || {};
+    var tuned = normalizeEncryptionKey(state.encryptionKey || '');
+    if (tuned) return tuned;
+    var freq = normalizeFrequency(frequency != null ? frequency : state.frequency);
+    var comFreq = communityFrequencyFromCode(ctx.comCode);
+    if (ctx.comCode && freq && comFreq && freq === comFreq) {
+        var comKey = normalizeEncryptionKey(ctx.communityRadioKey || getStoredCommunityCipher(ctx.comCode));
+        if (comKey) return comKey;
+    }
+    return '';
+}
+
 export function normalizeOperatingMode(mode) {
     if (mode === 'off') return 'off';
     if (mode === 'on') return 'on';

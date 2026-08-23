@@ -152,13 +152,14 @@ export function processIncomingCipherMessage(wireText, msgKey, myKey, reception,
     var normalizedMsgKey = normalizeEncryptionKey(msgKey);
     var normalizedMyKey = normalizeEncryptionKey(myKey);
 
-    if (!normalizedMsgKey) {
-        var pt = applyReceptionToPlaintext(cipherText, reception, opts);
-        if (!pt) return null;
-        return Object.assign({ cipherText: '', encrypted: false }, pt);
+    /* Neplatný / prázdný klíč u zprávy = plaintext na drátu (PT). */
+    if (!normalizedMsgKey || !isValidCipherKey(normalizedMsgKey)) {
+        var ptOpen = applyReceptionToPlaintext(cipherText, reception, opts);
+        if (!ptOpen) return null;
+        return Object.assign({ cipherText: '', encrypted: false }, ptOpen);
     }
 
-    if (normalizedMsgKey !== normalizedMyKey) {
+    if (normalizedMsgKey !== normalizedMyKey || !isValidCipherKey(normalizedMyKey)) {
         return {
             text: 'POŠK · ' + cipherText,
             cipherText: cipherText,

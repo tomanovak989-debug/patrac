@@ -23,6 +23,7 @@ import {
     communityFrequencyFromCode,
     getCommunityRadioKey,
     setStoredCommunityCipher,
+    resolveListenCipherKey,
     formatStandbyPresetLine,
     buildStandbyPresetDisplay,
     formatStandbyFrequencyLine,
@@ -195,6 +196,7 @@ import {
     encryptPlaintext,
     processIncomingCipherMessage,
     isValidCipherKey,
+    decryptCiphertext,
     defaultWheelKey
 } from './radioCipher.js';
 import {
@@ -1988,7 +1990,7 @@ function tryAutoscanLock(payload) {
     }
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
-    var myKey = normalizeEncryptionKey(state.encryptionKey || '');
+    var myKey = resolvePayloadCipherKey(msgFreq);
     var processed = processIncomingCipherMessage(payload.text || '', msgKey, myKey, reception, {
         seed: payload.id || payload.text,
         frequency: msgFreq
@@ -3554,32 +3556,44 @@ function normalizeUserId(id) {
 }
 
 /** Echo vlastní TX: cloud id ≠ local_ id, takže by se zápis zduplikoval jako ↓. */
+function resolvePayloadCipherKey(frequency) {
+    var c = getCtx();
+    return resolveListenCipherKey(state, c, frequency);
+}
+
 function hasRecentOutgoingEcho(payload) {
     if (!notebook || !notebook.station) return false;
-    var text = String(payload.text || '').trim();
-    if (!text) return false;
+    var incomingText = String(payload.text || '').trim();
+    if (!incomingText) return false;
     var freq = normalizeFrequency(payload.frequency);
     var ts = Number(payload.timestamp) || Date.now();
     var sid = normalizeUserId(payload.senderId);
     var from = String(payload.senderName || '').trim().toLowerCase();
     var me = normalizeUserId(getCtx().userId);
     var myName = String(getCtx().playerName || '').trim().toLowerCase();
+    var incomingKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var list = notebook.station;
     for (var i = 0; i < list.length; i++) {
         var e = list[i];
         if (!e || e.dir !== 'out') continue;
         if (normalizeFrequency(e.frequency) !== freq) continue;
-        if (String(e.text || '').trim() !== text) continue;
         if (Math.abs((e.ts || 0) - ts) > 45000 && !(e.cloudId && payload.id && e.cloudId === payload.id)) {
             continue;
         }
-        /* Jen vlastní odchozí — ne cizí ↑ omylem v sešitu. */
         var own = (me && normalizeUserId(e.senderId) === me) ||
             (myName && String(e.from || '').trim().toLowerCase() === myName) ||
             (sid && me && sid === me) ||
             (from && myName && from === myName);
-        if (own) return true;
-        if (e.cloudId && payload.id && e.cloudId === payload.id) return true;
+        if (!own && !(e.cloudId && payload.id && e.cloudId === payload.id)) continue;
+
+        var outText = String(e.text || '').trim();
+        var outKey = normalizeEncryptionKey(e.encryptionKey || '');
+        if (incomingKey && outKey && incomingKey === outKey && isValidCipherKey(incomingKey)) {
+            if (decryptCiphertext(incomingText, incomingKey) === outText) return true;
+            continue;
+        }
+        if (outText !== incomingText) continue;
+        return true;
     }
     return false;
 }
@@ -3731,7 +3745,7 @@ function ingestIncomingBeacon(payload, c) {
     if (hasRecentOutgoingEcho(payload)) return;
     if (hasContentDuplicate(payload)) return;
     var beaconKey = normalizeEncryptionKey(payload.encryptionKey || '');
-    var myBeaconKey = normalizeEncryptionKey(state.encryptionKey || '');
+    var myBeaconKey = resolvePayloadCipherKey(payload.frequency);
     var beaconReadable = !beaconKey || beaconKey === myBeaconKey;
     if (beaconReadable && payload.pttAudio) {
         playPttAudio(payload.pttAudio, payload.pttMime);
@@ -3766,7 +3780,7 @@ function ingestIncomingMessage(payload, c) {
     }
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
-    var myKey = normalizeEncryptionKey(state.encryptionKey || '');
+    var myKey = resolvePayloadCipherKey(payload.frequency);
     var processed = processIncomingCipherMessage(payload.text || '', msgKey, myKey, reception, {
         seed: payload.id || payload.text,
         frequency: payload.frequency
@@ -3775,7 +3789,7 @@ function ingestIncomingMessage(payload, c) {
 
     var entry = createIncomingEntry(Object.assign({}, payload, {
         text: processed.text,
-        cipherText: processed.cipherText || (msgKey ? String(payload.text || '') : ''),
+        cipherText: processed.cipherText || (isValidCipherKey(msgKey) ? String(payload.text || '') : ''),
         encrypted: !!processed.encrypted,
         fromAutoscan: isAutoscanListening(),
         signalQuality: processed.signalQuality,
@@ -3888,6 +3902,19 @@ async function transmitMessage(text, extras) {
     });
     var txPresetSlot = extras.presetSlot != null ? extras.presetSlot : state.activePresetSlot;
     if (txPresetSlot) txState.activePresetSlot = txPresetSlot;
+
+    var txKeyNorm = normalizeEncryptionKey(txKey || '');
+    if (!txKeyNorm) {
+        txKeyNorm = resolveListenCipherKey(txState, c, txFreq);
+    }
+    var wireText = text;
+    var wireKey = '';
+    if (txKeyNorm && isValidCipherKey(txKeyNorm)) {
+        wireText = encryptPlaintext(text, txKeyNorm);
+        wireKey = txKeyNorm;
+    }
+    if (wireKey) txState.encryptionKey = wireKey;
+
     if (!extras.skipTxFx) radioTxStart();
     var entry = createOutgoingEntry(text, c, txState, extras);
     if (!extras.skipNotebook) {
@@ -3898,17 +3925,11 @@ async function transmitMessage(text, extras) {
 
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
 
-    var txKeyNorm = normalizeEncryptionKey(txKey || '');
-    var wireText = text;
-    if (txKeyNorm && isValidCipherKey(txKeyNorm)) {
-        wireText = encryptPlaintext(text, txKeyNorm);
-    }
-
     try {
         var sent = await sendRadioTransmission({
             channelId: entry.channelId,
             frequency: entry.frequency,
-            encryptionKey: entry.encryptionKey,
+            encryptionKey: wireKey,
             scope: entry.scope,
             comCode: c.comCode,
             senderId: c.userId,
