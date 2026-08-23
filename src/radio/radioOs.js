@@ -373,6 +373,10 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'decoder') {
+        if (action === 'left') return { changed: true, effect: 'decoder_left' };
+        if (action === 'right') return { changed: true, effect: 'decoder_right' };
+        if (action === 'up') return { changed: true, effect: 'decoder_up' };
+        if (action === 'down') return { changed: true, effect: 'decoder_down' };
         if (action === 'ok') return { changed: true, effect: 'decoder_ok' };
         return { changed: false };
     }

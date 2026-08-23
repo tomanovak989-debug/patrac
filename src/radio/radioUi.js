@@ -22,6 +22,7 @@ import {
     createIncomingEntry,
     communityFrequencyFromCode,
     getCommunityRadioKey,
+    setStoredCommunityCipher,
     formatStandbyPresetLine,
     buildStandbyPresetDisplay,
     formatStandbyFrequencyLine,
@@ -57,8 +58,6 @@ import { getFirebaseAuth } from '../lib/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
     evaluateBestRadioReception,
-    applyReceptionToMessage,
-    noisePlaceholder,
     SIGNAL_NOISE,
     SIGNAL_CLEAR,
     SIGNAL_NONE
@@ -185,8 +184,19 @@ import {
 } from './radioArkanoid.js';
 import {
     createDecoderState,
-    resetDecoderState
+    DECODER_SCREENS,
+    decoderHubMove,
+    decoderOpenSelected,
+    decoderRotateWheel,
+    decoderMoveWheelFocus,
+    computeDecoderPreview
 } from './radioDecoder.js';
+import {
+    encryptPlaintext,
+    processIncomingCipherMessage,
+    isValidCipherKey,
+    defaultWheelKey
+} from './radioCipher.js';
 import {
     bindQuickKey,
     bindingFromMenuItem,
@@ -1219,6 +1229,42 @@ function applyRadioOsEffect(result) {
         closeDecoderScreen();
         return true;
     }
+    if (result.effect === 'decoder_left') {
+        if (decoderSession && decoderSession.screen === DECODER_SCREENS.WORKBENCH) {
+            decoderMoveWheelFocus(decoderSession, -1);
+        }
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'decoder_right') {
+        if (decoderSession && decoderSession.screen === DECODER_SCREENS.WORKBENCH) {
+            decoderMoveWheelFocus(decoderSession, 1);
+        }
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'decoder_up') {
+        if (decoderSession) {
+            if (decoderSession.screen === DECODER_SCREENS.HUB) {
+                decoderHubMove(decoderSession, notebook, -1);
+            } else {
+                decoderRotateWheel(decoderSession, 1);
+            }
+        }
+        renderDisplay();
+        return true;
+    }
+    if (result.effect === 'decoder_down') {
+        if (decoderSession) {
+            if (decoderSession.screen === DECODER_SCREENS.HUB) {
+                decoderHubMove(decoderSession, notebook, 1);
+            } else {
+                decoderRotateWheel(decoderSession, -1);
+            }
+        }
+        renderDisplay();
+        return true;
+    }
     if (result.effect === 'decoder_ok') {
         handleDecoderOk();
         return true;
@@ -1890,6 +1936,10 @@ function isAutoscanListening() {
     return !!(autoscanSession && autoscanSession.status === SCAN_RUNNING);
 }
 
+function isDecoderMenuOpen() {
+    return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'decoder');
+}
+
 function isAutoscanMenuOpen() {
     return !!(radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === 'autoscan');
 }
@@ -1938,17 +1988,17 @@ function tryAutoscanLock(payload) {
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var myKey = normalizeEncryptionKey(state.encryptionKey || '');
-    var foreignEncrypt = !!(msgKey && msgKey !== myKey);
-    var hitLabel = foreignEncrypt ? 'ŠIFROVANÝ PROVOZ' : (msgFreq + ' MHz');
-    var applied = foreignEncrypt ? null : applyReceptionToMessage(payload.text, reception, {
+    var processed = processIncomingCipherMessage(payload.text || '', msgKey, myKey, reception, {
         seed: payload.id || payload.text,
         frequency: msgFreq
     });
-    var captureText = foreignEncrypt
-        ? '[ŠIFROVANÝ PROVOZ]'
-        : String((applied && applied.text) || payload.text || '').slice(0, 96);
+    var foreignEncrypt = !!(processed && processed.encrypted);
+    var hitLabel = foreignEncrypt ? 'ŠIFROVANÝ PROVOZ' : (msgFreq + ' MHz');
+    var captureText = processed
+        ? String(processed.text || processed.cipherText || '').slice(0, 96)
+        : '';
     if (!captureText && payload.messageType === 'ptt') captureText = '[PTT]';
-    if (!captureText) captureText = '[ZACHYCENO]';
+    if (!captureText) captureText = foreignEncrypt ? '[ŠIFROVANÝ PROVOZ]' : '[ZACHYCENO]';
 
     /* Jen počítat a ukládat — bez auto-zamčení na první zásah. */
     autoscanSession.hitFrequency = msgFreq;
@@ -1973,7 +2023,7 @@ function tryAutoscanLock(payload) {
     }
     persist();
     renderDisplay();
-    radioIncomingFeedback((applied && applied.signalQuality) || reception.quality || SIGNAL_CLEAR);
+    radioIncomingFeedback((processed && processed.signalQuality) || reception.quality || SIGNAL_CLEAR);
 }
 
 function openRadioAutoscanScreen(autoStart) {
@@ -2929,6 +2979,27 @@ function closeDecoderScreen() {
 
 function handleDecoderOk() {
     if (!decoderSession) return;
+    if (decoderSession.screen === DECODER_SCREENS.HUB) {
+        if (!decoderOpenSelected(decoderSession, notebook)) {
+            renderDisplay();
+            return;
+        }
+        renderDisplay();
+        return;
+    }
+    var preview = computeDecoderPreview(decoderSession, notebook) ||
+        decoderSession.draftOutput || '';
+    if (!preview) {
+        renderDisplay();
+        return;
+    }
+    resetRadioOs(radioOs);
+    radioOs.screen = 'menu';
+    radioOs.menuPath = ['comms'];
+    ensureCommsSession();
+    commsSession.screen = COMMS_COMPOSE;
+    decoderSession = null;
+    openCommsCompose(preview);
     renderDisplay();
 }
 
@@ -3695,35 +3766,25 @@ function ingestIncomingMessage(payload, c) {
 
     var msgKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var myKey = normalizeEncryptionKey(state.encryptionKey || '');
-    /* Otevřený kanál (PT): prázdná šifra na zprávě i u přijímače → čitelný text.
-       Cizí heslo na stejné frekvenci → šum. */
-    var canRead = !msgKey || msgKey === myKey;
-
-    var applied;
-    if (!canRead) {
-        applied = {
-            text: noisePlaceholder(payload.frequency),
-            signalQuality: SIGNAL_NOISE,
-            distanceKm: reception.distanceKm
-        };
-    } else {
-        applied = applyReceptionToMessage(payload.text, reception, {
-            seed: payload.id || payload.text,
-            frequency: payload.frequency
-        });
-    }
-    if (!applied) return;
+    var processed = processIncomingCipherMessage(payload.text || '', msgKey, myKey, reception, {
+        seed: payload.id || payload.text,
+        frequency: payload.frequency
+    });
+    if (!processed) return;
 
     var entry = createIncomingEntry(Object.assign({}, payload, {
-        text: applied.text,
-        signalQuality: applied.signalQuality,
-        distanceKm: applied.distanceKm
+        text: processed.text,
+        cipherText: processed.cipherText || (msgKey ? String(payload.text || '') : ''),
+        encrypted: !!processed.encrypted,
+        fromAutoscan: isAutoscanListening(),
+        signalQuality: processed.signalQuality,
+        distanceKm: processed.distanceKm
     }), c);
     recordEntry(entry);
-    if (canRead && payload.messageType === 'ptt' && payload.pttAudio) {
+    if (!processed.encrypted && payload.messageType === 'ptt' && payload.pttAudio) {
         playPttAudio(payload.pttAudio, payload.pttMime);
     }
-    radioIncomingFeedback(applied.signalQuality);
+    radioIncomingFeedback(processed.signalQuality);
 }
 
 function bindRadioAuthRefresh() {
@@ -3836,6 +3897,12 @@ async function transmitMessage(text, extras) {
 
     if (ctx.isLocalOnly && ctx.isLocalOnly()) return;
 
+    var txKeyNorm = normalizeEncryptionKey(txKey || '');
+    var wireText = text;
+    if (txKeyNorm && isValidCipherKey(txKeyNorm)) {
+        wireText = encryptPlaintext(text, txKeyNorm);
+    }
+
     try {
         var sent = await sendRadioTransmission({
             channelId: entry.channelId,
@@ -3845,7 +3912,7 @@ async function transmitMessage(text, extras) {
             comCode: c.comCode,
             senderId: c.userId,
             senderName: c.playerName,
-            text: text,
+            text: wireText,
             messageType: extras.messageType,
             beaconBandcast: extras.beaconBandcast,
             pttAudio: extras.pttAudio,
@@ -4379,6 +4446,15 @@ function handleRadioBackPress() {
         renderDisplay();
         return;
     }
+    if (decoderSession && decoderSession.screen === DECODER_SCREENS.WORKBENCH && isDecoderMenuOpen()) {
+        decoderSession.screen = DECODER_SCREENS.HUB;
+        decoderSession.selectedEntryId = null;
+        decoderSession.wheelFocus = 0;
+        decoderSession.wheels = defaultWheelKey();
+        decoderSession.draftOutput = '';
+        renderDisplay();
+        return;
+    }
     if (handleRadioOsInput('back')) return;
     state.dialBuffer = '';
     state.keypadMode = 'tx';
@@ -4732,6 +4808,11 @@ export function initRadioCommsSystem(options) {
     };
     window.patracRefreshRadioDisplay = function() {
         renderDisplay();
+    };
+    window.patracSetCommunityCipher = function(key) {
+        var c = getCtx();
+        if (c.comCode) setStoredCommunityCipher(c.comCode, key);
+        refreshRadioCommsContext();
     };
     window.patracRefreshRadioUnreadBadge = refreshRadioUnreadBadge;
     syncNotebookTabs();

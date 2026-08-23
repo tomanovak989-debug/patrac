@@ -9,6 +9,7 @@ import {
     stepFrequency
 } from './radioBand.js';
 import { normalizeEncryptionKey, isEmergencyFrequency } from './radioComms.js';
+import { CIPHER_KEY_LEN, isValidCipherKey } from './radioCipher.js';
 
 var FREQ_DIGITS = 6;
 var TEXT_MAX = 16;
@@ -109,7 +110,7 @@ export function finalizeT9Session(session) {
 
 function textMaxLen(session) {
     if (session.type === 'text') return session.maxLen || LABEL_MAX;
-    if (session.type === 'encrypt') return TEXT_MAX;
+    if (session.type === 'encrypt') return CIPHER_KEY_LEN;
     return LABEL_MAX;
 }
 
@@ -522,7 +523,8 @@ export function applyFieldEditToState(session, radioState, ctx) {
         return true;
     }
     if (session.type === 'encrypt') {
-        radioState.encryptionKey = normalizeEncryptionKey(normalizeTextValue(session.text));
+        var encKey = normalizeEncryptionKey(normalizeTextValue(session.text));
+        radioState.encryptionKey = isValidCipherKey(encKey) ? encKey : '';
         return true;
     }
     return false;
@@ -535,8 +537,10 @@ export function applyFieldEditToDraft(session, draft) {
     if (vals.frequency && isEmergencyFrequency(vals.frequency)) return false;
     if (vals.frequency) draft.frequency = vals.frequency;
     if (vals.text != null) {
-        if (session.type === 'encrypt') draft.encryptionKey = normalizeEncryptionKey(vals.text);
-        else draft.label = vals.text.trim() || ('Kanál ' + draft.slot);
+        if (session.type === 'encrypt') {
+            var dk = normalizeEncryptionKey(vals.text);
+            draft.encryptionKey = isValidCipherKey(dk) ? dk : '';
+        } else draft.label = vals.text.trim() || ('Kanál ' + draft.slot);
     }
     return true;
 }

@@ -133,11 +133,13 @@ function filterDrafts(notebook) {
 function formatEntryLine(entry, radioState) {
     if (!entry) return { text: '', bold: false };
     var arrow = entry.dir === 'out' ? '↑' : '↓';
+    var scanMark = entry.fromAutoscan ? '◎' : '';
     var channel = formatEntryChannelLabel(entry, radioState);
     var text = String(entry.text || '').replace(/\s+/g, ' ').trim();
+    if (entry.encrypted && !entry.cipherText && !text) text = '[POŠK]';
     if (entry.messageType === 'ptt' || /^\[PTT/.test(text)) text = text || '[PTT]';
     var when = formatDateShort(entry.ts);
-    var line = when + ' ' + arrow + ' ' + channel + ' ' + text;
+    var line = when + ' ' + arrow + scanMark + ' ' + channel + ' ' + text;
     var bold = entry.dir === 'in' && entry.read !== true;
     return { text: line, bold: bold };
 }

@@ -22,6 +22,17 @@ import {
     isEmergencyFrequency
 } from './radioBand.js';
 import { createDefaultQuickKeys, normalizeQuickKeys } from './radioShortcuts.js';
+import {
+    normalizeEncryptionKey,
+    isValidCipherKey,
+    CIPHER_KEY_LEN
+} from './radioCipher.js';
+
+export {
+    normalizeEncryptionKey,
+    isValidCipherKey,
+    CIPHER_KEY_LEN
+} from './radioCipher.js';
 
 export {
     BAND_MIN_MHZ,
@@ -62,8 +73,37 @@ export const CHANNEL_SCOPE_LABELS = {
     private: 'SOUK'
 };
 
-export function normalizeEncryptionKey(value) {
-    return String(value || '').trim().toLowerCase();
+export function communityFrequencyFromCode(comCode) {
+    return channelFromCode(comCode, 435);
+}
+
+var COMMUNITY_CIPHER_PREFIX = 'patrac_com_cipher_';
+
+/** Komunitní šifra — nastaví příběh / mise, ne generátor z názvu. */
+export function getStoredCommunityCipher(comCode) {
+    comCode = String(comCode || '').trim().toUpperCase();
+    if (!comCode) return '';
+    try {
+        var stored = localStorage.getItem(COMMUNITY_CIPHER_PREFIX + comCode);
+        if (stored) return normalizeEncryptionKey(stored);
+    } catch (e) {}
+    return '';
+}
+
+export function setStoredCommunityCipher(comCode, key) {
+    comCode = String(comCode || '').trim().toUpperCase();
+    if (!comCode) return '';
+    var normalized = normalizeEncryptionKey(key);
+    try {
+        if (normalized) localStorage.setItem(COMMUNITY_CIPHER_PREFIX + comCode, normalized);
+        else localStorage.removeItem(COMMUNITY_CIPHER_PREFIX + comCode);
+    } catch (e) {}
+    return normalized;
+}
+
+/** @deprecated alias — použij getStoredCommunityCipher */
+export function getCommunityRadioKey(comCode) {
+    return getStoredCommunityCipher(comCode);
 }
 
 export function normalizeOperatingMode(mode) {
@@ -82,26 +122,6 @@ export function hashChannelId(frequency, encryptionKey) {
     return 'ch_' + h.toString(16);
 }
 
-export function communityFrequencyFromCode(comCode) {
-    return channelFromCode(comCode, 435);
-}
-
-export function communityEncryptionDefault(comCode, comName) {
-    var base = String(comName || comCode || 'komunita').trim().toLowerCase();
-    var word = base.split(/\s+/)[0].replace(/[^a-z0-9áčďéěíňóřšťúůýž]/gi, '');
-    return word.slice(0, 16) || 'tabor';
-}
-
-export function getCommunityRadioKey(comCode, comName) {
-    comCode = String(comCode || '').trim().toUpperCase();
-    if (!comCode) return '';
-    try {
-        var stored = localStorage.getItem('patrac_com_radio_key_' + comCode);
-        if (stored) return stored;
-    } catch (e) {}
-    return communityEncryptionDefault(comCode, comName);
-}
-
 export function classifyChannel(frequency, encryptionKey, ctx) {
     ctx = ctx || {};
     var freq = normalizeFrequency(frequency);
@@ -114,8 +134,9 @@ export function classifyChannel(frequency, encryptionKey, ctx) {
 
     if (ctx.comCode) {
         var comFreq = communityFrequencyFromCode(ctx.comCode);
-        var comKey = normalizeEncryptionKey(ctx.communityRadioKey || communityEncryptionDefault(ctx.comCode, ctx.comName));
-        if (freq === comFreq && key === comKey) return 'community';
+        var comKey = normalizeEncryptionKey(ctx.communityRadioKey || getStoredCommunityCipher(ctx.comCode));
+        if (freq === comFreq && key && key === comKey) return 'community';
+        if (freq === comFreq && !key && !comKey) return 'community';
     }
 
     return 'private';
@@ -124,7 +145,7 @@ export function classifyChannel(frequency, encryptionKey, ctx) {
 export function defaultRadioState(userId, ctx) {
     ctx = ctx || {};
     var comFreq = communityFrequencyFromCode(ctx.comCode);
-    var comKey = ctx.comCode ? getCommunityRadioKey(ctx.comCode, ctx.comName) : '';
+    var comKey = ctx.comCode ? getStoredCommunityCipher(ctx.comCode) : '';
     var presets = buildDefaultDialPresets({
         comCode: ctx.comCode,
         comFreq: comFreq,
@@ -241,7 +262,7 @@ export function sanitizeEmergencyFromState(state, ctx) {
     if (!state) return state;
     ctx = ctx || {};
     var comFreq = communityFrequencyFromCode(ctx.comCode);
-    var comKey = ctx.comCode ? getCommunityRadioKey(ctx.comCode, ctx.comName) : '';
+    var comKey = ctx.comCode ? getStoredCommunityCipher(ctx.comCode) : '';
     if (!comFreq && state.presets && state.presets.length) {
         for (var c = 0; c < state.presets.length; c++) {
             if (state.presets[c].slot === 1 && !isEmergencyFrequency(state.presets[c].frequency)) {
@@ -1043,6 +1064,9 @@ export function createIncomingEntry(payload, ctx) {
     if (payload.pttMime) entry.pttMime = payload.pttMime;
     if (payload.signalQuality) entry.signalQuality = payload.signalQuality;
     if (payload.distanceKm != null) entry.distanceKm = payload.distanceKm;
+    if (payload.cipherText) entry.cipherText = payload.cipherText;
+    if (payload.encrypted) entry.encrypted = true;
+    if (payload.fromAutoscan) entry.fromAutoscan = true;
     if (payload.originLat != null) entry.originLat = payload.originLat;
     if (payload.originLng != null) entry.originLng = payload.originLng;
     return entry;

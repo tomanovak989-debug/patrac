@@ -3747,10 +3747,11 @@ function initRadioCommsAsync() {
             getComName: function() { return localStorage.getItem('com_name') || ''; },
             getCommunityRadioKey: function() {
                 var code = localStorage.getItem('com_code') || operatorComCode || '';
-                var name = localStorage.getItem('com_name') || '';
                 try {
-                    var stored = localStorage.getItem('patrac_com_radio_key_' + code);
+                    var stored = localStorage.getItem('patrac_com_cipher_' + code);
                     if (stored) return stored;
+                    var legacy = localStorage.getItem('patrac_com_radio_key_' + code);
+                    if (legacy) return legacy;
                 } catch (e) {}
                 return null;
             },
