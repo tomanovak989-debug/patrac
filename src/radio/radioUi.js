@@ -432,6 +432,19 @@ function getRelayNodes(channel) {
     return listReceiverNodes(getComCode(), channel || null);
 }
 
+function activeNodeElevationM(resolved) {
+    if (!resolved || !resolved.node) return 0;
+    var node = resolved.node;
+    if (node.elevationM != null && isFinite(Number(node.elevationM))) {
+        return Number(node.elevationM);
+    }
+    var cached = getCachedElevationM(node.lat, node.lng);
+    if (cached != null) return cached;
+    if (resolved.kind === 'handset' && receptionElev.playerM != null) return receptionElev.playerM;
+    if (resolved.kind === 'shelter' && receptionElev.shelterM != null) return receptionElev.shelterM;
+    return 0;
+}
+
 function evaluateIncomingReception(origin, channel) {
     var receiver = getRadioLatLng();
     var resolved = resolveActiveRadioNode(radioNodeDeps());
