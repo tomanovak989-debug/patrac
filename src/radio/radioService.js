@@ -116,7 +116,9 @@ function mapDocToPayload(docSnap, fallbackFreq, channelId) {
     };
 }
 
-function attachChannelListener(raw, onMessage) {
+function attachChannelListener(raw, onMessage, opts) {
+    opts = opts || {};
+    var backfillRecentMs = opts.backfillRecentMs || 0;
     var freq = normalizeFrequency(raw);
     var channelId = freq ? frequencyChannelId(freq) : String(raw || '');
     if (!channelId || channelUnsubs[channelId]) return;
@@ -133,9 +135,16 @@ function attachChannelListener(raw, onMessage) {
         if (initialSnap) {
             initialSnap = false;
             var docs = snap.docs.slice().reverse();
-            for (var s = 0; s < docs.length; s++) {
+            var cutoff = backfillRecentMs > 0 ? Date.now() - backfillRecentMs : 0;
+            var s;
+            for (s = 0; s < docs.length; s++) {
                 seen[docs[s].id] = true;
-                onMessage(mapDocToPayload(docs[s], freq, channelId));
+                if (backfillRecentMs > 0) {
+                    var ts = Number((docs[s].data() || {}).timestamp) || 0;
+                    if (ts >= cutoff) {
+                        onMessage(mapDocToPayload(docs[s], freq, channelId));
+                    }
+                }
             }
             return;
         }
@@ -167,7 +176,9 @@ export async function subscribeRadioChannels(frequenciesOrIds, onMessage, opts) 
     await ensureRadioAuth(false);
 
     for (var i = 0; i < frequenciesOrIds.length; i++) {
-        attachChannelListener(frequenciesOrIds[i], onMessage);
+        attachChannelListener(frequenciesOrIds[i], onMessage, {
+            backfillRecentMs: opts.backfillRecentMs || 0
+        });
     }
 }
 
@@ -283,8 +294,9 @@ export async function subscribeRadioListen(onMessage, opts) {
     await ensureRadioAuth(false);
 
     var freqs = Array.isArray(opts.frequencies) ? opts.frequencies : [];
+    var backfillRecentMs = opts.backfillRecentMs || 0;
     for (var i = 0; i < freqs.length; i++) {
-        attachChannelListener(freqs[i], onMessage);
+        attachChannelListener(freqs[i], onMessage, { backfillRecentMs: backfillRecentMs });
     }
 
     var bandOk = false;

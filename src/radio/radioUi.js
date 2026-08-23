@@ -3561,6 +3561,23 @@ function resolvePayloadCipherKey(frequency) {
     return resolveListenCipherKey(state, c, frequency);
 }
 
+/** Příjem jen na naladěných / poslouchaných frekvencích (ne celé pásmo). */
+function shouldAcceptIncomingPayload(payload) {
+    if (!payload || state.operatingMode === 'off') return false;
+    var msgFreq = normalizeFrequency(payload.frequency);
+    if (!msgFreq) return false;
+    if (isAutoscanListening()) {
+        return isAutoscanListenFrequency(msgFreq);
+    }
+    var tuned = normalizeFrequency(state.frequency);
+    if (tuned && msgFreq === tuned) return true;
+    var c = getCtx();
+    var comFreq = communityFrequencyFromCode(c.comCode);
+    if (comFreq && msgFreq === comFreq) return true;
+    if (msgFreq === normalizeFrequency(BEACON_SOS_FREQUENCY)) return true;
+    return false;
+}
+
 function hasRecentOutgoingEcho(payload) {
     if (!notebook || !notebook.station) return false;
     var incomingText = String(payload.text || '').trim();
@@ -3568,23 +3585,19 @@ function hasRecentOutgoingEcho(payload) {
     var freq = normalizeFrequency(payload.frequency);
     var ts = Number(payload.timestamp) || Date.now();
     var sid = normalizeUserId(payload.senderId);
-    var from = String(payload.senderName || '').trim().toLowerCase();
     var me = normalizeUserId(getCtx().userId);
-    var myName = String(getCtx().playerName || '').trim().toLowerCase();
+    /* Echo jen stejného účtu na tomto zařízení — jiný telefon se stejným účtem musí přijmout. */
+    if (!me || !sid || sid !== me) return false;
     var incomingKey = normalizeEncryptionKey(payload.encryptionKey || '');
     var list = notebook.station;
     for (var i = 0; i < list.length; i++) {
         var e = list[i];
         if (!e || e.dir !== 'out') continue;
+        if (normalizeUserId(e.senderId) !== me) continue;
         if (normalizeFrequency(e.frequency) !== freq) continue;
         if (Math.abs((e.ts || 0) - ts) > 45000 && !(e.cloudId && payload.id && e.cloudId === payload.id)) {
             continue;
         }
-        var own = (me && normalizeUserId(e.senderId) === me) ||
-            (myName && String(e.from || '').trim().toLowerCase() === myName) ||
-            (sid && me && sid === me) ||
-            (from && myName && from === myName);
-        if (!own && !(e.cloudId && payload.id && e.cloudId === payload.id)) continue;
 
         var outText = String(e.text || '').trim();
         var outKey = normalizeEncryptionKey(e.encryptionKey || '');
@@ -3669,6 +3682,7 @@ function recordEntry(entry) {
 function ingestIncomingPayload(payload) {
     var c = getCtx();
     if (!payload || !payload.id) return;
+    if (!shouldAcceptIncomingPayload(payload)) return;
     if (seenMessageIds[payload.id] || notebookHasId(payload.id)) {
         seenMessageIds[payload.id] = true;
         return;
@@ -3691,8 +3705,9 @@ function ingestIncomingPayload(payload) {
         return;
     }
 
-    ingestIncomingMessage(payload, c);
-    seenMessageIds[payload.id] = true;
+    if (ingestIncomingMessage(payload, c)) {
+        seenMessageIds[payload.id] = true;
+    }
 }
 
 function applyLiveBeaconsFromCloud(docs) {
@@ -3785,7 +3800,7 @@ function ingestIncomingMessage(payload, c) {
         seed: payload.id || payload.text,
         frequency: payload.frequency
     });
-    if (!processed) return;
+    if (!processed) return false;
 
     var entry = createIncomingEntry(Object.assign({}, payload, {
         text: processed.text,
@@ -3800,6 +3815,8 @@ function ingestIncomingMessage(payload, c) {
         playPttAudio(payload.pttAudio, payload.pttMime);
     }
     radioIncomingFeedback(processed.signalQuality);
+    renderDisplay();
+    return true;
 }
 
 function bindRadioAuthRefresh() {
