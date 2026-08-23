@@ -3047,6 +3047,9 @@ function switchMainTab(tab, element) {
                     if (typeof window.patracRefreshSectorTech === 'function') {
                         try { window.patracRefreshSectorTech(); } catch (eSt) {}
                     }
+                    if (typeof window.patracEnsureRadioHitmap === 'function') {
+                        try { window.patracEnsureRadioHitmap(); } catch (eHm) {}
+                    }
                 });
             });
         }

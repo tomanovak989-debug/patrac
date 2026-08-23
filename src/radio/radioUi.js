@@ -77,7 +77,7 @@ import {
     copyGridLineText
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
-import { applyDisplayTypography } from './radioHitmap.js';
+import { applyDisplayTypography, applyRadioHitmap } from './radioHitmap.js';
 import {
     syncBattery,
     formatStandbyClockBattery,
@@ -4041,6 +4041,7 @@ function bindKeypadPointerFeedback() {
 }
 
 function bindKeypad() {
+    applyRadioHitmap();
     var nodeBtn = el('radio-display-node');
     if (nodeBtn && !nodeBtn._radioCommsBound) {
         nodeBtn._radioCommsBound = true;
@@ -4620,6 +4621,7 @@ export function initRadioCommsSystem(options) {
     ctx = options || {};
     var c = getCtx();
     state = loadRadioState(c.userId, c);
+    bindKeypad();
     notebook = loadNotebook(c.userId);
     notebook = sanitizeStationNotebook(notebook, {
         userId: c.userId,
@@ -4650,7 +4652,6 @@ export function initRadioCommsSystem(options) {
         saveNotebook(c.userId, notebook);
     }
 
-    bindKeypad();
     bindRadioAuthRefresh();
     bindChargeControl();
     startBatteryTimer();
@@ -4666,6 +4667,9 @@ export function initRadioCommsSystem(options) {
     resetRadioOs(radioOs);
     initSectorTechShell();
     window.patracRefreshSectorTech = refreshSectorTechLayout;
+    window.patracEnsureRadioHitmap = function() {
+        applyRadioHitmap();
+    };
     window.patracRefreshRadioUnreadBadge = refreshRadioUnreadBadge;
     syncNotebookTabs();
     renderDisplay();
