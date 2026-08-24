@@ -264,7 +264,7 @@ export function wheelsToKey(wheels) {
     return out;
 }
 
-/** Mezery viditelné na displeji dešifrátoru (NBSP). */
+/** Mezery jako podtržítka na displeji dešifrátoru (viditelná délka slov). */
 export function formatDecoderDisplayText(text) {
-    return String(text || '').replace(/ /g, '\u00a0');
+    return String(text || '').replace(/ /g, '_');
 }

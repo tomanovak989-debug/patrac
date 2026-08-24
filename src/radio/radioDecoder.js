@@ -72,9 +72,9 @@ function formatHubLine(entry) {
     return when + ' ' + from + ' ' + preview;
 }
 
-/** Zalamování s zachováním mezer; zbytek textu = … na posledním řádku. */
+/** Zalamování; mezery = podtržítka; zbytek textu = … na posledním řádku. */
 function wrapDecoderResult(text, maxLen, maxLines) {
-    text = String(text || '').replace(/\u00a0/g, ' ');
+    text = formatDecoderDisplayText(text);
     maxLen = maxLen || 18;
     maxLines = maxLines || 5;
     var lines = [];
@@ -82,17 +82,17 @@ function wrapDecoderResult(text, maxLen, maxLines) {
     while (pos < text.length && lines.length < maxLines) {
         var end = pos + maxLen;
         if (end >= text.length) {
-            lines.push(formatDecoderDisplayText(text.slice(pos)));
+            lines.push(text.slice(pos));
             pos = text.length;
             break;
         }
         var slice = text.slice(pos, end);
-        var sp = slice.lastIndexOf(' ');
+        var sp = slice.lastIndexOf('_');
         if (sp > 0) {
-            lines.push(formatDecoderDisplayText(text.slice(pos, pos + sp)));
+            lines.push(text.slice(pos, pos + sp));
             pos = pos + sp + 1;
         } else {
-            lines.push(formatDecoderDisplayText(slice));
+            lines.push(slice);
             pos = end;
         }
     }

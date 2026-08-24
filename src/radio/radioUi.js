@@ -763,13 +763,19 @@ function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
     focusLine = focusLine == null ? -1 : focusLine;
     lineStyles = lineStyles || [];
     lineIcons = lineIcons || [];
+    var screen = el('radio-display-screen');
+    var decoderWorkbench = !!(screen && screen.classList.contains('is-decoder-workbench'));
     var i;
     for (i = 0; i < DISPLAY_LINE_IDS.length; i++) {
         var row = el(DISPLAY_LINE_IDS[i]);
         if (!row) continue;
         var text = i < lines.length ? (lines[i] || '') : '';
         var iconFile = i < lineIcons.length ? lineIcons[i] : null;
-        row.innerHTML = buildMenuRowHtml(text, iconFile);
+        if (decoderWorkbench) {
+            row.textContent = text;
+        } else {
+            row.innerHTML = buildMenuRowHtml(text, iconFile);
+        }
         row.classList.remove('radio-display-row-marquee-active');
         row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
         row.classList.toggle('radio-display-row-focus', i === focusLine);
