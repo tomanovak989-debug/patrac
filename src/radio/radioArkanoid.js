@@ -7,14 +7,14 @@ export var ARK_W = 48;
 export var ARK_H = 48;
 export var ARK_UNIT = 2;
 export var ARK_CELL_COUNT = ARK_W * ARK_H;
-export var ARK_PADDLE_W = 24;
+export var ARK_PADDLE_W = 16;
 export var ARK_PADDLE_STEP = 8;
 export var ARK_PADDLE_H = 2;
 export var ARK_BRICK_ROWS = 6;
 export var ARK_BRICK_COLS = ARK_W / ARK_UNIT;
 export var ARK_BALL_R = 0.9;
-export var ARK_BASE_VX = 0.13;
-export var ARK_BASE_VY = 0.144;
+export var ARK_BASE_VX = 0.26;
+export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
 
 function buildInitialBricks() {
@@ -53,8 +53,8 @@ function createBall(session, waiting, velSign) {
 
 export function createArkanoidState() {
     var session = {
-        paddleX: 12,
-        balls: [createBall({ paddleX: 12, level: 1 }, true, 1)],
+        paddleX: 16,
+        balls: [createBall({ paddleX: 16, level: 1 }, true, 1)],
         bricks: buildInitialBricks(),
         score: 0,
         level: 1,

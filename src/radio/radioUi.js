@@ -2907,8 +2907,8 @@ function isSnakeMenuOpen() {
 function gamePadDigitToDirection(digit) {
     if (digit === '2') return 'up';
     if (digit === '8') return 'down';
-    if (digit === '6') return 'left';
-    if (digit === '4') return 'right';
+    if (digit === '6') return 'right';
+    if (digit === '4') return 'left';
     return null;
 }
 
@@ -4161,14 +4161,12 @@ function bindRadioKeyT9() {
             return;
         }
         if (key === '*' || key === '#') {
-            if (e.pointerType === 'touch') {
-                clearHold();
-                return;
-            }
             e.preventDefault();
             e.stopPropagation();
             fieldEditPunctFired = true;
             handleFieldEditAction('char', key);
+            clearHold();
+            return;
         }
         clearHold();
     }, true);

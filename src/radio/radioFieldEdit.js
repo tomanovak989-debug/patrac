@@ -129,18 +129,18 @@ function scheduleT9Advance(session) {
     }, T9_TIMEOUT_MS);
 }
 
-var PUNCT_CYCLE = ['.', ',', '?'];
+var PUNCT_CYCLE = ['.', ',', '?', '!'];
 
 function applyPunctTap(session) {
     var group = PUNCT_CYCLE;
     if (session.t9Key === '*') {
         session.t9Index = (session.t9Index + 1) % group.length;
-        replacePunctChar(session, group.charAt(session.t9Index));
+        replacePunctChar(session, group[session.t9Index]);
     } else {
         finalizeT9Session(session);
         session.t9Key = '*';
         session.t9Index = 0;
-        insertPunctChar(session, group.charAt(0));
+        insertPunctChar(session, group[0]);
     }
     scheduleT9Advance(session);
     return true;
@@ -168,7 +168,7 @@ function replacePunctChar(session, ch) {
 }
 
 export function textEditHint() {
-    return 'T9 · 0 vel/mal poslední · # mez · * .,? · Zpět maže';
+    return 'T9 · 0 vel/mal poslední · # mez · * .,?! · Zpět maže';
 }
 
 export function encryptEditHint() {
