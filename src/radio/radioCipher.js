@@ -1,7 +1,6 @@
 /**
  * Vigenère šifra — abeceda A–Z + 1–9 + 0 (36 znaků), klíč 5× A–Z.
- * Mezery se před šifrou nahradí tokenem 0 (šifruje se) — na drátu nejsou vidět.
- * Po dešifrování se token 0 znovu zobrazí jako mezera.
+ * Mezery → token 0 (šifruje se). Znaky . , ? ! nešifrované — viditelné v ciphertextu.
  */
 import {
     SIGNAL_CLEAR,
@@ -18,7 +17,14 @@ export var CIPHER_WHEEL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 /** Na drátu místo mezery — šifruje se jako běžný znak (skryje délku slov). */
 export var CIPHER_SPACE_CHAR = '0';
 
+/** Interpunkce viditelná v šifrované zprávě — neposouvá klíč, nešifruje se. */
+export var CIPHER_PASS_THROUGH = '.,?!';
+
 var ALPHABET_LEN = CIPHER_ALPHABET.length;
+
+function isCipherPassThroughChar(ch) {
+    return CIPHER_PASS_THROUGH.indexOf(String(ch || '')) >= 0;
+}
 
 /** Mezery → token před šifrou. */
 export function plainToCipherChars(text) {
@@ -91,9 +97,12 @@ export function encryptPlaintext(plaintext, key) {
     var i;
     for (i = 0; i < plain.length; i++) {
         var ch = plain.charAt(i);
+        if (isCipherPassThroughChar(ch)) {
+            out += ch;
+            continue;
+        }
         var pIdx = charToIndex(ch);
         if (pIdx < 0) {
-            out += ch;
             continue;
         }
         var kCh = keyCharAt(k, keyPos);
@@ -121,9 +130,12 @@ export function decryptCiphertext(ciphertext, key) {
             out += ' ';
             continue;
         }
+        if (isCipherPassThroughChar(ch)) {
+            out += ch;
+            continue;
+        }
         var cIdx = charToIndex(ch);
         if (cIdx < 0) {
-            out += ch;
             continue;
         }
         var kCh = keyCharAt(k, keyPos);
