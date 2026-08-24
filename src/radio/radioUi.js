@@ -56,6 +56,14 @@ import {
     countUnreadInbox
 } from './radioComms.js';
 import { sendRadioTransmission, subscribeRadioListen, stopRadioSubscriptions, upsertRadioBeaconLive, clearRadioBeaconLive, subscribeRadioBeaconsLive } from './radioService.js';
+import {
+    upsertRadioLogEntry,
+    deleteRadioLogEntry,
+    fetchRadioLogFromCloud,
+    mergeNotebookWithCloudLog,
+    trimCloudRadioLog,
+    removeStationEntry
+} from './radioArchive.js';
 import { getFirebaseAuth } from '../lib/firebase.js';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -1882,8 +1890,7 @@ function renderDisplay() {
         });
         var l6 = el('radio-display-line6');
         if (l6) {
-            var onOpen = normalizeFrequency(state.frequency) === normalizeFrequency(OPEN_CHANNEL_FREQUENCY);
-            l6.textContent = onOpen ? '' : 'Mezikom: preset Otevřený 400';
+            l6.textContent = '';
         }
         clearExtraDisplayLines();
         if (nodeEl) {
@@ -3200,6 +3207,11 @@ function handleCommsOk() {
                 var scanId = session.detailEntry.id;
                 notebook.autoscan = notebook.autoscan.filter(function(c) { return c && c.id !== scanId; });
                 persist();
+            } else if (session.detailEntry) {
+                var delEntry = session.detailEntry;
+                removeStationEntry(notebook, delEntry);
+                persist();
+                deleteRadioLogEntry(getCtx().userId, delEntry);
             }
             session.detailEntry = null;
             session.screen = session.detailReturn || COMMS_INBOX;
@@ -3701,6 +3713,15 @@ function notebookHasId(id) {
     return false;
 }
 
+function syncEntryToCloud(entry) {
+    if (!entry || (ctx.isLocalOnly && ctx.isLocalOnly())) return;
+    var uid = getCtx().userId;
+    if (!uid) return;
+    upsertRadioLogEntry(uid, entry).then(function() {
+        trimCloudRadioLog(uid);
+    });
+}
+
 function recordEntry(entry) {
     if (!entry) return;
     if (entry.id && (seenMessageIds[entry.id] || notebookHasId(entry.id))) return;
@@ -3717,6 +3738,7 @@ function recordEntry(entry) {
     entryIndex = (notebook.station || []).indexOf(entry);
     if (entryIndex < 0) entryIndex = (notebook.station || []).length - 1;
     persist();
+    syncEntryToCloud(entry);
 
     if (entry.dir === 'in' && entry.read === false) {
         refreshRadioUnreadBadge();
@@ -3894,24 +3916,8 @@ function bindRadioAuthRefresh() {
 }
 
 function collectListenFrequencies() {
-    var c = getCtx();
-    var freqs = collectTunedFrequencies(state).slice();
-    /* Mezikomunitní otevřený kanál — vždy v poslechu (400.000 PT). */
-    freqs.push(OPEN_CHANNEL_FREQUENCY);
-    /* Pevný SOS maják — vždy v poslechu na všech vysílačkách. */
-    freqs.unshift(BEACON_SOS_FREQUENCY);
-    var comFreq = communityFrequencyFromCode(c.comCode);
-    if (comFreq) freqs.push(comFreq);
-    var i;
-    var seen = {};
-    var uniq = [];
-    for (i = 0; i < freqs.length; i++) {
-        var f = normalizeFrequency(freqs[i]);
-        if (!f || seen[f]) continue;
-        seen[f] = true;
-        uniq.push(f);
-    }
-    return uniq;
+    /* Poslech jen naladěný kanál — komunitní frekvence není „vždy v pozadí“. */
+    return collectTunedFrequencies(state).slice();
 }
 
 function refreshSubscriptions() {
@@ -3923,7 +3929,7 @@ function refreshSubscriptions() {
     var onMsg = ingestIncomingPayload;
     return subscribeRadioListen(onMsg, {
         frequencies: collectListenFrequencies(),
-        backfillRecentMs: 45000
+        backfillRecentMs: 300000
     }).then(function() {
         return subscribeRadioBeaconsLive(applyLiveBeaconsFromCloud);
     }).then(function() {
@@ -4030,6 +4036,7 @@ async function transmitMessage(text, extras) {
             seenMessageIds[sent.id] = true;
             entry.cloudId = sent.id;
             persist();
+            syncEntryToCloud(entry);
         }
     } catch (err) {
         console.warn('[radioUi] send', err);
@@ -4902,6 +4909,28 @@ export function initRadioCommsSystem(options) {
             if (e.id) seenMessageIds[e.id] = true;
             if (e.cloudId) seenMessageIds[e.cloudId] = true;
         }
+    }
+
+    if (!(ctx.isLocalOnly && ctx.isLocalOnly()) && c.userId) {
+        fetchRadioLogFromCloud(c.userId).then(function(cloudEntries) {
+            if (!cloudEntries || !cloudEntries.length) return;
+            notebook = mergeNotebookWithCloudLog(notebook, cloudEntries);
+            saveNotebook(c.userId, notebook);
+            var j;
+            for (j = 0; j < notebook.station.length; j++) {
+                var ce = notebook.station[j];
+                if (!ce) continue;
+                if (ce.id) seenMessageIds[ce.id] = true;
+                if (ce.cloudId) seenMessageIds[ce.cloudId] = true;
+            }
+            var layout = stationPageMetrics();
+            trimStationToMaxPages(notebook, NOTEBOOK_MAX_PAGES, layout.linesPerPage, layout.charsPerLine);
+            saveNotebook(c.userId, notebook);
+            renderNotebook();
+            refreshRadioUnreadBadge();
+        }).catch(function(err) {
+            console.warn('[radioUi] cloud archive hydrate', err);
+        });
     }
 
     if (!notebook.station.length) {

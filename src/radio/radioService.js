@@ -138,12 +138,10 @@ function attachChannelListener(raw, onMessage, opts) {
             var cutoff = backfillRecentMs > 0 ? Date.now() - backfillRecentMs : 0;
             var s;
             for (s = 0; s < docs.length; s++) {
-                seen[docs[s].id] = true;
-                if (backfillRecentMs > 0) {
-                    var ts = Number((docs[s].data() || {}).timestamp) || 0;
-                    if (ts >= cutoff) {
-                        onMessage(mapDocToPayload(docs[s], freq, channelId));
-                    }
+                var ts = Number((docs[s].data() || {}).timestamp) || 0;
+                if (backfillRecentMs > 0 && ts >= cutoff) {
+                    seen[docs[s].id] = true;
+                    onMessage(mapDocToPayload(docs[s], freq, channelId));
                 }
             }
             return;
@@ -230,9 +228,9 @@ function attachBandScanListener(q, onMessage, backfillRecentMs, unsubKey) {
                     var docs = snap.docs.slice().reverse();
                     for (i = 0; i < docs.length; i++) {
                         var docSnap = docs[i];
-                        seen[docSnap.id] = true;
                         var ts = Number((docSnap.data() || {}).timestamp) || 0;
                         if (ts >= cutoff) {
+                            seen[docSnap.id] = true;
                             onMessage(mapDocToPayload(docSnap));
                         }
                     }

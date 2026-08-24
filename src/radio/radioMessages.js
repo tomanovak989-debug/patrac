@@ -76,7 +76,7 @@ function filterEntries(notebook, opts) {
     var i;
     for (i = entries.length - 1; i >= 0; i--) {
         var e = entries[i];
-        if (!e || e.id === 'sys_welcome') continue;
+        if (!e || e.id === 'sys_welcome' || e.deleted) continue;
         if (opts.dir && e.dir !== opts.dir) continue;
         if (opts.savedOnly && !e.savedPermanent) continue;
         out.push(e);

@@ -85,6 +85,11 @@ service cloud.firestore {
         && request.resource.data.firebaseUid == request.auth.uid
         && request.resource.data.userId == userId;
       allow update: if isOwner(userId);
+
+      match /radio_log/{entryId} {
+        allow read, create, update: if isOwner(userId);
+        allow delete: if isOwner(userId);
+      }
     }
 
     match /communities/{comCode} {
