@@ -6,7 +6,7 @@
 import { normalizeEncryptionKey, communityFrequencyFromCode } from './radioComms.js';
 import { EMERGENCY_FREQUENCY, normalizeFrequency } from './radioBand.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
-import { buildFixedCursorMenuLines } from './radioMenuScroll.js';
+import { buildBoundedCursorMenuLines } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 
 export var BEACON_REPEAT_MS = 18000;
@@ -308,7 +308,7 @@ export function buildBeaconOsView(session, radioState, localBeacon, uiState) {
     }
 
     var items = clampBeaconFocus(session, localBeacon);
-    var hubView = buildFixedCursorMenuLines(items, session.focusIndex, function(item) {
+    var hubView = buildBoundedCursorMenuLines(items, session.focusIndex, function(item) {
         return formatMenuDisplayLabel(item.label);
     }, function(item) {
         return menuIconForItem(item);

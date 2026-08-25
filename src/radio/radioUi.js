@@ -97,7 +97,7 @@ import {
     canPowerRadioOn
 } from './radioBattery.js';
 import { radioIconUrl } from './radioMenuIcons.js';
-import { wrapMenuFocus, clampMenuFocus } from './radioMenuScroll.js';
+import { clampMenuFocus } from './radioMenuScroll.js';
 import { radioKeyFeedback, radioTxStart, radioTxEnd, radioIncomingFeedback, initRadioFeedback, setRadioSoundPrefs, previewSoundPref, radioDialFeedback, radioKeypadPttDown, radioKeypadPttUp } from './radioFeedback.js';
 import {
     createRadioOsState,
@@ -794,20 +794,11 @@ function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
 }
 
 function resolveMenuScrollMeta(osView) {
-    if (!osView || osView.focusLine == null || osView.focusLine < 0) {
-        return { key: '', index: -1, animate: false };
-    }
-    if (osView.mode !== 'menu' && osView.mode !== 'comms' && osView.mode !== 'beacon' &&
-        osView.mode !== 'preset_detail' && osView.mode !== 'sound_settings') {
+    if (!osView || !osView.fixedCursor || osView.focusLine == null || osView.focusLine < 0) {
         return { key: '', index: -1, animate: false };
     }
     var key = osView.mode + '|' + (osView.status || '');
-    var index = -1;
-    if (osView.mode === 'comms' && commsSession) index = commsSession.focusIndex;
-    else if (osView.mode === 'beacon' && beaconSession) index = beaconSession.focusIndex;
-    else if (osView.mode === 'preset_detail' && radioOs) index = radioOs.presetFieldFocus;
-    else if (osView.mode === 'sound_settings' && radioOs) index = radioOs.soundFieldFocus;
-    else if (radioOs) index = radioOs.focusIndex;
+    var index = radioOs ? radioOs.focusIndex : -1;
     return { key: key, index: index, animate: true };
 }
 
@@ -2505,7 +2496,7 @@ function handleBeaconUp() {
     if (session.screen === BEACON_CONFIRM) return;
     var items = clampBeaconFocus(session, beaconActive);
     if (!items.length) return;
-    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, -1);
+    session.focusIndex = clampMenuFocus(session.focusIndex - 1, items.length);
     renderDisplay();
 }
 
@@ -2514,7 +2505,7 @@ function handleBeaconDown() {
     if (session.screen === BEACON_CONFIRM) return;
     var items = clampBeaconFocus(session, beaconActive);
     if (!items.length) return;
-    session.focusIndex = wrapMenuFocus(session.focusIndex, items.length, 1);
+    session.focusIndex = clampMenuFocus(session.focusIndex + 1, items.length);
     renderDisplay();
 }
 

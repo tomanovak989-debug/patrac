@@ -9,7 +9,7 @@ import { buildSnakeOsView } from './radioSnake.js';
 import { buildArkanoidOsView } from './radioArkanoid.js';
 import { buildDecoderOsView } from './radioDecoder.js';
 import { formatMenuDisplayLabel } from './radioShortcuts.js';
-import { buildFixedCursorMenuLines, MENU_CURSOR_ROW, wrapMenuFocus } from './radioMenuScroll.js';
+import { buildFixedCursorMenuLines, buildBoundedCursorMenuLines, wrapMenuFocus, clampMenuFocus } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 export var SCREEN_STANDBY = 'standby';
 export var SCREEN_MENU = 'menu';
@@ -144,16 +144,20 @@ function buildSoundSettingsLines(os, radioState) {
         var field = SOUND_FIELDS[i];
         items.push(SOUND_LABELS[field] + '   ' + prefs[field]);
     }
-    return buildFixedCursorMenuLines(items, os.soundFieldFocus, function(item) { return item; });
+    return buildBoundedCursorMenuLines(items, os.soundFieldFocus, function(item) { return item; });
+}
+
+function isMainRadioMenu(os) {
+    return !!(os && os.screen === SCREEN_MENU && os.menuPath && os.menuPath.length === 0);
 }
 
 function getCurrentMenuItems(os, radioState) {
-    if (!os.menuPath.length) return getMenuItems();
+    if (isMainRadioMenu(os) || !os.menuPath || !os.menuPath.length) return getMenuItems();
     var leaf = os.menuPath[os.menuPath.length - 1];
     if (leaf === 'presets') return buildPresetSlotItems(radioState);
     if (leaf === 'settings') return SETTINGS_MENU;
     if (leaf === 'apps') return APPS_MENU;
-    return getMenuItems();
+    return [];
 }
 
 function menuStatusLabel(os, radioState, draft) {
@@ -415,11 +419,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.menuPath[os.menuPath.length - 1] === 'sounds') {
         if (action === 'up') {
-            os.soundFieldFocus = wrapMenuFocus(os.soundFieldFocus, SOUND_FIELDS.length, -1);
+            os.soundFieldFocus = clampMenuFocus(os.soundFieldFocus - 1, SOUND_FIELDS.length);
             return { changed: true };
         }
         if (action === 'down') {
-            os.soundFieldFocus = wrapMenuFocus(os.soundFieldFocus, SOUND_FIELDS.length, 1);
+            os.soundFieldFocus = clampMenuFocus(os.soundFieldFocus + 1, SOUND_FIELDS.length);
             return { changed: true };
         }
         if (action === 'left' || action === 'right') {
@@ -433,11 +437,11 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail') {
         if (action === 'up') {
-            os.presetFieldFocus = wrapMenuFocus(os.presetFieldFocus, 3, -1);
+            os.presetFieldFocus = clampMenuFocus(os.presetFieldFocus - 1, 3);
             return { changed: true };
         }
         if (action === 'down') {
-            os.presetFieldFocus = wrapMenuFocus(os.presetFieldFocus, 3, 1);
+            os.presetFieldFocus = clampMenuFocus(os.presetFieldFocus + 1, 3);
             return { changed: true };
         }
         if (action === 'ok' || action === 'right') {
@@ -453,12 +457,17 @@ export function radioOsHandleInput(os, operatingMode, action, radioState) {
 
     if (os.screen === SCREEN_MENU) {
         var menuItems = getCurrentMenuItems(os, radioState);
+        var isRootMenu = isMainRadioMenu(os);
         if (action === 'up') {
-            os.focusIndex = wrapMenuFocus(os.focusIndex, menuItems.length, -1);
+            os.focusIndex = isRootMenu
+                ? wrapMenuFocus(os.focusIndex, menuItems.length, -1)
+                : clampMenuFocus(os.focusIndex - 1, menuItems.length);
             return { changed: true };
         }
         if (action === 'down') {
-            os.focusIndex = wrapMenuFocus(os.focusIndex, menuItems.length, 1);
+            os.focusIndex = isRootMenu
+                ? wrapMenuFocus(os.focusIndex, menuItems.length, 1)
+                : clampMenuFocus(os.focusIndex + 1, menuItems.length);
             return { changed: true };
         }
         if (action === 'ok' || action === 'right') {
@@ -551,7 +560,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     if (os.menuPath[os.menuPath.length - 1] === 'detail' && draft) {
-        var presetView = buildFixedCursorMenuLines([
+        var presetView = buildBoundedCursorMenuLines([
             'NÁZEV  ' + (draft.label || ('Kanál ' + draft.slot)),
             'F       ' + (draft.frequency || '---.---'),
             'ŠIFRA   ' + (draft.encryptionKey ? draft.encryptionKey : '—')
@@ -567,7 +576,6 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         var soundView = buildSoundSettingsLines(os, radioState);
         soundView.mode = 'sound_settings';
         soundView.status = menuStatusLabel(os, radioState, draft);
-        soundView.focusLine = MENU_CURSOR_ROW;
         soundView.footer = '←→ varianta · Zpět';
         soundView.buffer = '';
         return soundView;
@@ -618,14 +626,21 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
     }
 
     var items = getCurrentMenuItems(os, radioState);
-    var menuView = buildFixedCursorMenuLines(items, os.focusIndex, function(item) {
-        return decorateItemLabel(item);
-    }, function(item) {
-        return menuIconForItem(item);
-    });
+    var isRootMenu = isMainRadioMenu(os);
+    var menuView = (isRootMenu ? buildFixedCursorMenuLines : buildBoundedCursorMenuLines)(
+        items,
+        os.focusIndex,
+        function(item) {
+            return decorateItemLabel(item);
+        },
+        function(item) {
+            return menuIconForItem(item);
+        }
+    );
 
     return {
         mode: 'menu',
+        fixedCursor: isRootMenu,
         status: menuStatusLabel(os, radioState, draft),
         lines: menuView.lines,
         focusLine: menuView.focusLine,

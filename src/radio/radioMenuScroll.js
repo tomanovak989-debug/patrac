@@ -1,7 +1,6 @@
 /**
- * Menu s pevným kurzorem uprostřed displeje — ↑/↓ posouvá položky, ne kurzor.
- * Seznam vizuálně opakuje (nad první je poslední).
- * buildBoundedCursorMenuLines — bez opakování (zprávy, delší seznamy).
+ * Hlavní menu: pevný kurzor uprostřed, ↑/↓ posouvá položky (vizuální smyčka).
+ * Ostatní seznamy: klasický posuvný kurzor odshora, bez opakování.
  */
 export var MENU_VISIBLE_LINES = 6;
 export var MENU_CURSOR_ROW = 2;
@@ -71,7 +70,7 @@ export function buildFixedCursorMenuLines(items, focusIndex, labelFn, iconFn) {
 }
 
 /**
- * Pevný kurzor uprostřed — bez nekonečného wrapu; na okrajích se posouvá okno seznamu.
+ * Klasický seznam — kurzor jezdí po řádcích; okno se posune, až by vyjel z displeje.
  */
 export function buildBoundedCursorMenuLines(items, focusIndex, labelFn, iconFn) {
     items = items || [];
@@ -85,7 +84,7 @@ export function buildBoundedCursorMenuLines(items, focusIndex, labelFn, iconFn) 
 
     if (count > MENU_VISIBLE_LINES) {
         var maxStart = count - MENU_VISIBLE_LINES;
-        windowStart = focusIndex - MENU_CURSOR_ROW;
+        windowStart = focusIndex - MENU_VISIBLE_LINES + 1;
         if (windowStart < 0) windowStart = 0;
         if (windowStart > maxStart) windowStart = maxStart;
     }

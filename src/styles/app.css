@@ -2538,14 +2538,15 @@ body.theme-light .sector-tech-screen.is-field-edit .radio-display-edit-large {
     line-height: 1;
     padding-top: 0;
     padding-bottom: 0;
-    white-space: nowrap !important;
-    text-overflow: ellipsis;
+    white-space: pre !important;
+    text-overflow: clip;
 }
 .sector-tech-screen.is-decoder-workbench .radio-display-main > div:last-child {
     display: flex !important;
     align-items: center !important;
     justify-content: center;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
 }
 .sector-tech-screen.is-field-edit .radio-edit-dec {
     opacity: 0.85;

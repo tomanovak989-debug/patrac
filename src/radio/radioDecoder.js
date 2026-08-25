@@ -11,6 +11,7 @@ import {
     CIPHER_KEY_LEN,
     CIPHER_WHEEL_ALPHABET
 } from './radioCipher.js';
+import { buildBoundedCursorMenuLines, clampMenuFocus } from './radioMenuScroll.js';
 
 export var DECODER_SCREENS = {
     HUB: 'hub',
@@ -72,7 +73,13 @@ function formatHubLine(entry) {
     return when + ' ' + from + ' ' + preview;
 }
 
-/** Zalamování; mezery = podtržítka; zbytek textu = … na posledním řádku. */
+function lastWrapBreak(slice) {
+    var u = slice.lastIndexOf('_');
+    var s = slice.lastIndexOf(' ');
+    return u > s ? u : s;
+}
+
+/** Zalamování; mezery = podtržítka (zůstávají na řádku). Zbytek textu = … na posledním řádku. */
 function wrapDecoderResult(text, maxLen, maxLines) {
     text = formatDecoderDisplayText(text);
     maxLen = maxLen || 18;
@@ -80,21 +87,16 @@ function wrapDecoderResult(text, maxLen, maxLines) {
     var lines = [];
     var pos = 0;
     while (pos < text.length && lines.length < maxLines) {
-        var end = pos + maxLen;
-        if (end >= text.length) {
+        if (text.length - pos <= maxLen) {
             lines.push(text.slice(pos));
             pos = text.length;
             break;
         }
-        var slice = text.slice(pos, end);
-        var sp = slice.lastIndexOf('_');
-        if (sp > 0) {
-            lines.push(text.slice(pos, pos + sp));
-            pos = pos + sp + 1;
-        } else {
-            lines.push(slice);
-            pos = end;
-        }
+        var slice = text.slice(pos, pos + maxLen);
+        var sp = lastWrapBreak(slice);
+        var take = sp > 0 ? sp + 1 : maxLen;
+        lines.push(text.slice(pos, pos + take));
+        pos += take;
     }
     if (pos < text.length && lines.length > 0) {
         var li = lines.length - 1;
@@ -112,9 +114,9 @@ function buildWheelLine(wheels, wheelFocus) {
     var i;
     for (i = 0; i < CIPHER_KEY_LEN; i++) {
         var ch = wheels[i] || 'A';
-        parts.push(i === wheelFocus ? ('[' + ch + ']') : ch);
+        parts.push(i === wheelFocus ? ('[' + ch + ']') : (' ' + ch + ' '));
     }
-    return parts.join(' ');
+    return parts.join('');
 }
 
 export function decoderRotateWheel(session, delta) {
@@ -129,7 +131,8 @@ export function decoderRotateWheel(session, delta) {
 
 export function decoderMoveWheelFocus(session, delta) {
     if (!session || session.screen !== DECODER_SCREENS.WORKBENCH) return false;
-    var next = (session.wheelFocus + delta + CIPHER_KEY_LEN) % CIPHER_KEY_LEN;
+    var next = clampMenuFocus((session.wheelFocus || 0) + delta, CIPHER_KEY_LEN);
+    if (next === session.wheelFocus) return false;
     session.wheelFocus = next;
     return true;
 }
@@ -137,7 +140,9 @@ export function decoderMoveWheelFocus(session, delta) {
 export function decoderHubMove(session, notebook, delta) {
     var list = filterDecoderEntries(notebook);
     if (!list.length) return false;
-    session.focusIndex = (session.focusIndex + delta + list.length) % list.length;
+    var next = clampMenuFocus((session.focusIndex || 0) + delta, list.length);
+    if (next === session.focusIndex) return false;
+    session.focusIndex = next;
     return true;
 }
 
@@ -174,34 +179,37 @@ export function buildDecoderOsView(session, notebook, displayOpts) {
 
     if (session.screen === DECODER_SCREENS.HUB) {
         var list = filterDecoderEntries(notebook);
-        var lines = [];
         if (!list.length) {
-            lines = [
-                'Luštění šifrovaných',
-                'přijatých zpráv.',
-                'Fronta prázdná.',
-                'OK · Zpět',
-                '',
-                ''
-            ];
-        } else {
-            var i;
-            for (i = 0; i < 4 && i < list.length; i++) {
-                var mark = i === session.focusIndex ? '▸ ' : '  ';
-                lines.push(mark + formatHubLine(list[i]));
-            }
-            while (lines.length < 4) lines.push('');
-            lines.push(list.length > 4 ? ('+' + (list.length - 4) + ' dalších') : '');
-            lines.push('');
+            return {
+                mode: 'decoder',
+                layout: 'hub',
+                status: 'DEŠIFRÁTOR',
+                lines: [
+                    'Luštění šifrovaných',
+                    'přijatých zpráv.',
+                    'Fronta prázdná.',
+                    'OK · Zpět',
+                    '',
+                    ''
+                ],
+                focusLine: -1,
+                footer: '↑↓ výběr · OK luštit',
+                buffer: ''
+            };
         }
+        var hubView = buildBoundedCursorMenuLines(list, session.focusIndex, function(entry) {
+            return formatHubLine(entry);
+        });
         return {
             mode: 'decoder',
             layout: 'hub',
             status: 'DEŠIFRÁTOR',
-            lines: lines,
-            focusLine: session.focusIndex < 4 ? session.focusIndex : -1,
+            lines: hubView.lines,
+            lineStyles: hubView.lineStyles,
+            lineIcons: hubView.lineIcons,
+            focusLine: hubView.focusLine,
             footer: '↑↓ výběr · OK luštit',
-            buffer: list.length ? ('Ve frontě: ' + list.length) : ''
+            buffer: 'Ve frontě: ' + list.length
         };
     }
 
