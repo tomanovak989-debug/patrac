@@ -3061,6 +3061,7 @@ function switchMainTab(tab, element) {
             });
             setTimeout(pokeRadioDisplay, 80);
             setTimeout(pokeRadioDisplay, 320);
+            setTimeout(pokeRadioDisplay, 800);
         }
         if (isOperatorMode) {
             try { ensureOperatorEditContext(); } catch (eOp) {}

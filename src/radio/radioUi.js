@@ -1672,7 +1672,6 @@ function startBatteryTimer() {
 function renderDisplay() {
     try {
         if (!document.body.classList.contains('radio-tab-active')) {
-            if (isPowerAnimActive(powerAnim)) finishPowerAnim(powerAnim);
             try { refreshRadioUnreadBadge(); } catch (eBadge) {}
             return;
         }
@@ -1992,15 +1991,26 @@ function skipActivePowerAnim() {
     return true;
 }
 
+function paintRadioDisplayNow() {
+    if (!document.body.classList.contains('radio-tab-active')) return;
+    try { applyRadioHitmap(); } catch (eHm) {}
+    if (typeof window.patracRefreshSectorTech === 'function') {
+        try { window.patracRefreshSectorTech(); } catch (eSt) {}
+    }
+    try { renderDisplayCore(); } catch (eRd) {
+        try { renderDisplay(); } catch (eRd2) {}
+    }
+    try { resetDisplayTypography(); } catch (eTy) {}
+}
+
 function wakeRadioDisplay() {
     skipActivePowerAnim();
     menuScrollAnimating = false;
     if (!document.body.classList.contains('radio-tab-active')) return;
-    try { resetDisplayTypography(); } catch (eTy) {}
-    try { renderDisplay(); } catch (eRd) {}
-    if (typeof window.patracRefreshSectorTech === 'function') {
-        try { window.patracRefreshSectorTech(); } catch (eSt) {}
-    }
+    paintRadioDisplayNow();
+    setTimeout(paintRadioDisplayNow, 80);
+    setTimeout(paintRadioDisplayNow, 280);
+    setTimeout(paintRadioDisplayNow, 700);
 }
 
 function bindRadioForeground() {
