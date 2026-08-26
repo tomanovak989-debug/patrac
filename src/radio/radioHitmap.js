@@ -39,6 +39,7 @@ export function resetDisplayTypography() {
 
 /** Font displeje v px — škáluje se s reálnou velikostí panelu (zoom vysílačky). */
 export function applyDisplayTypography() {
+    if (!isRadioTabActive()) return;
     var screen = document.getElementById('radio-display-screen');
     if (!screen) return;
     var w = screen.clientWidth;

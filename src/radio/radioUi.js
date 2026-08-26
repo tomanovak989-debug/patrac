@@ -2002,7 +2002,7 @@ function bindRadioForeground() {
     if (window._patracRadioForegroundBound) return;
     window._patracRadioForegroundBound = true;
     function onForeground() {
-        if (!document.body.classList.contains('radio-tab-active')) return;
+        /* skipActivePowerAnim i mimo Radio — boot v pozadí jinak sežere hlavní vlákno. */
         wakeRadioDisplay();
     }
     document.addEventListener('visibilitychange', function() {

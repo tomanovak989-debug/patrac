@@ -198,11 +198,12 @@ body.admin-mode .bottom-hud-wrapper {
 }
 body.admin-mode .hud-center-panel {
     top: 74px;
-    height: calc(100% - 130px);
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+    height: auto;
 }
 body.admin-mode.radio-tab-active .hud-center-panel.hud-radio-fullwidth {
     top: 38px;
-    bottom: 44px;
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px));
     height: auto;
 }
 body.admin-mode.radio-tab-active #operator-admin-bar {
@@ -662,7 +663,8 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 .hud-center-panel {
     top: 44px; left: 60px; width: calc(100% - 65px);
-    height: calc(100% - 100px);
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px));
+    height: auto;
     padding: var(--panel-padding) 10px; overflow-y: auto; overflow-x: hidden; display: none;
     line-height: var(--panel-line-height);
     position: absolute;
@@ -695,13 +697,27 @@ body.admin-mode .admin-only-tab { display: flex !important; }
     .hud-center-panel { padding: var(--panel-padding) 16px; }
 }
 
-.bottom-hud-wrapper { position: absolute; bottom: 0; left: 0; width: 100%; z-index: 15; display: none; flex-direction: column; }
+.bottom-hud-wrapper {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 20000;
+    display: none;
+    flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    pointer-events: auto;
+}
 .bottom-action-bar { height: 44px; display: flex; background-color: var(--bar-bg); border-top: 1px solid var(--hud-border); }
 .action-tab {
     flex: 1; display: flex; align-items: center; justify-content: center;
     font-size: var(--text-base); font-weight: bold; background: none; color: var(--faint-fg);
     border: none; border-right: 1px solid var(--tab-divider); font-family: inherit;
     letter-spacing: 0.06em;
+    pointer-events: auto;
+    touch-action: manipulation;
+    position: relative;
+    z-index: 1;
 }
 .action-tab.active { color: var(--text-green); background-color: var(--accent-hover-bg); text-shadow: var(--text-glow); }
 
@@ -1111,12 +1127,16 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 body.radio-tab-active .hud-center-panel.hud-radio-fullwidth {
     top: 38px;
-    bottom: 44px;
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px));
     left: 0;
     width: 100%;
     height: auto;
     z-index: 1300;
     touch-action: manipulation;
+}
+body:not(.radio-tab-active) #content-clan {
+    display: none !important;
+    pointer-events: none !important;
 }
 /* Mapové float prvky (z-index ~1000) nesmí na mobilu krást dotyky vysílačce. */
 body.radio-tab-active #map,

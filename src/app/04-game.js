@@ -2997,30 +2997,25 @@ function switchMainTab(tab, element) {
     for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
     if (element) element.classList.add('active');
 
-    if (activeTargetingQuest && tab !== 'map-only') cancelTargeting();
-    if (tab !== 'map-only') {
-        closeAddPoiPanel();
-        closeAddRxPanel();
-        closeRxEditor();
-        closeStoryPositionsPanel();
-        closePoiEditor();
-        closeStoryPosEditor();
+    function showNode(id, on) {
+        var node = document.getElementById(id);
+        if (node) node.style.display = on ? 'block' : 'none';
     }
-
-    setMapToolsVisible(tab === 'map-only');
 
     if (tab === 'map-only') {
         if (m) m.classList.remove('blur-mode');
-        c.style.display = 'none';
+        if (c) c.style.display = 'none';
         setTimeout(function() {
             if (map) {
-                ensureMapPanes();
-                map.invalidateSize();
-                refreshMapLayerStack();
-                reloadAllMapPoints();
-                if (!userMarker) startGeolocation();
+                try { ensureMapPanes(); } catch (eP) {}
+                try { map.invalidateSize(); } catch (eS) {}
+                try { refreshMapLayerStack(); } catch (eL) {}
+                try { reloadAllMapPoints(); } catch (eR) {}
+                if (!userMarker) {
+                    try { startGeolocation(); } catch (eG) {}
+                }
                 if (typeof window.patracRefreshBeaconMap === 'function') {
-                    window.patracRefreshBeaconMap(true);
+                    try { window.patracRefreshBeaconMap(true); } catch (eB) {}
                 }
             }
         }, 150);
@@ -3029,9 +3024,9 @@ function switchMainTab(tab, element) {
             if (tab === 'clan') m.classList.remove('blur-mode');
             else m.classList.add('blur-mode');
         }
-        c.style.display = 'block';
-        document.getElementById('content-shelter').style.display = (tab === 'shelter') ? 'block' : 'none';
-        document.getElementById('content-tasks').style.display = (tab === 'tasks') ? 'block' : 'none';
+        if (c) c.style.display = 'block';
+        showNode('content-shelter', tab === 'shelter');
+        showNode('content-tasks', tab === 'tasks');
         var qline = document.getElementById('content-questline');
         if (qline) {
             qline.style.display = (tab === 'questline' && isOperatorMode) ? 'block' : 'none';
@@ -3039,9 +3034,11 @@ function switchMainTab(tab, element) {
                 try { window.patracRefreshQuestLine(); } catch (eQl) {}
             }
         }
-        document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
+        showNode('content-clan', tab === 'clan');
+        showNode('data-karta', tab === 'data-karta');
+        showNode('content-inventory', tab === 'inventory');
         if (tab === 'clan') {
-            updateRadioDisplayHud();
+            try { updateRadioDisplayHud(); } catch (eHud) {}
             function pokeRadioDisplay() {
                 if (typeof window.patracWakeRadioDisplay === 'function') {
                     try { window.patracWakeRadioDisplay(); } catch (eWk) {}
@@ -3063,9 +3060,26 @@ function switchMainTab(tab, element) {
             setTimeout(pokeRadioDisplay, 80);
             setTimeout(pokeRadioDisplay, 320);
         }
-        document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
-        document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';
-        if (isOperatorMode) ensureOperatorEditContext();
+        if (isOperatorMode) {
+            try { ensureOperatorEditContext(); } catch (eOp) {}
+        }
+    }
+
+    if (activeTargetingQuest && tab !== 'map-only') {
+        try { cancelTargeting(); } catch (eT) {}
+    }
+    if (tab !== 'map-only') {
+        try { closeAddPoiPanel(); } catch (e1) {}
+        try { closeAddRxPanel(); } catch (e2) {}
+        try { closeRxEditor(); } catch (e3) {}
+        try { closeStoryPositionsPanel(); } catch (e4) {}
+        try { closePoiEditor(); } catch (e5) {}
+        try { closeStoryPosEditor(); } catch (e6) {}
+    }
+    try {
+        setMapToolsVisible(tab === 'map-only');
+    } catch (eMap) {
+        console.warn('setMapToolsVisible', eMap);
     }
 }
 
