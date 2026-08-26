@@ -577,12 +577,13 @@ function remeasureAll() {
     if (!scroll) return;
     /* Skrytá záložka Radio — měření a CSS scale nesmí běhat na Útočišti (layout smyčka na mobilu). */
     if (!isRadioTabActive()) return;
-    applyRadioHitmap();
     measureStage(scroll);
     if (!isAdminCalibrateMode()) {
         applyViewLayout(scroll);
     }
+    applyRadioHitmap();
     requestAnimationFrame(function() {
+        applyRadioHitmap();
         resetDisplayTypography();
         if (typeof window.patracRefreshRadioDisplay === 'function') {
             try { window.patracRefreshRadioDisplay(); } catch (eRd) {}

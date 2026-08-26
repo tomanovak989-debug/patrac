@@ -2749,9 +2749,7 @@ body.sector-calibrate-on .sector-tech-screen .sector-hit-tag {
 .radio-display-screen {
     font-family: var(--radio-display-font) !important;
 }
-.sector-tech-screen,
-.radio-display-screen {
-    width: 100%;
+.sector-tech-screen {
     min-height: 0;
     box-sizing: border-box;
     overflow: hidden;

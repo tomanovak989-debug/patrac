@@ -1993,10 +1993,10 @@ function skipActivePowerAnim() {
 
 function paintRadioDisplayNow() {
     if (!document.body.classList.contains('radio-tab-active')) return;
-    try { applyRadioHitmap(); } catch (eHm) {}
     if (typeof window.patracRefreshSectorTech === 'function') {
         try { window.patracRefreshSectorTech(); } catch (eSt) {}
     }
+    try { applyRadioHitmap(); } catch (eHm) {}
     try { renderDisplayCore(); } catch (eRd) {
         try { renderDisplay(); } catch (eRd2) {}
     }
@@ -2011,6 +2011,7 @@ function wakeRadioDisplay() {
     setTimeout(paintRadioDisplayNow, 80);
     setTimeout(paintRadioDisplayNow, 280);
     setTimeout(paintRadioDisplayNow, 700);
+    setTimeout(paintRadioDisplayNow, 1400);
 }
 
 function bindRadioForeground() {

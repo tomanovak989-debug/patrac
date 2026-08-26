@@ -12,8 +12,32 @@ function pct(x, y, w, h) {
     };
 }
 
-function applyRect(el, x, y, w, h) {
+function getStageBox() {
+    var stage = document.querySelector('.sector-tech-stage');
+    if (!stage) return null;
+    var w = stage.clientWidth;
+    var h = stage.clientHeight;
+    if (w < 8 || h < 8) {
+        var img = document.getElementById('sector-tech-img');
+        if (img) {
+            w = img.clientWidth || w;
+            h = img.clientHeight || h;
+        }
+    }
+    if (w < 8 || h < 8) return null;
+    return { w: w, h: h };
+}
+
+function applyRect(el, x, y, w, h, stageBox) {
     if (!el) return;
+    if (stageBox) {
+        /* iOS: % výšky overlaye je 0, když rodič bere výšku z <img>. Pixely z fotky sedí. */
+        el.style.left = (x / SRC * stageBox.w) + 'px';
+        el.style.top = (y / SRC * stageBox.h) + 'px';
+        el.style.width = (w / SRC * stageBox.w) + 'px';
+        el.style.height = (h / SRC * stageBox.h) + 'px';
+        return;
+    }
     var r = pct(x, y, w, h);
     el.style.left = r.left;
     el.style.top = r.top;
@@ -45,12 +69,16 @@ export function applyDisplayTypography() {
     var w = screen.clientWidth;
     var h = screen.clientHeight;
     if (w < 8 || h < 8) {
-        /* Skrytá záložka má 0×0 — nesmí vyčerpat pokusy před prvním otevřením Radio. */
+        applyRadioHitmap(true);
+        w = screen.clientWidth;
+        h = screen.clientHeight;
+    }
+    if (w < 8 || h < 8) {
         if (!isRadioTabActive()) return;
-        if (displayTypoRetries < 40) {
+        if (displayTypoRetries < 80) {
             displayTypoRetries++;
             if (displayTypoTimer) clearTimeout(displayTypoTimer);
-            var wait = displayTypoRetries < 8 ? 0 : 50;
+            var wait = displayTypoRetries < 8 ? 0 : displayTypoRetries < 20 ? 50 : 120;
             if (wait) {
                 displayTypoTimer = setTimeout(function() {
                     displayTypoTimer = null;
@@ -147,21 +175,22 @@ function applyBatteryChrome(px) {
     }
 }
 
-export function applyRadioHitmap() {
+export function applyRadioHitmap(skipTypo) {
+    var stageBox = getStageBox();
     var screen = document.getElementById('radio-display-screen');
-    applyRect(screen, 321, 332, 156, 208);
+    applyRect(screen, 321, 332, 156, 208, stageBox);
 
     var dpad = document.getElementById('radio-dpad-zone');
-    applyRect(dpad, 361, 568, 77, 64);
+    applyRect(dpad, 361, 568, 77, 64, stageBox);
 
-    applyRect(document.querySelector('[data-key="p1"]'), 315, 568, 46, 32);
-    applyRect(document.getElementById('radio-key-ent'), 315, 600, 46, 37);
-    applyRect(document.querySelector('[data-key="p2"]'), 438, 568, 46, 32);
-    applyRect(document.getElementById('radio-key-clr'), 438, 600, 46, 37);
+    applyRect(document.querySelector('[data-key="p1"]'), 315, 568, 46, 32, stageBox);
+    applyRect(document.getElementById('radio-key-ent'), 315, 600, 46, 37, stageBox);
+    applyRect(document.querySelector('[data-key="p2"]'), 438, 568, 46, 32, stageBox);
+    applyRect(document.getElementById('radio-key-clr'), 438, 600, 46, 37, stageBox);
 
-    applyRect(document.getElementById('radio-key-mode'), 300, 200, 48, 55);
-    applyRect(document.getElementById('radio-key-preset-dial'), 373, 174, 44, 79);
-    applyRect(document.getElementById('radio-key-main-dial'), 513, 310, 37, 228);
+    applyRect(document.getElementById('radio-key-mode'), 300, 200, 48, 55, stageBox);
+    applyRect(document.getElementById('radio-key-preset-dial'), 373, 174, 44, 79, stageBox);
+    applyRect(document.getElementById('radio-key-main-dial'), 513, 310, 37, 228, stageBox);
 
     var cols = [315, 376, 437];
     var rows = [
@@ -179,9 +208,10 @@ export function applyRadioHitmap() {
                 cols[ci],
                 row.y,
                 w,
-                row.h
+                row.h,
+                stageBox
             );
         }
     }
-    requestAnimationFrame(applyDisplayTypography);
+    if (!skipTypo) requestAnimationFrame(applyDisplayTypography);
 }
