@@ -2,7 +2,7 @@
  * SECTOR-TECH — dva pohledy (celá / displej+klávesnice), kalibrace pásem, +/- ovládání.
  * Per-device prefs: uživatel nastaví pásma, zamkne → vodící lišty zmizí.
  */
-import { applyRadioHitmap, applyDisplayTypography } from './radioHitmap.js';
+import { applyRadioHitmap, applyDisplayTypography, resetDisplayTypography } from './radioHitmap.js';
 import {
     loadSectorDisplayPrefs,
     lockSectorDisplayPrefs,
@@ -569,7 +569,7 @@ function remeasureAll() {
         applyViewLayout(scroll);
     }
     requestAnimationFrame(function() {
-        applyDisplayTypography();
+        resetDisplayTypography();
         if (typeof window.patracRefreshRadioDisplay === 'function') {
             try { window.patracRefreshRadioDisplay(); } catch (eRd) {}
         }
@@ -581,16 +581,20 @@ function ensureVisibleRemeasure(attempt) {
     attempt = attempt || 0;
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
-    if (isRadioTabActive() && isScrollMeasurable(scroll)) {
+    if (!isRadioTabActive()) return;
+    if (isScrollMeasurable(scroll)) {
         remeasureAll();
         return;
     }
-    if (!isRadioTabActive() || attempt >= 16) return;
+    if (attempt >= 40) {
+        remeasureAll();
+        return;
+    }
     if (remeasureRetryTimer) clearTimeout(remeasureRetryTimer);
     remeasureRetryTimer = setTimeout(function() {
         remeasureRetryTimer = null;
         ensureVisibleRemeasure(attempt + 1);
-    }, attempt < 3 ? 0 : attempt < 8 ? 60 : 140);
+    }, attempt < 4 ? 0 : attempt < 12 ? 50 : 120);
 }
 
 export function initSectorTechShell() {

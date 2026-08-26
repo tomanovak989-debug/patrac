@@ -19,6 +19,8 @@ var BLINK_COUNT = 4;
 var SIGNAL_MS = 220;
 var GOODBYE_MS = 420;
 var FADE_MS = 280;
+/** Mobil v pozadí zahodí setTimeout — bez stropu zůstane HELLO navždy. */
+export var POWER_ANIM_MAX_MS = 4200;
 
 export function createPowerAnimState() {
     return {
@@ -29,7 +31,10 @@ export function createPowerAnimState() {
         signalLevel: 0,
         blinkOn: true,
         blinkCount: 0,
-        timer: null
+        timer: null,
+        watchdog: null,
+        startedAt: 0,
+        onComplete: null
     };
 }
 
@@ -43,18 +48,60 @@ export function stopPowerAnim(session) {
         clearTimeout(session.timer);
         session.timer = null;
     }
+    if (session.watchdog) {
+        clearTimeout(session.watchdog);
+        session.watchdog = null;
+    }
     session.active = false;
     session.direction = null;
     session.phase = 'idle';
+    session.onComplete = null;
+}
+
+function pageIsHidden() {
+    return typeof document !== 'undefined' && !!document.hidden;
+}
+
+function armWatchdog(session, onComplete) {
+    session.onComplete = onComplete;
+    session.startedAt = Date.now();
+    if (session.watchdog) clearTimeout(session.watchdog);
+    session.watchdog = setTimeout(function() {
+        session.watchdog = null;
+        if (!session.active) return;
+        finishPowerAnim(session, onComplete);
+    }, POWER_ANIM_MAX_MS);
+}
+
+/** Dokončí boot/vypnutí i když mobil zahodil časovače. */
+export function finishPowerAnim(session, onComplete) {
+    if (!session || !session.active) return false;
+    var cb = onComplete || session.onComplete;
+    stopPowerAnim(session);
+    if (cb) cb();
+    return true;
 }
 
 function schedule(session, ms, fn) {
     if (session.timer) clearTimeout(session.timer);
-    session.timer = setTimeout(fn, ms);
+    session.timer = setTimeout(function() {
+        session.timer = null;
+        if (!session.active) return;
+        if (pageIsHidden() || (session.startedAt && (Date.now() - session.startedAt) > POWER_ANIM_MAX_MS)) {
+            finishPowerAnim(session, session.onComplete);
+            return;
+        }
+        fn();
+    }, ms);
 }
 
 export function startBootAnim(session, onFrame, onComplete) {
     stopPowerAnim(session);
+    if (pageIsHidden()) {
+        if (onComplete) onComplete();
+        else if (onFrame) onFrame();
+        return;
+    }
     session.active = true;
     session.direction = 'boot';
     session.phase = 'hello';
@@ -62,6 +109,7 @@ export function startBootAnim(session, onFrame, onComplete) {
     session.signalLevel = 0;
     session.blinkOn = true;
     session.blinkCount = 0;
+    armWatchdog(session, onComplete);
     if (onFrame) onFrame();
     schedule(session, HELLO_MS, function() {
         advanceBoot(session, onFrame, onComplete);
@@ -130,11 +178,17 @@ function advanceBoot(session, onFrame, onComplete) {
 
 export function startShutdownAnim(session, onFrame, onComplete) {
     stopPowerAnim(session);
+    if (pageIsHidden()) {
+        if (onComplete) onComplete();
+        else if (onFrame) onFrame();
+        return;
+    }
     session.active = true;
     session.direction = 'shutdown';
     session.phase = 'signal';
     session.signalLevel = BOOT_SIGNAL_FILES.length;
     session.textStep = 0;
+    armWatchdog(session, onComplete);
     if (onFrame) onFrame();
     schedule(session, SIGNAL_MS, function() {
         advanceShutdown(session, onFrame, onComplete);

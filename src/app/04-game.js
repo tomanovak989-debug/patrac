@@ -3042,16 +3042,26 @@ function switchMainTab(tab, element) {
         document.getElementById('content-clan').style.display = (tab === 'clan') ? 'block' : 'none';
         if (tab === 'clan') {
             updateRadioDisplayHud();
+            function pokeRadioDisplay() {
+                if (typeof window.patracWakeRadioDisplay === 'function') {
+                    try { window.patracWakeRadioDisplay(); } catch (eWk) {}
+                    return;
+                }
+                if (typeof window.patracRefreshSectorTech === 'function') {
+                    try { window.patracRefreshSectorTech(); } catch (eSt) {}
+                }
+                if (typeof window.patracEnsureRadioHitmap === 'function') {
+                    try { window.patracEnsureRadioHitmap(); } catch (eHm) {}
+                }
+                if (typeof window.patracRefreshRadioDisplay === 'function') {
+                    try { window.patracRefreshRadioDisplay(); } catch (eRd) {}
+                }
+            }
             requestAnimationFrame(function() {
-                requestAnimationFrame(function() {
-                    if (typeof window.patracRefreshSectorTech === 'function') {
-                        try { window.patracRefreshSectorTech(); } catch (eSt) {}
-                    }
-                    if (typeof window.patracEnsureRadioHitmap === 'function') {
-                        try { window.patracEnsureRadioHitmap(); } catch (eHm) {}
-                    }
-                });
+                requestAnimationFrame(pokeRadioDisplay);
             });
+            setTimeout(pokeRadioDisplay, 80);
+            setTimeout(pokeRadioDisplay, 320);
         }
         document.getElementById('data-karta').style.display = (tab === 'data-karta') ? 'block' : 'none';
         document.getElementById('content-inventory').style.display = (tab === 'inventory') ? 'block' : 'none';

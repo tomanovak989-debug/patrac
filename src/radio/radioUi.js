@@ -86,7 +86,7 @@ import {
     copyGridLineText
 } from './radioGrids.js';
 import { initSectorTechShell, refreshSectorTechLayout } from './radioSectorShell.js';
-import { applyDisplayTypography, applyRadioHitmap } from './radioHitmap.js';
+import { applyDisplayTypography, applyRadioHitmap, resetDisplayTypography } from './radioHitmap.js';
 import {
     syncBattery,
     formatStandbyClockBattery,
@@ -257,6 +257,7 @@ import {
     stopPowerAnim,
     startBootAnim,
     startShutdownAnim,
+    finishPowerAnim,
     buildPowerAnimHtml
 } from './radioBoot.js';
 
@@ -1669,6 +1670,23 @@ function startBatteryTimer() {
 }
 
 function renderDisplay() {
+    try {
+        renderDisplayCore();
+    } catch (err) {
+        console.warn('[radioUi] renderDisplay', err);
+        try {
+            if (isPowerAnimActive(powerAnim)) stopPowerAnim(powerAnim);
+            menuScrollAnimating = false;
+            var screen = el('radio-display-screen');
+            if (screen) {
+                screen.classList.toggle('is-boot', false);
+                screen.classList.toggle('is-boot-black', false);
+            }
+        } catch (e2) {}
+    }
+}
+
+function renderDisplayCore() {
     var c = getCtx();
     var screen = el('radio-display-screen');
     syncBatteryAndApply({
@@ -1954,6 +1972,41 @@ function renderDisplay() {
     updateInputForMode();
     updateChargeButtonUi();
     requestAnimationFrame(applyDisplayTypography);
+}
+
+function skipActivePowerAnim() {
+    if (!isPowerAnimActive(powerAnim)) return false;
+    var dir = powerAnim.direction;
+    finishPowerAnim(powerAnim);
+    if (dir === 'shutdown') {
+        forceRadioPowerOff(true);
+        return true;
+    }
+    if (state && state.operatingMode === 'on') refreshSubscriptions();
+    renderDisplay();
+    return true;
+}
+
+function wakeRadioDisplay() {
+    skipActivePowerAnim();
+    menuScrollAnimating = false;
+    try { resetDisplayTypography(); } catch (eTy) {}
+    try { renderDisplay(); } catch (eRd) {}
+    if (typeof window.patracRefreshSectorTech === 'function') {
+        try { window.patracRefreshSectorTech(); } catch (eSt) {}
+    }
+}
+
+function bindRadioForeground() {
+    if (window._patracRadioForegroundBound) return;
+    window._patracRadioForegroundBound = true;
+    function onForeground() {
+        wakeRadioDisplay();
+    }
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) onForeground();
+    });
+    window.addEventListener('pageshow', onForeground);
 }
 
 function stopAutoscanTimer() {
@@ -4679,7 +4732,10 @@ function bindDisplayDialSwipe() {
 var RADIO_OPERATING_MODES = ['off', 'on'];
 
 function cycleOperatingMode(direction) {
-    if (isPowerAnimActive(powerAnim)) return;
+    if (isPowerAnimActive(powerAnim)) {
+        skipActivePowerAnim();
+        return;
+    }
     haltAutoscan(true);
     autoscanSession = null;
     closeAppScreens();
@@ -4719,6 +4775,7 @@ function cycleOperatingMode(direction) {
     cancelFieldEdit(fieldEditSession);
     fieldEditSession = null;
     persist();
+    refreshSubscriptions();
     startBootAnim(powerAnim, function() {
         renderDisplay();
     }, function() {
@@ -4940,6 +4997,7 @@ export function initRadioCommsSystem(options) {
 
     bindRadioAuthRefresh();
     bindChargeControl();
+    bindRadioForeground();
     startBatteryTimer();
     syncBatteryAndApply({
         operatingMode: state.operatingMode,
@@ -4959,6 +5017,7 @@ export function initRadioCommsSystem(options) {
     window.patracRefreshRadioDisplay = function() {
         renderDisplay();
     };
+    window.patracWakeRadioDisplay = wakeRadioDisplay;
     window.patracSetCommunityCipher = function(key) {
         var c = getCtx();
         if (c.comCode) setStoredCommunityCipher(c.comCode, key);

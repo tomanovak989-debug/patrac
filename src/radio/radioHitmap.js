@@ -22,6 +22,20 @@ function applyRect(el, x, y, w, h) {
 }
 
 var displayTypoRetries = 0;
+var displayTypoTimer = null;
+
+function isRadioTabActive() {
+    return !!(document.body && document.body.classList.contains('radio-tab-active'));
+}
+
+export function resetDisplayTypography() {
+    displayTypoRetries = 0;
+    if (displayTypoTimer) {
+        clearTimeout(displayTypoTimer);
+        displayTypoTimer = null;
+    }
+    applyDisplayTypography();
+}
 
 /** Font displeje v px — škáluje se s reálnou velikostí panelu (zoom vysílačky). */
 export function applyDisplayTypography() {
@@ -30,13 +44,28 @@ export function applyDisplayTypography() {
     var w = screen.clientWidth;
     var h = screen.clientHeight;
     if (w < 8 || h < 8) {
-        if (displayTypoRetries < 12) {
+        /* Skrytá záložka má 0×0 — nesmí vyčerpat pokusy před prvním otevřením Radio. */
+        if (!isRadioTabActive()) return;
+        if (displayTypoRetries < 40) {
             displayTypoRetries++;
-            requestAnimationFrame(applyDisplayTypography);
+            if (displayTypoTimer) clearTimeout(displayTypoTimer);
+            var wait = displayTypoRetries < 8 ? 0 : 50;
+            if (wait) {
+                displayTypoTimer = setTimeout(function() {
+                    displayTypoTimer = null;
+                    applyDisplayTypography();
+                }, wait);
+            } else {
+                requestAnimationFrame(applyDisplayTypography);
+            }
         }
         return;
     }
     displayTypoRetries = 0;
+    if (displayTypoTimer) {
+        clearTimeout(displayTypoTimer);
+        displayTypoTimer = null;
+    }
     var innerW = Math.max(8, w - 10);
     var px = Math.min(innerW / 10.5, (h / 8) * 0.9);
     px = Math.max(9, Math.round(px * 10) / 10);
