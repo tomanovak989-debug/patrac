@@ -1671,6 +1671,11 @@ function startBatteryTimer() {
 
 function renderDisplay() {
     try {
+        if (!document.body.classList.contains('radio-tab-active')) {
+            if (isPowerAnimActive(powerAnim)) finishPowerAnim(powerAnim);
+            try { refreshRadioUnreadBadge(); } catch (eBadge) {}
+            return;
+        }
         renderDisplayCore();
     } catch (err) {
         console.warn('[radioUi] renderDisplay', err);
@@ -5035,9 +5040,13 @@ export function initRadioCommsSystem(options) {
     renderNotebook();
     refreshSubscriptions();
     notifyRadioRangeLayer();
-    prefetchReceptionElevations().catch(function(err) {
-        console.warn('[radioUi] elevation prefetch', err);
-    });
+    var idlePrefetch = function() {
+        prefetchReceptionElevations().catch(function(err) {
+            console.warn('[radioUi] elevation prefetch', err);
+        });
+    };
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(idlePrefetch, { timeout: 4000 });
+    else setTimeout(idlePrefetch, 1200);
     window.patracListReceivers = function() {
         return listReceivers(getComCode());
     };

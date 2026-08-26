@@ -698,15 +698,17 @@ body.admin-mode .admin-only-tab { display: flex !important; }
 }
 
 .bottom-hud-wrapper {
-    position: absolute;
+    position: fixed !important;
     bottom: 0;
     left: 0;
     width: 100%;
-    z-index: 20000;
+    z-index: 2147483000;
     display: none;
     flex-direction: column;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     pointer-events: auto;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
 }
 .bottom-action-bar { height: 44px; display: flex; background-color: var(--bar-bg); border-top: 1px solid var(--hud-border); }
 .action-tab {
@@ -1133,6 +1135,10 @@ body.radio-tab-active .hud-center-panel.hud-radio-fullwidth {
     height: auto;
     z-index: 1300;
     touch-action: manipulation;
+}
+body:not(.map-tab-active):not(.radio-tab-active) #map,
+body:not(.map-tab-active):not(.radio-tab-active) #map.leaflet-container {
+    pointer-events: none !important;
 }
 body:not(.radio-tab-active) #content-clan {
     display: none !important;
@@ -4655,4 +4661,4 @@ body.theme-light .radio-notebook-sheet { background: #fffcf5; }
     font-weight: 600;
 }
 .map-tac-tile-mgrs .map-tac-value { font-size: 11px; letter-spacing: 0.04em; line-height: 1.25; }
-.bottom-hud-wrapper.crt-surface { position: absolute; }
+.bottom-hud-wrapper.crt-surface { position: fixed; }

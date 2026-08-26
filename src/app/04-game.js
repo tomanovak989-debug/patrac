@@ -2836,6 +2836,7 @@ function launchGame() {
     document.getElementById('hud-top').style.display = 'flex';
     document.getElementById('hud-left').style.display = 'flex';
     document.getElementById('hud-bottom').style.display = 'flex';
+    bindBottomTabHits();
 
     document.getElementById('display-com-name').textContent = localStorage.getItem('com_name') || "---";
     document.getElementById('display-player-name').textContent = localStorage.getItem('player_name') || "---";
@@ -2992,6 +2993,7 @@ function switchMainTab(tab, element) {
         else c.classList.remove('hud-radio-fullwidth');
     }
     document.body.classList.toggle('radio-tab-active', tab === 'clan');
+    document.body.classList.toggle('map-tab-active', tab === 'map-only');
 
     var btns = document.querySelectorAll('.bottom-action-bar button');
     for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
@@ -3081,6 +3083,48 @@ function switchMainTab(tab, element) {
     } catch (eMap) {
         console.warn('setMapToolsVisible', eMap);
     }
+}
+
+function bindBottomTabHits() {
+    if (window._patracTabHitsBound) return;
+    window._patracTabHitsBound = true;
+    var lastHit = 0;
+    function onTabHit(e) {
+        var wrap = document.getElementById('hud-bottom');
+        if (!wrap || wrap.style.display === 'none') return;
+        var vis = window.getComputedStyle(wrap);
+        if (vis.display === 'none' || vis.visibility === 'hidden') return;
+        var area = wrap.getBoundingClientRect();
+        if (area.height < 8) return;
+        var x = e.clientX;
+        var y = e.clientY;
+        if (e.touches && e.touches[0]) {
+            x = e.touches[0].clientX;
+            y = e.touches[0].clientY;
+        }
+        if (x < area.left || x > area.right || y < area.top || y > area.bottom) return;
+        var buttons = wrap.querySelectorAll('.action-tab');
+        var i;
+        for (i = 0; i < buttons.length; i++) {
+            var btn = buttons[i];
+            if (window.getComputedStyle(btn).display === 'none') continue;
+            var r = btn.getBoundingClientRect();
+            if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+            if (btn.contains(e.target) || e.target === btn) return;
+            if (Date.now() - lastHit < 400) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            lastHit = Date.now();
+            e.preventDefault();
+            e.stopPropagation();
+            btn.click();
+            return;
+        }
+    }
+    document.addEventListener('pointerdown', onTabHit, true);
+    document.addEventListener('touchstart', onTabHit, { capture: true, passive: false });
 }
 
 function updateCraftBindLabel() {
