@@ -172,7 +172,9 @@ function updateSetupBarUi() {
         bar.hidden = !setup;
         bar.setAttribute('aria-hidden', setup ? 'false' : 'true');
     }
-    document.body.classList.toggle('sector-user-setup-on', setup);
+    if (document.body.classList.contains('sector-user-setup-on') !== !!setup) {
+        document.body.classList.toggle('sector-user-setup-on', setup);
+    }
     updateViewControls();
 }
 
@@ -559,10 +561,22 @@ function measureStage(scroll) {
 }
 
 var remeasureRetryTimer = null;
+var radioRemeasureFrame = null;
+
+function scheduleRadioRemeasure() {
+    if (!isRadioTabActive()) return;
+    if (radioRemeasureFrame) return;
+    radioRemeasureFrame = requestAnimationFrame(function() {
+        radioRemeasureFrame = null;
+        if (isRadioTabActive()) ensureVisibleRemeasure(0);
+    });
+}
 
 function remeasureAll() {
     var scroll = el('sector-tech-scroll');
     if (!scroll) return;
+    /* Skrytá záložka Radio — měření a CSS scale nesmí běhat na Útočišti (layout smyčka na mobilu). */
+    if (!isRadioTabActive()) return;
     applyRadioHitmap();
     measureStage(scroll);
     if (!isAdminCalibrateMode()) {
@@ -613,7 +627,6 @@ export function initSectorTechShell() {
     if (img) {
         function onImgReady() {
             if (isRadioTabActive()) ensureVisibleRemeasure(0);
-            else remeasureAll();
         }
         if (img.complete) onImgReady();
         else img.addEventListener('load', onImgReady);
@@ -623,10 +636,10 @@ export function initSectorTechShell() {
         window._patracSectorResizeBound = true;
         var rt;
         function onViewportChange() {
+            if (!isRadioTabActive()) return;
             if (rt) clearTimeout(rt);
             rt = setTimeout(function() {
                 if (isRadioTabActive()) ensureVisibleRemeasure(0);
-                else remeasureAll();
             }, 120);
         }
         window.addEventListener('resize', onViewportChange);
@@ -640,8 +653,7 @@ export function initSectorTechShell() {
     if (!window._patracSectorAdminBound) {
         window._patracSectorAdminBound = true;
         var obs = new MutationObserver(function() {
-            if (isRadioTabActive()) ensureVisibleRemeasure(0);
-            else remeasureAll();
+            scheduleRadioRemeasure();
         });
         obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
     }
@@ -649,7 +661,7 @@ export function initSectorTechShell() {
     if (!window._patracSectorResizeObsBound && typeof ResizeObserver !== 'undefined') {
         window._patracSectorResizeObsBound = true;
         var resizeObs = new ResizeObserver(function() {
-            if (isRadioTabActive()) ensureVisibleRemeasure(0);
+            scheduleRadioRemeasure();
         });
         resizeObs.observe(scroll);
         var viewport = el('sector-tech-viewport');
@@ -657,6 +669,7 @@ export function initSectorTechShell() {
     }
 
     scroll.addEventListener('scroll', function() {
+        if (!isRadioTabActive()) return;
         if (isAdminCalibrateMode()) updateViewportRulers(scroll);
         requestAnimationFrame(applyDisplayTypography);
     }, { passive: true });
@@ -668,7 +681,6 @@ export function scrollSectorTechTo() {
 
 export function refreshSectorTechLayout() {
     if (isRadioTabActive()) ensureVisibleRemeasure(0);
-    else remeasureAll();
 }
 
 export { isSectorDisplayLocked, lockSectorDisplayPrefs, unlockSectorDisplayPrefs };

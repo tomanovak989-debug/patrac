@@ -1990,6 +1990,7 @@ function skipActivePowerAnim() {
 function wakeRadioDisplay() {
     skipActivePowerAnim();
     menuScrollAnimating = false;
+    if (!document.body.classList.contains('radio-tab-active')) return;
     try { resetDisplayTypography(); } catch (eTy) {}
     try { renderDisplay(); } catch (eRd) {}
     if (typeof window.patracRefreshSectorTech === 'function') {
@@ -2001,6 +2002,7 @@ function bindRadioForeground() {
     if (window._patracRadioForegroundBound) return;
     window._patracRadioForegroundBound = true;
     function onForeground() {
+        if (!document.body.classList.contains('radio-tab-active')) return;
         wakeRadioDisplay();
     }
     document.addEventListener('visibilitychange', function() {
