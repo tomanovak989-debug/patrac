@@ -721,6 +721,9 @@ function beginSessionForUser(userId, options) {
     if (options.comName) profile.currentClan = options.comName;
     if (options.resetChronicle) profile.chronicle = [];
     savePlayerProfile(profile);
+    if (typeof window.patracApplySectorDisplayPrefs === 'function') {
+        try { window.patracApplySectorDisplayPrefs(); } catch (eSector) {}
+    }
 }
 
 function getPatracItemsCommunityKey(comCode) {

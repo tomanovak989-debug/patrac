@@ -2145,6 +2145,16 @@ body.theme-light #radio-display-signal.is-standby {
     grid-template-rows: repeat(6, minmax(0, 1fr));
     margin: 0;
 }
+.sector-tech-screen.is-standby:not(.is-standby-tune) .radio-display-sub {
+    display: none;
+}
+.sector-tech-screen.is-standby:not(.is-standby-tune) .radio-display-main {
+    flex: 7 7 0;
+}
+.sector-tech-screen.is-standby .radio-display-standby-alert {
+    font-weight: 700 !important;
+    letter-spacing: 0.04em;
+}
 .sector-tech-screen.is-snake .radio-display-main > div:not(#radio-snake-board),
 .sector-tech-screen.is-arkanoid .radio-display-main > div:not(#radio-arkanoid-board) {
     display: none !important;

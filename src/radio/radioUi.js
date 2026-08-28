@@ -158,7 +158,9 @@ import {
     COMMS_TEMPLATES,
     markCommsEntryRead,
     appendAutoscanCapture,
-    markAutoscanCaptureRead
+    markAutoscanCaptureRead,
+    countUnreadAutoscanCaptures,
+    markAllAutoscanCapturesRead
 } from './radioMessages.js';
 import {
     createStandbyUiState,
@@ -787,6 +789,7 @@ function applyMenuLineContent(lines, focusLine, lineStyles, lineIcons) {
         }
         row.classList.remove('radio-display-row-marquee-active');
         row.classList.toggle('radio-display-row-unread', !!lineStyles[i]);
+        row.classList.remove('radio-display-standby-alert');
         row.classList.toggle('radio-display-row-focus', i === focusLine);
     }
     if (focusLine >= 0 && focusLine < lines.length && lines[focusLine]) {
@@ -875,11 +878,57 @@ function clearDisplayRowFocus() {
     }
 }
 
-function clearExtraDisplayLines() {
+function setStandbyAlertRow(row, text) {
+    if (!row) return;
+    row.textContent = text || '';
+    row.classList.toggle('radio-display-row-unread', !!text);
+    row.classList.toggle('radio-display-standby-alert', !!text);
+}
+
+function applyStandbyHomeAlerts() {
+    var unread = countUnreadInbox(notebook);
+    var msg = '';
+    if (unread === 1) msg = '● Nová zpráva';
+    else if (unread > 1) msg = '● ' + unread + ' nové';
+
+    var unreadScan = countUnreadAutoscanCaptures(notebook);
+    var scan = '';
+    if (unreadScan === 1) scan = '◎ Autosken · záchyt';
+    else if (unreadScan > 1) scan = '◎ Autosken · ' + unreadScan;
+
+    if (!msg && scan) {
+        msg = scan;
+        scan = '';
+    }
+
+    var l4 = el('radio-display-preset');
     var l5 = el('radio-display-line5');
     var l6 = el('radio-display-line6');
-    if (l5) l5.textContent = '';
-    if (l6) l6.textContent = '';
+    var l4Busy = !!(l4 && String(l4.textContent || '').trim());
+
+    if (l4Busy) {
+        setStandbyAlertRow(l5, msg);
+        setStandbyAlertRow(l6, scan);
+    } else {
+        setStandbyAlertRow(l4, msg);
+        setStandbyAlertRow(l5, scan);
+        setStandbyAlertRow(l6, '');
+    }
+}
+
+function clearExtraDisplayLines() {
+    var l4 = el('radio-display-preset');
+    var l5 = el('radio-display-line5');
+    var l6 = el('radio-display-line6');
+    if (l4) l4.classList.remove('radio-display-row-unread', 'radio-display-standby-alert');
+    if (l5) {
+        l5.textContent = '';
+        l5.classList.remove('radio-display-row-unread', 'radio-display-standby-alert');
+    }
+    if (l6) {
+        l6.textContent = '';
+        l6.classList.remove('radio-display-row-unread', 'radio-display-standby-alert');
+    }
 }
 
 function updateInputForMode() {
@@ -1901,23 +1950,13 @@ function renderDisplayCore() {
             dialBuffer: dialBuffer || '',
             beaconSos: (beaconActive && beaconActive.active) ? ('● SOS ' + BEACON_SOS_FREQUENCY) : ''
         });
-        var l6 = el('radio-display-line6');
-        if (l6) {
-            l6.textContent = '';
-        }
-        clearExtraDisplayLines();
+        applyStandbyHomeAlerts();
         if (nodeEl) {
             nodeEl.textContent = gpsOk ? 'NOSIČ' : 'GPS?';
             nodeEl.style.visibility = 'hidden';
             nodeEl.title = '';
         }
-        if (footerWrap) {
-            if (!footerWrap.querySelector('#radio-display-com')) {
-                footerWrap.innerHTML = '0 KEY · <span id="radio-display-com"></span>';
-                foot = el('radio-display-com');
-            }
-            if (foot) foot.textContent = standbyLines.footer;
-        }
+        if (footerWrap) footerWrap.textContent = '';
         updateChargeButtonUi();
     } else {
         var menuLines = osView.lines || ['', '', '', '', '', ''];
@@ -2052,7 +2091,7 @@ function tickAutoscanStep() {
         return;
     }
     advanceAutoscanVisual(autoscanSession);
-    renderDisplay();
+    if (isAutoscanMenuOpen()) renderDisplay();
 }
 
 function startAutoscanTimer() {
@@ -2080,6 +2119,7 @@ function stopAutoscanToSummary() {
         autoscanSession.hitFrequency
     );
     stopAutoscanTimer();
+    if (markAllAutoscanCapturesRead(notebook)) persist();
     refreshSubscriptions();
     radioIncomingFeedback(SIGNAL_CLEAR);
     renderDisplay();
@@ -2159,6 +2199,9 @@ function openRadioAutoscanScreen(autoStart) {
     radioOs.screen = 'menu';
     radioOs.menuPath = ['autoscan'];
     ensureAutoscanSession();
+    if (!autoStart && autoscanSession && autoscanSession.status !== SCAN_RUNNING) {
+        if (markAllAutoscanCapturesRead(notebook)) persist();
+    }
     if (autoStart) {
         handleAutoscanOk();
     } else {
@@ -2206,9 +2249,11 @@ function handleAutoscanOk() {
 
 function handleAutoscanClose() {
     if (autoscanSession && autoscanSession.status === SCAN_RUNNING) {
-        stopAutoscanToSummary();
+        persist();
+        renderDisplay();
         return;
     }
+    if (markAllAutoscanCapturesRead(notebook)) persist();
     haltAutoscan(false);
     autoscanSession = createAutoscanState();
     persist();
@@ -3318,9 +3363,6 @@ function cancelFieldEditSession() {
 
 function returnRadioToStandby() {
     cancelFieldEditSession();
-    if (autoscanSession && autoscanSession.status === SCAN_RUNNING) {
-        stopAutoscanToSummary();
-    }
     if (presetEditDraft) {
         var c = getCtx();
         savePresetDraft(presetEditDraft, state, {
@@ -3399,11 +3441,6 @@ function handleRadioOsInput(action) {
     }
     if (action === 'back' && clearMenuDialIfActive() &&
         !(radioOs.menuPath && radioOs.menuPath.length)) return true;
-
-    if (action === 'back' && isAutoscanMenuOpen() && autoscanSession &&
-        autoscanSession.status === SCAN_RUNNING) {
-        stopAutoscanToSummary();
-    }
 
     var result = radioOsHandleInput(radioOs, state.operatingMode, action, state);
     if (!result || !result.changed) return false;

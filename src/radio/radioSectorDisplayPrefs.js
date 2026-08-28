@@ -1,6 +1,6 @@
 /**
- * Zoom vysílačky — per-device cache v prohlížeči (localStorage).
- * Uživatel si nastaví vodící pásma, zamkne a lišty zmizí.
+ * Zoom / pohled vysílačky — localStorage na zařízení i záloha u účtu.
+ * Jednou nastavené se po přihlášení nesmí vracet do kalibrace.
  */
 export var DEVICE_PREFS_KEY = 'patrac_sector_display_prefs';
 var LEGACY_BANDS_KEY = 'patrac_sector_view_bands';
@@ -14,19 +14,73 @@ export var DEFAULT_BANDS = {
 var prefsCache = null;
 
 function cloneBands(src) {
+    src = src || DEFAULT_BANDS;
     return {
         full: { top: src.full.top, bottom: src.full.bottom },
         focus: { top: src.focus.top, bottom: src.focus.bottom }
     };
 }
 
+function currentUserId() {
+    try { return String(localStorage.getItem('patrac_session') || '').trim(); } catch (e) {
+        return '';
+    }
+}
+
+function userPrefsKey(userId) {
+    return DEVICE_PREFS_KEY + '_u_' + String(userId || '');
+}
+
+function bandsDifferFromDefault(bands) {
+    if (!bands || !bands.full || !bands.focus) return false;
+    var d = DEFAULT_BANDS;
+    return bands.full.top !== d.full.top ||
+        bands.full.bottom !== d.full.bottom ||
+        bands.focus.top !== d.focus.top ||
+        bands.focus.bottom !== d.focus.bottom;
+}
+
+function hasRadioStateForUser(userId) {
+    if (!userId) return false;
+    try { return localStorage.getItem('patrac_radio_state_' + userId) != null; } catch (e) {
+        return false;
+    }
+}
+
+function readStoredPrefs(key) {
+    try {
+        return normalizePrefs(JSON.parse(localStorage.getItem(key)));
+    } catch (e) {
+        return null;
+    }
+}
+
 function normalizePrefs(raw) {
     if (!raw || !raw.bands || !raw.bands.full || !raw.bands.focus) return null;
+    var locked = !!raw.locked;
     return {
-        locked: !!raw.locked,
+        locked: locked,
+        configured: !!(raw.configured || locked),
         viewMode: raw.viewMode === 'full' ? 'full' : 'focus',
         bands: cloneBands(raw.bands)
     };
+}
+
+function shouldKeepView(prefs, userId) {
+    if (!prefs) return false;
+    if (prefs.locked || prefs.configured) return true;
+    if (prefs.viewMode === 'full') return true;
+    if (bandsDifferFromDefault(prefs.bands)) return true;
+    if (hasRadioStateForUser(userId || currentUserId())) return true;
+    return false;
+}
+
+function commitIfNeeded(prefs, userId) {
+    if (!shouldKeepView(prefs, userId)) return prefs;
+    if (prefs.locked && prefs.configured) return prefs;
+    prefs.locked = true;
+    prefs.configured = true;
+    return prefs;
 }
 
 function migrateLegacyPrefs() {
@@ -49,33 +103,44 @@ function migrateLegacyPrefs() {
 
     return {
         locked: hadLegacy,
+        configured: hadLegacy,
         viewMode: viewMode,
         bands: bands
     };
 }
 
+function writePrefsKeys(prefs, userId) {
+    var json = JSON.stringify(prefs);
+    try { localStorage.setItem(DEVICE_PREFS_KEY, json); } catch (e) {}
+    userId = userId || currentUserId();
+    if (userId) {
+        try { localStorage.setItem(userPrefsKey(userId), json); } catch (e2) {}
+    }
+}
+
 export function loadSectorDisplayPrefs() {
     if (prefsCache) return prefsCache;
-    try {
-        var raw = JSON.parse(localStorage.getItem(DEVICE_PREFS_KEY));
-        var normalized = normalizePrefs(raw);
-        if (normalized) {
-            prefsCache = normalized;
-            return prefsCache;
-        }
-    } catch (e) {}
-    prefsCache = migrateLegacyPrefs();
-    saveSectorDisplayPrefs(prefsCache);
+    var userId = currentUserId();
+    var device = readStoredPrefs(DEVICE_PREFS_KEY);
+    var user = userId ? readStoredPrefs(userPrefsKey(userId)) : null;
+    var prefs = device || user || migrateLegacyPrefs();
+    prefs = commitIfNeeded(prefs, userId);
+    prefsCache = prefs;
+    writePrefsKeys(prefsCache, userId);
     return prefsCache;
 }
 
 export function saveSectorDisplayPrefs(prefs) {
     prefs = normalizePrefs(prefs) || migrateLegacyPrefs();
     prefsCache = prefs;
-    try {
-        localStorage.setItem(DEVICE_PREFS_KEY, JSON.stringify(prefsCache));
-    } catch (e) {}
+    writePrefsKeys(prefsCache, currentUserId());
     return prefsCache;
+}
+
+/** Po přihlášení — znovu načíst zálohu účtu a držet už nastavený pohled. */
+export function reloadSectorDisplayPrefs() {
+    prefsCache = null;
+    return loadSectorDisplayPrefs();
 }
 
 export function isSectorDisplayLocked() {
@@ -85,12 +150,14 @@ export function isSectorDisplayLocked() {
 export function lockSectorDisplayPrefs() {
     var prefs = loadSectorDisplayPrefs();
     prefs.locked = true;
+    prefs.configured = true;
     return saveSectorDisplayPrefs(prefs);
 }
 
 export function unlockSectorDisplayPrefs() {
     var prefs = loadSectorDisplayPrefs();
     prefs.locked = false;
+    prefs.configured = true;
     return saveSectorDisplayPrefs(prefs);
 }
 
@@ -101,6 +168,7 @@ export function getSectorViewModeFromPrefs() {
 export function setSectorViewModeInPrefs(mode) {
     var prefs = loadSectorDisplayPrefs();
     prefs.viewMode = mode === 'full' ? 'full' : 'focus';
+    prefs.configured = true;
     return saveSectorDisplayPrefs(prefs);
 }
 
@@ -111,5 +179,6 @@ export function getSectorBandsFromPrefs() {
 export function setSectorBandsInPrefs(bands) {
     var prefs = loadSectorDisplayPrefs();
     prefs.bands = cloneBands(bands);
+    prefs.configured = true;
     return saveSectorDisplayPrefs(prefs);
 }

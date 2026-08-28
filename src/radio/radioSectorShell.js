@@ -5,6 +5,7 @@
 import { applyRadioHitmap, applyDisplayTypography, resetDisplayTypography } from './radioHitmap.js';
 import {
     loadSectorDisplayPrefs,
+    reloadSectorDisplayPrefs,
     lockSectorDisplayPrefs,
     unlockSectorDisplayPrefs,
     getSectorViewModeFromPrefs,
@@ -233,6 +234,7 @@ function bindViewControls() {
             e.preventDefault();
             e.stopPropagation();
             lockSectorDisplayPrefs();
+            updateSetupBarUi();
             remeasureAll();
         });
     }
@@ -623,6 +625,13 @@ export function initSectorTechShell() {
     bindBandLines();
     bindCrosshair();
     remeasureAll();
+
+    window.patracApplySectorDisplayPrefs = function() {
+        reloadSectorDisplayPrefs();
+        viewMode = getViewMode();
+        updateSetupBarUi();
+        if (isRadioTabActive()) ensureVisibleRemeasure(0);
+    };
 
     var img = el('sector-tech-img');
     if (img) {

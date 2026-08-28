@@ -163,7 +163,7 @@ export function buildAutoscanOsView(session, radioState, notebook) {
             sessionCount > 0 ? ('● ' + sessionCount + ' uloženo') : '○ čekám na provoz…',
             totalSaved > 0 ? ('Celkem v paměti: ' + totalSaved) : ''
         ];
-        footer = 'OK = stop · Zpět = stop';
+        footer = 'OK = stop · Zpět = menu';
         status = 'AUTOSKEN · SKEN';
     } else if (session.status === SCAN_LOCKED) {
         var locked = session.hitFrequency || (visual && visual.frequency);

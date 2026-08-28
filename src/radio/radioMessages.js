@@ -126,7 +126,7 @@ function formatScanCaptureLine(capture, radioState) {
     var when = formatDateShort(capture.ts);
     return {
         text: when + ' ◎ ' + channel + ' ' + text,
-        bold: capture.read !== true
+        bold: capture.read === false
     };
 }
 function formatEntryChannelLabel(entry, radioState) {
@@ -446,4 +446,24 @@ export function markAutoscanCaptureRead(capture) {
     if (capture.read === true) return false;
     capture.read = true;
     return true;
+}
+
+export function countUnreadAutoscanCaptures(notebook) {
+    var list = (notebook && notebook.autoscan) ? notebook.autoscan : [];
+    var n = 0;
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (list[i] && list[i].read === false) n++;
+    }
+    return n;
+}
+
+export function markAllAutoscanCapturesRead(notebook) {
+    var list = (notebook && notebook.autoscan) ? notebook.autoscan : [];
+    var changed = false;
+    var i;
+    for (i = 0; i < list.length; i++) {
+        if (markAutoscanCaptureRead(list[i])) changed = true;
+    }
+    return changed;
 }
