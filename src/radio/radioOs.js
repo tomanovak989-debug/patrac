@@ -8,7 +8,7 @@ import { buildBeaconOsView } from './radioBeacon.js';
 import { buildSnakeOsView } from './radioSnake.js';
 import { buildArkanoidOsView } from './radioArkanoid.js';
 import { buildDecoderOsView } from './radioDecoder.js';
-import { formatMenuDisplayLabel } from './radioShortcuts.js';
+import { decorateMenuLabel, findQuickKeyForAction, bindingFromMenuItem } from './radioShortcuts.js';
 import { buildFixedCursorMenuLines, buildBoundedCursorMenuLines, wrapMenuFocus, clampMenuFocus } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 export var SCREEN_STANDBY = 'standby';
@@ -200,9 +200,11 @@ function buildQuickKeysHelpLines(radioState) {
     return lines;
 }
 
-function decorateItemLabel(item) {
+function decorateItemLabel(item, radioState) {
     if (!item) return '';
-    return formatMenuDisplayLabel(item.label || '');
+    var binding = bindingFromMenuItem(item);
+    var keyId = binding ? findQuickKeyForAction(radioState, binding.action) : null;
+    return decorateMenuLabel(item.label || '', keyId);
 }
 
 export function getFocusedMenuItem(os, radioState) {
@@ -631,7 +633,7 @@ export function buildOsDisplayLines(os, operatingMode, standby, radioState, draf
         items,
         os.focusIndex,
         function(item) {
-            return decorateItemLabel(item);
+            return decorateItemLabel(item, radioState);
         },
         function(item) {
             return menuIconForItem(item);

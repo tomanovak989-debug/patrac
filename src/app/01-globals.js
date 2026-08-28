@@ -1,9 +1,9 @@
 /* PATRAC app chunk: 01-globals.js — do not reorder script tags in index.html */
 var map = null, userMarker = null;
-var PATRAC_BUILD = '20260826e213';
+var PATRAC_BUILD = '20260828e215';
 window.PATRAC_BUILD = PATRAC_BUILD;
 
-/** Dynamický import ES modulů — absolutní cesta od kořene webu (skript běží z /src/app/, proto ne relativní!), s cache-bustem. */
+/** Dynamický import ES modulů — absolutní cesta od kořene webu (skript běží z /src/app/, proto ne relativní!), s cache-bustem. Vnořené `from './x.js'` řeší import mapa v index.html. */
 function patracImport(modulePath) {
     return import('/src/' + modulePath + '?v=' + PATRAC_BUILD);
 }

@@ -194,8 +194,8 @@ function tickBall(session, ball) {
     if (ball.x < ARK_BALL_R) {
         ball.x = ARK_BALL_R;
         ball.velX = Math.abs(ball.velX);
-    } else if (ball.x > ARK_W - 1 - ARK_BALL_R) {
-        ball.x = ARK_W - 1 - ARK_BALL_R;
+    } else if (ball.x > ARK_W - ARK_BALL_R) {
+        ball.x = ARK_W - ARK_BALL_R;
         ball.velX = -Math.abs(ball.velX);
     }
 

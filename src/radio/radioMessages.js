@@ -2,7 +2,7 @@
  * SMS — hub, seznamy, compose, detail, potvrzení odeslání.
  */
 import { findPreset, normalizeFrequency, formatTime, wrapNotebookText } from './radioComms.js';
-import { formatMenuDisplayLabel } from './radioShortcuts.js';
+import { decorateMenuLabel, findQuickKeyForAction, bindingFromCommsItem } from './radioShortcuts.js';
 import { buildBoundedCursorMenuLines } from './radioMenuScroll.js';
 import { menuIconForItem } from './radioMenuIcons.js';
 
@@ -162,7 +162,9 @@ function formatEntryLine(entry, radioState) {
 function formatItem(item, radioState) {
     if (!item) return { text: '', bold: false };
     if (item.label) {
-        return { text: formatMenuDisplayLabel(item.label), bold: false };
+        var binding = bindingFromCommsItem(item, null);
+        var keyId = binding ? findQuickKeyForAction(radioState, binding.action) : null;
+        return { text: decorateMenuLabel(item.label, keyId), bold: false };
     }
     if (item.type === 'draft') {
         return { text: '✎ ' + formatDateShort(item.draft.ts) + ' ' + String(item.draft.text || '').slice(0, 12), bold: false };

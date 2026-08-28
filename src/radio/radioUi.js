@@ -2791,7 +2791,7 @@ function syncArkanoidBoardGrid(innerEl) {
     if (!innerEl) return;
     innerEl.style.gridTemplateColumns = 'repeat(' + ARK_W + ', 1fr)';
     innerEl.style.gridTemplateRows = 'repeat(' + ARK_H + ', 1fr)';
-    innerEl.style.aspectRatio = ARK_W + ' / ' + ARK_H;
+    innerEl.style.aspectRatio = 'auto';
 }
 
 function rebuildAppBoardCells(innerEl, count, cellClass) {
