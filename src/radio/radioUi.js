@@ -1912,7 +1912,7 @@ function renderDisplayCore() {
             nodeEl.textContent = '';
             nodeEl.style.visibility = 'hidden';
         }
-        if (footerWrap) footerWrap.textContent = 'OK volba · Zpět = ano';
+        if (footerWrap) footerWrap.textContent = 'OK volba · Zpět = ne';
         updateInputForMode();
         updateChargeButtonUi();
         requestAnimationFrame(applyDisplayTypography);
@@ -3144,13 +3144,25 @@ function gamePadDigitToDirection(digit) {
     return null;
 }
 
+function arkanoidSteerDigitToDirection(digit) {
+    if (digit === '4' || digit === '1' || digit === '7') return 'left';
+    if (digit === '6' || digit === '3' || digit === '9') return 'right';
+    return null;
+}
+
 function handleGamePadDigit(keyId) {
+    if (isArkanoidMenuOpen()) {
+        if (arkanoidSteerDigitToDirection(keyId)) return true;
+        var arkDir = gamePadDigitToDirection(keyId);
+        if (arkDir) {
+            handleRadioOsInput(arkDir);
+            return true;
+        }
+        return false;
+    }
     var dir = gamePadDigitToDirection(keyId);
     if (!dir) return false;
-    if (isArkanoidMenuOpen() && (dir === 'left' || dir === 'right')) {
-        return true;
-    }
-    if (isSnakeMenuOpen() || isArkanoidMenuOpen()) {
+    if (isSnakeMenuOpen()) {
         handleRadioOsInput(dir);
         return true;
     }
@@ -3254,10 +3266,7 @@ function popOsLeaf(leaf) {
 }
 
 function beginExitConfirm(leaf, onYes) {
-    if (isExitConfirmActive()) {
-        confirmExitYes();
-        return;
-    }
+    if (isExitConfirmActive()) return;
     if (leaf && radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] !== leaf) {
         radioOs.menuPath.push(leaf);
     }
@@ -3281,7 +3290,7 @@ function confirmExitNo() {
 function handleExitConfirmInput(action) {
     if (!isExitConfirmActive()) return false;
     if (action === 'back') {
-        confirmExitYes();
+        confirmExitNo();
         return true;
     }
     if (action === 'ok') {
@@ -4889,7 +4898,7 @@ function handleRadioBackPress() {
     var input = el('chat-input-field');
     if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
     if (isExitConfirmActive()) {
-        confirmExitYes();
+        confirmExitNo();
         return;
     }
     if (standbyPttActive) {
@@ -4947,6 +4956,17 @@ function bindRadioKeyboard() {
             return;
         }
 
+        if (/^[134679]$/.test(e.key) && isArkanoidMenuOpen()) {
+            var arkSteer = arkanoidSteerDigitToDirection(e.key);
+            if (arkSteer) {
+                e.preventDefault();
+                if (e.repeat) return;
+                radioKeyFeedback('key');
+                startArkanoidSteer(arkSteer);
+                return;
+            }
+        }
+
         if (/^[2468]$/.test(e.key) && (isSnakeMenuOpen() || isArkanoidMenuOpen())) {
             var padDir = gamePadDigitToDirection(e.key);
             if (padDir) {
@@ -4980,7 +5000,9 @@ function bindRadioKeyboard() {
         }
     });
     window.addEventListener('keyup', function(e) {
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === '4' || e.key === '6') {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' ||
+            e.key === '1' || e.key === '3' || e.key === '4' ||
+            e.key === '6' || e.key === '7' || e.key === '9') {
             stopArkanoidSteer();
         }
     });
@@ -5025,9 +5047,9 @@ function bindArkanoidKeypadHold() {
     grid.addEventListener('pointerdown', function(e) {
         if (!isArkanoidMenuOpen() || !arkanoidSession || !arkanoidSession.alive) return;
         if (isExitConfirmActive() || e.button !== 0) return;
-        var btn = e.target.closest('[data-key="4"], [data-key="6"]');
+        var btn = e.target.closest('[data-key="1"], [data-key="3"], [data-key="4"], [data-key="6"], [data-key="7"], [data-key="9"]');
         if (!btn || !grid.contains(btn)) return;
-        var dir = gamePadDigitToDirection(btn.getAttribute('data-key'));
+        var dir = arkanoidSteerDigitToDirection(btn.getAttribute('data-key'));
         if (dir !== 'left' && dir !== 'right') return;
         pointerId = e.pointerId;
         try { btn.setPointerCapture(e.pointerId); } catch (err) {}
