@@ -22,8 +22,8 @@ export var ARK_PADDLE_VEL_K = 0.078;
 export var ARK_BALL_MASS = 1;
 export var ARK_PADDLE_MASS = 2.8;
 export var ARK_PADDLE_RESTITUTION = 0.38;
-/** Max. náklon odletu na krajní zóně (rad). */
-export var ARK_HIT_TILT = 0.95;
+/** Ostřejší „faleš“ na krajní zóně (rad, ~68°). Střed drží 0. */
+export var ARK_HIT_TILT = 1.18;
 /** Pásy pálky: levý okraj, levý střed, střed, pravý střed, pravý okraj. */
 export var ARK_PADDLE_ZONES = 5;
 /** Kolik snímků ještě platí švih po zastavení pálky (ať jde stihnout nakopnutí). */
@@ -271,13 +271,19 @@ function paddleHitZone(session, ballX) {
     var t = (ballX - session.paddleX) / ARK_PADDLE_W;
     if (t < 0) t = 0;
     if (t > 1) t = 1;
-    var zone = Math.floor(t * ARK_PADDLE_ZONES);
-    if (zone >= ARK_PADDLE_ZONES) zone = ARK_PADDLE_ZONES - 1;
-    return zone;
+    if (t < 0.16) return 0;
+    if (t < 0.38) return 1;
+    if (t < 0.62) return 2;
+    if (t < 0.84) return 3;
+    return 4;
 }
 
 function tiltForPaddleZone(zone) {
-    return (zone - (ARK_PADDLE_ZONES - 1) / 2) * (ARK_HIT_TILT / ((ARK_PADDLE_ZONES - 1) / 2));
+    if (zone === 0) return -ARK_HIT_TILT;
+    if (zone === 1) return -ARK_HIT_TILT * 0.32;
+    if (zone === 2) return 0;
+    if (zone === 3) return ARK_HIT_TILT * 0.32;
+    return ARK_HIT_TILT;
 }
 
 export function handlePaddleCollision(session, ball) {
@@ -288,10 +294,15 @@ export function handlePaddleCollision(session, ball) {
     var mag = Math.sqrt(ball.velX * ball.velX + ball.velY * ball.velY);
     if (mag < 0.2 * speed) mag = 0.2 * speed;
 
-    /* 2) Úhel podle zóny dopadu — okraj / střed / okraj. */
+    /* 2) Kraj = ostřejší faleš, přesný střed = kolmo vzhůru. */
     var tilt = tiltForPaddleZone(zone);
-    ball.velX = mag * Math.sin(tilt);
-    ball.velY = -mag * Math.cos(tilt);
+    if (zone === 2) {
+        ball.velX = 0;
+        ball.velY = -mag;
+    } else {
+        ball.velX = mag * Math.sin(tilt);
+        ball.velY = -mag * Math.cos(tilt);
+    }
 
     /* 1) Kinetický přenos hybnosti — impuls z pohybu pálky do velX kuličky. */
     var relVx = ball.velX - paddleU;
