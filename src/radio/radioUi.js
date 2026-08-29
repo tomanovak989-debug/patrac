@@ -288,6 +288,7 @@ var snakeTimer = null;
 var snakeTimerMs = null;
 var arkanoidSession = null;
 var arkanoidTimer = null;
+var arkanoidSteerDir = null;
 var decoderSession = null;
 var beaconSession = null;
 var beaconActive = null;
@@ -3165,6 +3166,7 @@ function startArkanoidTimer() {
             return;
         }
         if (arkanoidSession.alive) {
+            if (arkanoidSteerDir) arkanoidMovePaddle(arkanoidSession, arkanoidSteerDir);
             arkanoidTick(arkanoidSession);
         }
         renderDisplay();
@@ -3181,7 +3183,21 @@ function openArkanoidScreen() {
     renderDisplay();
 }
 
+function startArkanoidSteer(dir) {
+    if (dir !== 'left' && dir !== 'right') return;
+    arkanoidSteerDir = dir;
+    if (arkanoidSession && arkanoidSession.alive) {
+        arkanoidMovePaddle(arkanoidSession, dir);
+        renderDisplay();
+    }
+}
+
+function stopArkanoidSteer() {
+    arkanoidSteerDir = null;
+}
+
 function closeArkanoidScreen() {
+    stopArkanoidSteer();
     stopArkanoidTimer();
     arkanoidSession = null;
     hideArkanoidBoard();
@@ -4418,6 +4434,7 @@ function bindRadioTouchFallback() {
         var key = btn.getAttribute('data-key');
         if (!key) return;
         if (key === 'up' || key === 'down' || key === 'left' || key === 'right') {
+            if (isArkanoidMenuOpen() && (key === 'left' || key === 'right')) return;
             handleRadioDpadKey(key);
             nudgeDisplayPaint();
             return;
@@ -4575,6 +4592,7 @@ function bindKeypad() {
 
     bindRadioDialGestures();
     bindDpadNavigation();
+    bindArkanoidDpadHold();
     bindRadioTouchFallback();
     bindRadioKeyboard();
     bindRadioKeyT9();
@@ -4696,6 +4714,9 @@ function handleRadioDpadKey(key) {
         handleStandbyInput(key);
         return;
     }
+    if (isArkanoidMenuOpen() && (key === 'left' || key === 'right')) {
+        return;
+    }
     if (isRadioOsActive(radioOs)) {
         handleRadioOsInput(key);
     }
@@ -4778,7 +4799,12 @@ function bindRadioKeyboard() {
 
         if (dpadKey) {
             e.preventDefault();
+            if (e.repeat) return;
             radioKeyFeedback('key');
+            if (isArkanoidMenuOpen() && (dpadKey === 'left' || dpadKey === 'right')) {
+                startArkanoidSteer(dpadKey);
+                return;
+            }
             handleRadioDpadKey(dpadKey);
             return;
         }
@@ -4810,6 +4836,39 @@ function bindRadioKeyboard() {
             handleRadioBackPress();
         }
     });
+    window.addEventListener('keyup', function(e) {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') stopArkanoidSteer();
+    });
+}
+
+function bindArkanoidDpadHold() {
+    var zone = el('radio-dpad-zone');
+    if (!zone || zone._arkSteerBound) return;
+    zone._arkSteerBound = true;
+    var pointerId = null;
+
+    zone.addEventListener('pointerdown', function(e) {
+        if (!isArkanoidMenuOpen() || !arkanoidSession || !arkanoidSession.alive) return;
+        if (e.button !== 0) return;
+        var btn = e.target.closest('[data-key]');
+        if (!btn) return;
+        var key = btn.getAttribute('data-key');
+        if (key !== 'left' && key !== 'right') return;
+        pointerId = e.pointerId;
+        try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+        startArkanoidSteer(key);
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+
+    function endSteer(e) {
+        if (pointerId != null && e && e.pointerId !== pointerId) return;
+        pointerId = null;
+        stopArkanoidSteer();
+    }
+
+    zone.addEventListener('pointerup', endSteer, true);
+    zone.addEventListener('pointercancel', endSteer, true);
 }
 
 function bindDpadNavigation() {
@@ -4821,6 +4880,7 @@ function bindDpadNavigation() {
         if (!btn) return;
         var key = btn.getAttribute('data-key');
         if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right') return;
+        if (isArkanoidMenuOpen() && (key === 'left' || key === 'right')) return;
         e.preventDefault();
         e.stopPropagation();
         handleRadioDpadKey(key);

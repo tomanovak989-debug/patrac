@@ -8,7 +8,7 @@ export var ARK_H = 48;
 export var ARK_UNIT = 2;
 export var ARK_CELL_COUNT = ARK_W * ARK_H;
 export var ARK_PADDLE_W = 16;
-export var ARK_PADDLE_STEP = 8;
+export var ARK_PADDLE_STEP = 2;
 export var ARK_PADDLE_H = 2;
 export var ARK_BRICK_ROWS = 6;
 export var ARK_BRICK_COLS = ARK_W / ARK_UNIT;
@@ -17,7 +17,7 @@ export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
 /** Přepočet delty pálky (jednotky hřiště / snímek) na rychlost kuličky. */
-export var ARK_PADDLE_VEL_K = 0.078;
+export var ARK_PADDLE_VEL_K = 0.14;
 /** Kinetický přenos hybnosti v ose X — pálka je těžší, kulička převezme impuls. */
 export var ARK_BALL_MASS = 1;
 export var ARK_PADDLE_MASS = 2.8;
