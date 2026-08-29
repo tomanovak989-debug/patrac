@@ -16,6 +16,14 @@ export var ARK_BALL_R = 0.9;
 export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
+/** Jak dlouho po kroku pálky ještě platí „švih“ (english). */
+export var ARK_ENGLISH_MS = 320;
+/** Podíl švihu pálky, který se přičte k velX kuličky. */
+export var ARK_PADDLE_ENGLISH = 0.048;
+/** Jak moc místo zásahu stáčí úhel (střed → rovně, kraj → ostře). */
+export var ARK_HIT_ANGLE = 0.18;
+/** Kolik z původního velX zůstane po odrazu (plynulost, ne statický úhel). */
+export var ARK_KEEP_INCOMING_X = 0.38;
 
 function buildInitialBricks() {
     var rows = [];
@@ -54,6 +62,8 @@ function createBall(session, waiting, velSign) {
 export function createArkanoidState() {
     var session = {
         paddleX: 16,
+        paddleVelX: 0,
+        paddleMovedAt: 0,
         balls: [createBall({ paddleX: 16, level: 1 }, true, 1)],
         bricks: buildInitialBricks(),
         score: 0,
@@ -81,6 +91,8 @@ export function resetArkanoidState(session) {
     if (!session) return createArkanoidState();
     var fresh = createArkanoidState();
     session.paddleX = fresh.paddleX;
+    session.paddleVelX = 0;
+    session.paddleMovedAt = 0;
     session.balls = fresh.balls;
     session.bricks = fresh.bricks;
     session.score = 0;
@@ -98,9 +110,18 @@ export function arkanoidMovePaddle(session, dir) {
     if (next < 0) next = 0;
     if (next > ARK_W - ARK_PADDLE_W) next = ARK_W - ARK_PADDLE_W;
     if (next === session.paddleX) return false;
+    session.paddleVelX = next - session.paddleX;
+    session.paddleMovedAt = Date.now();
     session.paddleX = next;
     if (session.waiting) syncWaitingBalls(session);
     return true;
+}
+
+function paddleEnglishVx(session) {
+    var age = Date.now() - (session.paddleMovedAt || 0);
+    if (age < 0 || age > ARK_ENGLISH_MS) return 0;
+    var freshness = 1 - (age / ARK_ENGLISH_MS);
+    return (session.paddleVelX || 0) * freshness;
 }
 
 function brickAt(session, bx, by) {
@@ -180,8 +201,25 @@ function reflectFromPaddle(session, ball) {
     var hit = (ball.x - center) / (ARK_PADDLE_W / 2);
     if (hit < -1) hit = -1;
     if (hit > 1) hit = 1;
-    ball.velX = hit * 0.17 * speedMult(session);
-    ball.velY = -Math.abs(ball.velY);
+
+    var speed = speedMult(session);
+    var english = paddleEnglishVx(session);
+    var vx = (ball.velX * ARK_KEEP_INCOMING_X) +
+        (hit * ARK_HIT_ANGLE * speed) +
+        (english * ARK_PADDLE_ENGLISH);
+    var maxVx = 0.64 * speed;
+    if (vx > maxVx) vx = maxVx;
+    if (vx < -maxVx) vx = -maxVx;
+
+    var vy = -Math.abs(ball.velY);
+    if (Math.abs(english) > 2) vy -= 0.035 * speed;
+    var minUp = -0.16 * speed;
+    var maxUp = -0.58 * speed;
+    if (vy > minUp) vy = minUp;
+    if (vy < maxUp) vy = maxUp;
+
+    ball.velX = vx;
+    ball.velY = vy;
     ball.y = ARK_H - 6;
 }
 
