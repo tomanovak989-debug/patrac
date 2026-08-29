@@ -22,8 +22,10 @@ export var ARK_PADDLE_VEL_K = 0.078;
 export var ARK_BALL_MASS = 1;
 export var ARK_PADDLE_MASS = 2.8;
 export var ARK_PADDLE_RESTITUTION = 0.38;
-/** Max. náklon odletu podle kraje pálky (rad). Střed = 0, kraj = ±toto. */
+/** Max. náklon odletu na krajní zóně (rad). */
 export var ARK_HIT_TILT = 0.95;
+/** Pásy pálky: levý okraj, levý střed, střed, pravý střed, pravý okraj. */
+export var ARK_PADDLE_ZONES = 5;
 /** Kolik snímků ještě platí švih po zastavení pálky (ať jde stihnout nakopnutí). */
 export var ARK_KICK_HOLD_TICKS = 4;
 export var ARK_KICK_DECAY = 0.68;
@@ -265,19 +267,29 @@ export function arkanoidOk(session) {
     return false;
 }
 
+function paddleHitZone(session, ballX) {
+    var t = (ballX - session.paddleX) / ARK_PADDLE_W;
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    var zone = Math.floor(t * ARK_PADDLE_ZONES);
+    if (zone >= ARK_PADDLE_ZONES) zone = ARK_PADDLE_ZONES - 1;
+    return zone;
+}
+
+function tiltForPaddleZone(zone) {
+    return (zone - (ARK_PADDLE_ZONES - 1) / 2) * (ARK_HIT_TILT / ((ARK_PADDLE_ZONES - 1) / 2));
+}
+
 export function handlePaddleCollision(session, ball) {
     var speed = speedMult(session);
     var paddleU = paddleEnglishVx(session) * ARK_PADDLE_VEL_K;
-    var center = session.paddleX + (ARK_PADDLE_W / 2);
-    var hit = (ball.x - center) / (ARK_PADDLE_W / 2);
-    if (hit < -1) hit = -1;
-    if (hit > 1) hit = 1;
+    var zone = paddleHitZone(session, ball.x);
 
     var mag = Math.sqrt(ball.velX * ball.velX + ball.velY * ball.velY);
     if (mag < 0.2 * speed) mag = 0.2 * speed;
 
-    /* 2) Úhel podle místa dopadu — střed nahoru, kraj šikmo. */
-    var tilt = hit * ARK_HIT_TILT;
+    /* 2) Úhel podle zóny dopadu — okraj / střed / okraj. */
+    var tilt = tiltForPaddleZone(zone);
     ball.velX = mag * Math.sin(tilt);
     ball.velY = -mag * Math.cos(tilt);
 
