@@ -17,7 +17,10 @@ export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
 /** velocity.x += paddleVelocity.x * k — přenos švihu pálky na kuličku. */
-export var ARK_PADDLE_VEL_K = 0.048;
+export var ARK_PADDLE_VEL_K = 0.078;
+/** Kolik snímků ještě platí švih po zastavení pálky (ať jde stihnout nakopnutí). */
+export var ARK_KICK_HOLD_TICKS = 4;
+export var ARK_KICK_DECAY = 0.68;
 
 function buildInitialBricks() {
     var rows = [];
@@ -58,6 +61,7 @@ export function createArkanoidState() {
         paddleX: 16,
         paddleXPrev: 16,
         paddleVelX: 0,
+        paddleKickHold: 0,
         dragActive: false,
         dragVelX: 0,
         balls: [createBall({ paddleX: 16, level: 1 }, true, 1)],
@@ -89,6 +93,7 @@ export function resetArkanoidState(session) {
     session.paddleX = fresh.paddleX;
     session.paddleXPrev = fresh.paddleX;
     session.paddleVelX = 0;
+    session.paddleKickHold = 0;
     session.dragActive = false;
     session.dragVelX = 0;
     session.balls = fresh.balls;
@@ -122,6 +127,7 @@ export function arkanoidMovePaddle(session, dir) {
     var next = clampPaddleX(session.paddleX + delta);
     if (next === session.paddleX) return false;
     session.paddleVelX = next - session.paddleX;
+    session.paddleKickHold = ARK_KICK_HOLD_TICKS;
     session.paddleX = next;
     if (session.waiting) syncWaitingBalls(session);
     return true;
@@ -138,14 +144,42 @@ export function arkanoidNotePaddleDrag(session, deltaX, dtMs) {
 export function arkanoidEndPaddleDrag(session) {
     if (!session) return;
     session.dragActive = false;
+    if (session.dragVelX) {
+        session.paddleVelX = session.dragVelX;
+        session.paddleKickHold = ARK_KICK_HOLD_TICKS;
+    }
     session.dragVelX = 0;
 }
 
 function samplePaddleMotion(session) {
     var prev = session.paddleXPrev;
     if (prev == null) prev = session.paddleX;
-    session.paddleVelX = session.paddleX - prev;
+    var frameDx = session.paddleX - prev;
     session.paddleXPrev = session.paddleX;
+
+    if (session.dragActive) {
+        session.paddleVelX = session.dragVelX || 0;
+        if (session.paddleVelX) session.paddleKickHold = ARK_KICK_HOLD_TICKS;
+        return;
+    }
+
+    if (frameDx !== 0) {
+        session.paddleVelX = frameDx;
+        session.paddleKickHold = ARK_KICK_HOLD_TICKS;
+        return;
+    }
+
+    if (session.paddleKickHold > 0) {
+        session.paddleKickHold--;
+        session.paddleVelX *= ARK_KICK_DECAY;
+        if (Math.abs(session.paddleVelX) < 0.12) {
+            session.paddleVelX = 0;
+            session.paddleKickHold = 0;
+        }
+        return;
+    }
+
+    session.paddleVelX = 0;
 }
 
 function paddleEnglishVx(session) {
@@ -228,9 +262,16 @@ export function arkanoidOk(session) {
 function reflectFromPaddle(session, ball) {
     var speed = speedMult(session);
     var paddleVx = paddleEnglishVx(session);
+    var kick = paddleVx * ARK_PADDLE_VEL_K;
 
     ball.velY = -Math.abs(ball.velY);
-    ball.velX += paddleVx * ARK_PADDLE_VEL_K;
+    ball.velX += kick;
+
+    /* Silné nakopnutí určí směr odletu, i když kulička letěla opačně. */
+    if (Math.abs(kick) >= 0.16 * speed) {
+        if (kick > 0 && ball.velX < 0.2 * speed) ball.velX = 0.28 * speed;
+        if (kick < 0 && ball.velX > -0.2 * speed) ball.velX = -0.28 * speed;
+    }
 
     var maxVx = 0.64 * speed;
     if (ball.velX > maxVx) ball.velX = maxVx;
