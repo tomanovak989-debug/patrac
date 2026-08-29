@@ -16,12 +16,8 @@ export var ARK_BALL_R = 0.9;
 export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
-/** Podíl švihu pálky (delta X za snímek / tažení), který se přičte k velX kuličky. */
-export var ARK_PADDLE_ENGLISH = 0.048;
-/** Jak moc místo zásahu stáčí úhel (střed → rovně, kraj → ostře). */
-export var ARK_HIT_ANGLE = 0.18;
-/** Kolik z původního velX zůstane po odrazu (plynulost, ne statický úhel). */
-export var ARK_KEEP_INCOMING_X = 0.38;
+/** velocity.x += paddleVelocity.x * k — přenos švihu pálky na kuličku. */
+export var ARK_PADDLE_VEL_K = 0.048;
 
 function buildInitialBricks() {
     var rows = [];
@@ -230,29 +226,21 @@ export function arkanoidOk(session) {
 }
 
 function reflectFromPaddle(session, ball) {
-    var center = session.paddleX + (ARK_PADDLE_W / 2);
-    var hit = (ball.x - center) / (ARK_PADDLE_W / 2);
-    if (hit < -1) hit = -1;
-    if (hit > 1) hit = 1;
-
     var speed = speedMult(session);
-    var english = paddleEnglishVx(session);
-    var vx = (ball.velX * ARK_KEEP_INCOMING_X) +
-        (hit * ARK_HIT_ANGLE * speed) +
-        (english * ARK_PADDLE_ENGLISH);
-    var maxVx = 0.64 * speed;
-    if (vx > maxVx) vx = maxVx;
-    if (vx < -maxVx) vx = -maxVx;
+    var paddleVx = paddleEnglishVx(session);
 
-    var vy = -Math.abs(ball.velY);
-    if (Math.abs(english) > 2) vy -= 0.035 * speed;
+    ball.velY = -Math.abs(ball.velY);
+    ball.velX += paddleVx * ARK_PADDLE_VEL_K;
+
+    var maxVx = 0.64 * speed;
+    if (ball.velX > maxVx) ball.velX = maxVx;
+    if (ball.velX < -maxVx) ball.velX = -maxVx;
+
     var minUp = -0.16 * speed;
     var maxUp = -0.58 * speed;
-    if (vy > minUp) vy = minUp;
-    if (vy < maxUp) vy = maxUp;
+    if (ball.velY > minUp) ball.velY = minUp;
+    if (ball.velY < maxUp) ball.velY = maxUp;
 
-    ball.velX = vx;
-    ball.velY = vy;
     ball.y = ARK_H - 6;
 }
 
