@@ -259,7 +259,7 @@ export function arkanoidOk(session) {
     return false;
 }
 
-function reflectFromPaddle(session, ball) {
+export function handlePaddleCollision(session, ball) {
     var speed = speedMult(session);
     var paddleVx = paddleEnglishVx(session);
     var kick = paddleVx * ARK_PADDLE_VEL_K;
@@ -323,7 +323,7 @@ function tickBall(session, ball) {
         ball.x >= session.paddleX - 0.5 &&
         ball.x <= session.paddleX + ARK_PADDLE_W + 0.5 &&
         ball.velY > 0) {
-        reflectFromPaddle(session, ball);
+        handlePaddleCollision(session, ball);
         return 'paddle';
     }
 
