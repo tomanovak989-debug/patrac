@@ -289,6 +289,7 @@ var snakeTimerMs = null;
 var arkanoidSession = null;
 var arkanoidTimer = null;
 var arkanoidSteerDir = null;
+var exitConfirm = null;
 var decoderSession = null;
 var beaconSession = null;
 var beaconActive = null;
@@ -1227,7 +1228,10 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'autoscan_close') {
-        handleAutoscanClose();
+        beginExitConfirm('autoscan', function() {
+            popOsLeaf('autoscan');
+            handleAutoscanClose();
+        });
         return true;
     }
     if (result.effect === 'autoscan_ok') {
@@ -1286,7 +1290,10 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'snake_close') {
-        closeSnakeScreen();
+        beginExitConfirm('snake', function() {
+            popOsLeaf('snake');
+            closeSnakeScreen();
+        });
         return true;
     }
     if (result.effect === 'snake_dir') {
@@ -1303,7 +1310,10 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'arkanoid_close') {
-        closeArkanoidScreen();
+        beginExitConfirm('arkanoid', function() {
+            popOsLeaf('arkanoid');
+            closeArkanoidScreen();
+        });
         return true;
     }
     if (result.effect === 'arkanoid_paddle') {
@@ -1320,7 +1330,10 @@ function applyRadioOsEffect(result) {
         return true;
     }
     if (result.effect === 'decoder_close') {
-        closeDecoderScreen();
+        beginExitConfirm('decoder', function() {
+            popOsLeaf('decoder');
+            closeDecoderScreen();
+        });
         return true;
     }
     if (result.effect === 'decoder_left') {
@@ -1867,6 +1880,42 @@ function renderDisplayCore() {
         clearExtraDisplayLines();
         if (footerWrap) footerWrap.textContent = editView.footer || 'OK · uložit';
         updateInputForMode();
+        return;
+    }
+
+    if (isExitConfirmActive()) {
+        hideAppBoards();
+        if (screen) {
+            screen.classList.toggle('is-menu', true);
+            screen.classList.toggle('is-snake', false);
+            screen.classList.toggle('is-arkanoid', false);
+            screen.classList.toggle('is-decoder', false);
+            screen.classList.toggle('is-standby', false);
+            screen.classList.toggle('is-field-edit', false);
+        }
+        clearStandbyDisplayLayout(f, k, buf, p);
+        setDisplayMenuLines([
+            'UKONČIT?',
+            '',
+            exitConfirm.focus === 0 ? '▸ ANO' : '  ANO',
+            exitConfirm.focus === 1 ? '▸ NE' : '  NE',
+            '',
+            ''
+        ], exitConfirm.focus === 0 ? 2 : 3);
+        if (ch) ch.textContent = '';
+        updateRadioStatusWidgets(state, osView);
+        if (sig) {
+            sig.textContent = '';
+            sig.classList.remove('is-tuned', 'is-standby');
+        }
+        if (nodeEl) {
+            nodeEl.textContent = '';
+            nodeEl.style.visibility = 'hidden';
+        }
+        if (footerWrap) footerWrap.textContent = 'OK volba · Zpět = ano';
+        updateInputForMode();
+        updateChargeButtonUi();
+        requestAnimationFrame(applyDisplayTypography);
         return;
     }
 
@@ -3066,6 +3115,10 @@ function ensureSnakeTimer() {
             stopSnakeTimer();
             return;
         }
+        if (isExitConfirmActive()) {
+            renderDisplay();
+            return;
+        }
         if (snakeSession.alive) {
             var tickResult = snakeTick(snakeSession);
             if (tickResult === 'ate' || tickResult === 'level') snakeEatPulse();
@@ -3094,6 +3147,9 @@ function gamePadDigitToDirection(digit) {
 function handleGamePadDigit(keyId) {
     var dir = gamePadDigitToDirection(keyId);
     if (!dir) return false;
+    if (isArkanoidMenuOpen() && (dir === 'left' || dir === 'right')) {
+        return true;
+    }
     if (isSnakeMenuOpen() || isArkanoidMenuOpen()) {
         handleRadioOsInput(dir);
         return true;
@@ -3165,6 +3221,10 @@ function startArkanoidTimer() {
             stopArkanoidTimer();
             return;
         }
+        if (isExitConfirmActive()) {
+            renderDisplay();
+            return;
+        }
         if (arkanoidSession.alive) {
             if (arkanoidSteerDir) arkanoidMovePaddle(arkanoidSession, arkanoidSteerDir);
             arkanoidTick(arkanoidSession);
@@ -3183,7 +3243,67 @@ function openArkanoidScreen() {
     renderDisplay();
 }
 
+function isExitConfirmActive() {
+    return !!(exitConfirm && exitConfirm.active);
+}
+
+function popOsLeaf(leaf) {
+    if (radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] === leaf) {
+        radioOs.menuPath.pop();
+    }
+}
+
+function beginExitConfirm(leaf, onYes) {
+    if (isExitConfirmActive()) {
+        confirmExitYes();
+        return;
+    }
+    if (leaf && radioOs && radioOs.menuPath && radioOs.menuPath[radioOs.menuPath.length - 1] !== leaf) {
+        radioOs.menuPath.push(leaf);
+    }
+    stopArkanoidSteer();
+    exitConfirm = { active: true, focus: 0, onYes: onYes };
+    renderDisplay();
+}
+
+function confirmExitYes() {
+    var fn = exitConfirm && exitConfirm.onYes;
+    exitConfirm = null;
+    if (typeof fn === 'function') fn();
+    else renderDisplay();
+}
+
+function confirmExitNo() {
+    exitConfirm = null;
+    renderDisplay();
+}
+
+function handleExitConfirmInput(action) {
+    if (!isExitConfirmActive()) return false;
+    if (action === 'back') {
+        confirmExitYes();
+        return true;
+    }
+    if (action === 'ok') {
+        if (exitConfirm.focus === 0) confirmExitYes();
+        else confirmExitNo();
+        return true;
+    }
+    if (action === 'up' || action === 'left') {
+        exitConfirm.focus = 0;
+        renderDisplay();
+        return true;
+    }
+    if (action === 'down' || action === 'right') {
+        exitConfirm.focus = 1;
+        renderDisplay();
+        return true;
+    }
+    return true;
+}
+
 function startArkanoidSteer(dir) {
+    if (isExitConfirmActive()) return;
     if (dir !== 'left' && dir !== 'right') return;
     arkanoidSteerDir = dir;
     if (arkanoidSession && arkanoidSession.alive) {
@@ -3411,6 +3531,19 @@ function handleCommsOk() {
     }
 }
 
+function applyCommsBack() {
+    var session = ensureCommsSession();
+    var next = commsBackScreen(session);
+    if (next === 'exit') {
+        popOsLeaf('comms');
+        commsSession = createCommsState();
+    } else {
+        session.screen = next;
+        session.focusIndex = 0;
+    }
+    renderDisplay();
+}
+
 function handleCommsBack() {
     if (fieldEditSession && fieldEditSession.returnTo === 'comms') {
         handleFieldEditBackAction();
@@ -3418,14 +3551,11 @@ function handleCommsBack() {
     }
     var session = ensureCommsSession();
     var next = commsBackScreen(session);
-    if (next === 'exit') {
-        radioOs.menuPath.pop();
-        commsSession = createCommsState();
-    } else {
-        session.screen = next;
-        session.focusIndex = 0;
+    if (next === 'exit' || session.screen === COMMS_COMPOSE) {
+        beginExitConfirm('comms', applyCommsBack);
+        return;
     }
-    renderDisplay();
+    applyCommsBack();
 }
 
 function handleCommsClose() {
@@ -3442,6 +3572,7 @@ function cancelFieldEditSession() {
 }
 
 function returnRadioToStandby() {
+    exitConfirm = null;
     cancelFieldEditSession();
     if (presetEditDraft) {
         var c = getCtx();
@@ -3502,6 +3633,8 @@ function handleRadioOsInput(action) {
         }
         return false;
     }
+
+    if (isExitConfirmActive()) return handleExitConfirmInput(action);
 
     if (action === 'open_menu') clearMenuDial(menuDial);
 
@@ -4593,6 +4726,7 @@ function bindKeypad() {
     bindRadioDialGestures();
     bindDpadNavigation();
     bindArkanoidDpadHold();
+    bindArkanoidKeypadHold();
     bindRadioTouchFallback();
     bindRadioKeyboard();
     bindRadioKeyT9();
@@ -4754,6 +4888,10 @@ function handleRadioOkPress() {
 function handleRadioBackPress() {
     var input = el('chat-input-field');
     if (state.operatingMode === 'off' || isPowerAnimActive(powerAnim)) return;
+    if (isExitConfirmActive()) {
+        confirmExitYes();
+        return;
+    }
     if (standbyPttActive) {
         cancelStandbyPtt();
         return;
@@ -4813,7 +4951,12 @@ function bindRadioKeyboard() {
             var padDir = gamePadDigitToDirection(e.key);
             if (padDir) {
                 e.preventDefault();
+                if (e.repeat) return;
                 radioKeyFeedback('key');
+                if (isArkanoidMenuOpen() && (padDir === 'left' || padDir === 'right')) {
+                    startArkanoidSteer(padDir);
+                    return;
+                }
                 handleRadioOsInput(padDir);
                 return;
             }
@@ -4837,7 +4980,9 @@ function bindRadioKeyboard() {
         }
     });
     window.addEventListener('keyup', function(e) {
-        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') stopArkanoidSteer();
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === '4' || e.key === '6') {
+            stopArkanoidSteer();
+        }
     });
 }
 
@@ -4869,6 +5014,36 @@ function bindArkanoidDpadHold() {
 
     zone.addEventListener('pointerup', endSteer, true);
     zone.addEventListener('pointercancel', endSteer, true);
+}
+
+function bindArkanoidKeypadHold() {
+    var grid = el('radio-keypad-grid');
+    if (!grid || grid._arkPadSteerBound) return;
+    grid._arkPadSteerBound = true;
+    var pointerId = null;
+
+    grid.addEventListener('pointerdown', function(e) {
+        if (!isArkanoidMenuOpen() || !arkanoidSession || !arkanoidSession.alive) return;
+        if (isExitConfirmActive() || e.button !== 0) return;
+        var btn = e.target.closest('[data-key="4"], [data-key="6"]');
+        if (!btn || !grid.contains(btn)) return;
+        var dir = gamePadDigitToDirection(btn.getAttribute('data-key'));
+        if (dir !== 'left' && dir !== 'right') return;
+        pointerId = e.pointerId;
+        try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+        startArkanoidSteer(dir);
+        e.preventDefault();
+        e.stopPropagation();
+    }, true);
+
+    function endPadSteer(e) {
+        if (pointerId != null && e && e.pointerId !== pointerId) return;
+        pointerId = null;
+        stopArkanoidSteer();
+    }
+
+    grid.addEventListener('pointerup', endPadSteer, true);
+    grid.addEventListener('pointercancel', endPadSteer, true);
 }
 
 function bindDpadNavigation() {
