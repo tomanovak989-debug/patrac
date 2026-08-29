@@ -16,8 +16,12 @@ export var ARK_BALL_R = 0.9;
 export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
-/** velocity.x += paddleVelocity.x * k — přenos švihu pálky na kuličku. */
+/** Přepočet delty pálky (jednotky hřiště / snímek) na rychlost kuličky. */
 export var ARK_PADDLE_VEL_K = 0.078;
+/** Kinetický přenos hybnosti v ose X — pálka je těžší, kulička převezme impuls. */
+export var ARK_BALL_MASS = 1;
+export var ARK_PADDLE_MASS = 2.8;
+export var ARK_PADDLE_RESTITUTION = 0.38;
 /** Kolik snímků ještě platí švih po zastavení pálky (ať jde stihnout nakopnutí). */
 export var ARK_KICK_HOLD_TICKS = 4;
 export var ARK_KICK_DECAY = 0.68;
@@ -261,17 +265,15 @@ export function arkanoidOk(session) {
 
 export function handlePaddleCollision(session, ball) {
     var speed = speedMult(session);
-    var paddleVx = paddleEnglishVx(session);
-    var kick = paddleVx * ARK_PADDLE_VEL_K;
+    var paddleU = paddleEnglishVx(session) * ARK_PADDLE_VEL_K;
 
     ball.velY = -Math.abs(ball.velY);
-    ball.velX += kick;
 
-    /* Silné nakopnutí určí směr odletu, i když kulička letěla opačně. */
-    if (Math.abs(kick) >= 0.16 * speed) {
-        if (kick > 0 && ball.velX < 0.2 * speed) ball.velX = 0.28 * speed;
-        if (kick < 0 && ball.velX > -0.2 * speed) ball.velX = -0.28 * speed;
-    }
+    /* 1) Kinetický přenos hybnosti — impuls z pohybu pálky do velX kuličky. */
+    var relVx = ball.velX - paddleU;
+    var reduced = (ARK_BALL_MASS * ARK_PADDLE_MASS) / (ARK_BALL_MASS + ARK_PADDLE_MASS);
+    var impulse = -(1 + ARK_PADDLE_RESTITUTION) * relVx * reduced;
+    ball.velX += impulse / ARK_BALL_MASS;
 
     var maxVx = 0.64 * speed;
     if (ball.velX > maxVx) ball.velX = maxVx;
