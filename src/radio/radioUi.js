@@ -186,13 +186,17 @@ import {
     createArkanoidState,
     resetArkanoidState,
     arkanoidMovePaddle,
+    arkanoidSetPaddleX,
+    arkanoidNotePaddleDrag,
+    arkanoidEndPaddleDrag,
     arkanoidTick,
     arkanoidOk,
     buildArkanoidCellGrid,
     ARK_TICK_MS,
     ARK_CELL_COUNT,
     ARK_W,
-    ARK_H
+    ARK_H,
+    ARK_PADDLE_W
 } from './radioArkanoid.js';
 import {
     createDecoderState,
@@ -2911,7 +2915,67 @@ function ensureArkanoidBoard() {
         rebuildAppBoardCells(innerEl, ARK_CELL_COUNT, 'radio-app-cell radio-arkanoid-cell');
         arkanoidBoardReady = true;
     }
+    bindArkanoidPaddleDrag(board);
     return board;
+}
+
+function bindArkanoidPaddleDrag(board) {
+    if (!board || board._arkDragBound) return;
+    board._arkDragBound = true;
+    var tracking = false;
+    var pointerId = null;
+    var lastT = 0;
+
+    function clientToPaddleX(clientX) {
+        var inner = board.querySelector('.radio-app-board-inner') || board;
+        var rect = inner.getBoundingClientRect();
+        if (!rect.width) return null;
+        return ((clientX - rect.left) / rect.width) * ARK_W - (ARK_PADDLE_W / 2);
+    }
+
+    board.addEventListener('pointerdown', function(e) {
+        if (!isArkanoidMenuOpen() || !arkanoidSession || !arkanoidSession.alive) return;
+        if (e.button !== 0) return;
+        tracking = true;
+        pointerId = e.pointerId;
+        lastT = Date.now();
+        try { board.setPointerCapture(e.pointerId); } catch (err) {}
+        var px = clientToPaddleX(e.clientX);
+        if (px != null) {
+            var before = arkanoidSession.paddleX;
+            arkanoidSetPaddleX(arkanoidSession, px);
+            arkanoidNotePaddleDrag(arkanoidSession, arkanoidSession.paddleX - before, ARK_TICK_MS);
+            renderDisplay();
+        }
+        e.preventDefault();
+    });
+
+    board.addEventListener('pointermove', function(e) {
+        if (!tracking || e.pointerId !== pointerId || !arkanoidSession) return;
+        var px = clientToPaddleX(e.clientX);
+        if (px == null) return;
+        var now = Date.now();
+        var before = arkanoidSession.paddleX;
+        arkanoidSetPaddleX(arkanoidSession, px);
+        arkanoidNotePaddleDrag(arkanoidSession, arkanoidSession.paddleX - before, now - lastT);
+        lastT = now;
+        renderDisplay();
+        e.preventDefault();
+    });
+
+    function endDrag(e) {
+        if (!tracking) return;
+        if (e && pointerId != null && e.pointerId !== pointerId) return;
+        tracking = false;
+        pointerId = null;
+        if (arkanoidSession) arkanoidEndPaddleDrag(arkanoidSession);
+        if (e) {
+            try { board.releasePointerCapture(e.pointerId); } catch (err) {}
+        }
+    }
+
+    board.addEventListener('pointerup', endDrag);
+    board.addEventListener('pointercancel', endDrag);
 }
 
 function hideAppBoards() {
@@ -3100,7 +3164,7 @@ function startArkanoidTimer() {
             stopArkanoidTimer();
             return;
         }
-        if (arkanoidSession.alive && !arkanoidSession.waiting) {
+        if (arkanoidSession.alive) {
             arkanoidTick(arkanoidSession);
         }
         renderDisplay();

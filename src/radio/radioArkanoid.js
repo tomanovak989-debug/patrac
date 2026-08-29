@@ -16,9 +16,7 @@ export var ARK_BALL_R = 0.9;
 export var ARK_BASE_VX = 0.26;
 export var ARK_BASE_VY = 0.288;
 export var ARK_BRICKS_PER_BALL = 5;
-/** Jak dlouho po kroku pálky ještě platí „švih“ (english). */
-export var ARK_ENGLISH_MS = 320;
-/** Podíl švihu pálky, který se přičte k velX kuličky. */
+/** Podíl švihu pálky (delta X za snímek / tažení), který se přičte k velX kuličky. */
 export var ARK_PADDLE_ENGLISH = 0.048;
 /** Jak moc místo zásahu stáčí úhel (střed → rovně, kraj → ostře). */
 export var ARK_HIT_ANGLE = 0.18;
@@ -62,8 +60,10 @@ function createBall(session, waiting, velSign) {
 export function createArkanoidState() {
     var session = {
         paddleX: 16,
+        paddleXPrev: 16,
         paddleVelX: 0,
-        paddleMovedAt: 0,
+        dragActive: false,
+        dragVelX: 0,
         balls: [createBall({ paddleX: 16, level: 1 }, true, 1)],
         bricks: buildInitialBricks(),
         score: 0,
@@ -91,8 +91,10 @@ export function resetArkanoidState(session) {
     if (!session) return createArkanoidState();
     var fresh = createArkanoidState();
     session.paddleX = fresh.paddleX;
+    session.paddleXPrev = fresh.paddleX;
     session.paddleVelX = 0;
-    session.paddleMovedAt = 0;
+    session.dragActive = false;
+    session.dragVelX = 0;
     session.balls = fresh.balls;
     session.bricks = fresh.bricks;
     session.score = 0;
@@ -103,25 +105,56 @@ export function resetArkanoidState(session) {
     return session;
 }
 
-export function arkanoidMovePaddle(session, dir) {
+function clampPaddleX(x) {
+    if (x < 0) return 0;
+    if (x > ARK_W - ARK_PADDLE_W) return ARK_W - ARK_PADDLE_W;
+    return x;
+}
+
+export function arkanoidSetPaddleX(session, x) {
     if (!session || !session.alive) return false;
-    var delta = dir === 'right' ? ARK_PADDLE_STEP : -ARK_PADDLE_STEP;
-    var next = session.paddleX + delta;
-    if (next < 0) next = 0;
-    if (next > ARK_W - ARK_PADDLE_W) next = ARK_W - ARK_PADDLE_W;
+    var next = clampPaddleX(x);
     if (next === session.paddleX) return false;
-    session.paddleVelX = next - session.paddleX;
-    session.paddleMovedAt = Date.now();
     session.paddleX = next;
     if (session.waiting) syncWaitingBalls(session);
     return true;
 }
 
+export function arkanoidMovePaddle(session, dir) {
+    if (!session || !session.alive) return false;
+    var delta = dir === 'right' ? ARK_PADDLE_STEP : -ARK_PADDLE_STEP;
+    var next = clampPaddleX(session.paddleX + delta);
+    if (next === session.paddleX) return false;
+    session.paddleVelX = next - session.paddleX;
+    session.paddleX = next;
+    if (session.waiting) syncWaitingBalls(session);
+    return true;
+}
+
+/** Tažení prstem/myší — delta v jednotkách hřiště, přepočtená na jeden snímek. */
+export function arkanoidNotePaddleDrag(session, deltaX, dtMs) {
+    if (!session) return;
+    session.dragActive = true;
+    var dt = dtMs && dtMs > 0 ? dtMs : ARK_TICK_MS;
+    session.dragVelX = deltaX * (ARK_TICK_MS / dt);
+}
+
+export function arkanoidEndPaddleDrag(session) {
+    if (!session) return;
+    session.dragActive = false;
+    session.dragVelX = 0;
+}
+
+function samplePaddleMotion(session) {
+    var prev = session.paddleXPrev;
+    if (prev == null) prev = session.paddleX;
+    session.paddleVelX = session.paddleX - prev;
+    session.paddleXPrev = session.paddleX;
+}
+
 function paddleEnglishVx(session) {
-    var age = Date.now() - (session.paddleMovedAt || 0);
-    if (age < 0 || age > ARK_ENGLISH_MS) return 0;
-    var freshness = 1 - (age / ARK_ENGLISH_MS);
-    return (session.paddleVelX || 0) * freshness;
+    if (session.dragActive) return session.dragVelX || 0;
+    return session.paddleVelX || 0;
 }
 
 function brickAt(session, bx, by) {
@@ -272,6 +305,7 @@ function tickBall(session, ball) {
 
 export function arkanoidTick(session) {
     if (!session || !session.alive) return false;
+    samplePaddleMotion(session);
     if (session.waiting) return false;
     if (!session.balls || !session.balls.length) {
         session.alive = false;
@@ -376,7 +410,7 @@ function activeBallCount(session) {
 
 export function buildArkanoidOsView(session) {
     session = session || createArkanoidState();
-    var footer = session.waiting ? '◀▶ pálka · OK vystřelit' : '◀▶ · Zpět';
+    var footer = session.waiting ? '◀▶ / táhni · OK start' : '◀▶ / táhni · Zpět';
     var lv = session.level || 1;
     var status = 'ARKANOID · LV ' + lv;
     var useBoard = !!session.alive;

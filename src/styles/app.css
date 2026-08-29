@@ -2192,12 +2192,18 @@ body.theme-light #radio-display-signal.is-standby {
     height: 100% !important;
     width: 100% !important;
 }
-.sector-tech-screen.is-snake #radio-snake-board.is-visible,
-.sector-tech-screen.is-arkanoid #radio-arkanoid-board.is-visible {
+.sector-tech-screen.is-snake #radio-snake-board.is-visible {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: none !important;
+}
+.sector-tech-screen.is-arkanoid #radio-arkanoid-board.is-visible {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    touch-action: none;
 }
 .sector-tech-screen:not(.is-snake) #radio-snake-board,
 .sector-tech-screen:not(.is-arkanoid) #radio-arkanoid-board {
